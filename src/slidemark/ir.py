@@ -273,7 +273,7 @@ class Placed(Model):
       carrying their paragraphs.
     - ``Placed.style`` is already merged (theme role -> classes -> inline); colors may still be theme names,
       resolve them with ``Theme.color``. ``font_scale`` multiplies every font size of the element.
-    - Slide-level settings (background, notes, hidden, transition, ids) are read by the renderer from ``Slide``.
+    - Slide-level settings (background, notes, hidden, transition, ids) are read from ``Slide`` by the renderer.
     """
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
