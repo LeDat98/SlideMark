@@ -1,0 +1,4 @@
+{"date": "2026-10-04T17:11:54+00:00", "commit": "3e8b9d4", "metric": "syntax_tokens", "deck": "q3-review", "format": "html", "tokens_proxy": 321, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-04T17:11:54+00:00", "commit": "3e8b9d4", "metric": "syntax_tokens", "deck": "q3-review", "format": "python-pptx", "tokens_proxy": 528, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-04T17:11:54+00:00", "commit": "3e8b9d4", "metric": "syntax_tokens", "deck": "q3-review", "format": "slidemark-compact", "tokens_proxy": 158, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-04T17:11:54+00:00", "commit": "3e8b9d4", "metric": "syntax_tokens", "deck": "q3-review", "format": "slidemark-verbose", "tokens_proxy": 223, "tokens_claude": null, "tokenizer": "o200k_base"}
