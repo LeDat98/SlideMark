@@ -109,7 +109,9 @@ class ElementBase(Model):
 class Text(ElementBase):
     type: Literal["text"] = "text"
     # title/subtitle are set by the parser; others come from syntax (blockquote -> "quote", ...)
-    role: Literal["title", "subtitle", "heading", "body", "quote", "lead", "caption", "footnote"] = "body"
+    role: Literal[
+        "title", "subtitle", "heading", "body", "quote", "lead", "conclusion", "caption", "footnote"
+    ] = "body"
     paragraphs: list[Paragraph] = Field(default_factory=list)
 
 
@@ -183,16 +185,16 @@ class Raw(ElementBase):
 
 
 class Container(ElementBase):
-    """A box that lays out its children. Created by ``::: name`` fenced divs.
+    """A box that lays out its children: a ``## heading`` box, or the slide body itself.
 
-    ``name`` is the region name used by slide layouts (``left``, ``right``, ``main``, ...).
-    ``direction``/``cols`` control how children are arranged inside the container.
+    ``title`` is the box heading (``None`` for an untitled group). ``grid`` is the raw ``@`` layout spec
+    for the children (``"3"``, ``"2x2"``, ``"1:2"``, ``"aab/aac"``); ``None`` means automatic.
+    Flags such as ``flow``/``chevron`` from the ``@`` line go to ``classes``.
     """
 
     type: Literal["container"] = "container"
-    name: str | None = None
-    direction: Literal["column", "row", "grid"] = "column"
-    cols: int | None = None
+    title: Text | None = None
+    grid: str | None = None
     gap: Length | None = None
     children: list[Element] = Field(default_factory=list)
 
@@ -209,10 +211,14 @@ Container.model_rebuild()
 
 class Slide(Model):
     id: str | None = None
-    layout: str | None = None  # None = infer from content
+    layout: str | None = None  # "cover" | "section" | "blank" | "center"; None = infer from content
+    grid: str | None = None  # raw `@` grid spec for the slide's blocks; None = automatic
     title: Text | None = None
     subtitle: Text | None = None
-    elements: list[Element] = Field(default_factory=list)
+    lead: Text | None = None  # `>` right after the title
+    conclusion: Text | None = None  # `>` as the last block
+    footnotes: list[Text] = Field(default_factory=list)  # `※` / `^` lines
+    elements: list[Element] = Field(default_factory=list)  # the blocks, in source order
     notes: str | None = None
     background: str | None = None  # color, "linear-gradient(...)" or image path
     transition: str | None = None
@@ -245,6 +251,7 @@ class Deck(Model):
     lang: str | None = None  # e.g. "ja", "vi", "en"
     footer: str | None = None
     slide_number: bool = False
+    density: Literal["normal", "dense"] = "normal"
     slides: list[Slide] = Field(default_factory=list)
     attrs: dict[str, Any] = Field(default_factory=dict)
     diagnostics: list[Diagnostic] = Field(default_factory=list)

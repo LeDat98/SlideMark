@@ -4,7 +4,8 @@ from slidemark.units import slide_size, to_emu
 
 def test_deck_json_roundtrip_with_nested_containers():
     inner = Text(paragraphs=[Paragraph(runs=[Run(text="日本語")], marker="bullet")])
-    deck = Deck(slides=[Slide(elements=[Container(name="left", children=[Container(children=[inner])])])])
+    box = Container(title=Text(role="heading"), grid="aab/aac", children=[Container(children=[inner])])
+    deck = Deck(slides=[Slide(elements=[box])])
     again = Deck.model_validate_json(deck.model_dump_json())
     assert again.slides[0].elements[0].children[0].children[0].paragraphs[0].plain == "日本語"
 

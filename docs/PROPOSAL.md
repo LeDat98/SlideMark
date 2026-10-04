@@ -75,6 +75,9 @@ Cài đặt chia theo extras: `pip install slidemark` (lõi nhẹ), `slidemark[h
 
 ## 4. Cú pháp đầu vào (phác thảo)
 
+> **Đã thay thế**: cú pháp chính thức là cú pháp riêng v1 trong `docs/SYNTAX.md` (heading là cấu trúc, dòng `@` cho layout).
+> Phác thảo kiểu Slidev bên dưới chỉ để tham khảo lịch sử.
+
 Cú pháp là **Markdown + YAML front-matter + thuộc tính kiểu Pandoc `{...}` + fenced div `:::`**.
 LLM đã quen cả bốn thứ này qua Slidev, Marp, Pandoc và MyST.
 

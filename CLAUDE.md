@@ -26,6 +26,10 @@ docs entry with shortest example → parser test → fuzz-safe (no crash, diagno
 (reopen the .pptx and assert) → opens in LibreOffice → golden/gallery image looks right → lint rule if it can
 break the visual → bench has no token regression. Mark progress in `docs/FEATURES.md`.
 
+## Workflow
+- Push straight to `main` (allowed by the owner). No pull requests needed.
+- At most 2 Sonnet subagents at a time (lane A front, lane B back); see `docs/PLAN.md`.
+
 ## Rules
 - Token cost is the main product metric. New syntax must be the shortest unambiguous form; measure it.
 - Never raise on bad user input: append a `Diagnostic` with a one-line, actionable `hint`.
