@@ -32,7 +32,31 @@ Cú pháp đầy đủ: [docs/SYNTAX.md](docs/SYNTAX.md).
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Chưa có ảnh: renderer đang được xây dựng. Ảnh sẽ được `scripts/gallery.py` tạo tự động mỗi ngày.
+Cập nhật: 2026-10-04 · commit `6c9c317` · tạo tự động bởi `scripts/gallery.py`.
+
+### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
+
+Nguồn: [`examples/01-basics.md`](examples/01-basics.md)
+
+![01-basics slide 1](docs/gallery/01-basics/slide-01.png)
+![01-basics slide 2](docs/gallery/01-basics/slide-02.png)
+![01-basics slide 3](docs/gallery/01-basics/slide-03.png)
+![01-basics slide 4](docs/gallery/01-basics/slide-04.png)
+
+### Slide dày đặc kiểu Nhật (jp-business)
+
+Nguồn: [`examples/02-jp-dense.md`](examples/02-jp-dense.md)
+
+![02-jp-dense slide 1](docs/gallery/02-jp-dense/slide-01.png)
+![02-jp-dense slide 2](docs/gallery/02-jp-dense/slide-02.png)
+
+### Báo cáo tiếng Việt
+
+Nguồn: [`examples/03-vi-report.md`](examples/03-vi-report.md)
+
+![03-vi-report slide 1](docs/gallery/03-vi-report/slide-01.png)
+![03-vi-report slide 2](docs/gallery/03-vi-report/slide-02.png)
+![03-vi-report slide 3](docs/gallery/03-vi-report/slide-03.png)
 <!-- gallery:end -->
 
 ## Tài liệu

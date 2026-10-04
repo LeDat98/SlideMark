@@ -80,7 +80,10 @@ daily routine keeps climbing L4 → L7, picking the unchecked gates with the bes
 
 ## Day 1 status
 - [x] Contracts: `ir.py`, `theme.py`, `units.py`, stage stubs, `docs/SYNTAX.md` v1
-- [ ] A: parser + CLI
-- [ ] B: layout + renderer
-- [ ] Orchestrator: preview, gallery, CI, examples
-- [ ] Merge, end-to-end test, README gallery, bench
+- [x] A: parser + CLI
+- [x] B: layout + renderer
+- [x] Orchestrator: preview, gallery, CI, examples
+- [x] Merge, end-to-end test, README gallery, bench
+
+## Day 1 leftovers (carried to day 2)
+- [ ] Table/`>` after the last `##` box become children of that box and (in a chevron box) vanish: add a way to end a box + diagnostic when a visual is dropped (found in `examples/02-jp-dense.md` slide 2)

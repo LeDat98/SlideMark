@@ -13,12 +13,17 @@ def table_grid(t: Table) -> tuple[int, int, list[tuple[int, int, Cell]]]:
     Returns ``(n_rows, n_cols, [(row, col, cell), ...])`` with spans clipped to the grid.
     """
     nrows = len(t.rows)
+    # The parser emits rectangular rows (covered cells = empty placeholders); hand-built tables may omit them.
+    rect = len({len(row) for row in t.rows}) == 1
     occupied: set[tuple[int, int]] = set()
     anchors: list[tuple[int, int, Cell]] = []
     ncols = 0
     for r, row in enumerate(t.rows):
         c = 0
         for cell in row:
+            if rect and (r, c) in occupied:
+                c += 1  # placeholder of a merged cell
+                continue
             while (r, c) in occupied:
                 c += 1
             rs, cs = max(cell.rowspan, 1), max(cell.colspan, 1)

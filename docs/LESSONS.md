@@ -9,3 +9,11 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [bench] `ruff check --fix` silently rewrote a bench corpus file (removed an unused import, 528 → 518 tokens) → `bench/corpus` is excluded from ruff; corpus files are data, never auto-format them.
 - [syntax] Own syntax v1 replaced Slidev-style `---` + YAML + `:::` (2026-10-04): headings carry structure, an `@` grid line replaces containers. Bench: q3 deck 155 tokens (30% of python-pptx), dense JP deck 482 vs HTML 828.
 - [env] Sandbox ships only libreoffice-core: `soffice` fails with "source file could not be loaded" for .pptx → `apt-get install -y libreoffice-impress` first (routine setup).
+- [parser] `>`/`|` right under a list or paragraph are swallowed by markdown-it lazy continuation → the line scanner flushes the text block before them.
+- [parser] An unclosed code fence swallows every later slide → escape the fence line and warn.
+- [parser] PyYAML turns `16:9` and `num: on` into int/bool → front-matter loader keeps every scalar a string; markdown-it needs `code`, `lheading`, `reference` rules off and `html=False`.
+- [render] python-pptx autoshapes carry `p:style` and LibreOffice draws a shadow → remove `p:style`, set fill/line explicitly.
+- [render] Children of `a:rPr`/`a:tcPr` must follow schema order (highlight, latin, ea, hlinkClick, borders) or PowerPoint asks to repair → use ordered inserts.
+- [render] python-pptx has no data labels for XY series, and `XY_SCATTER` renders as lines unless series line is no-fill.
+- [layout] Parser emits rectangular tables (covered cells = empty placeholders) while hand-built IR may omit them → `table_grid` handles both.
+- [parser] Content after the last `##` of a slide is a child of that box (a table after chevron boxes vanishes) → needs an explicit box terminator (day 2).

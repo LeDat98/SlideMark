@@ -18,10 +18,10 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 | L7 | Breakthrough | Agent decks rival top human designers at near-minimal token cost |
 
 ## L1: Works (target: day 2)
-- [ ] Title, text, nested lists, inline styles, images, tables with merges, code, charts, notes → native objects
-- [ ] Every example deck opens in LibreOffice without errors; `ruff` + `pytest` green in CI
-- [ ] README gallery regenerated from `examples/` daily
-- [ ] Syntax tokens ≤ 35% of python-pptx on the corpus
+- [x] Title, text, nested lists, inline styles, images, tables with merges, code, charts, notes → native objects
+- [ ] Every example deck opens in LibreOffice without errors; `ruff` + `pytest` green in CI  (LibreOffice ok; CI not yet seen green)
+- [x] README gallery regenerated from `examples/` daily
+- [x] Syntax tokens ≤ 35% of python-pptx on the corpus
 
 ## L2: Looks good by default (target: day 4)
 - [ ] Layout inferred for ≥ 90% of example slides (no `layout:` written)
