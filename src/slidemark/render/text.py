@@ -1,0 +1,193 @@
+"""Paragraphs and runs -> DrawingML text, with native bullets, fonts (latin + ea) and hyperlinks."""
+
+from __future__ import annotations
+
+import uuid
+
+from lxml import etree
+from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
+from pptx.oxml.ns import qn
+from pptx.util import Emu, Pt
+
+from ..ir import Paragraph, Run, Style
+from ..layout import measure
+from .util import RenderCtx, emu, hex6, rgb
+
+_RPR_ORDER = [
+    "ln",
+    "noFill",
+    "solidFill",
+    "gradFill",
+    "blipFill",
+    "pattFill",
+    "grpFill",
+    "effectLst",
+    "effectDag",
+    "highlight",
+    "uLnTx",
+    "uLn",
+    "uFillTx",
+    "uFill",
+    "latin",
+    "ea",
+    "cs",
+    "sym",
+    "hlinkClick",
+    "hlinkMouseOver",
+    "rtl",
+    "extLst",
+]
+_ALIGN = {
+    "left": PP_ALIGN.LEFT,
+    "center": PP_ALIGN.CENTER,
+    "right": PP_ALIGN.RIGHT,
+    "justify": PP_ALIGN.JUSTIFY,
+}
+_ANCHOR = {"top": MSO_ANCHOR.TOP, "middle": MSO_ANCHOR.MIDDLE, "bottom": MSO_ANCHOR.BOTTOM}
+_LANG = {
+    "ja": "ja-JP",
+    "vi": "vi-VN",
+    "en": "en-US",
+    "zh": "zh-CN",
+    "ko": "ko-KR",
+    "fr": "fr-FR",
+    "de": "de-DE",
+}
+_BULLETS = ["•", "–", "•", "–"]
+_NUMBERING = ["arabicPeriod", "alphaLcParenR", "romanLcPeriod", "arabicPeriod"]
+
+
+def insert_rpr_child(rpr, child) -> None:
+    """Insert ``child`` into an rPr honoring the schema sequence."""
+    name = etree.QName(child).localname
+    idx = _RPR_ORDER.index(name)
+    for existing in list(rpr):
+        en = etree.QName(existing).localname
+        if en in _RPR_ORDER and _RPR_ORDER.index(en) > idx:
+            existing.addprevious(child)
+            return
+    rpr.append(child)
+
+
+def _lang_for(text: str, deck_lang: str | None) -> str:
+    if deck_lang:
+        return _LANG.get(deck_lang.lower().split("-")[0], deck_lang)
+    for ch in text:
+        o = ord(ch)
+        if 0x3040 <= o <= 0x30FF:
+            return "ja-JP"
+        if 0xAC00 <= o <= 0xD7AF:
+            return "ko-KR"
+        if 0x4E00 <= o <= 0x9FFF:
+            return "ja-JP"
+    return "en-US"
+
+
+def _format_run(rc: RenderCtx, r, run: Run, style: Style, size_pt: float, text: str) -> None:
+    theme = rc.theme
+    f = r.font
+    f.size = Pt(size_pt)
+    bold = bool(run.bold or style.bold)
+    italic = bool(run.italic or style.italic)
+    f.bold = True if bold else None
+    f.italic = True if italic else None
+    if run.underline:
+        f.underline = True
+    color = run.color or style.color
+    f.color.rgb = rgb(theme, color, "#000000")
+    rpr = r._r.get_or_add_rPr()
+    if run.strike:
+        rpr.set("strike", "sngStrike")
+    if run.sup:
+        rpr.set("baseline", "30000")
+    elif run.sub:
+        rpr.set("baseline", "-25000")
+    lang = _lang_for(text, rc.deck.lang)
+    rpr.set("lang", lang)
+    rpr.set("altLang", "en-US")
+    if run.highlight:
+        hl = etree.SubElement(rpr, qn("a:highlight"))
+        etree.SubElement(hl, qn("a:srgbClr")).set("val", hex6(theme, run.highlight, "#FFFF00"))
+        rpr.remove(hl)
+        insert_rpr_child(rpr, hl)
+    latin = theme.fonts.mono if run.code else (style.font or theme.fonts.body)
+    ea = style.font_ea or theme.fonts.ea
+    for tag, face in (("a:latin", latin), ("a:ea", ea)):
+        el = etree.Element(qn(tag))
+        el.set("typeface", face)
+        insert_rpr_child(rpr, el)
+    if run.link:
+        if run.link.startswith("#"):
+            rc.links.append((r._r, rpr, run.link[1:], rc.slide_index))
+        else:
+            r.hyperlink.address = run.link
+
+
+def _set_bullet(para, p: Paragraph, size_pt: float) -> None:
+    pPr = para._p.get_or_add_pPr()
+    if p.marker:
+        marL, indent = measure.list_indent(size_pt, p.level)
+        pPr.set("marL", str(marL))
+        pPr.set("indent", str(indent))
+        lvl = min(p.level, 3)
+        if p.marker == "bullet":
+            bf = etree.SubElement(pPr, qn("a:buFont"))
+            bf.set("typeface", "Arial")
+            etree.SubElement(pPr, qn("a:buChar")).set("char", _BULLETS[lvl])
+        else:
+            etree.SubElement(pPr, qn("a:buFont")).set("typeface", "+mj-lt")
+            etree.SubElement(pPr, qn("a:buAutoNum")).set("type", _NUMBERING[lvl])
+    else:
+        pPr.set("marL", "0")
+        pPr.set("indent", "0")
+        etree.SubElement(pPr, qn("a:buNone"))
+
+
+def fill_text(
+    rc: RenderCtx,
+    tf,
+    paragraphs: list[Paragraph],
+    style: Style,
+    scale: float = 1.0,
+    *,
+    para_gap: bool = True,
+    field: str | None = None,
+    inset: int | None = None,
+) -> None:
+    """Write ``paragraphs`` into text frame ``tf`` using the (already merged) ``style``."""
+    tf.word_wrap = True
+    tf.auto_size = MSO_AUTO_SIZE.NONE
+    pad = inset if inset is not None else emu(style.padding, default=0) if style.padding is not None else 0
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = Emu(pad)
+    tf.vertical_anchor = _ANCHOR.get(style.valign or "top", MSO_ANCHOR.TOP)
+    paras = paragraphs or [Paragraph()]
+    for i, p in enumerate(paras):
+        para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        pst = style.merged(p.style)
+        size = (pst.font_size or 18) * scale
+        para.alignment = _ALIGN.get(pst.align or "left", PP_ALIGN.LEFT)
+        if pst.line_spacing:
+            para.line_spacing = pst.line_spacing
+        para.space_before = Pt(size * measure.PARA_GAP) if (i > 0 and para_gap) else Pt(0)
+        para.space_after = Pt(0)
+        _set_bullet(para, p, size)
+        first_text = ""
+        for run in p.runs:
+            segs = run.text.replace("\r", "").replace("\v", "\n").split("\n")
+            for k, seg in enumerate(segs):
+                if k > 0:
+                    para.add_line_break()
+                if seg == "" and len(segs) > 1:
+                    continue
+                r = para.add_run()
+                r.text = seg
+                _format_run(rc, r, run, pst, size, seg)
+                first_text = first_text or seg
+                if field == "slide_number":
+                    fld = r._r
+                    fld.tag = qn("a:fld")
+                    fld.set("id", "{" + str(uuid.uuid4()).upper() + "}")
+                    fld.set("type", "slidenum")
+        end = etree.SubElement(para._p, qn("a:endParaRPr"))
+        end.set("lang", _lang_for(first_text, rc.deck.lang))
+        end.set("sz", str(round(size * 100)))
