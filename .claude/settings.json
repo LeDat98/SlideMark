@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv:*)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(.venv/bin/pytest:*)",
+      "Bash(.venv/bin/ruff:*)",
+      "Bash(.venv/bin/slidemark:*)",
+      "Bash(python3:*)",
+      "Bash(soffice:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git merge:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)",
+      "Bash(git worktree:*)",
+      "Bash(git push origin main)"
+    ]
+  }
+}
