@@ -31,6 +31,10 @@ SlideMark nhắm vào khoảng trống đó.
    khung, chữ khó đọc vì tương phản thấp... trước khi người dùng mở file ra.
 5. **Đúng chuẩn OOXML.** File phải mở được trong PowerPoint mà không hiện thông báo "repair".
    Đây là rủi ro kỹ thuật lớn nhất (xem mục 9).
+6. **Tiết kiệm token là thước đo giá trị số một.** Mọi cú pháp mới đều phải có số token đo được, và không được làm
+   tăng tổng chi phí của Agent. Chi phí ở đây gồm token đọc docs, token sinh deck và token cho các lần sửa lỗi
+   (xem mục 4b và 8b).
+7. **Mỗi chức năng phải đi qua đủ quy trình kiểm thử** thì mới được tính là xong (xem mục 8).
 
 ## 3. Kiến trúc
 
@@ -145,6 +149,52 @@ Những phần chính của cú pháp:
 Song song với Markdown, Agent có thể đưa **JSON/YAML theo đúng IR schema** để kiểm soát chính xác tuyệt đối,
 hoặc dùng **Python API** (`Deck().slide(...).add_chart(...)`).
 
+## 4b. Thiết kế để Agent tốn ít token nhất
+
+### Số đo ban đầu
+
+Cùng một deck 3 slide (title + notes, bullet kèm bar chart, bảng), đo bằng `bench/count_tokens.py`
+với tokenizer proxy `o200k_base`:
+
+| Cách viết | Token | So với python-pptx |
+|---|---:|---:|
+| SlideMark compact (cú pháp đề xuất) | 158 | **30%** |
+| SlideMark verbose (YAML đầy đủ) | 223 | 42% |
+| HTML + data-attribute | 321 | 61% |
+| Code python-pptx (cách Agent hay làm hiện nay) | 528 | 100% |
+
+Bản python-pptx ở trên chưa hề có theme hay căn chỉnh. Nếu muốn đẹp tương đương thì nó còn dài hơn nhiều,
+nên khoảng cách thực tế sẽ lớn hơn con số trong bảng.
+
+### Chi phí cần tối ưu là tổng của cả vòng làm việc
+
+```
+Chi phí = token đọc docs/skill (input, đọc một lần)
+        + token sinh deck (output, đắt hơn input khoảng 5 lần)
+        + số lần sửa × (token đọc lỗi + token sinh lại)
+```
+
+Token output đắt nhất, nên ưu tiên giảm nó. Tuy vậy, một cú pháp quá ngắn mà dễ viết sai sẽ làm tăng số lần sửa,
+và tổng chi phí khi đó còn cao hơn. Vì vậy luôn đo **tổng chi phí**, không chỉ đo độ dài cú pháp.
+
+### Các quy tắc thiết kế
+
+1. **Mặc định thông minh.** Không khai báo gì thì vẫn ra slide đẹp. Layout được **suy ra từ nội dung**
+   (heading + list + chart thì thành hai cột; chỉ có heading thì thành slide section; một con số lớn thì thành big-number).
+   Agent chỉ ghi `layout:` khi muốn khác mặc định. Front-matter cũng không bắt buộc.
+2. **Dữ liệu viết dạng CSV, không dùng YAML.** Chart viết là ` ```bar ` kèm vài dòng CSV, thay cho khối YAML.
+   Bảng nhận cả Markdown lẫn CSV.
+3. **Tên ngắn, alias dài vẫn được chấp nhận.** Ví dụ `w`/`width`, `bg`/`background`. Docs chỉ dạy dạng ngắn.
+4. **Viết một lần, dùng nhiều lần.** Theme class và component/macro (`@card`, `@kpi 32% "Doanh thu"`)
+   thay cho việc lặp lại style inline trên từng slide.
+5. **Parser dễ tính.** Chấp nhận các biến thể Agent hay viết (cú pháp Marp/Slidev, `--` thay vì `---`, sai hoa thường...).
+   Parser tự sửa và phát cảnh báo thay vì báo lỗi, vì mỗi lần Agent phải sửa đều tốn token.
+6. **Thông báo lỗi ngắn gọn và sửa được ngay.** Mỗi lỗi một dòng: `slide 3 L42 overflow: rút còn ≤ 6 bullet hoặc dùng layout two-column`.
+7. **Sửa cục bộ.** Mỗi slide có id ổn định. Agent chỉ sửa đúng slide có lỗi (str_replace hoặc `slidemark patch`)
+   thay vì sinh lại cả deck.
+8. **Docs có ngân sách token.** Ví dụ `SKILL.md` ≤ 1.500 token, mỗi file trong `reference/` ≤ 800 token.
+   CI báo lỗi nếu vượt ngân sách.
+
 ## 5. Chiến lược hỗ trợ HTML
 
 Dùng hai chế độ, chọn qua thuộc tính `render=native|image` (mặc định là `auto`):
@@ -193,14 +243,74 @@ slidemark import deck.pptx -o deck.md      # (sau này) chuyển ngược pptx �
   Mọi ví dụ trong docs được chạy trong CI, nên tài liệu không bao giờ lệch với code.
 - Sau này có thể thêm MCP server (`slidemark mcp`).
 
-## 8. Chiến lược kiểm thử
+## 8. Quy trình kiểm thử cho từng chức năng
 
-- **Unit test** cho parser → IR, layout engine (toạ độ), từng renderer.
-- **Golden test**: build các deck mẫu, so sánh XML đã chuẩn hoá (snapshot), và so ảnh render qua LibreOffice
-  (perceptual diff) để bắt lỗi hồi quy về hình ảnh.
-- **Kiểm tra schema OOXML**: validate XML với XSD ECMA-376 để giảm rủi ro PowerPoint báo "repair".
-- **Docs test**: mọi đoạn ví dụ trong tài liệu đều phải build được.
-- CI bằng GitHub Actions: ruff, mypy/pyright, pytest.
+### 8a. Definition of Done: mọi chức năng phải qua đủ 8 bước
+
+| # | Bước | Nội dung | Công cụ |
+|---|---|---|---|
+| 1 | **Spec và docs trước** | Viết mục docs có ví dụ ngắn nhất có thể. Ghi ngân sách token cho ví dụ đó. | `docs/reference/*.md` |
+| 2 | **Parser** | Ví dụ được parse thành đúng IR. Test thêm các biến thể Agent hay viết sai. | pytest |
+| 3 | **Fuzz parser** | Đầu vào ngẫu nhiên hoặc hỏng không được làm crash, chỉ được trả lỗi có số dòng. | hypothesis |
+| 4 | **Renderer** | Mở lại file .pptx và kiểm tra đúng thuộc tính: toạ độ, font, màu, loại chart, dữ liệu... | python-pptx + lxml |
+| 5 | **Hợp lệ OOXML** | XML pass XSD ECMA-376. LibreOffice mở được mà không có lỗi. | xmlschema, soffice |
+| 6 | **Golden snapshot** | So XML đã chuẩn hoá và ảnh render (perceptual diff, có ngưỡng) với bản golden. | pytest-snapshot, pixelmatch |
+| 7 | **Lint** | Nếu chức năng có thể gây lỗi hiển thị (tràn, chồng lấn...) thì phải có rule trong `check` kèm test. | pytest |
+| 8 | **Bench** | Chạy bench. Không có metric nào xấu đi quá ngưỡng, trừ khi PR ghi rõ lý do. | `bench/` |
+
+Mỗi chức năng có một dòng trong `docs/FEATURES.md` (ma trận tính năng). Dòng đó ghi trạng thái của 8 bước trên,
+nên nhìn vào là biết chức năng nào mới làm một nửa.
+
+### Các tầng test và lúc chạy
+
+| Tầng | Chạy khi nào | Thời gian |
+|---|---|---|
+| Unit, parser, renderer, lint, docs-example, ngân sách token | Mỗi commit (CI) | < 1 phút |
+| XSD và golden XML | Mỗi commit (CI) | < 2 phút |
+| Golden ảnh qua LibreOffice | Mỗi PR | vài phút |
+| Agent eval (gọi model thật, tốn tiền) | Hằng ngày hoặc hằng tuần, chạy tay khi đổi cú pháp | tuỳ quy mô |
+| Thử trên PowerPoint thật | Mỗi milestone (thủ công) | — |
+
+## 8b. Đo lường và tối ưu hằng ngày
+
+### Các chỉ số cốt lõi
+
+| Nhóm | Chỉ số | Mục tiêu |
+|---|---|---|
+| **Token: cú pháp** | Số token của từng deck trong corpus, so với baseline python-pptx/HTML | Giảm dần, không được tăng |
+| **Token: docs** | Số token của SKILL.md và từng file reference | ≤ ngân sách |
+| **Token: Agent thật** | input / output / tổng token để ra một deck pass `check` | Giảm dần |
+| **Độ tin cậy** | Tỷ lệ pass ngay lần đầu, số vòng sửa trung bình, tỷ lệ lỗi parse | Tăng / giảm / giảm |
+| **Chất lượng** | Số vi phạm `check` trên mỗi deck, độ lệch ảnh golden | Giảm |
+| **Hiệu năng** | Thời gian build/slide, thời gian import, dung lượng cài đặt, số dependency | Nhỏ, vì Agent cài trong sandbox mỗi lần |
+| **Độ phủ** | Coverage test, số ô hoàn thành trong ma trận tính năng | Tăng |
+
+### Lưu trữ
+
+```
+bench/
+  corpus/<deck>/            # cùng một deck viết bằng nhiều cách: slidemark-compact, verbose, html, python-pptx
+  tasks/<task>.md           # đề bài cho Agent eval (ví dụ "làm deck 8 slide báo cáo Q3 từ dữ liệu sau...")
+  count_tokens.py           # đo token cú pháp (proxy o200k_base offline; số chính xác của Claude nếu có API key)
+  history.jsonl             # append-only: date, commit, metric, deck/task, giá trị, tokenizer
+  BASELINE.json             # giá trị tốt nhất hiện tại, CI so với file này để phát hiện regression
+  report.py                 # (sau này) vẽ biểu đồ xu hướng từ history.jsonl
+```
+
+- `history.jsonl` được commit vào git, mỗi dòng gắn với một commit, nên lúc nào cũng truy được thay đổi nào làm
+  metric tốt lên hay xấu đi.
+- CI fail khi một metric xấu đi quá ngưỡng so với `BASELINE.json` (ví dụ token tăng > 2%).
+  Muốn chấp nhận thì phải cập nhật baseline trong cùng PR và ghi lý do.
+- Số token proxy chỉ để so sánh tương đối (ổn định, chạy offline). Số token chính xác lấy từ Claude
+  `count_tokens` API và từ usage trong Agent eval.
+
+### Vòng lặp hằng ngày
+
+1. Làm một task trong lộ trình, đi đủ 8 bước của Definition of Done.
+2. Chạy `python bench/count_tokens.py --record` (sau này gom vào `make bench`).
+3. So với hôm trước. Nếu metric xấu đi thì sửa luôn, hoặc ghi lý do vào commit.
+4. Mỗi tuần chạy Agent eval một lần, dựa vào kết quả để chọn chỗ tối ưu cho tuần sau
+   (ví dụ: cú pháp nào Agent hay viết sai nhất thì làm parser dễ tính hơn hoặc rút gọn cú pháp đó).
 
 ## 9. Rủi ro và cách giảm
 
@@ -216,6 +326,9 @@ slidemark import deck.pptx -o deck.md      # (sau này) chuyển ngược pptx �
 
 **M0: Nền móng**
 - [ ] Skeleton package (`src/` layout, `pyproject.toml`, uv), ruff, pytest, CI
+- [x] Bench v0: corpus đầu tiên, `count_tokens.py`, `history.jsonl`
+- [ ] `BASELINE.json` và CI gate chặn regression token; `docs/FEATURES.md` (ma trận Definition of Done)
+- [ ] Harness test chung: helper mở pptx để assert, validate XSD, golden XML/ảnh
 - [ ] Định nghĩa IR v0: Deck, Slide, TextBox, Paragraph/Run, Image, Table, Notes
 - [ ] Renderer v0: IR → pptx (title, bullet, image, notes)
 
@@ -239,6 +352,7 @@ slidemark import deck.pptx -o deck.md      # (sau này) chuyển ngược pptx �
 - [ ] Shape, icon, callout, card
 
 **M4: Vòng lặp cho Agent** (nên làm sớm, có thể chen vào sau M1)
+- [ ] Agent eval harness: chạy các task trong `bench/tasks` bằng model thật, ghi token/vòng sửa/pass rate vào history
 - [ ] `check` linter và đầu ra JSON
 - [ ] `preview` PNG
 - [ ] `docs`, `schema`, SKILL.md và reference/
