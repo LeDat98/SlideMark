@@ -261,7 +261,20 @@ class Deck(Model):
 
 
 class Placed(Model):
-    """An element with its final absolute box (EMU) and fully merged style. Renderer input."""
+    """An element with its final absolute box (EMU) and fully merged style. Renderer input.
+
+    Conventions between layout and renderer (z-order = list order):
+    - Slide title / subtitle / lead / conclusion / footnotes are ``Text`` items with that ``role``.
+    - A ``Container`` Placed is only its card (fill/line/radius from ``style``); its heading is a separate
+      ``Text(role="heading")`` Placed and its children are separate Placed items, never nested.
+    - Footer and slide number are ``Text(role="caption")`` with ``attrs={"field": "footer"|"slide_number"}``;
+      for ``slide_number`` the renderer emits a native slide-number field.
+    - ``flow`` arrows are ``Shape(shape="arrow-right")``; ``chevron`` boxes are ``Shape(shape="chevron")``
+      carrying their paragraphs.
+    - ``Placed.style`` is already merged (theme role -> classes -> inline); colors may still be theme names,
+      resolve them with ``Theme.color``. ``font_scale`` multiplies every font size of the element.
+    - Slide-level settings (background, notes, hidden, transition, ids) are read by the renderer from ``Slide``.
+    """
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
