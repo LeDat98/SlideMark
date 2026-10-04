@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "slidemark"
+version = "0.0.1"
+description = "Token-efficient Markdown/HTML to native, editable PowerPoint for AI agents"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "python-pptx>=1.0",
+    "markdown-it-py>=3.0",
+    "mdit-py-plugins>=0.4",
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+    "pygments>=2.17",
+    "pillow>=10.0",
+]
+
+[project.optional-dependencies]
+preview = ["pypdfium2>=4.20"]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6",
+    "ruff>=0.6",
+    "tiktoken>=0.7",
+    "pypdfium2>=4.20",
+]
+
+[project.scripts]
+slidemark = "slidemark.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/slidemark"]
+
+[tool.ruff]
+line-length = 110
+extend-exclude = ["bench/corpus"]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
