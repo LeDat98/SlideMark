@@ -1,7 +1,7 @@
 # SlideMark: notes for coding sessions
 
 Python library: token-efficient Markdown/HTML → native, editable .pptx for AI agents.
-Design: `docs/PROPOSAL.md` (Vietnamese). Plan: `docs/PLAN.md`. Syntax: `docs/SYNTAX.md`.
+Design: `docs/PROPOSAL.md`. Plan: `docs/PLAN.md`. Syntax: `docs/SYNTAX.md`.
 
 ## Before you start
 1. Read `docs/LESSONS.md` (known bugs, pitfalls, fixes). It is short on purpose.
@@ -27,6 +27,8 @@ docs entry with shortest example → parser test → fuzz-safe (no crash, diagno
 break the visual → bench has no token regression. Mark progress in `docs/FEATURES.md`.
 
 ## Workflow
+- **Language: everything in the repo is English** (code, comments, docs, commit messages, logs) **except
+  `README.md`, which is Vietnamese.** `scripts/gallery.py` must keep the README text Vietnamese.
 - Push straight to `main` (allowed by the owner). No pull requests needed.
 - At most 2 Sonnet subagents at a time (lane A front, lane B back); see `docs/PLAN.md`.
 
