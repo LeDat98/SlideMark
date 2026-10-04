@@ -29,6 +29,7 @@ break the visual → bench has no token regression. Mark progress in `docs/FEATU
 ## Workflow
 - **Language: everything in the repo is English** (code, comments, docs, commit messages, logs) **except
   `README.md`, which is Vietnamese.** `scripts/gallery.py` must keep the README text Vietnamese.
+  Slide *content* in `examples/` and `bench/corpus/` may be Japanese/Vietnamese on purpose (test data).
 - Push straight to `main` (allowed by the owner). No pull requests needed.
 - At most 2 Sonnet subagents at a time (lane A front, lane B back); see `docs/PLAN.md`.
 
