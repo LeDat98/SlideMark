@@ -30,13 +30,13 @@ num: on
 ※ 出所: 社内調査（2026年9月）
 ```
 
-- Header: `theme` (`default` `midnight` `jp-business`, a .pptx path, or `none`), `lang`, `footer`, `num: on`.
-- Own design: header lines `colors: primary=#7C5CFF bg=#0B1020`, `fonts: body="Inter"`, `sizes: body=16`,
-  `style: radius=14 card.fill=… title.band=none` override any token (`slidemark docs design`).
+- Header: `theme` (`default` `midnight` `jp-business`, .pptx, `none`), `lang`, `footer`, `num: on`.
+- Own design: `colors: primary=#7C5CFF bg=#0B1020`, `fonts: body="Inter"`, `style: radius=14 title.band=none`
+  header lines, CSS or `@html` slides (`slidemark docs design`).
 - `# Title` = slide; title + ≤ 2 short lines = cover or section divider.
 - `## Heading` = box; boxes arrange themselves. `>` after the title = key message, `>` last = conclusion
   bar, `※` = footnote, `??? ` = speaker notes.
-- `@end` closes the last box; what follows (table, chart) goes full width below.
+- `@end` closes the last box; a table/chart after it goes full width.
 
 `@` line, only if the auto layout is wrong: `@3` columns, `@2x2`, `@1:2` ratios, `@aab/aac` areas,
 `chevron` steps, `flow` arrows, `a>b` connectors (letters = blocks in order),
@@ -60,6 +60,5 @@ Content:
 - Flowcharts: ` ```mermaid ` `graph TD` / `A[申請] --> B{承認?}` / `B -->|yes| C`.
 - ` ```math ` LaTeX → native equation. `![alt](a.png)` images (always alt); `![alt](demo.mp4)` video/audio.
   Other fences = code. `[go](#5)` jumps to slide 5; `@hidden` hides a slide.
-- Given HTML/CSS: rewrite it as `#`/`##`/tables, or keep it in a ` ```html {render=native} ` fence.
 
 Rules: no positions; one message per slide (the `>` lead); ≤ 4 boxes × 6 bullets, tables ≤ 8 rows, else split; `check` to zero warnings.
