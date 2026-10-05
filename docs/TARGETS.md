@@ -48,7 +48,7 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 - [ ] HTML → native shapes (Chromium measurement) with image fallback; Mermaid → native shapes (HTML subset parser + Chromium image fallback ✓, Mermaid flowcharts ✓; no Chromium measurement yet)
 - [ ] Transitions, build animations, hyperlinks/slide jumps, sections, hidden slides, video/audio (all but video/audio ✓; PowerPoint repair check pending)
 - [x] User templates `.potx`/`.pptx`: placeholders, masters, theme colors/fonts reused (examples/10-template)
-- [ ] Feature matrix (`docs/FEATURES.md`) ≥ 90% of rows fully Done (all 8 DoD steps)
+- [x] Feature matrix (`docs/FEATURES.md`) ≥ 90% of rows fully Done (all 8 DoD steps): 27/29 = 93% (2026-10-05)
 
 ## L6: Production grade
 - [ ] 0 "repair" prompts: XSD-valid on 10k fuzzed decks + spot-checked in real PowerPoint each release

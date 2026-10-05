@@ -47,7 +47,7 @@ slidemark skill install      # cài skill cho Claude Code
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-05 · commit `db0ee37` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-05 · commit `025a5ef` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 

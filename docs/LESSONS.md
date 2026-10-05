@@ -53,3 +53,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [skill] SKILL.md 1,374 → 819 tokens (details moved to reference pages) to meet the agent token gate: (skill + deck) / python-pptx ≈ 0.36.
 - [layout] Measuring Calibri text with Arial metrics added needless wraps → committed per-family width tables (`scripts/gen_metrics.py` → `layout/metrics/widths.json`, 35 KB); no installed fonts needed; kana stays 1em (Yu Gothic is not kerned).
 - [layout] A row group has `grid` set, so `_box_nat` returned None and every group got an equal share → `_group_nat`.
+- [layout] Template footer placeholders keep their own y → `template.footer_top()` bounds the body; extra growth (≤ 1.4×) only for very sparse box slides, else normal slides get shouty.

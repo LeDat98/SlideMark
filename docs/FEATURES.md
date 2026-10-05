@@ -30,7 +30,7 @@ step does not apply (no visual risk to lint, or no syntax).
 | Mermaid flowcharts → native | x | x | x | x | x | x | x | x |
 | HTML subset → native, image fallback | x | x | x | x | x | | - | x |
 | Themes default / midnight / jp-business | x | x | - | x | x | x | x | - |
-| User templates `.pptx/.potx/.yaml` | x | x | x | x | x | | - | - |
+| User templates `.pptx/.potx/.yaml` | x | x | x | x | x | x | - | - |
 | Build animations, transitions, sections, hidden | x | x | x | x | x | - | - | x |
 | `check` linter + JSON | x | x | x | - | - | - | x | - |
 | `docs`, `schema`, `skill install`, JSON input | x | x | x | x | - | - | - | x |

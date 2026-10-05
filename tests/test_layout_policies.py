@@ -91,7 +91,7 @@ def test_sparse_boxes_grow_text_uniformly_within_the_theme_limit():
         grid="3",
         elements=[box("a", "x", "y"), box("b", "x" * 10, "y"), box("c", "x", "y")],
     )
-    for theme, limit in (("default", 1.15), ("jp-business", 1.35)):
+    for theme, limit in (("default", 1.4), ("jp-business", 1.35)):
         placed, _ = lay(s, theme)
         scales = {p.font_scale for p in of(placed, Text) if p.element.role == "body"}
         assert len(scales) == 1
@@ -265,3 +265,35 @@ def test_mixed_numeric_columns_stay_left_aligned_but_mostly_numeric_ones_go_righ
     assert price == ["right"] * 6  # 4 of 5 (80%) numeric: whole column and header right-aligned
     assert [r[2] for r in al] == [None] * 6  # only 3 of 5 numeric: the whole column stays left
     assert [r[3] for r in al] == ["right"] * 6  # "-" counts as a figure placeholder
+
+
+def _body_scales(slide, theme="default"):
+    placed, _ = lay(slide, theme)
+    body = {p.font_scale for p in of(placed, Text) if p.element.role == "body"}
+    head = {p.font_scale for p in of(placed, Text) if p.element.role == "heading"}
+    return body, head, placed
+
+
+def test_very_sparse_boxes_of_a_large_theme_grow_up_to_1_4_and_headings_up_to_1_25():
+    s = Slide(
+        title=T("t", "title"),
+        grid="3",
+        elements=[box("a", "one"), box("b", "two"), box("c", "three")],
+    )
+    body, head, placed = _body_scales(s)
+    assert len(body) == 1 and len(head) == 1  # siblings share one scale
+    bs, hs = body.pop(), head.pop()
+    assert 1.15 < bs <= 1.4 + 1e-9
+    assert 1.0 < hs <= 1.25 + 1e-9
+    assert get_theme("default").sizes["body"] * bs <= 26 + 1e-6
+
+
+def test_normal_boxes_of_a_large_theme_keep_the_small_growth():
+    s = Slide(
+        title=T("t", "title"),
+        grid="3",
+        elements=[box("a", "x", "y", "z"), box("b", "x", "y", "z"), box("c", "x", "y", "z")],
+    )
+    body, head, _ = _body_scales(s)
+    assert max(body) <= 1.15 + 1e-9
+    assert head == {1.0}

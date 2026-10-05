@@ -25,6 +25,7 @@ from ..ir import (
     Table,
     Text,
 )
+from ..template import footer_top
 from ..theme import Theme
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import measure
@@ -73,6 +74,14 @@ GROW_SMALL = (
 )
 GROW_SMALL_PT = 14
 GROW_BIG = 1.15  # ... and up to this factor for larger themes
+GROW_VERY_SPARSE = (
+    1.4  # very sparse boxes (<= SPARSE_LINES short lines each) of a theme with body >= ..._PT ...
+)
+GROW_VERY_SPARSE_PT = 16
+GROW_VERY_SPARSE_MAX_PT = 26  # ... grow up to this factor, but never beyond this body size
+GROW_HEAD = 1.25  # box headings grow along with the body text, up to this factor
+SPARSE_LINES = 2
+SPARSE_LINE_EM = 22  # a "short" line
 GROW_FILL = 0.85  # growth stops when the content would fill more than this share of the grid
 GROW_BOX_FILL = 0.92  # ... or more than this share of a box
 LEFT_KEEP = 0.2  # rows of a sparse slide expand until at most this share of the body is left over ...
@@ -97,6 +106,7 @@ class _Ctx:
     tight: float = 1.0  # gap / padding factor (dense slides)
     grow: float = 1.0  # body text growth inside boxes (sparse grids), shared by all sibling boxes
     depth: int = 0  # 0 = slide level, > 0 inside a box
+    head_grow: bool = False  # very sparse boxes: box headings grow with ``grow`` (up to ``GROW_HEAD``)
     grew: bool = False  # set when ``grow`` actually scaled some text
     fill: float | None = None  # natural content height / grid height of the slide-level grid, if known
     expand: int = 0  # extra height (EMU) the capped rows of the slide-level grid may take
@@ -522,6 +532,8 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
             )
         )
     eff = measure.effective_scale(hst.font_size or 18, ctx.scale, ctx.theme.min_font_size)
+    if ctx.head_grow and ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi:
+        eff *= min(ctx.grow, GROW_HEAD)
     return h_el, hst, eff, band
 
 
@@ -1328,6 +1340,37 @@ def _bottom(c: _Ctx) -> int:
     return max((p.y + p.h for p in c.out), default=0)
 
 
+def _very_sparse(elements: list) -> bool:
+    """Boxes only (callouts aside), each with at most ``SPARSE_LINES`` short text lines and nothing else."""
+    boxes = [e for e in elements if isinstance(e, Container)]
+    if not boxes or any(
+        not isinstance(e, Container) and not (isinstance(e, Text) and "callout" in e.classes)
+        for e in elements
+    ):
+        return False
+
+    def ok(c: Container) -> bool:
+        if (
+            c.grid
+            or c.links
+            or c.classes
+            and any(n in ("kpi", "flow", "chevron", "diagram") for n in c.classes)
+        ):
+            return False
+        lines = 0
+        for ch in c.children:
+            if isinstance(ch, Container):
+                return False
+            if not isinstance(ch, Text):
+                return False
+            lines += len(ch.paragraphs)
+            if any(measure.text_em(p.plain) > SPARSE_LINE_EM for p in ch.paragraphs):
+                return False
+        return lines <= SPARSE_LINES
+
+    return all(ok(b) for b in boxes)
+
+
 def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
     """Vertical policy of a sparse slide body: no empty band taller than ~``LEFT_KEEP`` of the body.
 
@@ -1509,6 +1552,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 cst.merged(Style(align="right", valign="middle")),
             )
         bottom = fy - sg // 2
+        if (ft := footer_top(theme)) is not None:  # template: its own footer zone replaces the built-in row
+            bottom = min(ft - sg // 2, H - My)
     elif kind not in ("cover", "section"):
         bottom = H - My
 
@@ -1576,8 +1621,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             slide_inherit = slide_inherit.merged(Style(align="center", valign="middle"))
         sgap = _gap(ctx, slide.attrs.get("gap"), body.w)
 
+        body_pt = theme.sizes.get("body", 18) * ctx.dense_k
+        very = body_pt >= GROW_VERY_SPARSE_PT and _very_sparse(elements)
+
         def run(area: Rect, **kw) -> _Ctx:
-            c = _Ctx(deck, theme, slide, index, W, H, dense_k=ctx.dense_k, tight=ctx.tight, **kw)
+            c = _Ctx(
+                deck, theme, slide, index, W, H, dense_k=ctx.dense_k, tight=ctx.tight, head_grow=very, **kw
+            )
             _place_blocks(
                 c, elements, area, slide_inherit, slide.grid, slide.classes, sgap, None, slide.links
             )
@@ -1590,7 +1640,9 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         assert final_ctx is not None
         if final_ctx.scale >= 1.0 and not final_ctx.over:
             # sparse slide: grow text uniformly (siblings share one factor), more for small themes
-            top = GROW_SMALL if (theme.sizes.get("body", 18) <= GROW_SMALL_PT) else GROW_BIG
+            top = GROW_SMALL if (body_pt <= GROW_SMALL_PT) else GROW_BIG
+            if very:
+                top = max(top, min(GROW_VERY_SPARSE, GROW_VERY_SPARSE_MAX_PT / body_pt))
             n = round((top - 1.05) / 0.05)
             for g in [round(top - 0.05 * i, 2) for i in range(n + 1)]:
                 c3 = run(body, grow=g)
