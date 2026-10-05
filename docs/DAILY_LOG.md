@@ -63,9 +63,14 @@ Run goal:
 - Problems: the brief of task 115 forces a 2.8:1 title color (lint is right); stretched layouts can move emptiness inside cards (fixed text-first; `html_fit` made opt-in).
 - Next: real PowerPoint check of gradients/shadows/customXml (owner), L3 consulting judgement, L7 tokens ≤ 20%.
 
-## 2026-10-05 (run 4, chained manual, 10:55 UTC–)
+## 2026-10-05 (run 4, chained manual, 10:55–14:00 UTC)
 Run goal:
-- [ ] L3: consulting-grade dense JP set (≥ 8 slides) + sparse cards (05 s2, 11 s9) + small HTML grid text (12 s1)
-- [ ] Larger HTML corpus (30 → 45, harder) with fidelity kept ≥ 0.9 per slide
-- [ ] Harder brand-eval briefs (121–140) run and reviewed
-- [ ] L7 token research: content floor vs python-pptx, report + proposal
+- [ ] L3: consulting-grade dense JP set — examples/16 (10 slides) built, sparse cards fixed (hug, sparse step, vfill), HTML zoom; independent designer review 2.8/3.0 → 3.2/3.3 of 5, still "not consulting-grade" → gate open
+- [x] Larger HTML corpus 30 → 45 harder slides, native 0.999 (45/45 ≥ 0.9), diff 0.0112
+- [x] Harder brand briefs 121–140: run-8 16/20 → fixes → run-9 18/20 first pass, 100% brief adherence, 0 shared palettes
+- [x] L7 token research: content floor 25% of q3 python-pptx (gate unreachable there), agent decks 6% → `docs/TOKEN_FLOOR.md`; CSV tables −7.1%
+- Done: 6 waves, 11 Sonnet coding runs + 2 eval + 2 design-review agents; L7 self-review gate (`review --fix`); round trip 115/116 → 117/117 incl. CSS/HTML decks.
+- Also: `.kpi` CSS, element tokens = any CSS property, 26 icons + `icon=file.svg`, CSS `width`, auto light ink on dark slides, derived muted, task lists, examples/17 editorial CSS.
+- Metrics: tests 1403 passed; q3 155 tokens = 30% of python-pptx (unchanged); markup vs HTML 13–28% (unchanged); fuzz 5k 0 crashes; XSD 1k 0 invalid.
+- Problems: one lint-red push (`commit -am` swept a file, fixed in minutes); a parallel owner commit moved CI to daily (push once per wave now).
+- Next: L3 two-card/decision slides and right panels still half empty (content-bound; needs a design rule the reviewers agree on); badge pills; katakana wraps in chevrons.

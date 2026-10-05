@@ -41,7 +41,7 @@ Never limit the agent's design ability: mechanisms, not looks. These gates come 
 
 ## L3: Dense & rich (target: day 7, end of foundation)
 - [ ] Dense JP slide set (≥ 8 slides: 3–4 column boxes, KPI tables, process arrows, lead line, ※ footnotes,
-      source line, 10–12pt) built from Markdown only, judged "consulting-grade" in review
+      source line, 10–12pt) built from Markdown only, judged "consulting-grade" in review (run 4: examples/11 + 16 (19 slides); independent designer review 2.8/3.0 → 3.2/3.3 of 5, verdict "not yet": half-empty decision/panel slides)
 - [x] Components: cards, callouts, KPI, steps/chevrons, badges, connectors, icons, 12-column grid
 - [x] All 10 chart kinds native with labels/legend/number formats; OMML math (OMML verified in XML; LibreOffice shows the fallback)
 - [x] `check` linter: overflow, off-slide, overlap, low contrast, missing alt → one-line JSON diagnostics

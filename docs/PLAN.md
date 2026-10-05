@@ -351,3 +351,12 @@ HTML corpus, L7 token research). Design freedom stays the rule: fixes are mechan
 - **Wave 4 A:** `slidemark review --fix` self-review loop (L7 gate) merged. Then eval run-9 (hard brand briefs, fresh).
 - **Wave 4 B: consulting polish** from the review: body block distribute + center when > 20% free, top-anchored panels
   beside charts, card text ≤ table text, reserved lead slot, chart/footnote gap, padded notes.
+- **Waves 4–6 status:** B vfill (distribute, center ≥ 60% fill, else top-anchor + bigger step), body size unify,
+  reserved lead slot, chart/footnote gap, padded notes; A run-9 gaps (auto light ink, cover `##`, task lists, katakana
+  units, SKILL.md backgrounds). All merged, 1403 tests.
+
+## Leftovers for the next run
+- [ ] L3 consulting-grade: designer review 3.2/5 (16) and 3.3/5 (11); open: two-card decision slides (16 s10, 11 s9) and
+      text panels beside charts (16 s3, 11 s3) half empty; badges are tight run highlights; 16 s9 header vs merged body
+- [ ] Katakana words still break inside chevrons in LibreOffice (needs a `\v` break or inset correction in render)
+- [ ] Owner: real PowerPoint repair check (gradients, shadows, customXml design part, media); PyPI token; decide the L7 token gate (`docs/TOKEN_FLOOR.md`)
