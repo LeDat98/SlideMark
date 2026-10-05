@@ -73,7 +73,10 @@ def test_sparse_boxes_are_capped_and_top_aligned():
         assert cs[0].h < 0.75 * H  # not stretched over the whole body
         assert cs[0].h > 0.2 * H  # but not tiny either
         below, body_h = _gap_below(placed, theme)
-        assert below <= 0.2 * body_h  # no empty band taller than 20% of the body
+        assert 0.22 * body_h <= cs[0].h <= 0.5 * body_h  # card height follows content (+ a modest factor)
+        title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
+        above = cs[0].y - (title.y + title.h)
+        assert above > 0 and below > above  # a single sparse row sits in the upper-middle of the free body
 
 
 def test_sparse_slide_keeps_the_block_low_enough_with_a_third_above():
@@ -104,8 +107,18 @@ def test_table_text_and_rows_grow_within_limits():
     placed, _ = lay(s, "jp-business")
     (tp,) = of(placed, Table)
     assert 1.0 < tp.font_scale <= 1.2 + 1e-9
-    nat = 11 * 1.2 * 12700  # rough single-line row height, grows well beyond it but stays capped
-    assert max(tp.element.attrs["_row_h"]) <= 2.2 * (nat * tp.font_scale * 1.6 + 2 * 45720)
+    line = 11 * 1.2 * 12700 * tp.font_scale
+    assert max(tp.element.attrs["_row_h"]) <= 1.8 * line + 2 * 45720 + 1  # a row stays near its text
+
+
+def test_table_rows_do_not_stretch_over_the_body():
+    rows = [[cell("項目"), cell("値")]] + [[cell("a"), cell("12")] for _ in range(5)]
+    s = Slide(title=T("t", "title"), elements=[Table(rows=rows)])
+    placed, _ = lay(s, "jp-business")
+    (tp,) = of(placed, Table)
+    rh = tp.element.attrs["_row_h"]
+    assert max(rh) <= 1.8 * (tp.style.font_size or 14) * tp.font_scale * 1.2 * 12700 + 2 * 45720 + 1
+    assert tp.h < 0.6 * H  # leftover room is not poured into the rows
 
 
 def test_dense_boxes_do_not_grow():
