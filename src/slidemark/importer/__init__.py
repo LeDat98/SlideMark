@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ..ir import Diagnostic
 from ..theme import DEFAULT, JP_BUSINESS, MIDNIGHT, Theme
-from .read import ReadCtx, SlideData, read_slide
+from .read import ReadCtx, SlideData, read_sections, read_slide
 from .structure import DeckInfo, build_slide
 
 __all__ = ["import_pptx"]
@@ -141,7 +141,9 @@ def _import(prs, out_dir, diags: list[Diagnostic]) -> tuple[str, list[Diagnostic
     diags.extend(ctx.diags)
     footer, footers = _footers(datas, H)
     colors = {k: v.lstrip("#").upper() for k, v in theme.colors.items()}
-    deck = DeckInfo(width=W, height=H, accent=accent, colors=colors, footers=footers)
+    deck = DeckInfo(
+        width=W, height=H, accent=accent, colors=colors, footers=footers, sections=read_sections(prs)
+    )
     classes = {}
     for cname in ("success", "danger", "muted", "accent"):
         classes.setdefault(colors[cname], cname)
@@ -194,12 +196,14 @@ def _import(prs, out_dir, diags: list[Diagnostic]) -> tuple[str, list[Diagnostic
     ):
         header.append("num: on")
     chunks: list[str] = []
+    solo_titles = False
     for n, sd in enumerate(datas, 1):
         try:
             sdiags: list[Diagnostic] = []
             info: dict = {}
             lines = build_slide(n, sd, deck, sdiags, save_image, classes, info)
             diags.extend(sdiags)
+            solo_titles = solo_titles or (n > 1 and bool(info.get("title_only")))
             lines = _shorten(lines, info, sd, deck, classes, header)
         except Exception as e:
             diags.append(
@@ -213,6 +217,8 @@ def _import(prs, out_dir, diags: list[Diagnostic]) -> tuple[str, list[Diagnostic
             )
             lines = ["---"]
         chunks.append("\n".join(lines))
+    if solo_titles and not deck.sections:
+        header.append("sections: off")
     text = ("\n".join(header) + "\n\n" if header else "") + "\n\n".join(chunks) + "\n"
     return text, diags
 
@@ -231,7 +237,7 @@ def _shorten(lines, info, sd, deck, classes, header) -> list[str]:
     tokens, at = info.get("tokens") or [], info.get("at")
     if at is None or not tokens or tokens == ["blank"]:
         return lines
-    hidden = ["hidden"] if sd.hidden else []
+    hidden = info.get("extra", [])
     try:
         import tempfile
 

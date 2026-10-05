@@ -25,6 +25,7 @@ class DeckInfo:
     accent: str | None = None  # RRGGBB of the theme accent (emphasis color)
     colors: dict[str, str] = field(default_factory=dict)  # name -> RRGGBB
     footers: set[str] = field(default_factory=set)
+    sections: list[tuple[str, list[int]]] = field(default_factory=list)  # PowerPoint sections (name, slide numbers)
 
 
 @dataclass
@@ -346,6 +347,7 @@ def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
         for k in body:
             blocks.extend(make(k, True))
         blocks.sort(key=lambda b: (b.y, b.x))
+        blocks = fold_subheads(blocks, W, H)
         if head is None:
             return blocks
         if extra:
@@ -358,6 +360,35 @@ def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
             continue
         out.extend(make(it, False))
     return _group_columns(_merge_cards(out, deck), deck)
+
+
+def fold_subheads(blocks: list[Block], W: int, H: int) -> list[Block]:
+    """A bold one-line text right above a text block at the same left edge is a ``###`` heading
+    (a sub-box without fill)."""
+    out: list[Block] = []
+    i = 0
+    while i < len(blocks):
+        b = blocks[i]
+        nxt = blocks[i + 1] if i + 1 < len(blocks) else None
+        if (
+            nxt is not None
+            and b.kind == "text"
+            and nxt.kind == "text"
+            and len(b.paras) == 1
+            and not b.paras[0].marker
+            and b.paras[0].all_bold
+            and not (b.item and b.item.role)
+            and abs(nxt.x - b.x) <= 0.02 * W
+            and -0.01 * H <= nxt.y - (b.y + b.h) <= 0.04 * H
+        ):
+            x0, y0 = min(b.x, nxt.x), b.y
+            x1, y1 = max(b.x + b.w, nxt.x + nxt.w), max(b.y + b.h, nxt.y + nxt.h)
+            out.append(Block("box", x0, y0, x1 - x0, y1 - y0, heading=b.paras, children=[nxt], sub=True))
+            i += 2
+            continue
+        out.append(b)
+        i += 1
+    return out
 
 
 def _group_columns(blocks: list[Block], deck: DeckInfo) -> list[Block]:
@@ -687,6 +718,13 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
         return [("fence", b.lines)]
     if b.kind == "image":
         out.img_n += 1
+        if b.item.missing is not None:  # placeholder of an absent file: write a reference that stays absent
+            kind, label = b.item.missing
+            label = label.replace("[", "(").replace("]", ")").replace("\n", " ")
+            if re.fullmatch(r"[^\s()]+\.(png|jpe?g|gif|svg|webp|mp4|mov|webm|mp3|wav|m4a)", label, re.I):
+                return [("image", [f"![]({label})"])]
+            ext = {"image": "png", "video": "mp4", "audio": "mp3"}[kind]
+            return [("image", [f"![{label}](images/{out.slide_no}-{out.img_n}.{ext})"])]
         blob, ext = b.item.img
         ref = out.save_image(out.slide_no, out.img_n, blob, ext)
         alt = (b.item.alt or b.item.name or "image").replace("[", "(").replace("]", ")").replace("\n", " ")
@@ -810,7 +848,8 @@ def build_slide(
     lead = by_role["lead"]
     if lead:
         lines.append("> " + one_line(lead[0].paras, accent=deck.accent, classes=classes))
-    if arrows and tokens and tokens[0].isdigit() and len(grid) > 1 and arrows >= len(grid) - 1:
+    n_boxes = sum(1 for b in grid if b.kind == "box")
+    if arrows and "chevron" not in tokens and n_boxes > 1 and arrows >= n_boxes - 1:
         tokens.append("flow")
     if info is not None:
         info["tokens"] = [t for t in tokens if t != "blank"]
@@ -822,9 +861,37 @@ def build_slide(
             b.links = link_tokens(inner[id(b)], b.children)
     if info is not None:
         info["links"] = links
+    extra: list[str] = []
+    title_only = (
+        title is not None
+        and all(b.kind == "text" for b in blocks)
+        and sum(len(b.paras) for b in blocks) + len(by_role["lead"]) <= 2
+        and not by_role["conclusion"]
+        and not by_role["footnote"]
+        and not arrows
+        and not data.conns
+    )
+    if title_only:
+        footer_row = any(
+            i.role == "decor"
+            and (i.ph in ("ftr", "sldNum") or i.has_slidenum or i.name.lower() in ("footer", "slide number"))
+            for i in data.items
+        )
+        starts = {nums[0] for _, nums in deck.sections if nums}
+        if n == 1 and (footer_row or len(deck.sections) == 1):
+            extra.append("section")
+        elif n > 1 and deck.sections and n not in starts:
+            extra.append("cover")
+    if data.transition:
+        extra.append("t=" + data.transition)
+    if data.build:
+        extra.append("build")
     if data.hidden:
-        tokens = [*tokens, "hidden"]
-    tokens = [*[t for t in tokens if t != "hidden"], *links, *[t for t in tokens if t == "hidden"]]
+        extra.append("hidden")
+    if info is not None:
+        info["extra"] = extra
+        info["title_only"] = title_only
+    tokens = [*tokens, *links, *extra]
     if tokens:
         if info is not None:
             info["at"] = len(lines)

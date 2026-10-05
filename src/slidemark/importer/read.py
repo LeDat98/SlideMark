@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -11,6 +12,7 @@ from pptx.oxml.ns import qn
 
 from ..ir import Diagnostic
 
+_MISSING = re.compile(r"\[(image|video|audio): (.*)\]", re.S)
 MONO = ("consolas", "courier", "menlo", "monaco", "mono", "source code")
 
 
@@ -88,6 +90,7 @@ class Item:
     sid: int = 0  # shape id in the slide (what ``a:stCxn``/``a:endCxn`` point at)
     col_w: list[int] = field(default_factory=list)  # table: column widths (EMU)
     row_h: list[int] = field(default_factory=list)  # table: row heights (EMU)
+    missing: tuple[str, str] | None = None  # image: a "[image: label]" placeholder of a file that was absent
 
     @property
     def cx(self) -> float:
@@ -134,6 +137,8 @@ class SlideData:
     hidden: bool = False
     connectors: int = 0
     num_field: bool = False
+    transition: str | None = None  # ``t=`` value: "fade", "push:0.5", ...
+    build: bool = False  # click-by-click appear animations on shapes
 
 
 @dataclass
@@ -482,11 +487,66 @@ def _alt(el, name: str) -> str:
     return ""
 
 
+_TRANS = ("fade", "push", "wipe", "split", "cover", "zoom", "morph")
+
+
+def read_transition(sld) -> str | None:
+    """The ``t=`` token of a slide: transition name plus ``:seconds`` when a duration was written."""
+    best = None
+    for tr in sld.iter():
+        if not isinstance(tr.tag, str) or etree.QName(tr).localname != "transition":
+            continue
+        if best is None or any("dur" in etree.QName(a).localname for a in tr.attrib):
+            best = tr
+    if best is None:
+        return None
+    name = next(
+        (etree.QName(c).localname for c in best if etree.QName(c).localname in _TRANS),
+        None,
+    )
+    if name is None:
+        return None
+    dur = next((v for a, v in best.attrib.items() if etree.QName(a).localname == "dur"), None)
+    if dur and dur.isdigit():
+        secs = int(dur) / 1000
+        if not (name == "morph" and secs == 2.0):
+            return f"{name}:{secs:g}"
+    return name
+
+
+def read_sections(prs) -> list[tuple[str, list[int]]]:
+    """PowerPoint sections as (name, [1-based slide numbers])."""
+    try:
+        ids = [int(e.get("id")) for e in prs.slides._sldIdLst]
+        out = []
+        for sec in prs.part._element.iter():
+            if isinstance(sec.tag, str) and etree.QName(sec).localname == "section":
+                nums = [
+                    ids.index(int(s.get("id"))) + 1
+                    for s in sec.iter()
+                    if isinstance(s.tag, str) and etree.QName(s).localname == "sldId" and int(s.get("id")) in ids
+                ]
+                out.append((sec.get("name") or "", nums))
+        return out
+    except Exception:
+        return []
+
+
 def read_slide(slide, ctx: ReadCtx) -> SlideData:
     data = SlideData()
     data.hidden = slide._element.get("show") in ("0", "false")
     part = slide.part
     _walk(slide.shapes, Tf(), data, ctx, part)
+    try:
+        data.transition = read_transition(slide._element)
+        data.build = bool(
+            slide._element.xpath(
+                ".//*[local-name()='cTn'][@nodeType='clickEffect'][@presetClass='entr']"
+                "[.//*[local-name()='attrName' and text()='style.visibility']]"
+            )
+        )
+    except Exception:
+        pass
     try:
         if slide.has_notes_slide:
             txt = (slide.notes_slide.notes_text_frame.text or "").strip()
@@ -597,6 +657,12 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
         geom = el.find(qn("p:spPr") + "/" + qn("a:prstGeom"))
         prst = geom.get("prst") if geom is not None else None
         radius = _radius(geom, box) if prst == "roundRect" else None
+        ph_m = _MISSING.fullmatch(" ".join(t.strip() for t in el.xpath(".//a:t/text()")) or "")
+        if ph_m and re.match(r"(Image|Media) \d+$", name):  # the library's placeholder for an absent file
+            data.items.append(
+                _new(ctx, "image", box, sid=sh.shape_id, name=name, missing=(ph_m.group(1), ph_m.group(2)))
+            )
+            return
         default_bullets = ph_type in ("body", "obj")
         paras, num = read_paras(
             el.find(qn("p:txBody")), ctx, part, default_bullets, keep_empty=name.lower().startswith("code")
