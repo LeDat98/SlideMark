@@ -203,3 +203,140 @@ def test_cli_check_never_tracebacks(text):
         code_json = main(["check", str(f), "--format", "json"])
     assert code in (0, 1) and code_json in (0, 1)
     assert "Traceback" not in out.getvalue() + err.getvalue()
+
+
+MERMAID = [
+    "graph TD",
+    "flowchart LR",
+    "graph BT;",
+    "graph RL",
+    "A",
+    "B[text]",
+    "C(round)",
+    "D{why}",
+    "E((dot))",
+    'F["q a"]',
+    "G([s])",
+    "-->",
+    "---",
+    "-.->",
+    "==>",
+    "-->|yes|",
+    "-- no -->",
+    "--",
+    "&",
+    ";",
+    "\n",
+    " ",
+    "%% c",
+    "subgraph S",
+    "end",
+    "classDef x fill:#f00",
+    "style A fill:#fff",
+    "click A cb",
+    "A-->B-->C",
+    "A-->A",
+    "B-->A",
+    "[",
+    "]",
+    "(",
+    '"',
+    "|",
+    ":::c",
+    "<br/>",
+    "日本語",
+    "sequenceDiagram",
+    "N1-->N2\n",
+]
+
+HTML = [
+    '<section class="slide">',
+    "</section>",
+    "<h1>T</h1>",
+    "<h2>B</h2>",
+    '<p class="lead">l</p>',
+    '<p class="note">※ n</p>',
+    '<div class="card">',
+    '<div class="kpi">',
+    '<div class="chevron">',
+    '<div class="callout warn">',
+    '<div class="chart" data-type="pie" data-categories="a,b" data-series=\'[{"name":"s","data":[1,null]}]\'>',  # noqa: E501
+    '<div class="chart" data-series="{">',
+    '<div class="arrow" data-from="a" data-to="b">',
+    '<div id="a" style="display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr">',
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr)">',
+    '<div style="grid-row:span 2;grid-column:1 / 3">',
+    '<div style="display:grid;grid-template-columns:repeat(99,1fr)">',
+    "</div>",
+    "<ul>",
+    "<ol>",
+    "<li>",
+    "</li>",
+    "</ul>",
+    "<table>",
+    "<tr>",
+    "<th>",
+    "<td colspan=2>",
+    "<td rowspan=0>",
+    "<td colspan=abc rowspan=-3>",
+    "</table>",
+    "<mark>m</mark>",
+    "<b>",
+    "</i>",
+    '<span class="badge danger">x</span>',
+    "<svg><path/></svg>",
+    "<pre class=mermaid>graph TD\nA-->B</pre>",
+    "<br>",
+    "<",
+    ">",
+    "&amp;",
+    "&#xZZ;",
+    "<!--",
+    "-->",
+    "<script>",
+    "</script>",
+    "<style>x{}",
+    "text",
+    "日本語",
+    "\n",
+]
+
+
+def check_html(text: str) -> None:
+    from slidemark.parser import parse_html
+
+    deck = parse_html(text)
+    assert isinstance(deck, Deck)
+    Deck.model_validate_json(deck.model_dump_json())
+    assert not [d for d in deck.diagnostics if d.rule == "internal"], deck.diagnostics
+
+
+@settings(max_examples=300, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(st.lists(st.sampled_from(MERMAID), max_size=40).map(" ".join))
+def test_mermaid_soup_never_crashes(body):
+    check("# T\n```mermaid\n" + body + "\n```\n")
+
+
+@settings(max_examples=300, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(st.text())
+def test_mermaid_random_text_never_crashes(body):
+    check("# T\n```mermaid\ngraph TD\n" + body.replace("```", "") + "\n```\n")
+
+
+@settings(max_examples=300, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(st.lists(st.sampled_from(HTML), max_size=40).map("".join))
+def test_html_soup_never_crashes(body):
+    check_html(body)
+    check("# T\n```html\n" + body.replace("```", "") + "\n```\n")
+
+
+@settings(max_examples=200, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(st.text())
+def test_html_random_text_never_crashes(text):
+    check_html(text)
+    check("<section class=slide>" + text)
+
+
+def test_html_corpus_never_crashes():
+    for p in sorted((Path(__file__).parent.parent / "bench" / "corpus").glob("*/html.html")):
+        check_html(p.read_text(encoding="utf-8"))
