@@ -77,3 +77,19 @@ def test_preview_without_backend_is_a_clear_error(tmp_path, capsys, monkeypatch)
     if code == 0:
         pytest.skip("preview backend available")
     assert code == 2 and err.startswith("error")
+
+
+def test_check_shows_lenient_hints(tmp_path, capsys):
+    f = tmp_path / "a.md"
+    f.write_text("marp: true\n\n# A\n@3 chevorn\n* x\n@end\n", encoding="utf-8")
+    assert main(["check", str(f)]) == 0
+    out = capsys.readouterr().out
+    assert "marp-syntax" in out and "did you mean 'chevron'" in out and "bullet-star" in out
+    assert "end-outside-box" in out and out.startswith("warning")
+
+
+def test_check_never_tracebacks_on_binary_file(tmp_path, capsys):
+    f = tmp_path / "a.md"
+    f.write_bytes(b"\xff\xfe\x00bad")
+    assert main(["check", str(f)]) == 2
+    assert "Traceback" not in capsys.readouterr().err

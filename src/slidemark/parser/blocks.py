@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from typing import Any
 from urllib.parse import unquote
 
@@ -27,6 +28,7 @@ CHART_KINDS = (
     "radar",
 )
 RAW_KINDS = ("mermaid", "math", "html")
+MARP_SIZE = re.compile(r"^(w|h|width|height):(\d+(?:\.\d+)?(?:px|pt|cm|mm|in|%)?)$", re.I)
 
 
 def _close_index(tokens: list[Token], i: int) -> int:
@@ -302,15 +304,37 @@ class _Builder:
         if any(r.text.strip() for r in runs):
             self.add_paragraph(Paragraph(runs=runs), line)
 
+    def marp_image(self, ref: ImageRef) -> tuple[str, Attrs | None]:
+        """Marp sizing in the alt text (``![w:200 h:100 text](a.png)``) -> ``{w=200 h=100}``. Pure."""
+        words = ref.alt.split()
+        kept = [w for w in words if not MARP_SIZE.match(w) and w != "bg"]
+        if len(kept) == len(words):
+            return ref.alt, ref.attrs
+        attrs = Attrs(list(ref.attrs.classes), ref.attrs.id, dict(ref.attrs.kv)) if ref.attrs else Attrs()
+        for w in words:
+            m = MARP_SIZE.match(w)
+            if m:
+                attrs.kv.setdefault("w" if m.group(1).lower().startswith("w") else "h", m.group(2))
+        return " ".join(kept), attrs
+
     def add_image(self, ref: ImageRef, line: int) -> None:
-        if not ref.alt.strip():
+        alt, attrs = self.marp_image(ref)
+        if alt != ref.alt:
+            self.ctx.warn(
+                f"Marp image options in alt text '{ref.alt}'",
+                line,
+                "marp-syntax",
+                "write ![alt](a.png){w=200}; a bare number is pt",
+            )
+        if not alt.strip():
             self.ctx.warn(
                 "image has no alt text",
                 line,
                 "image-alt",
                 "write ![what the image shows](path); alt text is used for accessibility",
             )
-        el = Image(src=_local_src(ref.src), alt=ref.alt)
+        ref.attrs = attrs
+        el = Image(src=_local_src(ref.src), alt=alt)
         self.flush()
         self.take(el, line)
         if ref.attrs is not None:

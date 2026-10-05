@@ -18,9 +18,17 @@ def _read(path: str) -> str | None:
         return None
 
 
+def _say(text: str, file=None) -> None:
+    """print() that cannot raise on text the terminal encoding cannot show."""
+    try:
+        print(text, file=file or sys.stdout)
+    except UnicodeEncodeError:
+        print(text.encode("ascii", "backslashreplace").decode("ascii"), file=file or sys.stdout)
+
+
 def _print_diagnostics(deck: Deck, file=sys.stderr) -> None:
     for d in deck.diagnostics:
-        print(str(d), file=file)
+        _say(str(d), file)
 
 
 def _has_errors(deck: Deck) -> bool:
@@ -35,10 +43,10 @@ def cmd_check(args: argparse.Namespace) -> int:
         return 2
     deck = parse(text)
     if args.format == "json":
-        print(json.dumps([d.model_dump() for d in deck.diagnostics], ensure_ascii=False))
+        _say(json.dumps([d.model_dump() for d in deck.diagnostics], ensure_ascii=False))
     elif deck.diagnostics:
         for d in deck.diagnostics:
-            print(str(d))
+            _say(str(d))
     else:
         print(f"ok: {len(deck.slides)} slides")
     return 1 if _has_errors(deck) else 0
@@ -130,7 +138,11 @@ def main(argv: list[str] | None = None) -> int:
         args = make_parser().parse_args(argv)
     except SystemExit as e:  # argparse exits itself on bad usage / --help
         return int(e.code) if isinstance(e.code, int) else 2
-    return int(args.func(args))
+    try:
+        return int(args.func(args))
+    except Exception as e:  # the CLI contract: a message and an exit code, never a traceback
+        print(f"error: {type(e).__name__}: {e}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
+import difflib
+from collections.abc import Iterable
+
 from ..ir import Diagnostic
+
+
+def closest(word: str, options: Iterable[str], cutoff: float = 0.7) -> str | None:
+    """The valid option nearest to ``word`` (difflib), or ``None``."""
+    m = difflib.get_close_matches(word.lower(), list(options), n=1, cutoff=cutoff)
+    return m[0] if m else None
 
 
 class Ctx:
