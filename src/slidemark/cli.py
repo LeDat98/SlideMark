@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -210,33 +211,143 @@ def _review_png(args: argparse.Namespace, text: str, base: Path, render) -> None
         print(f"note: --png failed: {type(e).__name__}: {e}", file=sys.stderr)
 
 
-def cmd_build(args: argparse.Namespace) -> int:
-    from .build import build
-
-    src = Path(args.input)
-    if _read(args.input) is None:
-        return 2
-    out = Path(args.output) if args.output else src.with_suffix(".pptx")
+def _read_stdin() -> str | None:
     try:
-        if _is_json(args.input):
-            from .jsonio import build_deck, load_deck
+        buf = getattr(sys.stdin, "buffer", None)
+        return buf.read().decode("utf-8") if buf is not None else sys.stdin.read()
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"error: cannot read stdin: {e}", file=sys.stderr)
+        return None
+
+
+def _walk(elements):
+    for el in elements:
+        yield el
+        if getattr(el, "type", None) == "container":
+            yield from _walk(el.children)
+
+
+def _facts(deck: Deck, out: Path) -> str:
+    """The one line an agent would otherwise get by re-opening the .pptx."""
+    counts = {"chart": 0, "table": 0, "image": 0}
+    for slide in deck.slides:
+        parts = [e for e in (slide.title, slide.subtitle, slide.lead, slide.conclusion) if e is not None]
+        for el in _walk([*parts, *slide.elements]):
+            kind = "image" if el.type in ("image", "media") else el.type
+            if kind in counts:
+                counts[kind] += 1
+    notes = sum(1 for s in deck.slides if s.notes and s.notes.strip())
+    n_err = sum(1 for d in deck.diagnostics if d.level == "error")
+    n_warn = sum(1 for d in deck.diagnostics if d.level == "warning")
+    bits = [f"{len(deck.slides)} slide{'s' if len(deck.slides) != 1 else ''} {deck.size}"]
+    for key, n in counts.items():
+        if n:
+            bits.append(f"{n} {key}{'s' if n != 1 else ''}")
+    if notes:
+        bits.append(f"notes on {notes} slide{'s' if notes != 1 else ''}")
+    if n_err:
+        bits.append(f"{n_err} error{'s' if n_err != 1 else ''}")
+    bits.append(f"{n_warn} warning{'s' if n_warn != 1 else ''}")
+    return f"wrote {out}: " + ", ".join(bits)
+
+
+def _grouped(diags: list[Diagnostic]) -> list[str]:
+    """Errors, warnings, infos; the same finding on several slides prints once with its slide list."""
+    lines: list[str] = []
+    for level in ("error", "warning", "info"):
+        groups: dict[tuple, list[Diagnostic]] = {}
+        for d in (d for d in diags if d.level == level):
+            key = (d.rule, d.message, d.hint) if d.slide else (id(d),)
+            groups.setdefault(key, []).append(d)
+        for ds in groups.values():
+            if len(ds) == 1:
+                lines.append(str(ds[0]))
+                continue
+            d = ds[0]
+            slides = ",".join(str(n) for n in sorted({x.slide for x in ds if x.slide}))
+            hint = f" -> {d.hint}" if d.hint else ""
+            where = f"slides {slides}" if "," in slides else f"slide {slides}"
+            lines.append(f"{level} {where} {d.rule or ''}: {d.message}{hint} (x{len(ds)})".replace("  ", " "))
+    return lines
+
+
+def _write_text(path: Path, text: str) -> bool:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8", newline="")
+        return True
+    except OSError as e:
+        print(f"error: cannot write {path}: {e}", file=sys.stderr)
+        return False
+
+
+def cmd_build(args: argparse.Namespace) -> int:
+    from .build import build_deck
+    from .parser import parse
+
+    stdin = args.input == "-"
+    src = Path(args.input)
+    is_json = not stdin and _is_json(args.input)
+    text = _read_stdin() if stdin else _read(args.input)
+    if text is None:
+        return 2
+    out = Path(args.output) if args.output else Path("deck.pptx") if stdin else src.with_suffix(".pptx")
+    base = Path.cwd() if stdin else src.resolve().parent
+    fixed: list = []
+    if not is_json and not args.no_fix and src.suffix.lower() != ".html":
+        from .fix import fix_text
+
+        try:
+            text, fixed = fix_text(text, lambda t: parse(t).diagnostics)
+        except Exception as e:  # a fixer bug must not stop the build
+            print(f"note: auto-fix skipped: {type(e).__name__}: {e}", file=sys.stderr)
+    if fixed and not stdin and not _write_text(src, text):
+        return 2
+    if args.save and not _write_text(Path(args.save), text):
+        return 2
+    try:
+        if is_json:
+            from .jsonio import load_deck
 
             deck = load_deck(src)
             if _has_errors(deck):
-                _print_diagnostics(deck)
+                for line in _grouped(deck.diagnostics):
+                    _say(line)
                 return 1
-            deck = build_deck(deck, out, src.resolve().parent)
         else:
-            deck = build(src, out)
+            deck = parse(text)
+        deck = build_deck(deck, out, base)
     except NotImplementedError:
         print("error: layout/render are not available in this build yet", file=sys.stderr)
         return 2
     except Exception as e:  # keep the CLI contract: a message and an exit code, never a traceback
         print(f"error: build failed: {type(e).__name__}: {e}", file=sys.stderr)
         return 2
-    _print_diagnostics(deck)
-    print(f"wrote {out} ({len(deck.slides)} slides)")
+    for f in fixed:
+        _say(str(f))
+    for line in _grouped(deck.diagnostics):
+        _say(line)
+    if args.png:
+        _contact_png(out, Path(args.png))
+    _say(_facts(deck, out))
     return 1 if _has_errors(deck) else 0
+
+
+def _contact_png(pptx: Path, dest: Path) -> None:
+    """Render a contact sheet of every slide; any failure is one ``note:`` line, never an exit code."""
+    try:
+        from .preview import contact_sheet, have_soffice, pptx_to_pngs
+
+        if not have_soffice():
+            print("note: --png skipped: LibreOffice (soffice) not found", file=sys.stderr)
+            return
+        import tempfile
+
+        with tempfile.TemporaryDirectory(prefix="slidemark-") as tmp:
+            pngs = pptx_to_pngs(pptx, tmp, max_width=640)
+            _say(str(contact_sheet(pngs, dest)))
+    except Exception as e:
+        print(f"note: --png failed: {type(e).__name__}: {e}", file=sys.stderr)
 
 
 def cmd_import(args: argparse.Namespace) -> int:
@@ -317,6 +428,9 @@ def _skill_files() -> list[tuple[str, str]]:
 
 
 def cmd_docs(args: argparse.Namespace) -> int:
+    if os.environ.get("SLIDEMARK_NO_DOCS"):
+        print("docs are disabled here: SKILL.md has everything", file=sys.stderr)
+        return 3
     docs = dict(_skill_files())
     if not args.topic:
         _say(docs["SKILL.md"].rstrip("\n"))
@@ -418,9 +532,18 @@ def make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="slidemark", description="Markdown to native, editable .pptx")
     sub = p.add_subparsers(dest="command", required=True)
 
-    b = sub.add_parser("build", help="build a .pptx from a Markdown or JSON deck file")
-    b.add_argument("input")
-    b.add_argument("-o", "--output", help="output .pptx (default: next to the input)")
+    b = sub.add_parser(
+        "build",
+        help="build a .pptx from a Markdown or JSON deck: fixes, diagnostics and a facts line in one call",
+        description="Build a .pptx. INPUT '-' reads the deck from stdin (output defaults to ./deck.pptx), "
+        "e.g. slidemark build - -o deck.pptx --save deck.md <<'EOF'. Mechanical fixes are applied first "
+        "(like check --fix) and written back to the input file. The last output line is a facts line.",
+    )
+    b.add_argument("input", help="deck .md/.json file, or '-' for stdin")
+    b.add_argument("-o", "--output", help="output .pptx (default: next to the input; ./deck.pptx for stdin)")
+    b.add_argument("--save", metavar="PATH", help="also write the (fixed) source text here, e.g. with stdin")
+    b.add_argument("--no-fix", action="store_true", help="do not apply or write back mechanical fixes")
+    b.add_argument("--png", metavar="PATH.png", help="also render one contact-sheet PNG of all slides")
     b.set_defaults(func=cmd_build)
 
     c = sub.add_parser("check", help="print diagnostics for a .md or .json deck, one per line")

@@ -146,7 +146,7 @@ def test_bad_json_exit_1(tmp_path, capsys):
     assert "bad-json" in capsys.readouterr().out
     assert main(["build", str(j), "-o", str(tmp_path / "x.pptx")]) == 1
     captured = capsys.readouterr()
-    assert "bad-json" in captured.err
+    assert "bad-json" in captured.out
     j.write_text("not json", encoding="utf-8")
     assert main(["check", str(j)]) == 1
 
