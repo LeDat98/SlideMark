@@ -55,3 +55,6 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] A row group has `grid` set, so `_box_nat` returned None and every group got an equal share → `_group_nat`.
 - [layout] Template footer placeholders keep their own y → `template.footer_top()` bounds the body; extra growth (≤ 1.4×) only for very sparse box slides, else normal slides get shouty.
 - [perf] `import slidemark` 304 → ~200 ms: python-pptx is imported only when rendering (build_deck, template.open_template).
+- [import] An unglued loop is several `cxnSp` pieces → chain free ends (≈ 30000 EMU) before resolving endpoints; a connector start needs the full xfrm transform (flips + `rot`).
+- [import] `_shorten` must keep link tokens in its trial `@` lines: links change the auto-arrangement. `[x]` and `(x)` mermaid nodes differ only by roundRect `adj`.
+- [xsd] python-pptx chart templates write negative `c:axId` (xs:unsignedInt in ECMA-376); core properties > 255 chars raise in python-pptx → truncate.
