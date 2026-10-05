@@ -365,3 +365,66 @@ def test_html_corpus_never_crashes():
 def test_token_header_lines_never_raise(lines):
     text = "\n".join(f"{g}: {v}" for g, v in lines) + "\n\n# T\n- x\n"
     assert isinstance(parse(text), Deck)
+
+
+CSS_BITS = [
+    "h1",
+    ".box",
+    "slide.cover",
+    "td:nth-child(even)",
+    "a[b]",
+    "p::before",
+    ",",
+    ">",
+    " ",
+    "{",
+    "}",
+    ";",
+    ":",
+    "(",
+    ")",
+    '"',
+    "'",
+    "/*",
+    "*/",
+    "@media",
+    "@import url(x);",
+    ":root",
+    "--primary: #7C5CFF",
+    "var(--x)",
+    "color: red",
+    "color: #12",
+    "background: linear-gradient(135deg, #fff, rgba(0,0,0,.5))",
+    "background: url(",
+    "border: 2px dashed #abc",
+    "border-bottom: 1px",
+    "box-shadow: 0 8px 24px #0006",
+    "box-shadow: inset",
+    "padding: 1px 2px 3px 4px 5px",
+    "grid-template-columns: repeat(3, 1fr)",
+    "grid-template-columns: repeat(",
+    'grid-template-areas: "a a" "b',
+    "transform: rotate(",
+    "transform: rotate(1e999deg)",
+    "font-size: 1e999px",
+    "line-height: 0",
+    "opacity: -",
+    "!important",
+    "\n",
+    "日本語",
+    "\x00",
+]
+
+
+@settings(max_examples=300, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(st.lists(st.sampled_from(CSS_BITS), max_size=40).map("".join), st.booleans())
+def test_random_css_fences_never_crash(css, in_header):
+    fence = "```css\n" + css + "\n```\n"
+    check((fence + "# A\n- x\n") if in_header else ("# A\n- x\n" + fence + "## B\n" + fence))
+
+
+@settings(max_examples=200, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(st.text(), st.booleans())
+def test_arbitrary_text_in_css_fence_never_crashes(css, in_header):
+    fence = "```css\n" + css.replace("```", "") + "\n```\n"
+    check((fence + "# A\n") if in_header else ("# A\n" + fence))
