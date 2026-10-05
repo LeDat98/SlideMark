@@ -73,7 +73,9 @@ def test_sparse_boxes_are_capped_and_top_aligned():
         assert cs[0].h < 0.75 * H  # not stretched over the whole body
         assert cs[0].h > 0.2 * H  # but not tiny either
         below, body_h = _gap_below(placed, theme)
-        assert 0.22 * body_h <= cs[0].h <= 0.5 * body_h  # card height follows content (+ a modest factor)
+        assert (
+            0.22 * body_h <= cs[0].h <= (0.5 if theme == "default" else 0.65) * body_h
+        )  # follows content; consulting rows reach ~60%
         title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
         above = cs[0].y - (title.y + title.h)
         assert above > 0 and below > above  # a single sparse row sits in the upper-middle of the free body
@@ -94,7 +96,7 @@ def test_sparse_boxes_grow_text_uniformly_within_the_theme_limit():
         grid="3",
         elements=[box("a", "x", "y"), box("b", "x" * 10, "y"), box("c", "x", "y")],
     )
-    for theme, limit in (("default", 1.4), ("jp-business", 1.35)):
+    for theme, limit in (("default", 1.4), ("jp-business", 1.35 * 1.2)):  # consulting: + roomy pass
         placed, _ = lay(s, theme)
         scales = {p.font_scale for p in of(placed, Text) if p.element.role == "body"}
         assert len(scales) == 1

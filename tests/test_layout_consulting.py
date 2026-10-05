@@ -224,3 +224,122 @@ def test_numeric_columns_stay_close_to_content_width():
     assert sum(w) == 12000000
     assert w[0] > w[1] and w[0] > w[2]  # the text column takes the larger share of the spare width
     assert w[1] >= 0.9 * 914400 * 0.5  # "Revenue" never wraps mid-word
+
+
+# ---- consulting review 2: grid text grows before rows expand, table text follows box text, lone rows
+
+_RISKS = """theme: jp-business
+density: dense
+
+# t
+@2x2
+## A
+- 影響：大／発生可能性：高
+- 対応：先行2拠点で成功事例を作り横展開
+## B
+- 影響：大／発生可能性：中
+- 対応：段階移行と旧システムの並行稼働（3か月）
+## C
+- 影響：中／発生可能性：中
+- 対応：共同配送の効果を荷主別に可視化して提示
+## D
+- 影響：中／発生可能性：中
+- 対応：データ人材を年5名採用、外部パートナー活用
+> 最大のリスクは現場の定着
+"""
+
+
+def _lay_md(src):
+    from slidemark.parser import parse
+    from slidemark.template import resolve_theme
+
+    deck = parse(src)
+    theme, _ = resolve_theme(deck.theme, None)
+    return layout_slide(deck.slides[0], deck, theme, 0), deck
+
+
+def _pt(p):
+    return p.style.font_size * p.font_scale
+
+
+def test_multirow_grid_grows_text_before_expanding_rows():
+    placed, deck = _lay_md(_RISKS)
+    bodies = [p for p in of(placed, Text) if p.element.role == "body" and p.h > 0]
+    assert min(_pt(p) for p in bodies) >= 1.5 * 9.9 - 0.1  # dense jp-business body 9.9 pt x (1.39 x 1.2)
+    assert not [d for d in deck.diagnostics if d.rule == "overflow"]
+    cs = cards(placed)
+    for c in cs:
+        inner = [
+            p
+            for p in of(placed, Text)
+            if c.x <= p.x and p.y >= c.y and p.y + p.h <= c.y + c.h + 2 and p.h > 0
+        ]
+        assert inner and sum(p.h for p in inner) / c.h >= 0.4  # card fill (was ~0.3 before text grew first)
+    bar = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "conclusion")
+    assert max(c.y + c.h for c in cs) <= bar.y  # nothing overlaps the conclusion
+
+
+_ROADMAP = """theme: jp-business
+density: dense
+
+# t
+@4
+## a
+- WMS 要件定義
+- PoC
+## b
+- WMS 本番稼働
+- AI 配車 PoC
+## c
+- 全国展開
+- 需要予測の導入
+## d
+- 共同配送開始
+- 効果検証
+| m | t | k |
+|-|-|-|
+| WMS PoC 完了 | 2027 年 9 月 | 99% |
+| AI 配車 | 2028 年 3 月 | +8pt |
+"""
+
+
+def test_table_text_stays_within_one_step_of_box_text():
+    placed, _ = _lay_md(_ROADMAP)
+    body = max(_pt(p) for p in of(placed, Text) if p.element.role == "body" and p.h > 0)
+    tb = of(placed, Table)[0]
+    tsz = _pt(tb)
+    assert body / tsz <= 1.15 + 1e-6 and tsz / body <= 1.15
+    assert tsz > 10.5 * 0.9 * 1.25  # it grew (it was 1.2x before)
+
+
+def test_single_sparse_row_reaches_most_of_the_body():
+    src = """theme: jp-business
+density: dense
+
+# t
+> lead line
+@2
+## A
+1. 物流 DX 推進計画の基本方針
+2. 第 1 期投資 8.0 億円
+3. DX 推進委員会の設置
+## B
+- 2026 年 11 月：詳細計画
+- 2027 年 1 月：契約締結
+- 2027 年 4 月：プロジェクト開始
+- 2027 年 9 月：PoC 結果を取締役会へ報告
+"""
+    placed, _ = _lay_md(src)
+    cs = cards(placed)
+    top = cs[0].y
+    body_h = (H - round(0.3 * 914400)) - top
+    assert 0.55 * body_h <= cs[0].h <= 0.68 * body_h
+    assert len({c.h for c in cs}) == 1
+
+
+def test_full_dense_slide_is_unchanged_by_the_roomy_row_policy():
+    dense = [f"line {i} " + "word " * 25 for i in range(9)]
+    s = Slide(title=T("t", "title"), grid="2", elements=[box("a", *dense), box("b", *dense)])
+    placed, _ = lay(s, "jp-business")
+    cs = cards(placed)
+    assert cs[0].h > 0.8 * (H - cs[0].y - round(0.3 * 914400))  # full slide: rows keep the whole body
