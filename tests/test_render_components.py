@@ -270,3 +270,12 @@ def test_table_cells_are_centered_and_numbers_right_aligned(tmp_path):
     aligns = [tbl.cell(r, 1).text_frame.paragraphs[0].alignment for r in range(3)]
     assert all(a == PP_ALIGN.RIGHT for a in aligns)
     assert tbl.cell(1, 0).text_frame.paragraphs[0].alignment == PP_ALIGN.LEFT
+
+
+def test_latin_badge_in_a_japanese_deck_is_padded(tmp_path):
+    runs = [Run(text="B", highlight="danger"), Run(text="A", highlight="success")]
+    s = Slide(elements=[Text(paragraphs=[Paragraph(runs=runs)])])
+    prs, _, _ = build(Deck(slides=[s], lang="ja"), tmp_path, "jp-business")
+    tb = next(x for x in prs.slides[0].shapes if x.has_text_frame)
+    pad = "\u00a0\u00a0"
+    assert [r.text for r in tb.text_frame.paragraphs[0].runs] == [f"{pad}B{pad}", f"{pad}A{pad}"]

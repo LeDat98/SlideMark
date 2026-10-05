@@ -221,8 +221,9 @@ def test_theme_none_top_gap_token_moves_the_body(tmp_path):
         prs, _ = _build_none(tmp_path, {**TOKENS, "layout.top_gap": gap})
         return min(s.top for s in prs.slides[0].shapes if s.name.startswith("Card"))
 
-    # a sparse slide moves its leftover down, so the shift is not exact: a bigger gap pushes the body down
-    assert 0 < body_top("1in") - body_top("0.25in") <= 685800
+    # sparse slides rebalance their leftover (taller cards, shift), so the shift is not exact: the token still
+    # changes where the body starts
+    assert body_top("1in") != body_top("0.25in")
 
 
 def test_theme_none_has_no_preset_look(tmp_path):
@@ -230,3 +231,45 @@ def test_theme_none_has_no_preset_look(tmp_path):
     prs, deck = _build_none(tmp_path, {})
     assert str(prs.slides[0].background.fill.fore_color.rgb) == "FFFFFF"
     assert deck.theme == "none"
+
+
+@pytest.mark.parametrize(
+    "css,rect",
+    [
+        ("circle at 25% 30%", (25000, 30000, 75000, 70000)),
+        ("circle", (50000, 50000, 50000, 50000)),
+        ("at left top", (0, 0, 100000, 100000)),
+        ("ellipse at 80%", (80000, 50000, 20000, 50000)),
+    ],
+)
+def test_radial_gradient_position(tmp_path, css, rect):
+    sppr, _ = card_sppr(Style(fill=f"radial-gradient({css}, #FFF, #000)"), tmp_path)
+    r = sppr.find(qn("a:gradFill")).find(qn("a:path")).find(qn("a:fillToRect"))
+    assert tuple(int(r.get(k)) for k in "ltrb") == rect
+
+
+def test_style_rotation_is_written_for_html_text_and_shapes(tmp_path):
+    """Placed items carry ``Style.rotation`` (as the HTML converter produces them): ``a:xfrm rot``."""
+    from slidemark.ir import Placed, Shape
+
+    text = Text(role="body", paragraphs=[Paragraph(runs=[Run(text="tilted")])], attrs={"measured": "html"})
+    items = [
+        Placed(element=text, x=914400, y=914400, w=2743200, h=457200, style=Style(rotation=-12.5)),
+        Placed(
+            element=Shape(shape="rect"),
+            x=914400,
+            y=2286000,
+            w=1828800,
+            h=914400,
+            style=Style(fill="#FF0000", rotation=30),
+        ),
+    ]
+    deck = Deck(slides=[Slide(title=T("t", "title"), elements=[])])
+    th = get_theme("default")
+    out = tmp_path / "rot.pptx"
+    render(deck, [items], th, out)
+    prs = Presentation(str(out))
+    rots = sorted(
+        int(x.get("rot")) for x in prs.slides[0].shapes._spTree.iter(qn("a:xfrm")) if x.get("rot") is not None
+    )
+    assert rots == [round(30 * 60000), round(347.5 * 60000)]

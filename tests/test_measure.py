@@ -1,3 +1,5 @@
+import pytest
+
 from slidemark.ir import Paragraph, Run, Style
 from slidemark.layout import measure
 from slidemark.units import EMU_PER_PT
@@ -17,8 +19,13 @@ def test_known_widths():
     assert measure.char_em("M", font="Liberation Sans") > measure.char_em("i", font="Liberation Sans")
 
 
-def test_unknown_font_uses_arial():
-    assert measure.text_em("Hello world", font="Comic Foo") == measure.text_em("Hello world", font="Arial")
+def test_unknown_font_is_measured_wider_than_arial():
+    wide = measure.text_em("Hello world", font="Comic Foo")
+    assert wide == pytest.approx(measure.text_em("Hello world", font="Arial") * measure.UNKNOWN_FONT_WIDEN)
+    # a heading that fits one line in Arial wraps for an unknown family (Inter -> DejaVu in LibreOffice)
+    segs = [("Machine perception", True, False)]
+    assert measure.count_lines(segs, 196, 20, "Arial") == 1
+    assert measure.count_lines(segs, 196, 20, "Inter") == 2
 
 
 def test_vietnamese_and_combining():

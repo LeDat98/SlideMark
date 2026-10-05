@@ -55,6 +55,12 @@ _LANG = {
     "fr": "fr-FR",
     "de": "de-DE",
 }
+
+
+def _cjk_lang(lang: str | None) -> bool:
+    return (lang or "").lower().split("-")[0] in ("ja", "zh", "ko")
+
+
 _BADGE_PAD = "\u3000"  # full-width space: renders flush inside the highlight (Latin spaces leave a gap)
 _BULLETS = ["•", "–", "•", "–"]
 _NUMBERING = ["arabicPeriod", "alphaLcParenR", "romanLcPeriod", "arabicPeriod"]
@@ -212,7 +218,10 @@ def fill_text(
                 seg = transform_text(seg, pst.text_transform)
                 r = para.add_run()
                 # badge: padding keeps bold CJK glyphs inside the highlight (LibreOffice clips them otherwise)
-                pad = _BADGE_PAD if run.highlight and measure.has_cjk(seg) else ""
+                pad = ""
+                if run.highlight:
+                    cjk = measure.has_cjk(seg)
+                    pad = _BADGE_PAD if cjk else ("\u00a0\u00a0" if _cjk_lang(rc.deck.lang) else "")
                 r.text = f"{pad}{seg}{pad}"
                 _format_run(rc, r, run, pst, size, seg, scale)
                 first_text = first_text or seg
