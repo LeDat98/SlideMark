@@ -25,13 +25,28 @@ from .blocks import convert
 from .ctx import Ctx, closest
 from .inline import inline_runs
 from .lenient import Rec, normalize
+from .tokens import THEME_MAPS, TOKEN_GROUPS, parse_token_line, parse_token_map
 
 FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 H1_RE = re.compile(r"^#(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
 HN_RE = re.compile(r"^(#{2,3})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
 HR_RE = re.compile(r"^-{3,}[ \t]*$")
 KV_RE = re.compile(r"^([A-Za-z_][\w-]*)[ \t]*:[ \t]*(.*?)[ \t]*$")
-HEADER_KEYS = ("theme", "size", "lang", "title", "author", "footer", "num", "density", "sections")
+HEADER_KEYS = (
+    "theme",
+    "size",
+    "lang",
+    "title",
+    "author",
+    "footer",
+    "num",
+    "density",
+    "sections",
+    "colors",
+    "fonts",
+    "sizes",
+    "style",
+)
 SHORT_LINE = 60
 MARP_IGNORED = (
     "header",
@@ -82,7 +97,11 @@ def _set_header(deck: Deck, key: str, value: str, ctx: Ctx, line: int) -> None:
     if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
         value = value[1:-1]
     k = key.lower()
-    if k == "theme":
+    if k in TOKEN_GROUPS and not (
+        k == "style" and value[:1] in ("|", ">")
+    ):  # Marp `style: |` CSS is ignored below
+        parse_token_line(deck, k, value, ctx, line)
+    elif k == "theme":
         deck.theme = value or "default"
     elif k == "size":
         deck.size = value or "16:9"
@@ -161,6 +180,10 @@ def parse_header(lines: list[str], inside: list[bool], deck: Deck, ctx: Ctx) -> 
                 data = None
             if isinstance(data, dict) and data:
                 for k, v in data.items():
+                    kl = str(k).lower()
+                    if isinstance(v, dict) and (kl in TOKEN_GROUPS or kl in THEME_MAPS):
+                        parse_token_map(deck, kl, v, ctx, i + 1)
+                        continue
                     _set_header(deck, str(k), "" if v is None else str(v), ctx, i + 1)
                 i = j + 1
     while i < n:

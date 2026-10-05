@@ -8,6 +8,7 @@ write (``theme: ./brand.yaml``) or override inline with header lines (``colors:`
 
 from __future__ import annotations
 
+import copy
 import difflib
 import re
 from functools import cache
@@ -361,7 +362,7 @@ def apply_tokens(theme: Theme, tokens: dict[str, str]) -> tuple[Theme, list[Diag
     diags: list[Diagnostic] = []
     data = theme.model_dump()
     for path, raw in tokens.items():
-        trial = merge_data(data, {})
+        trial = copy.deepcopy(data)
         try:
             _set_path(trial, path.split("."), _value(raw) if isinstance(raw, str) else raw)
             Theme.model_validate(trial)

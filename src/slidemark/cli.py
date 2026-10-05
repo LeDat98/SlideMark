@@ -347,6 +347,55 @@ def cmd_skill_install(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_themes(args: argparse.Namespace) -> int:
+    from .theme import available
+
+    for name in available():
+        _say(name)
+    return 0
+
+
+def cmd_tokens(args: argparse.Namespace) -> int:
+    """Every token path with its resolved value, for a theme (name or path) or a deck (with inline tokens)."""
+    from .template import deck_theme, resolve_theme
+    from .theme import schema_table
+
+    target = args.target or args.theme or "default"
+    diags: list[Diagnostic] = []
+    if Path(target).suffix.lower() in (".md", ".markdown", ".json"):
+        text = _read(target)
+        if text is None:
+            return 2
+        base = str(Path(target).resolve().parent)
+        if _is_json(target):
+            from .jsonio import load_deck
+
+            deck = load_deck(text)
+        else:
+            from .parser import parse
+
+            deck = parse(text)
+        theme, diags = deck_theme(deck, base)
+        diags = [d for d in deck.diagnostics if d.rule in ("unknown-token", "bad-token")] + diags
+    else:
+        theme, diags = resolve_theme(target, Path.cwd())
+    rows = schema_table(theme)
+    if args.format == "json":
+        _say(json.dumps(dict(rows), ensure_ascii=False))
+    else:
+        group = None
+        for path, value in rows:
+            head = path.split(".")[0]
+            if head != group:
+                if group is not None:
+                    _say("")
+                group = head
+            _say(f"{path} = {value}")
+    for d in diags:
+        _say(str(d), sys.stderr)
+    return 0
+
+
 def cmd_version(args: argparse.Namespace) -> int:
     from . import __version__
 
@@ -402,6 +451,14 @@ def make_parser() -> argparse.ArgumentParser:
     si.add_argument("--dir", help="target directory (default: ~/.claude/skills/slidemark)")
     si.add_argument("--print", action="store_true", help="list the files it would write, write nothing")
     si.set_defaults(func=cmd_skill_install)
+
+    t = sub.add_parser("tokens", help="list every design token and its value for a theme or a deck")
+    t.add_argument("target", nargs="?", help="deck (.md/.json), theme name or theme file (default: default)")
+    t.add_argument("--theme", help="theme name or .yaml/.pptx path")
+    t.add_argument("--format", choices=["text", "json"], default="text")
+    t.set_defaults(func=cmd_tokens)
+
+    sub.add_parser("themes", help="list theme names").set_defaults(func=cmd_themes)
 
     sub.add_parser("version", help="print the version").set_defaults(func=cmd_version)
     return p
