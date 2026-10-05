@@ -25,6 +25,7 @@ TITLES = {
     "11-jp-consulting": "Tiếng Nhật: bộ 9 slide tư vấn dày đặc (tóm tắt, KPI, tổ chức, lộ trình, rủi ro)",
     "13-brand-aurora": "Thiết kế tự do: thương hiệu tối, gradient, bóng đổ (theme: none + token)",
     "14-brand-terracotta": "Thiết kế tự do: thương hiệu sáng, font serif, màu đất nung (token)",
+    "15-html-mixed": "Slide HTML toàn trang (@html) + slide SlideMark dùng chung token",
 }
 
 

@@ -645,8 +645,12 @@ def _text(it: dict, ox: int, oy: int, theme: Theme) -> Placed:
         )
         for p in it["paras"]
     ]
+    # Chromium already measured this text: lint must not re-measure it, and a single line must not wrap when
+    # PowerPoint substitutes a wider font (attrs read by lint and render)
+    one_line = len(paras) == 1 and it["lh"] and it["h"] < 1.6 * it["lh"]
+    attrs = {"measured": "html", **({"nowrap": True} if one_line else {})}
     return Placed(
-        element=Text(role="body", paragraphs=paras),
+        element=Text(role="body", paragraphs=paras, attrs=attrs),
         x=ox + round(it["x"] * EMU_PER_PX),
         y=oy + round(it["y"] * EMU_PER_PX),
         w=round(it["w"] * EMU_PER_PX),
