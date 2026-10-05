@@ -82,6 +82,24 @@ row of chevron boxes). Without it a box runs to the end of the slide; `check` hi
 table, chart or callout that its siblings do not. A `>` that ends the slide is the conclusion even without
 `@end`.
 
+**Row groups.** An `@` line after `@end` starts a new row group with its own grid: the boxes of each group
+are laid out by that group's `@` line, and the groups are stacked top to bottom (each takes its natural height,
+the rest of the body is shared).
+
+```markdown
+@2 flow
+## 現状
+- 手作業が多い
+## 改善後
+- 自動化
+@end
+@2
+## 工数 {.kpi}
+-40%
+## ミス {.kpi}
+-70%
+```
+
 Blocks beyond the cells of the slide grid (for example a table after `@end` under `@4 chevron`, or a fourth
 block under `@aab/aac`) are stacked **full width below the grid**, each in its own row.
 
