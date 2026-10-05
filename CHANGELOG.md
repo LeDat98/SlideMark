@@ -25,3 +25,5 @@ All notable changes. Versions follow semver once 0.1.0 is published.
 - Linter: overflow, off-slide, overlap, contrast, tiny-text, alt, connector-crosses, missing-end.
 - Skill: `SKILL.md` (≤ 1,500 tokens) + 5 reference pages (≤ 800 tokens each).
 - Bench: token corpus + gate, layout-inference metric, agent eval harness.
+- `python -m slidemark.xsd deck.pptx`: ECMA-376 schema validation (markup compatibility resolved to the
+  fallback); `bench/xsd_fuzz.py` validates fuzzed decks. CI on Python 3.10–3.12 with a coverage report.
