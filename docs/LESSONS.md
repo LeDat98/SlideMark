@@ -74,3 +74,5 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] A mermaid diagram is a Container, so "text + visual" never applied: wide diagrams (LR ≥ 4 ranks) now take full width with text below; `_side_route` checks both sides for nodes at the target rank. Rows in a text/code stack take natural height (a floor made the scorer prefer a gap).
 - [layout] A diagram overflowing by 5% at scale 1.0 shrank the whole slide to 0.55 → the diagram squeezes its own font/nodes; rank-gap minimums are per gap (one labelled elbow widened all gaps).
 - [import] Drop an `@` line only if the trial slide matches geometry, not just grid tokens; cluster rows by vertical overlap (visuals are centered in cells); the code language is not stored in the .pptx → try lexers until colors map one-to-one.
+- [layout] Judge the roomy pass before row expansion and cap grown rows at ≈ 1.9× natural, or multi-row grids get empty cards; table text needs a growth floor tied to box text on the same slide.
+- [fix] `check --fix` applies edits bottom-up, idempotent, never touches content text; token regexes need `(?<![^\s@])` because `@` is glued to the first token.
