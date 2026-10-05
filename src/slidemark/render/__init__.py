@@ -645,9 +645,10 @@ def _core_properties(prs, deck: Deck) -> None:
             if sl.title and sl.title.paragraphs:
                 title = " ".join(p.plain for p in sl.title.paragraphs)
                 break
+    # core properties are limited to 255 characters (python-pptx raises beyond that)
     if title:
-        cp.title = title
+        cp.title = title[:255]
     if deck.author:
-        cp.author = deck.author
+        cp.author = deck.author[:255]
     if deck.lang:
-        cp.language = deck.lang
+        cp.language = deck.lang[:255]
