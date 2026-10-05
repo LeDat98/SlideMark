@@ -197,8 +197,10 @@ def _import(prs, out_dir, diags: list[Diagnostic]) -> tuple[str, list[Diagnostic
     for n, sd in enumerate(datas, 1):
         try:
             sdiags: list[Diagnostic] = []
-            lines = build_slide(n, sd, deck, sdiags, save_image, classes)
+            info: dict = {}
+            lines = build_slide(n, sd, deck, sdiags, save_image, classes, info)
             diags.extend(sdiags)
+            lines = _shorten(lines, info, sd, deck, classes, header)
         except Exception as e:
             diags.append(
                 Diagnostic(
@@ -213,3 +215,44 @@ def _import(prs, out_dir, diags: list[Diagnostic]) -> tuple[str, list[Diagnostic
         chunks.append("\n".join(lines))
     text = ("\n".join(header) + "\n\n" if header else "") + "\n\n".join(chunks) + "\n"
     return text, diags
+
+
+def _variants(tokens: list[str]) -> list[list[str]]:
+    """Shorter ``@`` lines to try, shortest first: none, only the flow/chevron word, the full line."""
+    words = [t for t in tokens if t in ("chevron", "flow")]
+    out: list[list[str]] = [[]]
+    if words:
+        out.append(words)
+    return out
+
+
+def _shorten(lines, info, sd, deck, classes, header) -> list[str]:
+    """Drop ``@`` tokens the auto-arrangement reproduces: build a trial slide and compare its grid."""
+    tokens, at = info.get("tokens") or [], info.get("at")
+    if at is None or not tokens or tokens == ["blank"]:
+        return lines
+    hidden = ["hidden"] if sd.hidden else []
+    try:
+        import tempfile
+
+        from pptx import Presentation
+
+        from ..build import build
+
+        for var in _variants(tokens):
+            new = [*var, *hidden]
+            trial = [*lines[:at], *(["@" + " ".join(new)] if new else []), *lines[at + 1 :]]
+            text = ("\n".join(header) + "\n\n" if header else "") + "\n".join(trial) + "\n"
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "t.pptx"
+                build(text, path)
+                prs = Presentation(str(path))
+                ctx = ReadCtx(accent=deck.accent or "")
+                ctx.slide_index[prs.slides[0].part] = 1
+                got: dict = {}
+                build_slide(1, read_slide(prs.slides[0], ctx), deck, [], lambda *a: "", classes, got)
+            if got.get("tokens") == tokens:
+                return trial
+    except Exception:
+        return lines
+    return lines

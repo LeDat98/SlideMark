@@ -39,6 +39,7 @@ class Block:
     sub: bool = False
     chevron: bool = False
     callout: str = "note"
+    icon: str | None = None
 
 
 # --------------------------------------------------------------------------- classification
@@ -54,7 +55,9 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
     items = data.items
     for it in items:
         nm = it.name.lower().strip()
-        if (
+        if nm.startswith("icon ") and it.kind == "shape":
+            it.role = "icon"
+        elif (
             it.ph in ("ftr", "sldNum", "dt")
             or nm in ("footer", "slide number")
             or it.has_slidenum
@@ -196,6 +199,22 @@ def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
         and 0.004 * slide_area <= i.area <= 0.85 * slide_area
         and not (i.role or "").startswith("callout")
     ]
+    tol = 0.01 * W
+    cands = [  # a heading band shares the top edge and width of its card: it is decoration, not a box
+        c
+        for c in cands
+        if not (
+            c.kind == "shape"
+            and any(
+                p is not c
+                and p.area > c.area
+                and abs(p.x - c.x) <= tol
+                and abs(p.w - c.w) <= tol
+                and abs(p.y - c.y) <= tol
+                for p in cands
+            )
+        )
+    ]
     parent: dict[int, Item] = {}
     kids: dict[int, list[Item]] = {}
     for it in pool:
@@ -286,6 +305,23 @@ def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
             continue
         out.extend(make(it, False))
     return out
+
+
+def _attach_icons(icons: list[Item], blocks: list[Block]) -> None:
+    """``icon <name>`` shapes belong to the smallest box that contains their center."""
+    boxes: list[Block] = []
+
+    def walk(bs: list[Block]) -> None:
+        for b in bs:
+            if b.kind == "box":
+                boxes.append(b)
+                walk(b.children)
+
+    walk(blocks)
+    for ic in icons:
+        inside = [b for b in boxes if b.x <= ic.cx <= b.x + b.w and b.y <= ic.cy <= b.y + b.h]
+        if inside:
+            min(inside, key=lambda b: b.w * b.h).icon = ic.name.strip()[5:].strip()
 
 
 # --------------------------------------------------------------------------- grid
@@ -501,7 +537,8 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     mark = "###" if b.sub else "##"
     chunks: list[tuple[str, list[str]]] = []
     kpi = _kpi(b)
-    head = f"{mark} {_head(b.heading or [], out)}" + (" {.kpi}" if kpi else "")
+    attrs = (".kpi " if kpi else "") + (f"icon={b.icon}" if b.icon else "")
+    head = f"{mark} {_head(b.heading or [], out)}" + (f" {{{attrs.strip()}}}" if attrs else "")
     if b.chevron:
         content = text_lines(b.paras, accent=acc, classes=cls)
         return [("meta", [head, *content])]
@@ -537,10 +574,12 @@ def build_slide(
     diags: list[Diagnostic],
     save_image: Callable[[int, int, bytes, str], str],
     classes: dict[str, str],
+    info: dict | None = None,
 ) -> list[str]:
     title, pool = classify(data, deck)
     by_role = {r: [i for i in data.items if i.role == r] for r in ("lead", "conclusion", "footnote")}
     blocks = make_blocks(pool, deck)
+    _attach_icons([i for i in data.items if i.role == "icon"], blocks)
     arrows = sum(1 for i in pool if i.kind == "shape" and i.prst and "rrow" in i.prst)
     notes: list[str] = []
     texts = [b for b in blocks if b.kind == "text"]
@@ -601,9 +640,14 @@ def build_slide(
         lines.append("> " + one_line(lead[0].paras, accent=deck.accent, classes=classes))
     if arrows and tokens and tokens[0].isdigit() and len(grid) > 1 and arrows >= len(grid) - 1:
         tokens.append("flow")
+    if info is not None:
+        info["tokens"] = [t for t in tokens if t != "blank"]
+        info["at"] = None
     if data.hidden:
         tokens = [*tokens, "hidden"]
     if tokens:
+        if info is not None:
+            info["at"] = len(lines)
         lines.append("@" + " ".join(tokens))
     chunks: list[tuple[str, list[str]]] = []
     seq = [*grid, *extras]
