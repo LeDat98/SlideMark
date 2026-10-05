@@ -143,8 +143,11 @@ def _figures():
 
 
 def test_numeric_table_width_is_capped_and_left_aligned():
+    # `layout.table_fill_width` (default on) makes a lone table span the width; off keeps the narrow cap
     s = Slide(title=T("t", "title"), elements=[_figures()])
-    placed, _ = lay(s)
+    th = get_theme("jp-business").model_copy(deep=True)
+    th.layout.table_fill_width = False
+    placed = layout_slide(s, Deck(slides=[s]), th, 0)
     (tp,) = of(placed, Table)
     assert tp.x == to_emu(get_theme("jp-business").margin_x)
     assert tp.w < 0.8 * full_width()

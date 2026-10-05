@@ -143,7 +143,7 @@ def test_content_slide_boxes_stay_boxes():
     deck = parse("# Deck\n## A\n- x\n- y\n## B\n- z\n")
     assert len(deck.slides[0].elements) == 2
     assert not any(d.rule == "cover-heading" for d in deck.diagnostics)
-    deck = parse("# Deck\n## Only\n")  # a lone box is not a cover
+    deck = parse("# Deck\n## Only\n- x\n")  # a lone box with a body is not a cover
     assert deck.slides[0].elements
 
 
