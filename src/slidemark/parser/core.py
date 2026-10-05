@@ -26,7 +26,7 @@ from .css import extract_fences, parse_css
 from .ctx import Ctx, closest
 from .inline import inline_runs
 from .lenient import Rec, normalize
-from .tokens import THEME_MAPS, TOKEN_GROUPS, parse_token_line, parse_token_map
+from .tokens import THEME_MAPS, TOKEN_GROUPS, finish_tokens, parse_token_line, parse_token_map
 
 FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 H1_RE = re.compile(r"^#(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
@@ -941,6 +941,7 @@ def parse_deck(text: str) -> Deck:
                 default=0,
             )
             slide_css.setdefault(k, []).append((fi, body))
+    finish_tokens(deck, ctx)
     for r in recs:
         # a record belongs to the first slide that ends after its line (blank separator slides are dropped)
         k = next((ci for ci, c in enumerate(chunks) if c.end > r.idx), len(chunks) - 1)

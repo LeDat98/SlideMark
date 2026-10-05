@@ -59,13 +59,41 @@ def _split_key(pair: str) -> tuple[str, str | None]:
 
 
 def set_token(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int) -> None:
-    from ..theme import canonical_token
+    from ..theme import TokenValueError, canonical_token, normalize_token
 
     path, hint = canonical_token(group, key)
     if path is None:
         ctx.warn(f"unknown token '{key}' in {group}:", line, "unknown-token", hint.replace("\n", " "))
-    else:
-        deck.tokens[path] = value
+        return
+    try:  # lenient: a bare word may be a color declared later; apply_tokens checks it again
+        normalize_token(path, value, None)
+    except TokenValueError as e:
+        ctx.warn(f"token {key}={value}: {e}"[:140], line, "bad-token", e.hint)
+        return
+    deck.tokens[path] = value
+    deck.attrs.setdefault("_token_src", {})[path] = (line, key, value)
+
+
+def finish_tokens(deck: Deck, ctx: Ctx) -> None:
+    """After the header (and header CSS): re-check values whose bare words may be color names declared later.
+
+    The parse-time check is lenient (any bare word passes); here names declared anywhere in the header (and
+    every preset's color names) count. A word still unknown is dropped with one ``bad-token`` warning that
+    carries the header line; ``apply_tokens`` re-checks against the chosen theme.
+    """
+    from ..theme import TokenValueError, normalize_token
+    from .css import known_color_names
+
+    src = deck.attrs.pop("_token_src", {})
+    names = known_color_names(deck)
+    for path, (line, key, value) in src.items():
+        if deck.tokens.get(path) != value:
+            continue
+        try:
+            normalize_token(path, value, names)
+        except TokenValueError as e:
+            del deck.tokens[path]
+            ctx.warn(f"token {key}={value}: {e}"[:140], line, "bad-token", e.hint)
 
 
 def parse_token_line(deck: Deck, group: str, value: str, ctx: Ctx, line: int) -> None:

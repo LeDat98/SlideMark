@@ -1081,3 +1081,12 @@ def extract_fences(lines: list[str]) -> list[tuple[int, str]]:
                 lines[k] = ""
         i = j + 1
     return out
+
+
+# ---- helpers shared with design tokens
+# Public names for theme.apply_tokens (`style: card.border="0.75pt solid #B08D57"` maps like CSS).
+BadValue = _Bad
+Maps = _Maps
+is_gradient = _is_gradient
+gradient = _gradient
+split_tokens = _tokens
