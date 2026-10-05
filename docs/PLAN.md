@@ -260,6 +260,14 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
 - **Wave 3 A: HTML → native via Chromium measurement** (`src/slidemark/htmlnative.py`): unsupported HTML blocks
   are laid out in headless Chromium and converted to native rects/text/images; `{render=image}` opts out;
   canvas/complex SVG keep the image fallback.
-- **Wave 3 B: fixes from the wave 2 gallery review.**
+- **Wave 3 B: fixes from the wave 2 gallery review.** (done)
 - **Wave 3 A (done): import fidelity** on 19 agent-written python-pptx decks (`bench/import_fidelity.py`, 0.955 → 0.977).
 - **Wave 4 A: `slidemark review`** (`critique.py`): design critic with source-level hints and a 0–100 score.
+
+## Run 2026-10-05 (manual, 04:10 UTC) status
+- [x] Leftover: sparse box slides + consulting-grade layout pass (top anchoring, content-sized cards/chevrons/trees/tables, growth, search)
+- [x] Leftover: importer reconstructs connectors and mermaid; round trip 98.2% lossless on 111 decks; foreign decks 0.975
+- [x] L5: video/audio; HTML → native via Chromium
+- [x] L6: XSD validation (10k fuzzed decks valid), CI 3.10–3.12 + coverage 93%
+- [x] L7: agent eval 100 tasks (99%), `slidemark review`, layout search, `check --fix`
+- [ ] L3 consulting-grade judgement of examples/11 (close; heading/body scale + paragraph spacing in wave 8)
