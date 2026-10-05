@@ -41,10 +41,13 @@ num: on
 
 Content:
 - `**b**` `*i*` `==accent==` `[x]{.danger}` `[済]{.badge .success}` `[link](url)`; lists `-` / `1.`.
-- `## 売上 {.kpi icon=yen}` + `12.4億円` + caption line = KPI card; `icon=` works on any box heading.
+- `## 売上 {.kpi icon=yen}` + `12.4億円` + caption line = KPI card. `icon=` on any box heading: check x warning
+  info user users building factory chart money yen target rocket lightbulb gear clock calendar document mail
+  phone globe lock shield cloud database search star heart truck cart leaf arrow-up arrow-down arrow-right.
 - `> [!warn] text` callout (`note` `tip` `warn` `caution`).
 - GFM table; a lone `<` merges left, `^` merges up; `{align=lrr}` on the line before.
-- Chart fence (`column bar line pie doughnut area scatter radar stacked-column stacked-bar`), CSV body:
+- Chart fence (`column bar line pie doughnut area scatter radar stacked-column stacked-bar`), CSV: first row =
+  categories, one row per series; options `title legend=bottom|none labels=on|percent fmt="0%"`:
 
 ````markdown
 ```column {title="売上（億円）" labels=on}
@@ -56,5 +59,5 @@ Content:
 - Branches/loops: ` ```mermaid ` `graph TD` / `A[申請] --> B{承認?}` / `B -->|yes| C` → native shapes.
 - ` ```math ` LaTeX → native equation. `![alt](a.png)` images (always alt). Other fences = code.
 
-Rules: no positions or font sizes; one message per slide (the `>` lead); ≤ 4 boxes × 6 bullets, tables ≤ 8 rows,
-else split; `check` until zero warnings.
+Rules: no positions or font sizes; table emphasis = `**bold**`/`==x==` in cells; one message per slide (the
+`>` lead); ≤ 4 boxes × 6 bullets, tables ≤ 8 rows, else split; `check` until zero warnings.
