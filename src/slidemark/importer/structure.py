@@ -737,9 +737,13 @@ def _kpi(b: Block) -> bool:
     if len(b.children) != 1 or b.children[0].kind != "text":
         return False
     ps = b.children[0].paras
-    if not 2 <= len(ps) <= 3 or any(p.marker for p in ps):
+    if not 1 <= len(ps) <= 3 or any(p.marker for p in ps):
         return False
-    s0, s1 = ps[0].size, ps[1].size
+    s0 = ps[0].size
+    if len(ps) == 1:  # a lone value: big next to the heading
+        s1 = b.heading[0].size if b.heading else None
+    else:
+        s1 = ps[1].size
     return bool(s0 and s1 and s0 >= 1.5 * s1)
 
 

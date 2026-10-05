@@ -315,18 +315,26 @@ def _read_trial(text: str, deck: DeckInfo) -> SlideData:
         return read_slide(prs.slides[0], ctx)
 
 
+def _geom_key(it) -> str | None:
+    if it.kind == "text" and it.text:
+        return re.sub(r"\s+", " ", it.text).strip()
+    if it.kind == "table":
+        return "|".join(re.sub(r"\s+", " ", p.plain).strip() for r in it.rows for c in r for p in c.paras)
+    return None
+
+
 def _geom_err(orig: SlideData, trial: SlideData) -> float:
-    """Sum over the original's texts of the distance (in) to the trial's text frame with the same text."""
-    key = lambda it: re.sub(r"\s+", " ", it.text).strip()  # noqa: E731
+    """Sum over the original's texts and tables of the distance (in) to the trial's item with the same text."""
     pool: dict[str, list] = {}
     for it in trial.items:
-        if it.kind == "text" and it.text:
-            pool.setdefault(key(it), []).append(it)
+        if (k := _geom_key(it)) is not None:
+            pool.setdefault(k, []).append(it)
     err = 0.0
     for it in orig.items:
-        if it.kind != "text" or not it.text:
+        k = _geom_key(it)
+        if k is None:
             continue
-        cand = pool.get(key(it))
+        cand = pool.get(k)
         if not cand:
             err += 3.0
             continue
