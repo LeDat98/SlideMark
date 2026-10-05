@@ -343,3 +343,41 @@ def test_full_dense_slide_is_unchanged_by_the_roomy_row_policy():
     placed, _ = lay(s, "jp-business")
     cs = cards(placed)
     assert cs[0].h > 0.8 * (H - cs[0].y - round(0.3 * 914400))  # full slide: rows keep the whole body
+
+
+def test_sparse_dense_two_card_slide_fills_its_cards():
+    from slidemark.layout import measure
+    from slidemark.parser import parse
+    from slidemark.template import resolve_theme
+
+    src = (
+        "---\ntheme: jp-business\ndensity: dense\n---\n\n# 決議事項\n\n@2\n\n"
+        "## 決議\n1. 基本方針の承認\n2. 第1期投資の承認\n3. 委員会の設置\n\n"
+        "## 予定\n- 2026年11月: 詳細計画\n- 2027年1月: 契約締結\n- 2027年4月: 開始\n- 2027年9月: 報告\n"
+    )
+    deck = parse(src)
+    theme, _ = resolve_theme(deck.theme, None)
+    placed = layout_slide(deck.slides[0], deck, theme, 0)
+    cs = cards(placed)
+    assert len(cs) == 2
+    for c in cs:
+        inner = [
+            p
+            for p in placed
+            if p is not c
+            and getattr(p.element, "paragraphs", None)
+            and p.x >= c.x
+            and p.y >= c.y
+            and p.y + p.h <= c.y + c.h + 2
+        ]
+        used = sum(
+            min(
+                p.h,
+                measure.paragraphs_height(
+                    p.element.paragraphs, p.w, p.style, p.font_scale, gap=measure.element_gap(p.element)
+                ),
+            )
+            for p in inner
+        )
+        assert used / c.h >= 0.5
+        assert all(p.y + p.h <= c.y + c.h + 2 for p in inner)

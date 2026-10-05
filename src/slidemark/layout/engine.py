@@ -78,9 +78,14 @@ TABLE_GROW_ROOMY = 2.0  # ... and rows up to this factor when a quarter of the b
 TREE_SLACK_ROOMY = 1.3  # org-tree boxes may be this much taller than their content on such slides
 ROOMY_LEFT = 0.25  # share of the body left empty (top-anchored) that triggers the roomy pass
 ROOMY_GROW = 1.2  # ... which also grows box / tree text by up to this factor on top of the sparse growth
+ROOMY_GROW_DENSE = (
+    1.4  # dense slides: sparse cards may grow text this much more (consulting decks fill cards)
+)
+DENSE_ROOMY_BODY = 1.6  # ... but body text stays at most this multiple of the theme body size
 ROOMY_ROW = 0.62  # ... and a lone row of boxes reaches this share of the body height (consulting decks rarely
 # leave half a slide blank)
 ROOMY_ROW_AIR = 1.9  # ... but never taller than this multiple of the natural height (no half-empty cards)
+ROOMY_ROW_AIR_DENSE = 1.6  # ... dense slides: cards hug their text a little closer
 PEER_STEP = 1.12  # table text is at most this much smaller than the box body text on the same slide
 BESIDE_MIN = 0.5  # a box beside a chart / image takes its natural height, at least this share of the visual
 BESIDE_FILL = 0.6  # ... a shorter one grows by this share of the way to that minimum
@@ -110,6 +115,7 @@ HEAD_TOL = (
 ROOM_FREE = 0.35  # a card with more than this share of its inner height free spreads its paragraphs ...
 ROOM_USE = 0.6  # ... using this share of the free height ...
 ROOM_GAP_MAX = 0.6  # ... up to this space-before (em, about half a line) per paragraph
+ROOM_GAP_MAX_DENSE = 0.8  # ... dense slides: up to this (about 0.8 line)
 SLIDE_PEER_STEP = 1.12  # slide-level text is at most this much smaller than the box body text beside it
 SPARSE_LINES = 2
 SPARSE_LINE_EM = 22  # a "short" line
@@ -930,7 +936,8 @@ def _roomy_paragraphs(ctx: _Ctx, flow: list, nat: list, area: Rect, inherit: Sty
     slots = sum(c[2] for c in cands)
     if not slots:
         return
-    g = min(ROOM_GAP_MAX, measure.PARA_GAP + free * ROOM_USE / EMU_PER_PT / slots)
+    gmax = ROOM_GAP_MAX_DENSE if ctx.dense_k < 1.0 else ROOM_GAP_MAX
+    g = min(gmax, measure.PARA_GAP + free * ROOM_USE / EMU_PER_PT / slots)
     while g > measure.PARA_GAP + 0.02:
         for k, ch, _ in cands:
             ctx.gaps[id(ch)] = g
@@ -1296,7 +1303,11 @@ def _row_heights(
             lone = nr == 1 and not has_tail and ctx.dense_k < 1.0
             floor = ROW_MIN_TAIL if has_tail else (ROW_MIN_DENSE if lone else ROW_MIN)
             if ctx.roomy and nr == 1 and not has_tail and ctx.grow > ctx.grow_base:
-                floor = max(floor, min(ROOMY_ROW * body.h, ROOMY_ROW_AIR * n) / body.h)  # fill stays >= ~50%
+                floor = max(
+                    floor,
+                    min(ROOMY_ROW * body.h, (ROOMY_ROW_AIR_DENSE if ctx.dense_k < 1.0 else ROOMY_ROW_AIR) * n)
+                    / body.h,
+                )  # fill stays >= ~50%
             caps.append(max(round(n * ROW_SLACK), round(floor * body.h)))
     extra_h = 0  # natural height that spanning blocks need beyond their rows
     for r0, r1, n in spans:
@@ -1336,7 +1347,13 @@ def _row_heights(
         for r in rows:
             grown = (caps[r] or 0) + round(ctx.expand * (caps[r] or 0) / max(tot, 1))
             if airy and nat[r]:
-                grown = min(grown, max(caps[r] or 0, round(ROOMY_ROW_AIR * (nat[r] or 0))))
+                grown = min(
+                    grown,
+                    max(
+                        caps[r] or 0,
+                        round((ROOMY_ROW_AIR_DENSE if ctx.dense_k < 1.0 else ROOMY_ROW_AIR) * (nat[r] or 0)),
+                    ),
+                )
             caps[r] = grown
     return grid_row_heights(gs, grid_area.h, gap, caps)
 
@@ -1851,8 +1868,20 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
         fin.dense_k < 1.0 or small_theme
     ):  # a quarter of the body stays empty (before the rows expanded)
         expanded = fin.expand > 0
-        for f in (ROOMY_GROW, 1.15, 1.1, 1.05, 1.0):  # tables / trees take more height, text grows a little
+        steps = (ROOMY_GROW_DENSE, 1.35, 1.3, 1.25) if fin.dense_k < 1.0 else ()
+        for f in (
+            *steps,
+            ROOMY_GROW,
+            1.15,
+            1.1,
+            1.05,
+            1.0,
+        ):  # tables / trees take more height, text grows a little
             g = round(fin.grow * f, 2)
+            if (
+                fin.dense_k < 1.0 and g * fin.dense_k > DENSE_ROOMY_BODY
+            ):  # consulting body text stays below ~1.6x the theme size
+                continue
             if expanded:  # text first: grow it, then spread what is left over the rows
                 c = run(body, grow=g, expand=0, roomy=True, grow_base=fin.grow)
                 if c.over or not c.out:
