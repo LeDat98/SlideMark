@@ -20,10 +20,19 @@ from slidemark.build import build_deck  # noqa: E402
 from slidemark.layout import layout_slide  # noqa: E402
 from slidemark.lint import lint  # noqa: E402
 from slidemark.parser import parse  # noqa: E402
-from slidemark.theme import get_theme  # noqa: E402
-from tests.test_parser_fuzz import FRAGMENTS, HTML, LENIENT, MERMAID  # noqa: E402
+from slidemark.template import deck_theme  # noqa: E402
+from tests.test_parser_fuzz import CSS_BITS, FRAGMENTS, HTML, LENIENT, MERMAID  # noqa: E402
 
-POOL = FRAGMENTS + LENIENT + MERMAID + HTML
+_r = random.Random(0)
+CSS = [
+    "\n```css\n" + " ".join(_r.choice(CSS_BITS) for _ in range(_r.randint(1, 12))) + "\n```\n"
+    for _ in range(40)
+]
+CSS += [
+    "\n# H\n@html\n```html\n"
+    "<div style='position:absolute;inset:0;background:linear-gradient(90deg,#000,#fff)'>x</div>\n```\n"
+]
+POOL = FRAGMENTS + LENIENT + MERMAID + HTML + CSS
 NOISE = "#@>|-*`{}[]()<>^~=!?※:/\\\n 　、。全角ABC123%,\"'"
 
 
@@ -55,7 +64,7 @@ def main() -> int:
                     build_deck(parse(text), Path(tmp) / "f.pptx")
                 else:
                     deck = parse(text)
-                    theme = get_theme("default")
+                    theme, _ = deck_theme(deck, tmp)
                     placed = [layout_slide(s, deck, theme, k) for k, s in enumerate(deck.slides)]
                     lint(deck, placed, theme)
                     if any(d.rule in ("layout-error", "lint-error") for d in deck.diagnostics):
