@@ -55,6 +55,7 @@ _INHERIT_FIELDS = (
 _VISUALS = (Image, Chart, Table, Code)
 _TOL = 1.01
 CHEVRON_ADJ = 0.3  # chevron point depth / shorter side; the renderer sets the same adjustment
+CHEVRON_PAD_PT = 4  # text padding inside a chevron (the preset's text rectangle already clears the points)
 CHEVRON_H = 0.45  # chevron height / width (room for 3 lines of text between the point paddings)
 TABLE_GROW = 2.2  # rows of a table with spare room grow up to this factor
 TABLE_FONT_GROW = 1.2  # table text grows with the sparse-slide growth, up to this factor
@@ -489,6 +490,11 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
 def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> None:
     style = _card_style(ctx, c)
     pad = _pad(style, 10 * EMU_PER_PT * ctx.tight)
+    if "diagram" in c.classes and c.title is None:
+        from .diagram import place_diagram  # flowcharts size and route their own nodes
+
+        if place_diagram(ctx, c, rect.inset(pad), inherit.merged(_only_inheritable(style))):
+            return
     ctx.emit(c, rect, style)
     inner = rect.inset(pad)
     y = inner.y
@@ -954,11 +960,21 @@ def _place_blocks(
                 tgap = tail_area.y - grid_area.bottom
                 ty = grid_area.y + used + tgap
                 tail_area = Rect(area.x, ty, area.w, max(area.bottom - ty, 0))
+    chev_eff: float | None = None  # one text size for the whole chevron row
+    if "chevron" in flags:
+        chev_eff = min(
+            (
+                _chevron_eff(ctx, blk, _apply_box(ctx, blk, r, False), inherit)
+                for (_i, blk), r in zip(flow, cells, strict=True)
+                if isinstance(blk, (Text, Shape, Container))
+            ),
+            default=None,
+        )
     for (i, blk), r in zip(flow, cells, strict=True):
         r = _apply_box(ctx, blk, r, False)
         rects[i] = r
         if "chevron" in flags and isinstance(blk, (Text, Shape, Container)):
-            rects[i] = _place_chevron(ctx, blk, r, inherit)
+            rects[i] = _place_chevron(ctx, blk, r, inherit, chev_eff)
         else:
             _place_block(ctx, blk, r, inherit)
     if "flow" in flags:
@@ -1007,19 +1023,49 @@ def _split_grid_tail(
     )
 
 
-def _place_chevron(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> Rect:
+def _chevron_geom(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> tuple[Shape, Style, Rect]:
     sh = _chevron_shape(blk)
     st = _text_style(ctx, sh, inherit)
-    full = rect
     rect = Rect(
         rect.x, rect.y, rect.w, min(rect.h, max(round(rect.w * CHEVRON_H), round(0.9 * EMU_PER_INCH)))
     )
-    pad_pt = round(CHEVRON_ADJ * min(rect.w, rect.h) * 1.05 / EMU_PER_PT, 1)
-    st = st.merged(Style(padding=f"{pad_pt}pt", align="center", valign="middle"))
+    # the preset text rectangle already starts a point depth inside both ends: add only a small padding
+    st = st.merged(Style(padding=f"{CHEVRON_PAD_PT}pt", align="center", valign="middle"))
+    return sh, st, rect
+
+
+def _chevron_text_w(rect: Rect, st: Style) -> int:
+    """Width of a chevron's text area: the shape minus both point depths minus the padding."""
+    return rect.w - 2 * round(CHEVRON_ADJ * min(rect.w, rect.h)) - 2 * _pad(st)
+
+
+def _chevron_eff(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> float:
+    """Font scale of a chevron whose wrapping survives a renderer that is ~12% narrower than the estimate.
+
+    A label that just fits would leave a lone character on its last line when the real font is wider (e.g.
+    "KPI モニタリン / グ"): shrink until the line count no longer changes in a 12% narrower area (>= 80%).
+    """
+    sh, st, rect = _chevron_geom(ctx, blk, rect, inherit)
+    width = _chevron_text_w(rect, st)
+    base = st.font_size or 18
+    first = measure.effective_scale(base, ctx.scale, ctx.theme.min_font_size)
+    for m in (1.0, 0.95, 0.9, 0.85, 0.8):
+        eff = measure.effective_scale(base, ctx.scale * m, ctx.theme.min_font_size)
+        wide = measure.paragraphs_height(sh.paragraphs, width, st, eff)
+        narrow = measure.paragraphs_height(sh.paragraphs, round(width * 0.88), st, eff)
+        if narrow <= wide * 1.001:
+            return eff
+    return first
+
+
+def _place_chevron(ctx: _Ctx, blk, rect: Rect, inherit: Style, eff_cap: float | None = None) -> Rect:
+    full = rect
+    sh, st, rect = _chevron_geom(ctx, blk, rect, inherit)
     eff = measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
-    # the padding only keeps text clear of the points: centered text may use the middle 80% of the height
-    pad = _pad(st)
-    need = measure.paragraphs_height(sh.paragraphs, rect.w - 2 * pad, st, eff)
+    if eff_cap is not None:
+        eff = min(eff, eff_cap)
+    # centered text may use the middle 80% of the height
+    need = measure.paragraphs_height(sh.paragraphs, _chevron_text_w(rect, st), st, eff)
     if need > rect.h * 0.8:
         ctx.over.append(_label(blk))
     ctx.emit(sh, rect, st, eff)
