@@ -123,10 +123,17 @@ def is_numeric(text: str) -> bool:
     return bool(t) and (bool(_NUM.match(t)) or t in _DASHES)
 
 
-def right_align_numbers(t: Table) -> Table:
-    """Copy of ``t`` where numeric body cells (and the header of all-numeric columns) are right-aligned.
+NUMERIC_SHARE = (
+    0.8  # a column is right-aligned when at least this share of its non-empty body cells are figures
+)
 
-    Cells with an explicit alignment (cell or paragraph style) are left alone.
+
+def right_align_numbers(t: Table) -> Table:
+    """Copy of ``t`` where mostly numeric body columns (and their headers) are right-aligned as a whole.
+
+    A column counts as numeric when >= ``NUMERIC_SHARE`` of its non-empty body cells are figures; every other
+    column stays left-aligned, so mixed columns do not look jagged. Cells with an explicit alignment (cell or
+    paragraph style) are left alone.
     """
     _, ncols, anchors = table_grid(t)
     col_of = {id(cell): c for _r, c, cell in anchors}
@@ -138,29 +145,26 @@ def right_align_numbers(t: Table) -> Table:
     for r, c, cell in anchors:
         if r >= t.header_rows and c >= t.header_cols and cell.colspan == 1 and text(cell):
             body[c].append(text(cell))
-    num_cols = {c for c, items in body.items() if items and all(is_numeric(x) for x in items)}
+    num_cols = {
+        c
+        for c, items in body.items()
+        if items and sum(is_numeric(x) for x in items) >= NUMERIC_SHARE * len(items)
+    }
     rows = [list(row) for row in t.rows]
     changed = False
     for ri, row in enumerate(t.rows):
         for ci, cell in enumerate(row):
             col = col_of.get(id(cell))
-            if col is None or cell.colspan != 1 or not text(cell):
+            if col is None or cell.colspan != 1 or col not in num_cols or not text(cell):
                 continue
-            if (cell.style and cell.style.align) or any(p.style and p.style.align for p in cell.paragraphs):
+            if col < t.header_cols or (cell.style and cell.style.align):
                 continue
-            if (
-                (col in num_cols)
-                if ri < t.header_rows
-                else (
-                    col >= t.header_cols
-                    and is_numeric(text(cell))
-                    and (col in num_cols or text(cell) not in _DASHES)
-                )
-            ):
-                rows[ri][ci] = cell.model_copy(
-                    update={"style": (cell.style or Style()).merged(Style(align="right"))}
-                )
-                changed = True
+            if any(p.style and p.style.align for p in cell.paragraphs):
+                continue
+            rows[ri][ci] = cell.model_copy(
+                update={"style": (cell.style or Style()).merged(Style(align="right"))}
+            )
+            changed = True
     return t.model_copy(update={"rows": rows}) if changed else t
 
 

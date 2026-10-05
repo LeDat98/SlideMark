@@ -53,6 +53,7 @@ _LANG = {
     "fr": "fr-FR",
     "de": "de-DE",
 }
+_BADGE_PAD = "\u3000"  # full-width space: renders flush inside the highlight (Latin spaces leave a gap)
 _BULLETS = ["•", "–", "•", "–"]
 _NUMBERING = ["arabicPeriod", "alphaLcParenR", "romanLcPeriod", "arabicPeriod"]
 
@@ -190,7 +191,9 @@ def fill_text(
                 if seg == "" and len(segs) > 1:
                     continue
                 r = para.add_run()
-                r.text = seg
+                # badge: padding keeps bold CJK glyphs inside the highlight (LibreOffice clips them otherwise)
+                pad = _BADGE_PAD if run.highlight and measure.has_cjk(seg) else ""
+                r.text = f"{pad}{seg}{pad}"
                 _format_run(rc, r, run, pst, size, seg)
                 first_text = first_text or seg
                 if field == "slide_number":
