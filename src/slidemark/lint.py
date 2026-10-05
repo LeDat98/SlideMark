@@ -144,6 +144,10 @@ def _overlap_area(a: Placed, b: Placed) -> int:
     return max(w, 0) * max(h, 0)
 
 
+def _has_text(p: Placed) -> bool:
+    return any(getattr(pa, "plain", "").strip() for pa in getattr(p.element, "paragraphs", None) or [])
+
+
 def _is_line(p: Placed) -> bool:
     return isinstance(p.element, Shape) and p.element.shape in ("line", "arrow-right", "connector")
 
@@ -261,12 +265,15 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
                 )
 
     # overlap between items that are not nested in each other
+    free = slide is not None and slide.layout == "free"
     solid = [p for p in items if not _is_line(p) and not _is_band(p) and p.w > 0 and p.h > 0]
     for a_i, a in enumerate(solid):
         for b in solid[a_i + 1 :]:
             area = _overlap_area(a, b)
             if area <= 0 or _inside(a, b) or _inside(b, a):
                 continue
+            if free and not (_has_text(a) and _has_text(b)):
+                continue  # @free: shapes under text are a design choice
             small = min(a.w * a.h, b.w * b.h)
             if small and area / small > 0.02:
                 warn(

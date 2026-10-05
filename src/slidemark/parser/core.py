@@ -864,7 +864,7 @@ def _as_role(t: Text, role: str) -> Text:
 
 
 def _infer_cover(slide: Slide, index: int) -> None:
-    if slide.title is None or slide.layout in ("blank", "center"):
+    if slide.title is None or slide.layout in ("blank", "center", "free"):
         return
     els = slide.elements
     if not els or not all(

@@ -218,7 +218,7 @@ def apply_attrs(
 
 # --------------------------------------------------------------------------- the `@` line
 
-LAYOUT_WORDS = ("cover", "section", "blank", "center")
+LAYOUT_WORDS = ("cover", "section", "blank", "center", "free")
 FLAGS = ("flow", "chevron")
 AT_KEYS = ("bg", "t", "id", "gap")
 KNOWN_WORDS = (*LAYOUT_WORDS, *FLAGS, "html", "hidden", "build", "dense", "dark", "light", "plain")

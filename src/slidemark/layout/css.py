@@ -260,7 +260,7 @@ def _match(parts: tuple[tuple[str, Compound], ...], i: int, n: Node | None) -> b
 
 def slide_kind(slide: Slide, index: int) -> str:
     """Layout kind of a slide, as the engine infers it: cover | section | blank | center | content."""
-    if slide.layout in ("cover", "section", "blank", "center", "content"):
+    if slide.layout in ("cover", "section", "blank", "center", "content", "free"):
         return slide.layout
     if slide.layout is None and slide.title and not slide.elements and not slide.conclusion:
         return "cover" if index == 0 else "section"
