@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .ir import Deck
 from .layout import layout_slide
+from .lint import lint
 from .parser import parse
 from .render import render
 from .theme import get_theme
@@ -24,5 +25,7 @@ def build(source: str | Path, out: str | Path, *, base_dir: str | Path | None = 
     deck.attrs.setdefault("base_dir", str(base_dir or Path.cwd()))
     theme = get_theme(deck.theme)
     placed = [layout_slide(slide, deck, theme, i) for i, slide in enumerate(deck.slides)]
+    seen = {(d.rule, d.slide) for d in deck.diagnostics}
+    deck.diagnostics.extend(d for d in lint(deck, placed, theme) if (d.rule, d.slide) not in seen)
     render(deck, placed, theme, out)
     return deck
