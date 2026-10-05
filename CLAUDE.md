@@ -31,7 +31,8 @@ break the visual → bench has no token regression. Mark progress in `docs/FEATU
   `README.md`, which is Vietnamese.** `scripts/gallery.py` must keep the README text Vietnamese.
   Slide *content* in `examples/` and `bench/corpus/` may be Japanese/Vietnamese on purpose (test data).
 - Push straight to `main` (allowed by the owner). No pull requests needed.
-- At most 2 Sonnet subagents at a time (lane A front, lane B back); see `docs/PLAN.md`.
+- Runs are led by an Opus orchestrator, last ≥ 2 hours, and use at most 2 Sonnet subagents at a time
+  (lane A front, lane B back), in waves; see "Run routine" in `docs/PLAN.md`.
 
 ## Rules
 - Token cost is the main product metric. New syntax must be the shortest unambiguous form; measure it.

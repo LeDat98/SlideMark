@@ -1,13 +1,17 @@
-# 7-day foundation plan
+# Foundation plan
 
-Each day has three lanes. The orchestrator session settles contracts, merges, and owns tooling/docs.
-**At most 2 Sonnet subagents** code in parallel, each in its own git worktree and file set:
-**A = front** (parser, CLI) and **B = back** (layout, renderer). Layout and renderer share one agent so the
-`Placed` hand-off never drifts. The day ends with tests green, the README gallery refreshed, the bench recorded,
-and a push to `main`.
+The plan is split into **plan days** (units of scope, below). A **run** is one routine session. Each run is
+led by an **Opus orchestrator** that settles contracts, merges, and owns tooling/docs, with **at most 2 Sonnet
+subagents** coding in parallel, each in its own git worktree and file set: **A = front** (parser, CLI) and
+**B = back** (layout, renderer). Layout and renderer share one agent so the `Placed` hand-off never drifts.
 
-Levels: days 1–2 → **L1**, days 3–4 → **L2**, days 5–7 → **L3** (see `docs/TARGETS.md`). After day 7 the
-daily routine keeps climbing L4 → L7, picking the unchecked gates with the best value per day.
+**Run size: at least 2 hours of implementation, targeting 2 plan days per run.** Subagents work in *waves*:
+when a wave is merged and green, the orchestrator starts the next wave (next work packages) until the time
+rules in "Run routine" say stop. Every run ends with tests green, the README gallery refreshed, the bench
+recorded, and a push to `main`.
+
+Levels: plan days 1–2 → **L1**, 3–4 → **L2**, 5–7 → **L3** (see `docs/TARGETS.md`). After plan day 7 each run
+keeps climbing L4 → L7, picking the unchecked gates with the best value.
 
 | Day | Subagent A: parser + CLI | Subagent B: layout + renderer | Orchestrator: tooling, docs, merge |
 |---|---|---|---|
@@ -19,20 +23,30 @@ daily routine keeps climbing L4 → L7, picking the unchecked gates with the bes
 | **6** | `html`, `mermaid` fences | HTML → native (Playwright measurement), image fallback | Agent eval harness v0 |
 | **7** | Slide links, `hidden`, sections | Transitions, build animations, hyperlinks, sections | Packaging (PyPI-ready), release notes, AGENT_TIPS review |
 
-## Daily routine (runs automatically at 02:45 JST)
-1. Read `CLAUDE.md`, `docs/LESSONS.md`, this plan, `docs/TARGETS.md`, `docs/SYNTAX.md`, the end of `docs/DAILY_LOG.md`.
-2. Pick the first day below that is not fully checked. Finish leftovers from the previous day first.
-   If that day has no "work packages" section yet, write it first, in the style of Day 1.
-3. Commit any contract change (`ir.py`, `theme.py`, `SYNTAX.md`) yourself **before** spawning subagents.
-4. Spawn **at most 2** subagents in one message (Agent tool, `model: sonnet`, `isolation: worktree`), with
-   self-contained prompts: owned files, spec, Definition of Done, own `.venv`, ruff + pytest, commit in the
+## Run routine (02:45 JST daily, or fired manually)
+1. Note the start time (`date -u`). Read `CLAUDE.md`, `docs/LESSONS.md`, this plan, `docs/TARGETS.md`,
+   `docs/SYNTAX.md`, the end of `docs/DAILY_LOG.md`.
+2. **Run goal:** leftovers first, then the next **two** unchecked plan days (after plan day 7: a set of
+   `TARGETS.md` gates worth ≥ 2 hours). Write the run goal as a checklist at the top of today's
+   `DAILY_LOG.md` entry, and write missing "Day N work packages" sections here before delegating.
+3. Commit any contract change (`ir.py`, `theme.py`, `SYNTAX.md`) yourself **before** spawning a wave.
+4. **Wave:** spawn **at most 2** subagents in one message (Agent tool, `model: sonnet`, `isolation: worktree`),
+   with self-contained prompts: owned files, spec, Definition of Done, own `.venv`, ruff + pytest, commit in the
    worktree, report ≤ 300 words (branch, commit, contract changes, deps, lessons). Subagents never edit
    `docs/LESSONS.md`, `AGENT_TIPS.md`, `PLAN.md`, `TARGETS.md`, `DAILY_LOG.md` or `README.md`.
-5. While they work, do the orchestrator lane yourself.
-6. Merge both branches, make ruff + pytest green, run `scripts/gallery.py` and the bench (`--record`).
-   Never push red: revert what can't be fixed today and log it.
-7. Update checkboxes (here and `TARGETS.md`), `LESSONS.md`, `AGENT_TIPS.md` (verified tips only), and append to
-   `DAILY_LOG.md` (≤ 10 lines). Commit and push straight to `main`.
+   While they work, do the orchestrator lane yourself.
+5. Merge the wave, make ruff + pytest green, push. **Review the gallery images yourself** (open the PNGs) and
+   turn visual defects into work packages for the next wave.
+6. Repeat waves until a stop rule fires:
+   - **Minimum:** do not stop before 2 hours unless BLOCKED. If the run goal is done early, extend it with the
+     next plan day or `TARGETS.md` gates and keep going.
+   - **Wrap-up:** at about 3h30, start no new wave; finish and merge the running one.
+   - **Hard stop:** about 4 hours: merge only what is green, leave the rest unchecked (next run's leftovers).
+   - **BLOCKED:** something you cannot fix yourself (push refused, install/network denied, a package fails
+     twice): push what is green, log the blocker, stop.
+7. Finish: `scripts/gallery.py`, bench (`--record`), checkboxes (here and `TARGETS.md`), `LESSONS.md`,
+   `AGENT_TIPS.md` (verified tips only), `DAILY_LOG.md` entry (≤ 15 lines). Push to `main`. Never end with
+   unpushed commits.
 
 ## Day 1 work packages
 - **A: parser + CLI** (`src/slidemark/parser/`, `src/slidemark/cli.py`, `tests/test_parser*.py`, `tests/test_cli.py`):
