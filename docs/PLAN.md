@@ -346,3 +346,8 @@ HTML corpus, L7 token research). Design freedom stays the rule: fixes are mechan
 - **Wave 3 A: CSS deck round trip** (`importer/`): examples/17-editorial-css (width, lead CSS vs runs, text-transform
   casing, KPI misdetection, `@1`, `@html`).
 - **Wave 3 B: sparse step** (`layout/`): one deck-wide step-up type size for slides < 55% filled; band ≤ 35%.
+- **Wave 3 status:** A CSS-deck round trip (examples/17 lossless, roundtrip 116/117) + transparent-card fix; B sparse
+  step (`sparse_*` tokens; 16 s6/s8 bands 42/39% → 16/18%). Independent designer review: decks 11/16 not yet consulting-grade.
+- **Wave 4 A:** `slidemark review --fix` self-review loop (L7 gate) merged. Then eval run-9 (hard brand briefs, fresh).
+- **Wave 4 B: consulting polish** from the review: body block distribute + center when > 20% free, top-anchored panels
+  beside charts, card text ≤ table text, reserved lead slot, chart/footnote gap, padded notes.

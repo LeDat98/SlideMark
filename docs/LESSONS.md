@@ -113,3 +113,8 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] Explicit font sizes (CSS, `{size=}`, element tokens) must bypass every growth path (`_explicit_size`), or a 12pt CSS heading renders at 20pt on sparse slides.
 - [tokens] Role aliases (`title.color`) used to create an unused class; route them to element CSS (`h1`). An icon name is lowercased everywhere → handle `icon=file.svg` paths before lowercasing.
 - [css] A KPI label's muted defaults must be merged before its CSS, or `.kpi h2` loses. `width: fit-content` only makes sense for text blocks.
+- [import] `style_to_css` must cover every Style field (per-side dash/dot used internal names); text-transform is baked into slide text, so source casing rides in the design part; table `widths` are not in the .pptx → emit only when a trial build differs.
+- [import] A transparent CSS card (no fill, no line, a separate border-top line) was classed as decor and its KPIs flattened to bullets → SlideMark's own `Card …` shapes are always box candidates.
+- [layout] A per-deck probe of the sparse step inside `layout_slide` cost ~50% build time (50 ms/slide gate) → step chosen per slide; a stepped slide must be the last growth pass (the roomy pass grew it again to 21pt).
+- [review] Split parts of a long flat list each trigger `design-empty-band`; rank fix rounds by the diagnostics the loop owns first. 6 boxes × 8 bullets or 9-row tables raise no lint warning (autofit shrinks to ~10pt) → source-level `too_dense` check.
+- [process] An independent "consulting designer" review agent (Sonnet, PNGs only) found what metrics missed: top-packed slides, panel text centered in tall cards, card body larger than table text, missing-lead slides breaking vertical rhythm.
