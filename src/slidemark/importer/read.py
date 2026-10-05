@@ -90,6 +90,7 @@ class Item:
     sid: int = 0  # shape id in the slide (what ``a:stCxn``/``a:endCxn`` point at)
     col_w: list[int] = field(default_factory=list)  # table: column widths (EMU)
     row_h: list[int] = field(default_factory=list)  # table: row heights (EMU)
+    latex: str | None = None  # math: the equation as LaTeX (``` math fence)
     missing: tuple[str, str] | None = None  # image: a "[image: label]" placeholder of a file that was absent
 
     @property
@@ -650,8 +651,26 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
     if tag == "sp":
         ph = el.find(qn("p:nvSpPr") + "/" + qn("p:nvPr") + "/" + qn("p:ph"))
         ph_type = (ph.get("type") or "obj") if ph is not None else None
-        if el.xpath(".//*[local-name()='oMath']"):
-            ctx.skip(f"equation {name!r}", "write the formula as text or an image")
+        paras_m = el.xpath(".//*[local-name()='oMathPara']")
+        if paras_m or el.xpath(".//*[local-name()='oMath']"):
+            from .mathml import omml_to_latex
+
+            src = paras_m[0] if paras_m else el.xpath(".//*[local-name()='oMath']")[0]
+            latex, exact = omml_to_latex(src)
+            if not latex:
+                ctx.skip(f"equation {name!r}", "write the formula as text or an image")
+                return
+            if not exact:
+                ctx.diags.append(
+                    Diagnostic(
+                        level="info",
+                        message=f"equation {name!r} converted approximately",
+                        slide=ctx.slide_no,
+                        rule="import-math",
+                        hint="check the ```math block against the original formula",
+                    )
+                )
+            data.items.append(_new(ctx, "math", box, sid=sh.shape_id, name=name, latex=latex))
             return
         fill, line = _fill_of(el)
         geom = el.find(qn("p:spPr") + "/" + qn("a:prstGeom"))

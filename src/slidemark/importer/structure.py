@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from ..ir import Diagnostic
-from .emit import chart_lines, one_line, table_lines, text_lines
+from .emit import chart_lines, detect_lang, one_line, table_lines, text_lines
 from .links import find_links, recover_diagram
 from .links import tokens as link_tokens
 from .read import Item, ParaT, RunT, SlideData
@@ -290,7 +290,7 @@ def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
         return Block(kind, it.x, it.y, it.w, it.h, item=it, paras=it.paras)
 
     def make(it: Item, nested: bool) -> list[Block]:
-        if it.kind == "table" or it.kind == "chart" or it.kind == "image":
+        if it.kind in ("table", "chart", "image", "math"):
             return [Block(it.kind, it.x, it.y, it.w, it.h, item=it)]
         if (it.role or "").startswith("callout"):
             return [Block("callout", it.x, it.y, it.w, it.h, item=it, paras=it.paras, callout=it.role[8:])]
@@ -691,7 +691,7 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     if b.kind == "code":
         text = "\n".join("".join(r.text.replace("\n", "\n") for r in p.runs) for p in b.paras)
         fence = "```" if "```" not in text else "````"
-        return [("fence", [fence, *text.split("\n"), fence])]
+        return [("fence", [fence + (detect_lang(b.paras) or ""), *text.split("\n"), fence])]
     if b.kind == "callout":
         lines = [one_line([p], accent=acc, classes=cls) for p in b.paras]
         lines = [ln for ln in lines if ln]
@@ -716,6 +716,8 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
         return [("fence", chart_lines(b.item.chart))]
     if b.kind == "fence":
         return [("fence", b.lines)]
+    if b.kind == "math":
+        return [("fence", ["```math", *(b.item.latex or "").split("\n"), "```"])]
     if b.kind == "image":
         out.img_n += 1
         if b.item.missing is not None:  # placeholder of an absent file: write a reference that stays absent

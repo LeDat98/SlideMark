@@ -142,6 +142,72 @@ def one_line(paras: list[ParaT], **kw) -> str:
     return " ".join(inline(p.runs, **kw).replace("\\\n", " ").replace("\n", " ") for p in paras).strip()
 
 
+# --------------------------------------------------------------------------- code
+
+_LANGS = (
+    "python",
+    "javascript",
+    "typescript",
+    "json",
+    "yaml",
+    "bash",
+    "sql",
+    "java",
+    "go",
+    "rust",
+    "c",
+    "cpp",
+    "csharp",
+    "html",
+    "xml",
+    "css",
+    "ruby",
+    "php",
+    "kotlin",
+    "swift",
+    "toml",
+    "ini",
+    "diff",
+    "markdown",
+)
+
+
+def detect_lang(paras: list[ParaT]) -> str | None:
+    """The fence language whose syntax highlighting reproduces the run colors of a code block (or None).
+
+    The renderer colors tokens by pygments class; the language itself is not stored in the .pptx, so every
+    candidate lexer is tried and the first whose token classes map one-to-one onto the observed colors wins.
+    """
+    try:
+        from ..ir import Code
+        from ..render.objects import code_paragraphs
+
+        actual: list[tuple] = []
+        for i, p in enumerate(paras):
+            if i:
+                actual.append(("\n",))
+            for r in p.runs:
+                actual += [(r.color, r.italic)] * len(r.text)
+        if len({a for a in actual if len(a) == 2}) < 2:
+            return None  # plain text: no highlighting to reproduce
+        text = "\n".join("".join(r.text for r in p.runs) for p in paras)
+        for lang in _LANGS:
+            got: list[tuple] = []
+            for i, p in enumerate(code_paragraphs(Code(lang=lang, text=text))):
+                if i:
+                    got.append(("\n",))
+                for r in p.runs:
+                    got += [(r.color or "fg", bool(r.italic))] * len(r.text)
+            if len(got) != len(actual):
+                continue
+            pairs = {(g, a) for g, a in zip(got, actual, strict=True)}
+            if len(pairs) == len({g for g, _ in pairs}) == len({a for _, a in pairs}):
+                return lang
+    except Exception:
+        return None
+    return None
+
+
 # --------------------------------------------------------------------------- table
 
 

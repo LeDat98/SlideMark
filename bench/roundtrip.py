@@ -200,6 +200,11 @@ def slide_facts(slide, ctx_slide_index: dict) -> dict:
                     )
             else:
                 items.append({"kind": "object", "key": "", "box": box})
+        elif tag == "sp" and el.xpath(".//*[local-name()='oMath']"):
+            from slidemark.importer.mathml import _canon
+
+            eq = el.xpath(".//*[local-name()='oMathPara']")
+            items.append({"kind": "math", "key": _canon(eq[0]) if eq else "?", "box": box})
         elif tag == "sp":
             paras = _paras(el.find(qn("p:txBody")))
             g = el.find(qn("p:spPr") + "/" + qn("a:prstGeom"))
