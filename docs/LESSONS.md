@@ -40,3 +40,5 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] Sparse slides: grow text (≤ 1.35× for body ≤ 14pt) → expand rows until ≤ 20% body is free → shift the block 1/3 down. Pure fill brings back empty boxes; pure shift leaves a 50% band.
 - [render] LibreOffice clips bold CJK glyphs in `a:highlight` → pad CJK badges with U+3000; Latin spaces leave a gap.
 - [env] Subagent worktrees refuse compound Bash commands; tell them to run one command per call.
+- [env] LibreOffice substituted DejaVu (much wider) for Calibri/Yu Gothic, so previews wrapped headings PowerPoint would not → `apt-get install -y fonts-crosextra-carlito`; preview.py writes a fontconfig alias file (Calibri→Carlito, Yu Gothic/Meiryo→IPAPGothic).
+- [eval] Agent eval run 1 (Sonnet, SKILL.md only): 10/10 parse+lint clean before the `connector-crosses` rule, 9/10 after; gaps found: mermaid undocumented, flow + a>b duplicates.

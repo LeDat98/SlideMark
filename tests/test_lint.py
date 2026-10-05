@@ -94,3 +94,13 @@ def test_examples_are_clean():
             str(d) for d in lint(deck, placed, th) if d.rule in ("off-slide", "overlap", "contrast", "alt")
         ]
         assert not bad, f"{md.name}: {bad}"
+
+
+def test_connector_through_a_block():
+    deck = parse("# T\n@3 a>c\n## A\n- a\n## B\n- b\n## C\n- c\n")
+    th = get_theme(deck.theme)
+    placed = [layout_slide(s, deck, th, i) for i, s in enumerate(deck.slides)]
+    assert "connector-crosses" in [d.rule for d in lint(deck, placed, th)]
+    ok = parse("# T\n@3 a>b\n## A\n- a\n## B\n- b\n## C\n- c\n")
+    placed = [layout_slide(s, ok, th, i) for i, s in enumerate(ok.slides)]
+    assert "connector-crosses" not in [d.rule for d in lint(ok, placed, th)]

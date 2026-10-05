@@ -520,9 +520,9 @@ def parse_slide(
 
     _lead_and_conclusion(slide)
     _infer_cover(slide, index)
-    slide.links = _resolve_links(slide_links, len(slide.elements), "slide", ctx)
+    slide.links = _resolve_links(slide_links, len(slide.elements), "slide", ctx, "flow" in slide.classes)
     for box, raw in ctx.box_links:
-        box.links = _resolve_links(raw, len(box.children), "box", ctx)
+        box.links = _resolve_links(raw, len(box.children), "box", ctx, "flow" in box.classes)
     ctx.box_links = []
     return slide
 
@@ -558,11 +558,19 @@ def _box_title(c: Container) -> str:
     return c.title.paragraphs[0].plain[:20] if c.title and c.title.paragraphs else "box"
 
 
-def _resolve_links(raw: list[RawLink], n: int, owner: str, ctx: Ctx) -> list[Link]:
+def _resolve_links(raw: list[RawLink], n: int, owner: str, ctx: Ctx, flow: bool = False) -> list[Link]:
     """Keep the connectors whose ends are existing, distinct blocks; warn about the rest."""
     out: list[Link] = []
     for r in raw:
-        if r.src == r.dst:
+        if flow and r.dst == r.src + 1:
+            ctx.add(
+                "info",
+                f"connector '{r.token}' repeats a flow arrow",
+                r.line,
+                "duplicate-link",
+                "flow already draws arrows between neighbours: keep only the other links",
+            )
+        elif r.src == r.dst:
             ctx.warn(
                 f"connector '{r.token}' joins a block to itself",
                 r.line,

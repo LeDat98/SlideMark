@@ -37,8 +37,9 @@ num: on
 ```
 
 - Header lines `key: value` before the first `#` (all optional): `theme` (`default`, `midnight`,
-  `jp-business`, or a .pptx/.potx path), `lang`, `size` (`16:9`, `4:3`, `A4`), `footer`, `num: on`, `density: dense`.
-- `# Title` starts a slide. A title with ≤ 2 short lines becomes a cover (first slide) or section divider.
+  `jp-business`, or a .pptx/.potx template path), `lang` (`ja` sets Japanese fonts and line breaking), `size` (`16:9`, `4:3`, `A4`), `footer`, `num: on`, `density: dense`.
+- `# Title` starts a slide. A title with ≤ 2 short lines and nothing else becomes a cover (first slide) or a
+  section divider; force it with `@cover` / `@section`.
 - `## Heading` makes a box. Boxes are arranged automatically (2 → columns, 3 → columns, 4 → 2×2, …).
 - `>` right after the title = lead message; `>` as the last line = conclusion bar; `※ text` = footnote.
 - `??? ` starts speaker notes.
@@ -75,7 +76,10 @@ Blocks beyond the grid's cells are stacked full width below it.
 ````
 
 - Image: `![alt text](path.png){w=40% fit=cover}` (always write alt).
-- ` ```math ` LaTeX → native equation; other fences → highlighted code.
+- Flowchart with branches or loops: a ` ```mermaid ` fence (`graph TD` or `graph LR`, `A[text] --> B{question?}`,
+  `B -->|yes| C`) → native boxes, diamonds and connectors. Use `@3 flow` only for a straight sequence.
+- ` ```math ` LaTeX (`\frac`, `\sqrt`, `\sum`, `^`, `_`, `\left( \right)`) → native equation, also inside a box;
+  other fences → highlighted code.
 - Attributes `{.class #id key=value}` at the end of a heading or on their own line before a block. Positions
   `{x y w h}` exist but avoid them: the layout engine places everything.
 

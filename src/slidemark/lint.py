@@ -8,11 +8,12 @@ Rules (all warnings, cheap to read for an agent):
 - ``contrast``: text color vs the fill behind it is below WCAG 3:1.
 - ``tiny-text``: text renders below the theme's minimum font size.
 - ``alt``: an image without alt text.
+- ``connector-crosses``: a connector runs through a block that is not one of its ends.
 """
 
 from __future__ import annotations
 
-from .ir import Deck, Diagnostic, Image, Placed, Shape, Text
+from .ir import Container, Deck, Diagnostic, Image, Placed, Shape, Text
 from .layout import measure
 from .theme import Theme
 from .units import EMU_PER_PT, slide_size
@@ -181,6 +182,70 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
                     "remove explicit {x y w h} or use an @ grid so blocks do not collide",
                     b,
                 )
+    for _line, block in _connector_crossings(items):
+        warn(
+            "connector-crosses",
+            f"a connector runs through {_label(block)}",
+            "link neighbouring blocks only, or reorder the blocks / use an @ areas grid",
+            block,
+        )
+    return out
+
+
+def _polyline(p: Placed) -> list[tuple[float, float]]:
+    """Points of a connector ``Shape(shape="line")`` from its box, flips and elbow attrs."""
+    a = p.element.attrs
+    x0, x1 = (p.x + p.w, p.x) if a.get("flip_h") else (p.x, p.x + p.w)
+    y0, y1 = (p.y + p.h, p.y) if a.get("flip_v") else (p.y, p.y + p.h)
+    if not a.get("elbow"):
+        return [(x0, y0), (x1, y1)]
+    adj = float(a.get("adj", 0.5))
+    if a.get("route") == "h":
+        xm = x0 + (x1 - x0) * adj
+        return [(x0, y0), (xm, y0), (xm, y1), (x1, y1)]
+    ym = y0 + (y1 - y0) * adj
+    return [(x0, y0), (x0, ym), (x1, ym), (x1, y1)]
+
+
+def _seg_hits(u, v, r: tuple[int, int, int, int]) -> bool:
+    """Liang-Barsky: does segment u-v enter the open rectangle r = (x, y, w, h)?"""
+    x, y, w, h = r
+    if w <= 0 or h <= 0:
+        return False
+    dx, dy = v[0] - u[0], v[1] - u[1]
+    t0, t1 = 0.0, 1.0
+    for pv, qv in ((-dx, u[0] - x), (dx, x + w - u[0]), (-dy, u[1] - y), (dy, y + h - u[1])):
+        if pv == 0:
+            if qv <= 0:
+                return False
+            continue
+        t = qv / pv
+        if pv < 0:
+            t0 = max(t0, t)
+        else:
+            t1 = min(t1, t)
+        if t0 >= t1:
+            return False
+    return True
+
+
+def _connector_crossings(items: list[Placed]) -> list[tuple[Placed, Placed]]:
+    inset = 3 * _TOL
+    blocks = [
+        q
+        for q in items
+        if isinstance(q.element, Container) or (isinstance(q.element, Shape) and q.element.paragraphs)
+    ]
+    out = []
+    for p in items:
+        if not (isinstance(p.element, Shape) and p.element.shape == "line"):
+            continue
+        pts = _polyline(p)
+        for q in blocks:
+            r = (q.x + inset, q.y + inset, q.w - 2 * inset, q.h - 2 * inset)
+            if any(_seg_hits(u, v, r) for u, v in zip(pts, pts[1:], strict=False)):
+                out.append((p, q))
+                break
     return out
 
 

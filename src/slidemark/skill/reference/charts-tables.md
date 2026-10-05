@@ -22,7 +22,7 @@ SaaS,30,34,38
 | `axis` | `off` hides the value axis |
 
 CSV cells: `"1,240"`, `1,240`, `12%`, full-width digits, `▲3` (= -3) are numbers; an empty cell is a gap.
-Scatter: first row = x values.
+Category labels are always text (years stay `2024`). Scatter: first row = x values.
 
 **Tables** are GFM tables. Merge: a lone `<` joins the cell on the left, a lone `^` the cell above.
 
@@ -36,4 +36,5 @@ Scatter: first row = x values.
 
 Options: `widths` (ratios), `align` (`l` `c` `r` per column), `header=N` (header rows, 0 = none), `hcol=N`
 (header columns), `.zebra`. Numeric columns are right-aligned automatically. A ` ```table ` fence takes CSV
-(first row = header) with the same options.
+(first row = header) with the same options. Schedules: one row per task, `●` in month columns, `<` to
+extend a bar over the next month.

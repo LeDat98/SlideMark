@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -10,6 +11,37 @@ from pathlib import Path
 
 def have_soffice() -> bool:
     return shutil.which("soffice") is not None
+
+
+# Office fonts are missing on Linux. Map them to metric-compatible (or same-script) fonts so previews wrap
+# text like PowerPoint does: Calibri -> Carlito, Arial -> Liberation Sans, Yu Gothic/Meiryo -> IPA Gothic.
+_ALIASES = {
+    "Calibri": ["Carlito", "Liberation Sans"],
+    "Calibri Light": ["Carlito", "Liberation Sans"],
+    "Arial": ["Liberation Sans"],
+    "Consolas": ["Liberation Mono", "DejaVu Sans Mono"],
+    "Yu Gothic": ["IPAPGothic", "IPAGothic"],
+    "Yu Gothic UI": ["IPAPGothic", "IPAGothic"],
+    "Meiryo": ["IPAPGothic", "IPAGothic"],
+    "MS Gothic": ["IPAGothic"],
+    "MS PGothic": ["IPAPGothic"],
+}
+
+
+def _fonts_conf(directory: str) -> str:
+    rules = "".join(
+        f"<alias binding='same'><family>{name}</family><prefer>"
+        + "".join(f"<family>{f}</family>" for f in fams)
+        + "</prefer></alias>"
+        for name, fams in _ALIASES.items()
+    )
+    path = Path(directory) / "fonts.conf"
+    path.write_text(
+        "<?xml version='1.0'?><!DOCTYPE fontconfig SYSTEM 'fonts.dtd'><fontconfig>"
+        f"<include ignore_missing='yes'>/etc/fonts/fonts.conf</include>{rules}</fontconfig>",
+        encoding="utf-8",
+    )
+    return str(path)
 
 
 def pptx_to_pdf(pptx: str | Path, out_dir: str | Path, timeout: int = 180) -> Path:
@@ -27,7 +59,8 @@ def pptx_to_pdf(pptx: str | Path, out_dir: str | Path, timeout: int = 180) -> Pa
             str(out_dir),
             str(pptx),
         ]
-        subprocess.run(cmd, check=True, capture_output=True, timeout=timeout)
+        env = dict(os.environ, FONTCONFIG_FILE=_fonts_conf(profile))
+        subprocess.run(cmd, check=True, capture_output=True, timeout=timeout, env=env)
     pdf = out_dir / (pptx.stem + ".pdf")
     if not pdf.exists():
         raise RuntimeError(f"LibreOffice produced no PDF for {pptx}")

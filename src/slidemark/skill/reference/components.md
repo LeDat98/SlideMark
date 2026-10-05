@@ -35,8 +35,21 @@ puts arrows between them. Add `@end` and a table to get a plan table under the s
 ## 管理
 ```
 
+**Flowcharts** — branches and loops go in a Mermaid fence; nodes become native shapes:
+
+````markdown
+```mermaid
+graph TD
+A[申請] --> B[上長承認]
+B --> C{承認?}
+C -->|yes| D[経理処理]
+C -->|no| A
+```
+````
+
 **Callouts** — `> [!note]`, `> [!tip]`, `> [!warn]`, `> [!caution]` + text: tinted box with a colored bar.
 Works at slide level (full width, below the grid) and inside boxes.
+Badges work anywhere in text, including bullets and table cells (`影響: [高]{.badge .danger}`).
 
 **Badges** — `[NEW]{.badge}`, color with a class: `.success .danger .accent .muted`.
 

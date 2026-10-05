@@ -490,3 +490,10 @@ def test_closing_quote_needs_no_end():
     deck = parse("# T\n## A\n- a\n## B\n- b\n> conclusion\n")
     assert not any(d.rule == "missing-end" for d in deck.diagnostics)
     assert deck.slides[0].conclusion is not None
+
+
+def test_flow_duplicate_links_dropped():
+    deck = parse("# T\n@3 flow a>b b>c c>a\n## A\n- a\n## B\n- b\n## C\n- c\n")
+    s = deck.slides[0]
+    assert [(link.src, link.dst) for link in s.links] == [(2, 0)]
+    assert sum(d.rule == "duplicate-link" for d in deck.diagnostics) == 2
