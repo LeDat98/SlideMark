@@ -808,7 +808,15 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     if kpi:
         lines = [one_line([p], accent=acc, classes=cls, plain_bold=True) for p in b.children[0].paras]
         return [("meta", [head, *[ln for ln in lines if ln]])]
-    chunks.append(("meta", [head, "@" + " ".join(b.links)] if b.links else [head]))
+    toks = list(b.links)
+    kids = [c for c in b.children if c.kind == "box"]
+    if kids and all(c.chevron and c.sub for c in kids) and len(kids) == len(b.children):
+        if len(kids) == 1:  # one chevron: its text, then the box's own ``@chevron`` line
+            k = kids[0]
+            lines = text_lines([*(k.heading or []), *k.paras], accent=acc, classes=cls)
+            return [("meta", [head]), ("text", lines), ("meta", ["@chevron"])]
+        toks = ["chevron", *toks]  # sub-boxes drawn as chevrons: the box's own ``@`` line says so
+    chunks.append(("meta", [head, "@" + " ".join(toks)] if toks else [head]))
     for ch in b.children:
         chunks.extend(("itext" if k == "text" else k, ln) for k, ln in emit_block(ch, out))
     return chunks
