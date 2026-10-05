@@ -220,6 +220,23 @@ _ICONS: dict[str, str] = {
 }
 
 
+from .glyphs import ALIASES, GLYPHS  # noqa: E402  (after the helpers they import)
+
+_ICONS.update(GLYPHS)
+
+
+def is_file(name: object) -> bool:
+    """``icon=path/to/file.svg``: a file icon rather than a built-in name."""
+    return isinstance(name, str) and name.strip().lower().endswith(".svg")
+
+
+def svg_layers(text: str):
+    """Layers of a simple filled SVG document on the 24 grid, or ``None`` (use a picture instead)."""
+    from .svgfile import svg_layers as _impl
+
+    return _impl(text)
+
+
 def names() -> list[str]:
     """All icon names, in a stable order."""
     return list(_ICONS)
@@ -227,7 +244,10 @@ def names() -> list[str]:
 
 def path(name: str) -> str | None:
     """The raw path string of an icon (``None`` when unknown)."""
-    return _ICONS.get(name.strip().lower()) if isinstance(name, str) else None
+    if not isinstance(name, str):
+        return None
+    key = name.strip().lower()
+    return _ICONS.get(key) or _ICONS.get(ALIASES.get(key, ""))
 
 
 _TOKEN = re.compile(r"([MLHVCQAZ])|(-?\d*\.?\d+(?:e-?\d+)?)", re.I)

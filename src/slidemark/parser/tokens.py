@@ -76,18 +76,67 @@ _PT_PROPS = {
 _CSS_CLASSES = {"lead", "conclusion", "footnote", "subtitle", "box", "kpi", "chart"}
 
 
-def _style_css_key(key: str) -> tuple[str, str] | None:
-    """``h1.letter-spacing`` -> (selector ``h1``, css property); None when the key is not an element style."""
+_HEAD_ALIAS = {"title": "h1", "heading": "h2", "body": "p", "text": "p"}
+_PROP_ALIAS = {
+    "weight": "font-weight",
+    "bold": "font-weight",
+    "size": "font-size",
+    "font": "font-family",
+    "family": "font-family",
+    "spacing": "letter-spacing",
+    "transform": "text-transform",
+    "case": "text-transform",
+    "uppercase": "text-transform",
+    "bg": "background",
+    "fill": "background",
+    "align": "text-align",
+    "italic": "font-style",
+    "underline": "text-decoration",
+}
+_FLAG_VALUES = {  # `bold=on` -> font-weight: bold
+    "bold": ("bold", "normal"),
+    "italic": ("italic", "normal"),
+    "underline": ("underline", "none"),
+    "uppercase": ("uppercase", "none"),
+}
+
+
+def _style_css_key(key: str) -> tuple[str, str, str] | None:
+    """``h1.letter-spacing`` -> (selector ``h1``, css property, alias used); None when not an element style.
+
+    Aliases: ``title`` = h1, ``heading`` = h2, ``body`` = p; ``weight`` = font-weight, ``size`` = font-size...
+    """
     from .css import SUPPORTED
 
     head, dot, rest = key.strip().partition(".")
-    head = head.lower()
+    head = _HEAD_ALIAS.get(head.lower(), head.lower())
     if not dot or (head not in _CSS_ELEMENTS and head not in _CSS_CLASSES):
         return None
     prop = rest.strip().lower().replace("_", "-")
+    alias = prop if prop in _PROP_ALIAS else ""
+    prop = _PROP_ALIAS.get(prop, prop)
     if prop not in SUPPORTED:
         return None
-    return (head if head in _CSS_ELEMENTS else "." + head), prop
+    return (head if head in _CSS_ELEMENTS else "." + head), prop, alias
+
+
+def element_hint(key: str) -> str:
+    """Did-you-mean for an element token that is not valid (``title.wieght`` -> ``h1.font-weight``)."""
+    import difflib
+
+    from .css import SUPPORTED
+
+    head, dot, rest = key.strip().partition(".")
+    h = _HEAD_ALIAS.get(head.lower(), head.lower())
+    if not dot and head.lower() in _PROP_ALIAS:
+        return f"name the element: 'h1.{_PROP_ALIAS[head.lower()]}=...' (h1 title, h2 box heading, p body)"
+    if not dot or (h not in _CSS_ELEMENTS and h not in _CSS_CLASSES):
+        return ""
+    prop = rest.strip().lower().replace("_", "-")
+    near = difflib.get_close_matches(prop, [*SUPPORTED, *_PROP_ALIAS], n=1, cutoff=0.6)
+    if not near:
+        return f"'{h}.<css-property>' takes any CSS property, e.g. {h}.font-weight=bold"
+    return f"did you mean '{h}.{_PROP_ALIAS.get(near[0], near[0])}'? element tokens take any CSS property"
 
 
 def _style_css(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int) -> bool:
@@ -99,7 +148,17 @@ def _style_css(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int
     hit = _style_css_key(key)
     if hit is None:
         return False
-    sel, prop = hit
+    sel, prop, alias = hit
+    if alias in _FLAG_VALUES:
+        on, off = _FLAG_VALUES[alias]
+        flag = value.strip().lower()
+        value = (
+            on
+            if flag in ("on", "true", "yes", "1")
+            else off
+            if flag in ("off", "false", "no", "0")
+            else value
+        )
     if prop in _PT_PROPS and re.fullmatch(r"[+-]?(\d+\.?\d*|\.\d+)", value.strip()):
         value = value.strip() + "pt"  # bare numbers are pt in tokens (css needs a unit)
     path, _ = canonical_token(group, key)
@@ -136,6 +195,7 @@ def set_token(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int)
         return
     path, hint = canonical_token(group, key)
     if path is None:
+        hint = (element_hint(key) if group == "style" else "") or hint
         ctx.warn(f"unknown token '{key}' in {group}:", line, "unknown-token", hint.replace("\n", " "))
         return
     try:  # lenient: a bare word may be a color declared later; apply_tokens checks it again

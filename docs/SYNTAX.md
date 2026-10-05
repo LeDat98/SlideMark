@@ -70,7 +70,7 @@ style: radius=14 gap=20 card.fill=#141A2E card.shadow="0 8 24 #00000055" title.b
 | `colors:` | any color name; new names (`brand=#FF5A1F`) are usable everywhere a color is |
 | `fonts:` | `heading`, `body`, `mono`, `ea` (East Asian) |
 | `sizes:` | text roles: `title`, `subtitle`, `heading`, `body`, `lead`, `quote`, `caption`, `footnote`, `code`, `table`, `cover-title`, `cover-subtitle` (pt) |
-| `style:` | any other token: theme fields (`gap`, `margin_x`, `title.band`, `heading.band`, `table.header.fill`, `palette=primary,#FF5A1F`), `<class>.<field>` styles (`card.fill`, `card.shadow`, `kpi.color`; a new class name such as `hero.fill` creates the class for `{.hero}`), `layout.<x>` and `render.<x>` constants, and the shortcuts `radius`, `padding`, `shadow`, `border`, `border-width`, `card` (all for `card`), `bg`, `fg`, `margin`; element styles without a CSS fence: `<element>.<css-property>` (`h1.letter-spacing=2pt`, `h1.text-transform=uppercase`, `th.background=#123456`, `box.border-radius=14`; elements `slide h1 h2 p li table th td code img`, classes `lead conclusion footnote subtitle box kpi chart`) become deck-level CSS rules placed before header css fences; Theme fields and class tokens (`card.fill`, `title.band`) keep their meaning |
+| `style:` | any other token: theme fields (`gap`, `margin_x`, `title.band`, `heading.band`, `table.header.fill`, `palette=primary,#FF5A1F`), `<class>.<field>` styles (`card.fill`, `card.shadow`, `kpi.color`; a new class name such as `hero.fill` creates the class for `{.hero}`), `layout.<x>` and `render.<x>` constants, and the shortcuts `radius`, `padding`, `shadow`, `border`, `border-width`, `card` (all for `card`), `bg`, `fg`, `margin`; element styles without a CSS fence: `<element>.<css-property>` (`h1.letter-spacing=2pt`, `h1.text-transform=uppercase`, `th.background=#123456`, `box.border-radius=14`, any property of the CSS fence; aliases `title`=h1, `heading`=h2, `body`=p and `weight`, `size`, `font`, `bold=on`, `italic=on`: `title.weight=bold` = `h1.font-weight=bold`; elements `slide h1 h2 p li table th td code img`, classes `lead conclusion footnote subtitle box kpi chart`) become deck-level CSS rules placed before header css fences; Theme fields and class tokens (`card.fill`, `title.band`) keep their meaning |
 
 Class style fields: `fill` (a color or `linear-gradient(...)`/`radial-gradient(...)`), `line`, `line_width`,
 `radius`, `padding`, `shadow` (`"x y blur [spread] color"` in pt), `opacity`, `color`, `font`, `font_size`,
@@ -193,7 +193,8 @@ Keys:
 ## Components
 
 **KPI box.** A box with `.kpi` shows its first line as a big number and the rest as a small caption; the
-heading is the label.
+heading is the label. CSS: `.kpi { color; font-size; font-family; font-weight }` styles the big number;
+`.kpi .caption` (or `.kpi p`) the caption, `.kpi h2` the label.
 
 ```markdown
 ## 売上 {.kpi}
@@ -213,7 +214,12 @@ colored border). It works anywhere a block can go, including inside a box, and i
 the number in a `.kpi` box): `## 売上 {.kpi icon=chart}`. `slidemark docs icons` lists the names (check, x,
 warning, info, user, users, building, factory, chart, money, yen, target, rocket, lightbulb, gear, clock,
 calendar, document, mail, phone, globe, lock, shield, cloud, database, search, star, heart, truck, cart, leaf,
-arrow-up, arrow-down, arrow-right). An unknown name is a warning with a did-you-mean hint.
+arrow-up, arrow-down, arrow-right, headphones, battery, music, sparkles, smile, camera, book, graduation-cap,
+home, map-pin, wifi, code, cpu, bell, flag, gift, coffee, plane, wrench, key, play, trophy, briefcase, chat, bolt,
+tooth; close synonyms such as `house`, `message`, `lightning` work too). `icon=assets/logo.svg` (path relative to
+the deck) uses your own SVG: simple filled shapes (path, rect, circle, polygon) become native geometry recolored
+like the built-in icons (white fills are cut-outs); strokes, gradients or transforms embed it as a picture. A
+missing file is a warning. An unknown name is a warning listing the closest names.
 
 **Badge.** `[text]{.badge}` is a small filled label inside text; add a color class to change it:
 `[済]{.badge .success}`, `[NEW]{.badge .danger}`.
@@ -332,6 +338,7 @@ split. Later rules and higher specificity win; inline `{}` attributes win over C
 | Font | `font-family`, `font-size`, `font-weight`, `font-style` |
 | Text | `letter-spacing`, `line-height`, `text-align`, `vertical-align`, `text-transform`, `text-decoration` |
 | Box | `padding` (1–4 values), `padding-top/right/bottom/left`, `margin`, `gap` |
+| Width | `width` (`fit-content` / `max-content` / `display: inline-block` = a text block hugs its text and padding and sits left, or right/center per `text-align`; `40%`, `3in` = fixed width) on blocks in the flow; `auto` resets |
 | Grid | `grid-template-columns` (`1fr 2fr` → `@1:2`, `repeat(3, 1fr)` → `@3`), `grid-template-areas` |
 | Transform | `transform: rotate(<deg>)` |
 

@@ -44,14 +44,37 @@ def _cust_geom(layers) -> etree._Element:
     return etree.fromstring(xml)
 
 
-def add_icon(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
-    """Draw ``pl.element.attrs["icon"]``; return False (nothing drawn) for an unknown icon name."""
-    icon = str(pl.element.attrs.get("icon", "")).strip().lower()
-    layers = icons.commands(icon)
-    if not layers:
+def _file_icon(rc: RenderCtx, slide, pl: Placed, name: str, src: str) -> bool:
+    """``icon=file.svg``: native geometry for simple filled SVG, else the SVG as a picture."""
+    from ..ir import Image
+    from .objects import resolve_image
+    from .svg import add_svg
+
+    path = resolve_image(rc, src)
+    if path is None:
+        rc.diag("icon-missing", f"icon file not found: {src}", "check the path, relative to the .md file")
         return False
+    try:
+        layers = icons.svg_layers(path.read_text(encoding="utf-8-sig", errors="replace"))
+    except OSError:
+        layers = None
+    if layers:
+        _draw(rc, slide, pl, f"icon {path.name}", layers)
+        return True
+    pic = Placed(
+        element=Image(src=str(path), alt=path.stem, fit="contain"),
+        x=pl.x,
+        y=pl.y,
+        w=pl.w,
+        h=pl.h,
+        style=pl.style,
+    )
+    return add_svg(rc, slide, pic, name)
+
+
+def _draw(rc: RenderCtx, slide, pl: Placed, name: str, layers) -> None:
     shp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Emu(pl.x), Emu(pl.y), Emu(pl.w), Emu(pl.h))
-    shp.name = f"icon {icon}"
+    shp.name = name
     el = shp._element
     if (style_el := el.find(qn("p:style"))) is not None:
         el.remove(style_el)
@@ -63,4 +86,16 @@ def add_icon(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
     shp.fill.fore_color.rgb = rgb(rc.theme, pl.style.fill or pl.style.color or "primary")
     shp.line.fill.background()
     shp.shadow.inherit = False
+
+
+def add_icon(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
+    """Draw ``pl.element.attrs["icon"]``; return False (nothing drawn) for an unknown icon name or file."""
+    raw = str(pl.element.attrs.get("icon", "")).strip()
+    if icons.is_file(raw):
+        return _file_icon(rc, slide, pl, name, raw)
+    icon = raw.lower()
+    layers = icons.commands(icon)
+    if not layers:
+        return False
+    _draw(rc, slide, pl, f"icon {icon}", layers)
     return True

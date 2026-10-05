@@ -21,14 +21,15 @@ from .helpers import needs_soffice
 EXPECTED = (
     "check x warning info user users building factory chart money yen target rocket lightbulb gear clock "
     "calendar document mail phone globe lock shield cloud database search star heart truck cart leaf "
-    "arrow-up arrow-down arrow-right"
+    "arrow-up arrow-down arrow-right headphones battery music sparkles smile camera book graduation-cap "
+    "home map-pin wifi code cpu bell flag gift coffee plane wrench key play trophy briefcase chat bolt tooth"
 ).split()
 E = 914400
 
 
 def test_icon_set_is_complete():
     assert sorted(icons.names()) == sorted(EXPECTED)
-    assert len(icons.names()) == 34
+    assert len(icons.names()) == 60
 
 
 @pytest.mark.parametrize("name", EXPECTED)
@@ -71,7 +72,7 @@ def _render_icons(tmp_path, names, fill="primary"):
 def test_every_icon_renders_as_custom_geometry(tmp_path):
     out, th = _render_icons(tmp_path, EXPECTED + ["not-an-icon"])
     shapes = list(Presentation(str(out)).slides[0].shapes)
-    assert len(shapes) == 34  # the unknown name draws nothing
+    assert len(shapes) == len(EXPECTED)  # the unknown name draws nothing
     assert sorted(s.name for s in shapes) == sorted(f"icon {n}" for n in EXPECTED)
     want = th.color("primary").lstrip("#").upper()
     for s in shapes:

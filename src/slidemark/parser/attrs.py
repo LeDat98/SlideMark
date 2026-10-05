@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import difflib
 import os
 import re
 import shlex
 from dataclasses import dataclass, field
 from typing import Any
 
+from .. import icons
 from ..ir import Box, Chart, ElementBase, Image, Media, Style, Table
 from .ctx import Ctx, closest
 from .tabular import apply_chart_kv, apply_table_kv
@@ -103,13 +105,7 @@ VALID_KEYS = (
     *("radius", "opacity", "pad", "fit", "bg", "t", "hidden", "gap", "id", "icon"),
     *("poster", "autoplay", "loop", "render"),
 )
-# keep in sync with slidemark.icons (tests/test_icons.py checks it)
-ICON_NAMES = (
-    *("check", "x", "warning", "info", "user", "users", "building", "factory", "chart", "money", "yen"),
-    *("target", "rocket", "lightbulb", "gear", "clock", "calendar", "document", "mail", "phone", "globe"),
-    *("lock", "shield", "cloud", "database", "search", "star", "heart", "truck", "cart", "leaf"),
-    *("arrow-up", "arrow-down", "arrow-right"),
-)
+ICON_NAMES = tuple(icons.names())
 KNOWN_CLASSES = (
     "primary",
     "accent",
@@ -197,11 +193,21 @@ def apply_attrs(
         elif k == "poster" and isinstance(el, Media):
             el.poster = v
         elif k == "icon":
-            if v in ICON_NAMES:
-                el.attrs["icon"] = v
+            if icons.is_file(v):
+                el.attrs["icon"] = v.strip()  # the file is read at render time (relative to the deck)
+            elif icons.path(v):
+                el.attrs["icon"] = v.strip().lower()
             else:
-                near = closest(v, ICON_NAMES, 0.5)
-                hint = f"did you mean '{near}'?" if near else "run 'slidemark docs icons' for the names"
+                low = v.strip().lower()
+                near = difflib.get_close_matches(low, ICON_NAMES, n=3, cutoff=0.3)
+                tip = "or icon=file.svg for your own"
+                if near and closest(low, near, 0.5) == near[0]:  # fix.py reads "did you mean '<name>'"
+                    more = f" (also {', '.join(near[1:])})" if len(near) > 1 else ""
+                    hint = f"did you mean '{near[0]}'?{more} {tip}"
+                else:
+                    hint = (
+                        f"closest: {', '.join(near)}; {tip}" if near else f"see 'slidemark docs icons'; {tip}"
+                    )
                 ctx.warn(f"unknown icon '{v}'", line, "unknown-icon", hint)
         else:
             sink[k] = v

@@ -386,6 +386,31 @@ def _apply_box(ctx: _Ctx, el, rect: Rect, absolute: bool) -> Rect:
     return Rect(x, y, w, h)
 
 
+def _css_width(ctx: _Ctx, el, r: Rect, inherit: Style) -> Rect:
+    """CSS ``width`` of a block in the flow: fixed (``40%``, ``3in``) or ``fit-content`` (a text hugs its
+    longest line + padding). The block keeps the cell's left edge, or moves per ``text-align``."""
+    if not ctx.css.active:
+        return r
+    st = ctx.css.own(el)
+    if not st.width or st.width == "auto" or (getattr(el, "box", None) is not None and el.box.w is not None):
+        return r
+    if st.width == "fit-content":
+        if not isinstance(el, Text) or not el.paragraphs:
+            return r
+        ts = _text_style(ctx, el, inherit)
+        size = (ts.font_size or 18) * ctx.scale
+        em = max(measure.text_em(p.plain, bold=bool(ts.bold)) for p in el.paragraphs)
+        pl, _, pr, _ = css.insets(ts, 0)
+        w = round(em * size * 1.08 * EMU_PER_PT) + pl + pr
+    else:
+        w = _len(ctx, st.width, r.w, el)
+        if w is None:
+            return r
+    w = max(min(w, r.w), 1)
+    dx = {"center": (r.w - w) // 2, "right": r.w - w}.get(_text_style(ctx, el, inherit).align or "left", 0)
+    return Rect(r.x + dx, r.y, w, r.h)
+
+
 def _fit(ctx: _Ctx, need_fn, avail: int, base_size: float) -> float:
     """Smallest-effort local autofit scale for a standalone element (title, lead, ...)."""
     for s in _SCALES:
@@ -703,7 +728,9 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
     hst = _text_style(ctx, h_el, Style())
     if kpi:
         body_size = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k
-        hst = hst.merged(Style(align="center", color="muted", bold=False, font_size=body_size))
+        hst = hst.merged(
+            Style(align="center", color="muted", bold=False, font_size=body_size), ctx.css.own(h_el)
+        )  # `.kpi h2 {..}` still wins over the label defaults
     if band:
         hst = hst.merged(
             Style(
@@ -787,7 +814,10 @@ def _equalize_heads(ctx: _Ctx, boxes: list[tuple[Container, int, int]]) -> None:
 def _icon_name(el) -> str | None:
     """The valid icon name of ``icon=name`` on a box / chevron (unknown names are ignored here)."""
     name = getattr(el, "attrs", {}).get("icon")
-    name = str(name).strip().lower() if name else ""
+    name = str(name).strip() if name else ""
+    if icons.is_file(name):  # `icon=file.svg`: case-sensitive path, read by the renderer
+        return name
+    name = name.lower()
     return name if name and icons.path(name) else None
 
 
@@ -872,7 +902,7 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
     children = c.children
     grid = _cgrid(ctx, c)
     if kpi:
-        children = _kpi_children(ctx, children, area.w)
+        children = _kpi_children(ctx, children, area.w, c)
     saved = (ctx.depth, ctx.grow)
     ctx.depth += 1
     if kpi:
@@ -923,7 +953,7 @@ def _box_nat0(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None
         return None
     inner_w = max(width - pl - pr, 1)
     if kpi:
-        children = _kpi_children(ctx, children, inner_w)
+        children = _kpi_children(ctx, children, inner_w, c)
     saved = (ctx.depth, ctx.grow)
     ctx.depth += 1
     if kpi:
@@ -938,7 +968,7 @@ def _box_nat0(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None
     return total + sum(nat) + _gap(ctx, _cgap(ctx, c), inner_w, small=True) * (len(nat) - 1)
 
 
-def _kpi_children(ctx: _Ctx, children: list, width: int) -> list:
+def _kpi_children(ctx: _Ctx, children: list, width: int, box: Container | None = None) -> list:
     """The first text child of a ``.kpi`` box: paragraph 0 = big number, the rest = muted caption."""
     i = next((k for k, c in enumerate(children) if isinstance(c, Text) and c.paragraphs), None)
     if i is None:
@@ -949,6 +979,8 @@ def _kpi_children(ctx: _Ctx, children: list, width: int) -> list:
     cap = Style(
         font_size=th.sizes.get("caption", DEFAULT_SIZES["caption"]), color="muted", align="center", bold=False
     )
+    vcss, ccss = ctx.css.kpi_styles(box) if box is not None else (Style(), Style())
+    big, cap = big.merged(vcss), cap.merged(ccss)
     paras: list[Paragraph] = []
     for j, p in enumerate(ch.paragraphs):
         if j == 0:
@@ -1087,7 +1119,7 @@ def _place_stack(
     used = 0
     for (i, ch), n in zip(flow, nat, strict=True):
         h = n if n is not None else flex_h
-        r = _apply_box(ctx, ch, Rect(area.x, y, area.w, h), False)
+        r = _css_width(ctx, ch, _apply_box(ctx, ch, Rect(area.x, y, area.w, h), False), inherit)
         rects[i] = r
         _place_block(ctx, ch, r, inherit)
         y += h + gap
@@ -1615,7 +1647,7 @@ def _place_blocks(
             default=None,
         )
     for (i, blk), r in zip(flow, cells, strict=True):
-        r = _apply_box(ctx, blk, r, False)
+        r = _css_width(ctx, blk, _apply_box(ctx, blk, r, False), inherit)
         rects[i] = r
         if "chevron" in flags and isinstance(blk, (Text, Shape, Container)):
             rects[i] = _place_chevron(ctx, blk, r, inherit, chev_eff, chev_h)

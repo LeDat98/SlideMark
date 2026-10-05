@@ -22,6 +22,8 @@
 | SaaS | 38.2 | [好調]{.badge .success} |
 ```
 
+KPI look: css `.kpi { color: #15803D; font-size: 40pt }` styles the number, `.kpi .caption` the caption.
+
 **Steps** — `@4 chevron` draws each box as a chevron (heading + 1–3 short bullets). `@3 flow` keeps cards and
 puts arrows between them. Add `@end` and a table to get a plan table under the steps.
 
@@ -54,6 +56,8 @@ Badges work anywhere in text, including bullets and table cells (`影響: [高]{
 **Badges** — `[NEW]{.badge}`, color with a class: `.success .danger .accent .muted`.
 
 **Icons** — `icon=name` on any box heading: `## 品質 {icon=shield}`, `## 売上 {.kpi icon=yen}` (`slidemark docs icons`).
+
+**Sticker / tag** — css `width: fit-content` (or `display: inline-block`) makes a text block hug its text; `width: 40%`. Header token `title.weight=bold` (= `h1.font-weight`).
 
 **Box colors** — `## 課題 {.danger}` colors the box border; `{.plain}` removes the card.
 

@@ -82,15 +82,25 @@ _BOX = {
     "border_left",
 }
 _HONORED: dict[str, set[str]] = {
-    "text": _TEXTUAL | _BOX,
-    "code": _TEXTUAL | _BOX,
+    "text": _TEXTUAL | _BOX | {"width"},
+    "code": _TEXTUAL | _BOX | {"width"},
     "shape": _TEXTUAL | _BOX,
-    "container": _TEXTUAL | _BOX | {"gap", "grid"},
+    "container": _TEXTUAL | _BOX | {"gap", "grid", "width"},
     "slide": {"fill", "gap", "grid", "color", "font", "font_ea", "font_size", "bold", "italic", "align"}
     | {"valign", "line_spacing", "letter_spacing", "text_transform"},
-    "image": {"line", "line_width", "line_dash", "radius", "shadow", "opacity", "rotation", "margin"},
-    "chart": {"color", "font", "font_ea", "font_size", "margin"},
-    "table": _TEXTUAL | {"fill", "line", "line_width", "line_dash", "margin"},
+    "image": {
+        "line",
+        "line_width",
+        "line_dash",
+        "radius",
+        "shadow",
+        "opacity",
+        "rotation",
+        "margin",
+        "width",
+    },
+    "chart": {"color", "font", "font_ea", "font_size", "margin", "width"},
+    "table": _TEXTUAL | {"fill", "line", "line_width", "line_dash", "margin", "width"},
     "cell": _TEXTUAL
     | {
         "fill",
@@ -285,6 +295,7 @@ class CssIndex:
         self.rules.sort(key=lambda t: (t[0].spec, t[2]))
         self.active = bool(self.rules)
         self.nodes: dict[int, Node] = {}
+        self.kpi_nodes: dict[int, tuple[Node, Node]] = {}
         self.diags: list[Diagnostic] = []
         self._tcache: dict[int, Table] = {}
         self._done: set[int] = set()
@@ -339,6 +350,11 @@ class CssIndex:
                 if (k := self._block(n, ch)) is not None:
                     kids.append(k)
             self._number(kids)
+            if "kpi" in classes:  # virtual nodes: `.kpi .value` (the big number), `.kpi .caption`
+                self.kpi_nodes[id(el)] = (
+                    Node(frozenset({"p"}), frozenset({"value"}), "text", None, n),
+                    Node(frozenset({"p"}), frozenset({"caption"}), "text", None, n),
+                )
             return n
         if isinstance(el, Text):
             return self._text_node(parent, el)
@@ -472,6 +488,27 @@ class CssIndex:
             return Style()
         self._compute(n)
         return n._own or Style()
+
+    def kpi_styles(self, box) -> tuple[Style, Style]:
+        """``(value, caption)`` CSS of a ``.kpi`` box.
+
+        The box's own text properties (``.kpi { color; font-size; font-family; font-weight }``) style the big
+        number; ``.kpi .value`` / ``.kpi p`` refine it, ``.kpi .caption`` / ``.kpi p`` style the caption.
+        """
+        pair = self.kpi_nodes.get(id(box)) if self.active else None
+        if pair is None:
+            return Style(), Style()
+        box_own = self.own(box)
+        keep = {
+            k: getattr(box_own, k) for k in ("font_size", "bold", "italic") if getattr(box_own, k) is not None
+        }
+        out = []
+        for i, n in enumerate(pair):
+            self._compute(n)
+            own = n._own or Style()
+            st = (n._inh or Style()).merged(own)
+            out.append(Style(**keep).merged(st) if i == 0 else own)
+        return out[0], out[1]
 
     def inherited(self, el) -> Style:
         n = self.node(el)

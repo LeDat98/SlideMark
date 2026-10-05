@@ -628,6 +628,26 @@ class _Maps:
             raise _Bad("margin supports one value for all sides, e.g. 8px")
         return {"margin": q[0]}
 
+    def p_width(self, v: str) -> dict:
+        t = v.strip().lower()
+        if t in ("fit-content", "max-content", "min-content"):
+            return {"width": "fit-content"}
+        if t == "auto":
+            return {"width": "auto"}
+        if t.endswith("%"):
+            if not _NUM_RE.match(t[:-1]):
+                raise _Bad("use fit-content, a percent (40%) or a length (3in)")
+            return {"width": t}
+        return {"width": f"{fmt(_length(t, self.fs))}pt"}
+
+    def p_display(self, v: str) -> dict:
+        t = v.strip().lower()
+        if t in ("inline-block", "inline", "inline-flex", "inline-grid"):
+            return {"width": "fit-content"}
+        if t in ("block", "flex", "grid"):
+            return {}
+        raise _Bad("only display: inline-block (hug the text) or block is supported")
+
     def p_gap(self, v: str) -> dict:
         vals = [_length(t, self.fs) for t in _tokens(v)]
         if not 1 <= len(vals) <= 2:
@@ -722,6 +742,8 @@ def _build_table(m: _Maps) -> dict[str, Any]:
         "padding": m.p_padding,
         "margin": m.p_margin,
         "gap": m.p_gap,
+        "width": m.p_width,
+        "display": m.p_display,
         "grid-template-columns": m.p_grid_template_columns,
         "grid-template-areas": m.p_grid_template_areas,
         "transform": m.p_transform,

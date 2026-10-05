@@ -65,6 +65,9 @@ class Style(Model):
     margin: Length | None = None  # outer space around a block inside its cell
     gap: Length | None = None  # gap between the children of a container / slide body
     grid: str | None = None  # `@` grid spec from grid-template-columns / -areas ("1:2", "aab/aac")
+    width: str | None = (
+        None  # CSS width of a block: "fit-content" (hug the text), "auto", "40%", "3in", "120pt"
+    )
 
     def merged(self, *others: Style | None) -> Style:
         """Return a copy where later non-None fields override earlier ones."""
