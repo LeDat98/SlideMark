@@ -310,3 +310,18 @@ def test_normal_boxes_of_a_large_theme_keep_the_small_growth():
     body, head, _ = _body_scales(s)
     assert max(body) <= 1.15 + 1e-9
     assert head == {1.0}
+
+
+def test_text_above_code_has_no_gap():
+    from slidemark.ir import Code
+
+    s = Slide(
+        title=T("Title", "title"),
+        grid="b/a",
+        elements=[Code(text="x = 1\ny = 2", lang="python"), bullets("one", "two")],
+    )
+    placed, _deck = lay(s, "midnight")
+    text = of(placed, Text)
+    body = next(p for p in text if p.element.role == "body")
+    code = of(placed, Code)[0]
+    assert 0 <= code.y - (body.y + body.h) <= 0.35 * EMU_PER_INCH  # the code follows the text directly

@@ -130,6 +130,7 @@ class _Ctx:
     tight: float = 1.0  # gap / padding factor (dense slides)
     grow: float = 1.0  # body text growth inside boxes (sparse grids), shared by all sibling boxes
     depth: int = 0  # 0 = slide level, > 0 inside a box
+    text_only: bool = False  # the slide body is plain text only: its body text grows like box text
     head_grow: bool = False  # very sparse boxes: box headings grow with ``grow`` (up to ``GROW_HEAD``)
     grew: bool = False  # set when ``grow`` actually scaled some text
     fill: float | None = None  # natural content height / grid height of the slide-level grid, if known
@@ -372,7 +373,7 @@ def _fit(ctx: _Ctx, need_fn, avail: int, base_size: float) -> float:
 
 def _grown(ctx: _Ctx, el, eff: float) -> float:
     """Autofit scale ``eff`` times the sparse-grid growth for body text inside boxes."""
-    if ctx.grow > 1.0 and ctx.depth > 0 and ctx.scale >= 1.0 and isinstance(el, Text):
+    if ctx.grow > 1.0 and (ctx.depth > 0 or ctx.text_only) and ctx.scale >= 1.0 and isinstance(el, Text):
         if el.role == "body" and "callout" not in el.classes:
             ctx.grew = True
             return eff * ctx.grow
@@ -1074,6 +1075,8 @@ def _row_heights(
     nat: list[int | None] = [0] * nr
     kinds: list[set[str]] = [set() for _ in range(nr)]
     covered = [False] * nr
+    onecol = len(gs.cols) == 1 and nr >= 2 and not tree
+    rowtext = [True] * nr  # rows holding only text / code blocks (a vertical stack)
     spans: list[tuple[int, int, int | None]] = []  # blocks spanning several rows: (first, last, natural)
     stacked: set[int] = set()  # rows beside a flexible block that spans them (a column of stacked boxes)
     for k, ((_i, blk), r) in enumerate(zip(flow, cells, strict=True)):
@@ -1089,6 +1092,8 @@ def _row_heights(
             continue
         covered[r0] = True
         kinds[r0].add(kind)
+        if not isinstance(blk, (Text, Code)):
+            rowtext[r0] = False
         nat[r0] = None if n is None or nat[r0] is None else max(nat[r0] or 0, n)
     caps: list[int | None] = []
     for row in range(nr):
@@ -1101,6 +1106,9 @@ def _row_heights(
             caps.append(n)
         elif tree:  # org-tree levels hug their boxes (+ modest slack): the connectors fill the gaps
             caps.append(round(n * (TREE_SLACK_ROOMY if ctx.roomy else TREE_SLACK)))
+        elif onecol and rowtext[row]:  # a stack of text / code: each row is its natural height, no gap
+            caps.append(n)
+            kinds[row] = {"stack"}
         else:
             lone = nr == 1 and not has_tail and ctx.dense_k < 1.0
             floor = ROW_MIN_TAIL if has_tail else (ROW_MIN_DENSE if lone else ROW_MIN)
@@ -1204,7 +1212,12 @@ def _place_blocks(
         if swapped:
             flow = [flow[1], flow[0]]
         wide = any(isinstance(b, Code) and max(map(len, b.text.split("\n")), default=0) > 45 for _, b in flow)
-        gs = auto_spec(len(flow), text_visual=text_visual, short=short, wide_visual=wide)
+        if len(flow) > 1 and any(_wide_diagram(b) for _, b in flow):
+            # a wide flowchart takes the full width; what follows it sits right below (the tail)
+            first = _wide_diagram(flow[0][1])
+            gs = GridSpec([1.0], [1.0] if first else [1.0] * len(flow), capacity=1 if first else None)
+        else:
+            gs = auto_spec(len(flow), text_visual=text_visual, short=short, wide_visual=wide)
         if searchable and not ctx.arrange:
             ctx.alts = _search_tokens(flow, gs, classes, bool(tables), swapped)
     elif searchable and not ctx.arrange:
@@ -1343,6 +1356,17 @@ def _hug_beside_visual(ctx: _Ctx, gs, flow: list, cells: list[Rect], inherit: St
 
 def _is_diagram(b) -> bool:
     return isinstance(b, Container) and "diagram" in b.classes and b.title is None
+
+
+def _wide_diagram(b) -> bool:
+    """A flowchart whose grid is much wider than tall (>= 4 columns, or a single row of 3+): full width."""
+    if not _is_diagram(b) or not b.grid:
+        return False
+    gs = parse_spec(b.grid, len(b.children), b.classes)
+    if gs is None or gs.errors or not gs.cols or not gs.rows:
+        return False
+    nc, nr = len(gs.cols), len(gs.rows)
+    return nc >= 4 or (nc >= 3 and nc / nr >= 2.5)
 
 
 def _hug_tail(ctx: _Ctx, start: int, area: Rect, gap: int) -> None:
@@ -1866,6 +1890,9 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
 
         body_pt = theme.sizes.get("body", 18) * ctx.dense_k
         very = body_pt >= GROW_VERY_SPARSE_PT and _very_sparse(elements)
+        text_only = kind != "center" and all(
+            isinstance(e, Text) and e.role == "body" and "callout" not in e.classes for e in elements
+        )
 
         def solve(arrange: str | None = None) -> _Ctx:
             def run(area: Rect, **kw) -> _Ctx:
@@ -1880,6 +1907,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     tight=ctx.tight,
                     head_grow=very,
                     arrange=arrange,
+                    text_only=text_only,
                     **kw,
                 )
                 _place_blocks(

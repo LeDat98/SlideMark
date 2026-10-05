@@ -242,3 +242,27 @@ def test_chevron_label_does_not_leave_orphans():
         wide = measure.paragraphs_height(p.element.paragraphs, width, p.style, p.font_scale)
         narrow = measure.paragraphs_height(p.element.paragraphs, round(width * 0.88), p.style, p.font_scale)
         assert narrow <= wide * 1.001  # still the same number of lines in a 12% narrower text area
+
+
+DEPLOY = """# Deployment pipeline
+```mermaid
+graph LR
+A[Commit] --> B[Build]
+B --> C[Test]
+C -->|pass| D[Deploy to staging]
+C -->|fail| F[Rollback]
+D --> E{Approve?}
+E -->|yes| G[Deploy to production]
+E -->|no| F
+```
+Every change passes tests and an approval gate before production.
+"""
+
+
+def test_wide_diagram_takes_full_width_with_text_below():
+    deck, theme, placed = check_clean(DEPLOY)
+    W, _H = slide_size(deck.size)
+    ns = nodes(placed)
+    assert max(n.x + n.w for n in ns) - min(n.x for n in ns) > 0.8 * W  # not squeezed into half the width
+    para = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "body")
+    assert para.y >= max(n.y + n.h for n in ns)  # the paragraph sits below the diagram

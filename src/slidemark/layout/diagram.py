@@ -483,11 +483,20 @@ def _side_route(a: Rect, b: Rect, everyone: list[Rect], side_k: int, step: int) 
     """Out of the right side of ``a``, around the nodes, into the right side of ``b`` (route ``h``)."""
     ya, yb = _cy(a), _cy(b)
     lo, hi = min(ya, yb), max(ya, yb)
-    ext = max(r.right for r in everyone if r.y <= hi and r.bottom >= lo)
+    near = [r for r in everyone if r.y <= hi and r.bottom >= lo]
+    others = [r for r in everyone if r is not a and r is not b]
+    ext = max(r.right for r in near)
     bend = ext + step * (side_k + 1)
     p0 = (a.right, ya)
     p1 = (b.right, yb)
-    return _Route([p0, (bend, ya), (bend, yb), p1], "h", False, 0.5, p0, p1, side=True)
+    right = _Route([p0, (bend, ya), (bend, yb), p1], "h", False, 0.5, p0, p1, side=True)
+    if not _poly_hits(right.pts, others):
+        return right
+    # the right side is blocked (a node of the target's rank sits beside it): go around the left side
+    bend = min(r.x for r in near) - step * (side_k + 1)
+    p0, p1 = (a.x, ya), (b.x, yb)
+    left = _Route([p0, (bend, ya), (bend, yb), p1], "h", False, 0.5, p0, p1, side=True)
+    return left if not _poly_hits(left.pts, others) else right
 
 
 def _label_rect(
@@ -510,7 +519,7 @@ def _label_rect(
     order = order + [s for s in segs if s not in order]
     toward = 1 if rt.p1[0] >= rt.p0[0] else -1
     if rt.side:
-        toward = 1  # outer side of the loop
+        toward = 1 if rt.pts[1][0] >= rt.p0[0] else -1  # outer side of the loop
     cands: list[Rect] = []
     for u, v in order:
         fracs = (0.8, 0.6, 0.4) if rt.elbow and (u, v) == order[0] else (0.5, 0.75, 0.25)
