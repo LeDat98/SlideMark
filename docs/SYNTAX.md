@@ -76,6 +76,9 @@ Three things are not blocks and have fixed places:
 
 A `>` anywhere else is a quote.
 
+`@end` on its own line closes the current `##` box: what follows belongs to the slide again (a table under a
+row of chevron boxes, a closing `>` conclusion). Without it a box runs to the end of the slide.
+
 `### Heading` inside a box is a sub-heading. It becomes a nested box only when the box has its own `@` line.
 
 ## Layout: `@` line

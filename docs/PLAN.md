@@ -87,3 +87,29 @@ daily routine keeps climbing L4 → L7, picking the unchecked gates with the bes
 
 ## Day 1 leftovers (carried to day 2)
 - [ ] Table/`>` after the last `##` box become children of that box and (in a chevron box) vanish: add a way to end a box + diagnostic when a visual is dropped (found in `examples/02-jp-dense.md` slide 2)
+
+## Day 2 work packages (incl. day 1 leftover)
+- **A: parser + CLI** (`src/slidemark/parser/`, `src/slidemark/cli.py`, `tests/test_parser*.py`, `tests/test_cli.py`):
+  - `@end` line closes the current `##` box (SYNTAX.md, committed by orchestrator); `@end` outside a box → info diagnostic.
+  - Lenient variants accepted with a warning + hint: Marp `<!-- _class: x -->`/`<!-- paginate: true -->` and
+    `marp: true` header, Slidev per-slide YAML frontmatter (`layout:`, `class:`), `::right::`-style slot lines,
+    `Note:` / `<!-- notes -->` comments → notes, `* ` bullets, `###` used as slide start when no `#` exists,
+    `![w:200](a.png)` Marp sizing, `<br>` in text.
+  - Every diagnostic has `rule` + one-line actionable `hint`; unknown `@` tokens/attrs suggest the closest valid one.
+  - Extend hypothesis fuzz (random line mixes incl. new variants): never raises.
+- **B: layout + renderer** (`src/slidemark/layout/`, `src/slidemark/render/`, `tests/test_layout*.py`, `tests/test_render*.py`):
+  - Layout emits a `Diagnostic` (rule `dropped-content`) when a chevron/flow box drops non-text children.
+  - Autofit: verify/make font_scale shrink with measured metrics for Latin and CJK, `overflow` diagnostic below
+    `min_font_size` (check it fires with a hint); CJK line breaking: no line starting with closing punctuation
+    (、。）」) or ending with an opening one (kinsoku).
+  - Table styling: header fill, zebra option via class `.zebra`, borders; image `fit=cover` real crop (srcRect).
+  - Tests reopen the .pptx and assert.
+- **Orchestrator:** golden image diff test (preview PNG vs stored, tolerance; skip without soffice), `bench/BASELINE.json`
+  + token gate test (fail if slidemark tokens regress >3%), examples, gallery, docs.
+
+## Day 2 status
+- [ ] Contract: `@end` in SYNTAX.md
+- [ ] A: lenient parsing + hints + `@end` + fuzz
+- [ ] B: dropped-content diag, autofit/kinsoku, table styling, image cover
+- [ ] Orchestrator: golden images, BASELINE.json token gate
+- [ ] Merge, gallery, bench
