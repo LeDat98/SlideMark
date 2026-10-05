@@ -75,7 +75,7 @@ Run goal:
 - Problems: one lint-red push (`commit -am` swept a file, fixed in minutes); a parallel owner commit moved CI to daily (push once per wave now).
 - Next: L3 two-card/decision slides and right panels still half empty (content-bound; needs a design rule the reviewers agree on); badge pills; katakana wraps in chevrons.
 
-## 2026-10-05 (run 5, routine, agent cost, 17:45–21:30 UTC)
+## 2026-10-05 (run 5, routine, agent cost, 17:45–20:50 UTC)
 Run goal (`docs/AGENT_COST.md`; DF1–DF6 already passed):
 - [x] WP1 AC gates + `bench/agent_cost.py` + `bench/agent_accept.py` + 9 briefs + python-pptx baseline (9 runs)
 - [x] WP2 SKILL.md as the only document (2,995 tokens, 3 patterns, no docs pointer; reference pages off in eval)
@@ -85,5 +85,6 @@ Run goal (`docs/AGENT_COST.md`; DF1–DF6 already passed):
 - [x] Smoke: 9 briefs × skill-only (+8 reruns); blind contact-sheet review (2 real defects / 54 slides, both fixed)
 - Agent cost, latest run per brief: median 3 calls (p90 6), 0 images, 9/9 accepted, output 19%, cost above start 48% (≥5 slides 36%) of python-pptx; first runs: 5 calls, 3 images, 57%.
 - Also: `※` kept in footnotes, decimal commas (vi/de/fr), table text grows, examples/18-brand-lime.
+- Metrics: tests 1518 passed (1423 at start); q3 155 tokens = 30% of python-pptx, markup vs HTML 13–27%, design paths 35/38% (all unchanged); layout 38 ms/slide in the gate test after the perf fix.
 - Problems: two red pushes (a `;`/`tail` chain hid pytest failures, fixed in minutes); layout time 31 → 38 ms/slide, the 50 ms gate test went flaky → lead re-layout reverted, perf package.
 - Next: AC full matrix (27 runs), cost ≤ 35% (python-pptx arm needs only 4–6 calls), 5-step chevron text size, perf margin.
