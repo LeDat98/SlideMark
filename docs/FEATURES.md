@@ -46,3 +46,9 @@ step does not apply (no visual risk to lint, or no syntax).
 | ` ```css ` fence: selectors + 34 properties native | x | x | x | x | x | x | x | x |
 | `@html` slides, `build deck.html`, shared CSS vars | x | x | x | x | x | x | x | x |
 | HTML → native fidelity (`bench/html_fidelity.py`, 30 slides) | x | - | - | x | x | x | x | x |
+| One-call `build` (stdin `-`, `--save`, auto-fix, grouped diagnostics, facts + look line, `--png` contact sheet) | x | - | x | x | x | - | - | x |
+| Contrast-safe derived ink (text on fills, theme colours as text, dark-brand surface/border) + paste-ready hints | x | - | x | x | x | x | x | - |
+| Cover from `# Title` + `## subtitle`; full-width lone table; chevron interior text, no word breaks | x | x | x | x | x | x | x | - |
+| Sparse slide completion (KPI rows, short lists, box rows, lone tables grow) | - | - | x | x | x | x | - | - |
+| Decimal commas in chart CSV for vi/de/fr…; `※` kept in footnotes | x | x | x | x | x | - | - | - |
+| Pie/doughnut per-point label ink | - | - | x | x | x | x | - | - |
