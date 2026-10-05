@@ -12,6 +12,7 @@ from ..ir import (
     Deck,
     Diagnostic,
     Image,
+    Link,
     Paragraph,
     Placed,
     Raw,
@@ -53,6 +54,7 @@ _INHERIT_FIELDS = (
 _VISUALS = (Image, Chart, Table, Code)
 _TOL = 1.01
 CHEVRON_ADJ = 0.3  # chevron point depth / shorter side; the renderer sets the same adjustment
+DENSE_TIGHT = 0.7  # gap / padding factor on dense slides
 _SCALES = [round(1.0 - 0.05 * i, 2) for i in range(15)]  # 1.0 .. 0.3
 
 
@@ -66,6 +68,7 @@ class _Ctx:
     H: int
     scale: float = 1.0
     dense_k: float = 1.0
+    tight: float = 1.0  # gap / padding factor (dense slides)
     out: list[Placed] = field(default_factory=list)
     over: list[str] = field(default_factory=list)
     diags: list[Diagnostic] = field(default_factory=list)
@@ -153,9 +156,11 @@ def _role_style(ctx: _Ctx, role: str, cover: bool = False) -> Style:
     return st
 
 
-def _class_styles(ctx: _Ctx, el) -> list[Style]:
+def _class_styles(ctx: _Ctx, el, skip: tuple[str, ...] = ()) -> list[Style]:
     out: list[Style] = []
     for name in getattr(el, "classes", []):
+        if name in skip:
+            continue
         if name in ctx.theme.classes:
             out.append(ctx.theme.classes[name])
         elif name in ctx.theme.colors and name not in ("bg", "fg", "surface", "border"):
@@ -166,6 +171,39 @@ def _class_styles(ctx: _Ctx, el) -> list[Style]:
             else:
                 out.append(Style(color=name))
     return out
+
+
+_CALLOUT_KINDS = ("note", "tip", "warn", "caution")
+
+
+def _hex(theme: Theme, value: str | None) -> tuple[int, int, int] | None:
+    v = theme.color(value) if value else None
+    if v and len(v) == 7 and v[0] == "#":
+        try:
+            return int(v[1:3], 16), int(v[3:5], 16), int(v[5:7], 16)
+        except ValueError:
+            return None
+    return None
+
+
+def _tint(theme: Theme, color: str | None, amount: float = 0.12) -> str | None:
+    """``color`` mixed into the slide background (``amount`` = share of ``color``)."""
+    c, bg = _hex(theme, color), _hex(theme, "bg") or (255, 255, 255)
+    if c is None:
+        return None
+    mixed = [round(b + (x - b) * amount) for x, b in zip(c, bg, strict=True)]
+    return "#{:02X}{:02X}{:02X}".format(*mixed)
+
+
+def _tighten(ctx: _Ctx, st: Style) -> Style:
+    """Dense slides shrink paddings as well as fonts."""
+    if ctx.tight >= 1.0 or st.padding is None:
+        return st
+    try:
+        pt = to_emu(st.padding) / EMU_PER_PT
+    except ValueError:
+        return st
+    return st.merged(Style(padding=f"{round(pt * ctx.tight, 2)}pt"))
 
 
 def _text_style(ctx: _Ctx, el: Text | Shape, inherit: Style) -> Style:
@@ -186,7 +224,12 @@ def _text_style(ctx: _Ctx, el: Text | Shape, inherit: Style) -> Style:
         st = _role_style(ctx, role)
     if role in _INHERIT_ROLES or role == "shape":
         st = st.merged(_only_inheritable(inherit))
-    return st.merged(*_class_styles(ctx, el), el.style)
+    st = st.merged(*_class_styles(ctx, el), el.style)
+    if isinstance(el, Text) and "callout" in el.classes and not (el.style and el.style.fill):
+        kind = next((k for k in _CALLOUT_KINDS if k in el.classes), None)
+        if kind and (tint := _tint(ctx.theme, st.line)):
+            st = st.merged(Style(fill=tint))
+    return _tighten(ctx, st)
 
 
 def _only_inheritable(s: Style) -> Style:
@@ -289,7 +332,7 @@ def _code_style(ctx: _Ctx, el: Code) -> Style:
         valign="top",
         align="left",
     )
-    return st.merged(*_class_styles(ctx, el), el.style)
+    return _tighten(ctx, st.merged(*_class_styles(ctx, el), el.style))
 
 
 def _table_style(ctx: _Ctx, el: Table) -> Style:
@@ -375,34 +418,88 @@ def _card_style(ctx: _Ctx, c: Container) -> Style:
         base = ctx.theme.classes.get(
             "card", Style(fill="surface", line="border", line_width=0.75, radius=6, padding="10pt")
         )
-    others = [s for n, s in zip(c.classes, _class_styles(ctx, c), strict=False) if n != "plain"]
-    return Style().merged(base, *others, c.style)
+    others = _class_styles(ctx, c, skip=("plain", "kpi"))
+    return _tighten(ctx, Style().merged(base, *others, c.style))
 
 
 def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> None:
     style = _card_style(ctx, c)
-    pad = _pad(style, 10 * EMU_PER_PT)
+    pad = _pad(style, 10 * EMU_PER_PT * ctx.tight)
     ctx.emit(c, rect, style)
     inner = rect.inset(pad)
     y = inner.y
     child_inherit = inherit.merged(_only_inheritable(style))
+    kpi = "kpi" in c.classes
+    band = None if kpi else ctx.theme.heading_band
     if c.title is not None and c.title.paragraphs:
         h_el = c.title if c.title.role == "heading" else c.title.model_copy(update={"role": "heading"})
         hst = _text_style(ctx, h_el, Style())
+        if kpi:
+            body_size = ctx.theme.sizes.get("body", 18) * ctx.dense_k
+            hst = hst.merged(Style(align="center", color="muted", bold=False, font_size=body_size))
+        if band:
+            hst = hst.merged(
+                Style(
+                    fill=band,
+                    color=ctx.theme.heading_band_color,
+                    bold=True,
+                    valign="middle",
+                    padding=f"{round(pad / EMU_PER_PT, 2)}pt",
+                )
+            )
         eff = measure.effective_scale(hst.font_size or 18, ctx.scale, ctx.theme.min_font_size)
-        hh = round(_text_need(ctx, h_el, hst, inner.w, eff))
-        if hh > inner.h * _TOL:
-            ctx.over.append(_label(c))
-        ctx.emit(h_el, Rect(inner.x, y, inner.w, min(hh, inner.h)), hst, eff)
-        y += hh + round(pad * 0.5)
+        if band:
+            hh = round(_text_need(ctx, h_el, hst, rect.w, eff))
+            if hh > rect.h * _TOL:
+                ctx.over.append(_label(c))
+            band_rect = Rect(rect.x, rect.y, rect.w, min(hh, rect.h))
+            ctx.emit(h_el, band_rect, hst, eff)
+            y = band_rect.bottom + round(pad * 0.5)
+        else:
+            hh = round(_text_need(ctx, h_el, hst, inner.w, eff))
+            if hh > inner.h * _TOL:
+                ctx.over.append(_label(c))
+            ctx.emit(h_el, Rect(inner.x, y, inner.w, min(hh, inner.h)), hst, eff)
+            y += hh + round(pad * 0.5)
     area = Rect(inner.x, y, inner.w, max(inner.bottom - y, 0))
     if not c.children:
         return
     gap = _gap(ctx, c.gap, inner.w, small=True)
+    children = c.children
+    if kpi:
+        children = _kpi_children(ctx, children, area.w)
     if c.grid or any(n in ("flow", "chevron") for n in c.classes):
-        _place_blocks(ctx, c.children, area, child_inherit, c.grid, c.classes, gap, c)
+        _place_blocks(ctx, children, area, child_inherit, c.grid, c.classes, gap, c, c.links)
     else:
-        _place_stack(ctx, c.children, area, child_inherit, gap, c)
+        rects = _place_stack(ctx, children, area, child_inherit, gap, c, center=kpi and len(children) == 1)
+        _emit_links(ctx, c.links, rects)
+
+
+def _kpi_children(ctx: _Ctx, children: list, width: int) -> list:
+    """The first text child of a ``.kpi`` box: paragraph 0 = big number, the rest = muted caption."""
+    i = next((k for k, c in enumerate(children) if isinstance(c, Text) and c.paragraphs), None)
+    if i is None:
+        return children
+    ch = children[i]
+    th = ctx.theme
+    big = th.classes.get("kpi", Style(font_size=36, bold=True, color="primary", align="center"))
+    cap = Style(font_size=th.sizes.get("caption", 12), color="muted", align="center", bold=False)
+    paras: list[Paragraph] = []
+    for j, p in enumerate(ch.paragraphs):
+        if j == 0:
+            st = big
+            size = big.font_size or 36
+            em = measure.text_em(p.plain, bold=True)
+            avail = width / EMU_PER_PT * 0.72  # headroom: fallback fonts are wider than the estimate
+            if em * size > avail:  # one line: shrink the number to the card width
+                st = st.merged(Style(font_size=max(round(avail / em, 1), 10)))
+        else:
+            st = cap
+        paras.append(p.model_copy(update={"style": st.merged(p.style)}))
+    new = ch.model_copy(
+        update={"paragraphs": paras, "style": Style(align="center", valign="middle").merged(ch.style)}
+    )
+    return children[:i] + [new] + children[i + 1 :]
 
 
 def _gap(ctx: _Ctx, value, ref: int, small: bool = False) -> int:
@@ -410,34 +507,43 @@ def _gap(ctx: _Ctx, value, ref: int, small: bool = False) -> int:
         v = _len(ctx, value, ref)
         if v is not None:
             return v
-    g = to_emu(ctx.theme.gap)
-    return round(g * 0.5) if small else g
+    g = to_emu(ctx.theme.gap) * ctx.tight
+    return round(g * 0.5) if small else round(g)
 
 
-def _place_stack(ctx: _Ctx, children: list, area: Rect, inherit: Style, gap: int, owner) -> None:
-    flow = [ch for ch in children if not _is_abs(ch)]
-    for ch in children:
+def _place_stack(
+    ctx: _Ctx, children: list, area: Rect, inherit: Style, gap: int, owner, *, center: bool = False
+) -> dict[int, Rect]:
+    """Stack blocks full width, one per row. Returns the rect of every child by index."""
+    rects: dict[int, Rect] = {}
+    for i, ch in enumerate(children):
         if _is_abs(ch):
-            _place_block(ctx, ch, _apply_box(ctx, ch, area, True), inherit)
+            rects[i] = _apply_box(ctx, ch, area, True)
+            _place_block(ctx, ch, rects[i], inherit)
+    flow = [(i, ch) for i, ch in enumerate(children) if not _is_abs(ch)]
     if not flow:
-        return
-    nat = [_natural_height(ctx, ch, area.w, inherit) for ch in flow]
+        return rects
+    nat = [_natural_height(ctx, ch, area.w, inherit) for _, ch in flow]
     fixed = sum(n for n in nat if n is not None) + gap * (len(flow) - 1)
     nflex = sum(1 for n in nat if n is None)
     flex_h = 0
     if nflex:
         flex_h = max((area.h - fixed) // nflex, int(0.8 * EMU_PER_INCH))
+    elif center and len(flow) == 1:
+        nat = [max(nat[0] or 0, area.h)]  # a lone block fills the area (its text is centered by its style)
     y = area.y
     used = 0
-    for ch, n in zip(flow, nat, strict=True):
+    for (i, ch), n in zip(flow, nat, strict=True):
         h = n if n is not None else flex_h
         r = _apply_box(ctx, ch, Rect(area.x, y, area.w, h), False)
+        rects[i] = r
         _place_block(ctx, ch, r, inherit)
         y += h + gap
         used += h + gap
     used -= gap
     if used > area.h * _TOL:
         ctx.over.append(_label(owner) if owner is not None else "content")
+    return rects
 
 
 def _chevron_shape(blk) -> Shape:
@@ -481,14 +587,68 @@ def _block_kind_hint(blocks: list) -> tuple[bool, bool]:
     return text_visual, all(size(b) <= 80 for b in blocks)
 
 
+def _cx(r: Rect) -> int:
+    return r.x + r.w // 2
+
+
+def _cy(r: Rect) -> int:
+    return r.y + r.h // 2
+
+
+def _emit_links(ctx: _Ctx, links: list[Link], rects: dict[int, Rect]) -> None:
+    """Connectors between block rects, emitted after the blocks so they sit on top."""
+    for ln in links:
+        a, b = rects.get(ln.src), rects.get(ln.dst)
+        if a is None or b is None or ln.src == ln.dst:
+            ctx.diag(
+                "link",
+                f"connector {ln.src}>{ln.dst} refers to a block that does not exist",
+                "use block letters/numbers that exist in this grid, e.g. @abc a>b>c",
+            )
+            continue
+        v_overlap = min(a.bottom, b.bottom) - max(a.y, b.y)
+        h_overlap = min(a.right, b.right) - max(a.x, b.x)
+        if h_overlap > 0 and v_overlap > 0:
+            continue  # overlapping blocks (area spans): nothing sensible to draw
+        if v_overlap > 0:
+            horizontal = True
+        elif h_overlap > 0:
+            horizontal = False
+        else:
+            horizontal = abs(_cx(b) - _cx(a)) >= abs(_cy(b) - _cy(a))
+        if horizontal:
+            if _cx(b) >= _cx(a):
+                p0, p1 = (a.right, _cy(a)), (b.x, _cy(b))
+            else:
+                p0, p1 = (a.x, _cy(a)), (b.right, _cy(b))
+        elif _cy(b) >= _cy(a):
+            p0, p1 = (_cx(a), a.bottom), (_cx(b), b.y)
+        else:
+            p0, p1 = (_cx(a), a.y), (_cx(b), b.bottom)
+        attrs = {"head": "arrow" if ln.arrow else "none", "flip_h": p1[0] < p0[0], "flip_v": p1[1] < p0[1]}
+        rect = Rect(min(p0[0], p1[0]), min(p0[1], p1[1]), abs(p1[0] - p0[0]), abs(p1[1] - p0[1]))
+        ctx.emit(Shape(shape="line", attrs=attrs), rect, Style(line="primary", line_width=1.5))
+
+
 def _place_blocks(
-    ctx: _Ctx, blocks: list, area: Rect, inherit: Style, grid: str | None, classes: list[str], gap: int, owner
+    ctx: _Ctx,
+    blocks: list,
+    area: Rect,
+    inherit: Style,
+    grid: str | None,
+    classes: list[str],
+    gap: int,
+    owner,
+    links: list[Link] | None = None,
 ) -> None:
-    flow = [b for b in blocks if not _is_abs(b)]
-    for b in blocks:
+    rects: dict[int, Rect] = {}
+    for i, b in enumerate(blocks):
         if _is_abs(b):
-            _place_block(ctx, b, _apply_box(ctx, b, area, True), inherit)
+            rects[i] = _apply_box(ctx, b, area, True)
+            _place_block(ctx, b, rects[i], inherit)
+    flow = [(i, b) for i, b in enumerate(blocks) if not _is_abs(b)]
     if not flow:
+        _emit_links(ctx, links or [], rects)
         return
     gs = parse_spec(grid, len(flow), classes)
     flags: set[str] = set()
@@ -497,23 +657,35 @@ def _place_blocks(
             ctx.diag("grid", err, "use @N, @CxR, @1:2 or areas like @aab/aac; falling back to auto layout")
         flags = gs.flags
     if gs is None or not gs.cols:
-        text_visual, short = _block_kind_hint(flow)
-        if text_visual and not isinstance(flow[0], Text):
+        text_visual, short = _block_kind_hint([b for _, b in flow])
+        if text_visual and not isinstance(flow[0][1], Text):
             flow = [flow[1], flow[0]]
         gs = auto_spec(len(flow), text_visual=text_visual, short=short)
+    # blocks beyond the grid's cells are stacked full width below it
+    extra: list[tuple[int, object]] = []
+    if gs.capacity is not None and len(flow) > gs.capacity:
+        extra = flow[gs.capacity :]
+        flow = flow[: gs.capacity]
     if "flow" in flags:
         gap = max(gap, round(0.45 * EMU_PER_INCH))
     elif "chevron" in flags:
         gap = max(round(gap / 4), 0)
-    rects = cell_rects(gs, len(flow), area, gap)
-    for blk, r in zip(flow, rects, strict=True):
+    elif links and len(gs.cols) > 1:
+        gap = max(gap, round(0.4 * EMU_PER_INCH))
+    grid_area = area
+    tail_area: Rect | None = None
+    if extra:
+        grid_area, tail_area = _split_grid_tail(ctx, area, gap, gs, flow, extra, inherit, flags)
+    cells = cell_rects(gs, len(flow), grid_area, gap, ctx.theme.columns)
+    for (i, blk), r in zip(flow, cells, strict=True):
         r = _apply_box(ctx, blk, r, False)
+        rects[i] = r
         if "chevron" in flags and isinstance(blk, (Text, Shape, Container)):
-            _place_chevron(ctx, blk, r, inherit)
+            rects[i] = _place_chevron(ctx, blk, r, inherit)
         else:
             _place_block(ctx, blk, r, inherit)
     if "flow" in flags:
-        for a, b in zip(rects, rects[1:], strict=False):
+        for a, b in zip(cells, cells[1:], strict=False):
             g = b.x - a.right
             overlap_y = min(a.bottom, b.bottom) - max(a.y, b.y)
             if g <= 0 or overlap_y <= 0:
@@ -523,9 +695,42 @@ def _place_blocks(
             cy = max(a.y, b.y) + overlap_y // 2
             st = Style(fill="muted", line=None)
             ctx.emit(Shape(shape="arrow-right"), Rect(a.right + (g - aw) // 2, cy - ah // 2, aw, ah), st)
+    if extra and tail_area is not None:
+        sub = _place_stack(ctx, [b for _, b in extra], tail_area, inherit, gap, owner)
+        for k, (i, _b) in enumerate(extra):
+            if k in sub:
+                rects[i] = sub[k]
+    _emit_links(ctx, links or [], rects)
 
 
-def _place_chevron(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> None:
+def _split_grid_tail(
+    ctx: _Ctx, area: Rect, gap: int, gs, flow: list, extra: list, inherit: Style, flags: set[str]
+) -> tuple[Rect, Rect]:
+    """Split ``area`` into the grid part (top) and the full-width stack of leftover blocks (bottom)."""
+    tgap = max(gap, round(0.1 * EMU_PER_INCH)) if "chevron" in flags else gap
+    avail = max(area.h - tgap, 0)
+    nat = [_natural_height(ctx, b, area.w, inherit) for _, b in extra]
+    tail_nat = sum(n for n in nat if n is not None) + gap * (len(extra) - 1)
+    has_flex = any(n is None for n in nat)
+    if "chevron" in flags:
+        cw = (area.w - gap * (len(gs.cols) - 1)) / max(len(gs.cols), 1)
+        compact = max(round(cw * 0.45), round(0.9 * EMU_PER_INCH))
+        has_extras = any(
+            isinstance(b, Container) and any(not isinstance(ch, (Text, Shape)) for ch in b.children)
+            for _, b in flow
+        )
+        grid_h = round(avail * 0.5) if has_extras else min(compact, round(avail * 0.5))
+    elif has_flex:
+        grid_h = round(avail * 0.5)
+    else:
+        grid_h = max(avail - tail_nat, round(avail * 0.4))
+    grid_h = min(grid_h, avail)
+    return Rect(area.x, area.y, area.w, grid_h), Rect(
+        area.x, area.y + grid_h + tgap, area.w, max(avail - grid_h, 0)
+    )
+
+
+def _place_chevron(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> Rect:
     sh = _chevron_shape(blk)
     st = _text_style(ctx, sh, inherit)
     full = rect
@@ -542,7 +747,7 @@ def _place_chevron(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> None:
         [ch for ch in blk.children if not isinstance(ch, (Text, Shape))] if isinstance(blk, Container) else []
     )
     if not extra:
-        return
+        return rect
     gap = _gap(ctx, getattr(blk, "gap", None), full.w, small=True)
     area = Rect(full.x, rect.bottom + gap, full.w, full.bottom - rect.bottom - gap)
     if area.h < round(0.4 * EMU_PER_INCH):
@@ -552,8 +757,9 @@ def _place_chevron(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> None:
             "end the box with `@end` or move the visual out of the chevron box",
             line=getattr(blk, "line", None),
         )
-        return
+        return rect
     _place_stack(ctx, extra, area, _only_inheritable(st), gap, blk)
+    return rect
 
 
 # --------------------------------------------------------------------------- slide frame
@@ -598,6 +804,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     ctx = _Ctx(deck, theme, slide, index, W, H)
     dense = deck.density == "dense" or "dense" in slide.classes
     ctx.dense_k = theme.dense_scale if dense else 1.0
+    ctx.tight = DENSE_TIGHT if dense else 1.0
 
     kind = slide.layout
     if kind not in ("cover", "section", "blank", "center", "content"):
@@ -792,8 +999,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             slide_inherit = slide_inherit.merged(Style(align="center", valign="middle"))
         sgap = _gap(ctx, slide.attrs.get("gap"), body.w)
         for s in _SCALES:
-            c2 = _Ctx(deck, theme, slide, index, W, H, scale=s, dense_k=ctx.dense_k)
-            _place_blocks(c2, elements, body, slide_inherit, slide.grid, slide.classes, sgap, None)
+            c2 = _Ctx(deck, theme, slide, index, W, H, scale=s, dense_k=ctx.dense_k, tight=ctx.tight)
+            _place_blocks(
+                c2, elements, body, slide_inherit, slide.grid, slide.classes, sgap, None, slide.links
+            )
             final_ctx = c2
             if not c2.over:
                 break

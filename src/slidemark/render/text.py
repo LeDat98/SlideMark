@@ -83,17 +83,25 @@ def _lang_for(text: str, deck_lang: str | None) -> str:
     return "en-US"
 
 
+def _contrast(hex_color: str) -> str:
+    """White or near-black, whichever reads better on ``hex_color`` ('RRGGBB')."""
+    r, g, b = (int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+    return "#1F2937" if 0.299 * r + 0.587 * g + 0.114 * b > 160 else "#FFFFFF"
+
+
 def _format_run(rc: RenderCtx, r, run: Run, style: Style, size_pt: float, text: str) -> None:
     theme = rc.theme
     f = r.font
     f.size = Pt(size_pt)
-    bold = bool(run.bold or style.bold)
+    bold = bool(run.bold or style.bold or run.highlight)
     italic = bool(run.italic or style.italic)
     f.bold = True if bold else None
     f.italic = True if italic else None
     if run.underline:
         f.underline = True
     color = run.color or style.color
+    if run.highlight and not run.color:  # badge: readable text on the highlight
+        color = _contrast(hex6(theme, run.highlight, "#FFFF00"))
     f.color.rgb = rgb(theme, color, "#000000")
     rpr = r._r.get_or_add_rPr()
     if run.strike:

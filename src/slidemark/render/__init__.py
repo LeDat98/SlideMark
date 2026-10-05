@@ -7,7 +7,7 @@ from pathlib import Path
 
 from lxml import etree
 from pptx import Presentation
-from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
@@ -270,6 +270,10 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
             shp.name = name
             tf = shp.text_frame
         fill_text(rc, tf, el.paragraphs, st, pl.font_scale, field=field)
+        if "callout" in el.classes and st.line and not use_placeholder:
+            _accent_bar(rc, s, pl, name)
+    elif isinstance(el, Shape) and el.shape == "line":
+        _connector(rc, s, pl, name)
     elif isinstance(el, Shape):
         kind = _SHAPES.get(el.shape)
         if kind is None:
@@ -304,6 +308,34 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
             "info",
             line=el.line,
         )
+
+
+def _accent_bar(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
+    """Callout cards get a thick accent bar on the left edge, in the border color."""
+    bar = pl.model_copy(update={"w": min(emu(4), pl.w), "style": Style(fill=pl.style.line, line=None)})
+    _autoshape(rc, slide, bar, MSO_SHAPE.RECTANGLE, f"{name} accent")
+
+
+def _connector(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
+    """A straight connector from one corner of the box to the opposite one (flips pick the diagonal)."""
+    el = pl.element
+    fh, fv = bool(el.attrs.get("flip_h")), bool(el.attrs.get("flip_v"))
+    x0, x1 = (pl.x + pl.w, pl.x) if fh else (pl.x, pl.x + pl.w)
+    y0, y1 = (pl.y + pl.h, pl.y) if fv else (pl.y, pl.y + pl.h)
+    cx = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Emu(x0), Emu(y0), Emu(x1), Emu(y1))
+    cx.name = name
+    style_el = cx._element.find(qn("p:style"))
+    if style_el is not None:
+        cx._element.remove(style_el)
+    st = pl.style
+    cx.line.color.rgb = rgb(rc.theme, st.line or "primary")
+    cx.line.width = Pt(st.line_width if st.line_width is not None else 1.5)
+    if el.attrs.get("head") == "arrow":
+        ln = cx.line._get_or_add_ln()
+        tail = etree.SubElement(ln, qn("a:tailEnd"))
+        tail.set("type", "triangle")
+        tail.set("w", "med")
+        tail.set("len", "med")
 
 
 def _placeholder(rc: RenderCtx, s, pl: Placed, name: str, label: str) -> None:

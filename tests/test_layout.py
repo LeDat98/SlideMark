@@ -146,9 +146,9 @@ def test_unknown_grid_falls_back_without_crash():
     s = Slide(title=T("t", "title"), grid="zz/9", elements=[box("a"), box("b")])
     placed, deck = lay(s)
     assert len(cards(placed)) == 2
-    s = Slide(title=T("t", "title"), grid="aab/aac", elements=[box("a"), box("b"), box("c"), box("d")])
+    s = Slide(title=T("t", "title"), grid="aab/a#/", elements=[box("a"), box("b")])
     placed, deck = lay(s)
-    assert len(cards(placed)) == 4
+    assert len(cards(placed)) == 2
     assert any(d.rule == "grid" for d in deck.diagnostics)
 
 
