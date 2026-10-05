@@ -85,7 +85,10 @@ def _natural_height(p: Placed, scale: float | None = None) -> float:
         return p.h
     pad = _pad(p)
     s = p.font_scale if scale is None else scale
-    return measure.paragraphs_height(paras, p.w - 2 * pad, p.style, s) + 2 * pad
+    return (
+        measure.paragraphs_height(paras, p.w - 2 * pad, p.style, s, gap=measure.element_gap(p.element))
+        + 2 * pad
+    )
 
 
 def _lines(p: Placed, theme: Theme, scale: float | None = None) -> int:

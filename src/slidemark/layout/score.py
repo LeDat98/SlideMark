@@ -66,8 +66,9 @@ def _natural(p: Placed, scale: float | None = None) -> float:
     if not paras:
         return p.h
     pad = _pad(p)
+    s = p.font_scale if scale is None else scale
     return (
-        measure.paragraphs_height(paras, p.w - 2 * pad, p.style, p.font_scale if scale is None else scale)
+        measure.paragraphs_height(paras, p.w - 2 * pad, p.style, s, gap=measure.element_gap(p.element))
         + 2 * pad
     )
 

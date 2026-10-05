@@ -63,6 +63,18 @@ def test_overlap_but_not_nesting():
     assert "overlap" not in _rules([a, inner])
 
 
+def test_overflow_uses_the_paragraph_gap_of_a_spread_box():
+    from slidemark.layout import measure
+
+    paras = [Paragraph(runs=[Run(text=f"line {i}")]) for i in range(8)]
+    st = Style(font_size=18, color="#000000")
+    plain = measure.paragraphs_height(paras, 3_000_000, st, 1.0)
+    p = Placed(element=Text(paragraphs=paras), x=0, y=0, w=3_000_000, h=round(plain * 1.02), style=st)
+    assert "overflow" not in _rules([p])
+    spread = p.model_copy(update={"element": Text(paragraphs=paras, attrs={"para_gap": 0.6})})
+    assert "overflow" in _rules([spread])
+
+
 def test_overflow_and_tiny_text():
     long = _text("word " * 400)
     p = Placed(element=long, x=0, y=0, w=2_000_000, h=300_000, style=Style(font_size=18, color="#000000"))

@@ -241,6 +241,12 @@ def paragraphs_height(
     return total_pt * EMU_PER_PT * SAFETY
 
 
+def element_gap(el) -> float | None:
+    """The paragraph gap (em) the layout chose for ``el`` (``attrs["para_gap"]``), ``None`` = default."""
+    v = getattr(el, "attrs", {}).get("para_gap")
+    return float(v) if isinstance(v, (int, float)) else None
+
+
 def code_height(text: str, width_emu: float, size_pt: float) -> float:
     """Height in EMU of a code block body (monospace, wrapped at the box width)."""
     cols = max(int(width_emu / EMU_PER_PT / (size_pt * 0.6)), 1)

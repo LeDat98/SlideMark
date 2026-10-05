@@ -147,7 +147,12 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
                     pad = to_emu(p.style.padding)
                 except ValueError:
                     pad = 0
-            need = measure.paragraphs_height(paras, p.w - 2 * pad, p.style, p.font_scale) + 2 * pad
+            need = (
+                measure.paragraphs_height(
+                    paras, p.w - 2 * pad, p.style, p.font_scale, gap=measure.element_gap(el)
+                )
+                + 2 * pad
+            )
             if need > p.h * _OVERFLOW_TOL + _TOL:
                 warn(
                     "overflow",
