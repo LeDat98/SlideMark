@@ -205,6 +205,16 @@ class LayoutTokens(BaseModel):
         0.4  # ... a chevron row alone aims at this share of the body height ...
     )
     chevron_max_alone_sparse: Length = "2.8in"  # ... up to this height
+    # --- L3 fill: a sparse row of text cards / a text panel beside a chart uses the height it has
+    l3_fill: bool = True  # False: cards and panels keep their natural height (no stretch, no spread)
+    sparse_row_bottom_band: float = (
+        0.12  # ... a lone card row stays under the lead and ends this share of the body above its bottom
+    )
+    l3_gap_extra: float = (
+        1.2  # ... paragraphs of such a card / panel spread by at most this much per gap (em)
+    )
+    l3_gap_extra_numbered: float = 1.8  # ... the same for numbered items (decisions)
+    panel_fill_min: float = 0.7  # ... a panel beside a chart whose content fills less of it is spread
 
 
 class RenderTokens(BaseModel):
