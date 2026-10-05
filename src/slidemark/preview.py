@@ -5,12 +5,34 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
+# Where installers put LibreOffice when it is not on PATH (Windows never adds it; macOS ships an app bundle).
+_KNOWN = [
+    *(
+        Path(os.environ[v]) / "LibreOffice" / "program" / "soffice.exe"
+        for v in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432")
+        if os.environ.get(v)
+    ),
+    Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"),
+]
+
+
+def find_soffice() -> str | None:
+    """The LibreOffice executable: ``$SLIDEMARK_SOFFICE``, then PATH, then the default install folders."""
+    env = os.environ.get("SLIDEMARK_SOFFICE")
+    if env and Path(env).is_file():
+        return env
+    for name in ("soffice", "soffice.exe", "libreoffice"):
+        if found := shutil.which(name):
+            return found
+    return next((str(p) for p in _KNOWN if p.is_file()), None)
+
 
 def have_soffice() -> bool:
-    return shutil.which("soffice") is not None
+    return find_soffice() is not None
 
 
 # Office fonts are missing on Linux. Map them to metric-compatible (or same-script) fonts so previews wrap
@@ -48,10 +70,12 @@ def pptx_to_pdf(pptx: str | Path, out_dir: str | Path, timeout: int = 180) -> Pa
     """Convert with an isolated LibreOffice profile so parallel runs and stale locks cannot interfere."""
     pptx, out_dir = Path(pptx), Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="slidemark-lo-") as profile:
+    with tempfile.TemporaryDirectory(prefix="slidemark-lo-", ignore_cleanup_errors=True) as profile:
+        # The profile must be a valid file URL: on Windows "file://C:\\..." makes LibreOffice refuse to
+        # start with "bootstrap.ini is corrupt"; as_uri() gives "file:///C:/...".
         cmd = [
-            "soffice",
-            f"-env:UserInstallation=file://{profile}",
+            find_soffice() or "soffice",
+            f"-env:UserInstallation={Path(profile).as_uri()}",
             "--headless",
             "--convert-to",
             "pdf",
@@ -59,7 +83,9 @@ def pptx_to_pdf(pptx: str | Path, out_dir: str | Path, timeout: int = 180) -> Pa
             str(out_dir),
             str(pptx),
         ]
-        env = dict(os.environ, FONTCONFIG_FILE=_fonts_conf(profile))
+        env = dict(os.environ)
+        if sys.platform.startswith("linux"):  # fontconfig aliases only matter where Office fonts are missing
+            env["FONTCONFIG_FILE"] = _fonts_conf(profile)
         subprocess.run(cmd, check=True, capture_output=True, timeout=timeout, env=env)
     pdf = out_dir / (pptx.stem + ".pdf")
     if not pdf.exists():

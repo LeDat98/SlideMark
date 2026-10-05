@@ -486,7 +486,19 @@ def make_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _utf8_streams() -> None:
+    """Windows consoles and pipes default to cp932/cp1252: Vietnamese or emoji in output would raise."""
+    if sys.platform != "win32":
+        return
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_streams()
     try:
         args = make_parser().parse_args(argv)
     except SystemExit as e:  # argparse exits itself on bad usage / --help

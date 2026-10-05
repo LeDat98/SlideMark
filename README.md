@@ -47,6 +47,9 @@ slidemark check deck.md && slidemark build deck.md -o deck.pptx
 slidemark skill install      # cài skill cho Claude Code
 ```
 
+Windows: `slidemark preview` / `review --png` tự tìm LibreOffice trong `C:\Program Files\LibreOffice`; nếu cài chỗ khác,
+đặt biến môi trường `SLIDEMARK_SOFFICE` trỏ tới `soffice.exe`. Build .pptx không cần LibreOffice.
+
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
