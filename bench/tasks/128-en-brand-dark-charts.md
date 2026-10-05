@@ -1,0 +1,2 @@
+<!-- tags: brand en dark chart -->
+Create a 4-slide English investor update for 'Polaris Energy'. Dark theme: background #0D1117, text #E6EDF3, primary #58A6FF, accent #3FB950, muted #8B949E. Charts must use the brand colors in this order: #58A6FF, #3FB950, #D29922. Slides: cover, revenue line chart (4 quarters, 2 series), capacity stacked column chart (3 sites × 3 years), summary with 3 bullets and a callout.
