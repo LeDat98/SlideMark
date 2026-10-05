@@ -117,6 +117,10 @@ class _Ctx:
     grow_base: float = (
         1.0  # roomy pass: the growth before it; text that would wrap more at ``grow`` is refused
     )
+    air: float = 0.0  # sparse completion: paragraph gap (em) of plain body text, KPI cards grow with ``grow``
+    kpi_air: float = 1.0  # sparse completion: KPI rows may be this many times their natural height
+    chev_air: bool = False  # sparse completion: a chevron row alone may be taller
+    completed: bool = False  # the sparse completion laid this slide out: the vertical fill keeps it as is
     band_h: dict[tuple[int, int], int] = field(
         default_factory=dict
     )  # (box id, box width) -> heading height shared by the boxes of one row
@@ -507,6 +511,8 @@ def _base_gap(ctx: _Ctx) -> float:
 def _para_gap(ctx: _Ctx, el) -> float | None:
     """The paragraph gap (em) chosen for ``el`` (spread or sparse step), ``None`` = the default gap."""
     g = ctx.gaps.get(id(el))
+    if ctx.air > 0 and ctx.depth == 0 and ctx.scale >= 1.0 and _spreadable(el):
+        return max(g or 0.0, _base_gap(ctx), ctx.air)
     if g is None and ctx.step > 1.0 and ctx.depth > 0 and ctx.scale >= 1.0 and _spreadable(el):
         return _base_gap(ctx)
     return g
@@ -604,11 +610,40 @@ def _has_box_text(ctx: _Ctx) -> bool:
     )
 
 
-def _kpi_grow(ctx: _Ctx, grow: float) -> float:
-    """Growth of the text inside a ``.kpi`` card: none, except next to free body text on a sparse slide."""
-    if ctx.lt.kpi_grow_max <= 1.0 or not _has_kpi_text(ctx):
+def _kpi_grow(ctx: _Ctx, grow: float, box: Container | None = None, width: int | None = None) -> float:
+    """Growth of the text inside a ``.kpi`` card: none, except next to free body text on a sparse slide.
+
+    The sparse completion (``ctx.air``) also grows a KPI row that stands alone, as long as the number still
+    fits one line, unless the author set the size (``{size=}`` on the card, a CSS rule on ``.kpi``)."""
+    if ctx.lt.kpi_grow_max <= 1.0:
         return 1.0
-    return min(max(grow, 1.0), ctx.lt.kpi_grow_max)
+    g = min(max(grow, 1.0), ctx.lt.kpi_grow_max)
+    if _has_kpi_text(ctx):
+        return g
+    if ctx.air <= 0 or _kpi_explicit(ctx, box):
+        return 1.0
+    return max(min(g, _kpi_fit(ctx, box, width)), 1.0) if width else g
+
+
+def _kpi_fit(ctx: _Ctx, box: Container | None, width: int) -> float:
+    """How many times larger the number of ``box`` may get and still fit one line of ``width``."""
+    if box is None:
+        return 1.0
+    text = next((c for c in box.children if isinstance(c, Text) and c.paragraphs), None)
+    if text is None:
+        return 1.0
+    big = (ctx.theme.classes.get("kpi") or _base_classes()["kpi"]).merged(ctx.css.kpi_styles(box)[0])
+    size = big.font_size or 36
+    em = measure.text_em(text.paragraphs[0].plain, bold=True)
+    return width / EMU_PER_PT * 0.72 / max(em * size, 1e-6)
+
+
+def _kpi_explicit(ctx: _Ctx, box: Container | None) -> bool:
+    if box is None:
+        return False
+    if _explicit_size(ctx, box):
+        return True
+    return ctx.css.active and any(st.font_size is not None for st in ctx.css.kpi_styles(box))
 
 
 def _has_kpi_text(ctx: _Ctx) -> bool:
@@ -1004,7 +1039,7 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
     saved = (ctx.depth, ctx.grow)
     ctx.depth += 1
     if kpi:
-        ctx.grow = _kpi_grow(ctx, saved[1])
+        ctx.grow = _kpi_grow(ctx, saved[1], c, area.w)
     try:
         if grid or any(n in ("flow", "chevron") for n in c.classes):
             _place_blocks(ctx, children, area, child_inherit, grid, c.classes, gap, c, c.links)
@@ -1055,7 +1090,7 @@ def _box_nat0(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None
     saved = (ctx.depth, ctx.grow)
     ctx.depth += 1
     if kpi:
-        ctx.grow = _kpi_grow(ctx, saved[1])
+        ctx.grow = _kpi_grow(ctx, saved[1], c, inner_w)
     try:
         child_inherit = inherit.merged(_only_inheritable(style))
         nat = [_natural_height(ctx, ch, inner_w, child_inherit) for ch in children]
@@ -1555,7 +1590,7 @@ def _row_heights(
         if not covered[row] or n is None or n <= 0:
             caps.append(None)
         elif kinds[row] == {"kpi"}:
-            caps.append(max(n, _emu(ctx.lt.kpi_min_h)))
+            caps.append(max(round(n * ctx.kpi_air), _emu(ctx.lt.kpi_min_h)))
         elif kinds[row] == {"table"}:
             caps.append(n)
         elif tree:  # org-tree levels hug their boxes (+ modest slack): the connectors fill the gaps
@@ -2110,8 +2145,9 @@ def _chevron_row_h(ctx: _Ctx, blocks: list, width: int, inherit: Style, alone_h:
     """
     lo, hi = _emu(ctx.lt.chevron_min_h), _emu(ctx.lt.chevron_max_h)
     if alone_h is not None:
-        hi = _emu(ctx.lt.chevron_max_alone)
-        lo = max(lo, min(hi, round(ctx.lt.chevron_alone_share * alone_h)))
+        hi = _emu(ctx.lt.chevron_max_alone_sparse if ctx.chev_air else ctx.lt.chevron_max_alone)
+        share = ctx.lt.chevron_alone_share_sparse if ctx.chev_air else ctx.lt.chevron_alone_share
+        lo = max(lo, min(hi, round(share * alone_h)))
     h = round(EMU_PER_INCH)
     for _ in range(3):  # the point depth depends on the height, the height on the wrapped text
         need = 0
@@ -2410,6 +2446,167 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
             )
             if not c.over and c.out:
                 fin = c
+    return fin
+
+
+def _text_h(p: Placed) -> int:
+    """Height of the lines of a placed text (at most its box)."""
+    pad = 0
+    if p.style.padding is not None:
+        try:
+            pad = to_emu(p.style.padding)
+        except ValueError:
+            pad = 0
+    gap = measure.element_gap(p.element)
+    need = measure.paragraphs_height(p.element.paragraphs, p.w - 2 * pad, p.style, p.font_scale, gap=gap)
+    return min(p.h, round(need) + 2 * pad)
+
+
+def _content_bottom(out: list[Placed]) -> int:
+    """Bottom of the visible content: a text box ends with its last line, not with the (taller) box."""
+    best = 0
+    for p in out:
+        paras = getattr(p.element, "paragraphs", None)
+        best = max(best, p.y + (_text_h(p) if paras and isinstance(p.element, Text) else p.h))
+    return best
+
+
+def _block_h(out: list[Placed]) -> int:
+    return _content_bottom(out) - min((p.y for p in out), default=0)
+
+
+def _spread_rows(out: list[Placed], gap_max: int, body: Rect, limit: int) -> list[Placed]:
+    """Rows of top-level blocks move apart (each gap by at most ``gap_max``) while a band is over it."""
+    cards = [p for p in out if isinstance(p.element, Container)]
+    roots: list[tuple[int, int]] = []  # (top, bottom) of the top-level blocks, as rows
+    for p in sorted(out, key=lambda p: p.y):
+        if any(
+            c is not p
+            and c.x - 2 <= p.x
+            and c.y - 2 <= p.y
+            and p.x + p.w <= c.x + c.w + 2
+            and p.y + p.h <= c.y + c.h + 2
+            for c in cards
+        ):
+            continue
+        h = _text_h(p) if isinstance(p.element, Text) and p.element.paragraphs else p.h
+        if roots and p.y < roots[-1][1] - 2:
+            roots[-1] = (roots[-1][0], max(roots[-1][1], p.y + h))
+        else:
+            roots.append((p.y, p.y + h))
+    if len(roots) < 2:
+        return out
+    free = body.bottom - max(b for _t, b in roots)
+    add = min(gap_max, max(free - limit, 0) // (len(roots) - 1) + 1 if free > limit else 0)
+    if add <= 0:
+        return out
+    res = []
+    for p in out:
+        k = sum(1 for t, _b in roots[1:] if p.y >= t - 2)  # how many row gaps lie above this item
+        res.append(p.model_copy(update={"y": p.y + k * add}) if k else p)
+    return res
+
+
+def _hug_text(out: list[Placed]) -> list[Placed]:
+    """Top-anchored body text outside any card ends with its last line (the empty rest is not a box)."""
+    cards = [p for p in out if isinstance(p.element, Container)]
+    res = []
+    for p in out:
+        el = p.element
+        if (
+            isinstance(el, Text)
+            and el.role == "body"
+            and el.paragraphs
+            and p.style.valign in (None, "top")
+            and not any(
+                c.x - 2 <= p.x
+                and c.y - 2 <= p.y
+                and p.x + p.w <= c.x + c.w + 2
+                and p.y + p.h <= c.y + c.h + 2
+                for c in cards
+            )
+        ):
+            p = p.model_copy(update={"h": _text_h(p)})
+        res.append(p)
+    return res
+
+
+def _needs_complete(ctx: _Ctx, fin: _Ctx, body: Rect, elements: list) -> bool:
+    """A candidate for ``_complete``: boxes / text only, and an empty band over ``sparse_left_max``."""
+    lt = ctx.lt
+    if lt.sparse_left_max <= 0 or not lt.grow or fin.scale < 1.0 or fin.over or not fin.out:
+        return False
+    if not all(isinstance(e, (Text, Container)) for e in elements):
+        return False
+    bg = ctx.slide.background or ""
+    if "." in bg or "(" in bg:  # a picture / gradient behind the text: the author placed it, do not move it
+        return False
+    if ctx.slide.links or any(
+        isinstance(e, Container) and ("diagram" in e.classes or e.links) for e in elements
+    ):
+        return False
+    top = min((p.y for p in fin.out), default=body.y)
+    return max(body.bottom - _content_bottom(fin.out), top - body.y) > round(lt.sparse_left_max * body.h)
+
+
+def _complete(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
+    """Last stage of a sparse slide: no empty band over ``sparse_left_max`` of the body.
+
+    Only boxes / text / chevron rows (tables, charts and pictures fill their own space). The slide is laid
+    out again with larger text (up to ``sparse_text_max_pt`` and ``sparse_step_max`` x the theme body size;
+    explicit sizes never change, the CJK wrap guard stays on), air between paragraphs, taller KPI cards, cards
+    up to ``sparse_card_air`` x their content and taller chevrons. What is still empty then moves above the
+    block until the band below it is ``sparse_left_target`` of the body. A slide that already fits is kept.
+    """
+    lt = ctx.lt
+    if not _needs_complete(ctx, fin, body, elements):
+        return fin
+    limit = round(lt.sparse_left_max * body.h)
+
+    def empty(c: _Ctx) -> int:
+        top = min((p.y for p in c.out), default=body.y)
+        return max(body.bottom - _content_bottom(c.out), top - body.y)
+
+    base_pt = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"])
+    cap_pt = min(lt.sparse_text_max_pt, base_pt * max(lt.sparse_step_max, 1.0))
+    base = base_pt * ctx.dense_k
+    top_g = math.floor(cap_pt / base * 100 + 1e-6) / 100  # never past the cap
+    extra = {"air": lt.sparse_air, "kpi_air": lt.sparse_kpi_air, "chev_air": True}
+    if fin.step > 1.0:
+        extra["step"] = fin.step
+    if fin.roomy:
+        extra["roomy"] = True
+    grow_base = fin.grow if fin.step <= 1.0 else max(fin.grow / fin.step, 1.0)
+    top_g = max(top_g, fin.grow)
+    n = max(round((top_g - fin.grow) / 0.05), 0)
+    for g in [round(top_g - 0.05 * i, 2) for i in range(n + 1)] + [fin.grow]:
+        if g < fin.grow - 1e-9:
+            continue
+        c = run(
+            body,
+            grow=g,
+            expand=fin.expand,
+            lone_air=lt.sparse_card_air,
+            grow_base=grow_base,
+            **extra,
+        )
+        if c.over or not c.out or _block_h(c.out) <= _block_h(fin.out):
+            continue  # nothing gained (or something would overflow): try a smaller step
+        fin = c
+        break
+    fin.out = _hug_text(fin.out)
+    fin.completed = True
+    if empty(fin) > limit:
+        fin.out = _spread_rows(fin.out, _emu(lt.sparse_row_gap_max), body, limit)
+    left = body.bottom - _content_bottom(fin.out)
+    above = min((p.y for p in fin.out), default=body.y) - body.y
+    dy = left - max(
+        round(lt.sparse_left_target * body.h), (left + above) // 2
+    )  # too little content: halve it
+    if (
+        dy > 0 and empty(fin) > limit and lt.body_valign != "top"
+    ):  # a plain translation: re-running in a smaller area would shrink the block
+        fin.out = [p.model_copy(update={"y": p.y + dy}) for p in fin.out]
     return fin
 
 
@@ -2858,7 +3055,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             isinstance(e, Text) and e.role == "body" and "callout" not in e.classes for e in elements
         )
 
-        def solve(arrange: str | None = None) -> _Ctx:
+        def solve(arrange: str | None = None, complete: bool = False) -> _Ctx:
             stepped: list[float] = [1.0, 1.0]  # sparse step, growth before it
 
             def run(area: Rect, **kw) -> _Ctx:
@@ -2909,6 +3106,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 fc = _sparse_step(ctx, fc, run, body, stepped)
             if fc.scale >= 1.0 and not fc.over:
                 fc = _spread(ctx, fc, run, body, elements)
+                if complete:
+                    fc = _complete(ctx, fc, run, body, elements)
             return fc
 
         final_ctx = solve()
@@ -2920,12 +3119,16 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 f"write `@{chosen}` to pin it",
                 level="info",
             )
+        if _needs_complete(ctx, final_ctx, body, elements):  # the search judged the plain arrangements
+            done = solve(chosen, complete=True)
+            if done.out and not done.over:
+                final_ctx = done
         if kind == "content" and not final_ctx.over and final_ctx.out:
             final_ctx.out = fill_body(
                 final_ctx.out,
                 body,
                 ctx.lt.body_free_max,
-                ctx.lt.body_valign,
+                "top" if final_ctx.completed else ctx.lt.body_valign,
                 ctx.lt.body_spread_max,
                 _emu(ctx.lt.top_gap) if (slide.conclusion or slide.footnotes) else 0,
                 ctx.lt.center_min_fill,
