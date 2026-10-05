@@ -9,9 +9,18 @@ from collections import Counter
 from pathlib import Path
 
 from ..ir import Diagnostic
+from ..render.design_part import read_design_part
 from ..theme import DEFAULT, JP_BUSINESS, MIDNIGHT, Theme
+from .design import (
+    css_fence,
+    design_header,
+    edited,
+    edited_diag,
+    html_slide_lines,
+    match_slide,
+)
 from .read import ReadCtx, SlideData, read_sections, read_slide
-from .structure import DeckInfo, build_slide
+from .structure import DeckInfo, build_slide, notes_lines
 
 __all__ = ["import_pptx"]
 
@@ -139,11 +148,18 @@ def import_pptx(path: str | Path, out_dir: str | Path | None = None) -> tuple[st
 def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[str, list[Diagnostic]]:
     W, H = int(prs.slide_width), int(prs.slide_height)
     theme = detect_theme(prs)
-    accent = theme.colors["accent"].lstrip("#").upper()
+    design = read_design_part(prs) or {}
+    tok_colors = {  # the deck's own palette (tokens) replaces the stock theme's for badge/class detection
+        k.split(".", 1)[1]: v.lstrip("#").upper()
+        for k, v in (design.get("tokens") or {}).items()
+        if k.startswith("colors.") and re.fullmatch(r"#[0-9A-Fa-f]{6}", str(v))
+    }
+    accent = tok_colors.get("accent") or theme.colors["accent"].lstrip("#").upper()
     ctx = ReadCtx(accent=accent)
     for i, s in enumerate(prs.slides, 1):
         ctx.slide_index[s.part] = i
     datas: list[SlideData] = []
+    slide_ids = [getattr(s, "slide_id", None) for s in prs.slides]
     for i, s in enumerate(prs.slides, 1):
         ctx.slide_no = i
         try:
@@ -153,7 +169,7 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
             ctx.skip(f"slide ({type(e).__name__}: {e})")
     diags.extend(ctx.diags)
     footer, footers = _footers(datas, H)
-    colors = {k: v.lstrip("#").upper() for k, v in theme.colors.items()}
+    colors = {**{k: v.lstrip("#").upper() for k, v in theme.colors.items()}, **tok_colors}
     from ..units import to_emu
 
     deck = DeckInfo(
@@ -202,7 +218,11 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
         return ref
 
     header: list[str] = []
-    if theme is not DEFAULT:
+    css_head: list[str] = []
+    if design:
+        head_lines, css_head = design_header(design)
+        header.extend(head_lines)
+    elif theme is not DEFAULT:
         header.append(f"theme: {theme.name}")
     elif src_name and _custom_theme(prs):
         header.append(f"theme: {src_name}")  # its own masters and colors: the source deck is the template
@@ -230,11 +250,14 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
     # pass 1: which slides need ``dense`` (on a copy: building a slide edits its data)
     flags: dict[int, bool] = {}
     for n, sd in enumerate(datas, 1):
+        ent = match_slide(design, n, slide_ids[n - 1]) if design else None
+        if ent and ent.get("html") is not None and not edited(ent, sd):
+            continue  # restored from the stored HTML: no shapes to arrange
         try:
             sdc = copy.deepcopy(sd)
             info: dict = {}
             lines = build_slide(n, sdc, deck, [], lambda *a: "", classes, info)
-            tried, dense = _dense_decision(lines, info, sdc, deck, header, theme)
+            tried, dense = _dense_decision(lines, info, sdc, deck, _trial_head(header, css_head), theme)
             if tried:
                 flags[n] = dense
         except Exception:
@@ -252,9 +275,21 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
             lines = build_slide(n, sd, deck, sdiags, save_image, classes, info)
             diags.extend(sdiags)
             solo_titles = solo_titles or (n > 1 and bool(info.get("title_only")))
-            if flags.get(n) and not deck_dense:
-                lines = _add_dense(lines, info)
-            lines = _shorten(lines, info, sd, deck, classes, header)
+            ent = match_slide(design, n, slide_ids[n - 1]) if design else None
+            html_slide = False
+            if ent and ent.get("html") is not None:
+                if edited(ent, sd):
+                    diags.append(edited_diag(n))
+                else:
+                    lines = html_slide_lines(ent, sd, notes_lines(sd.notes))
+                    html_slide = True
+            if not html_slide:
+                if flags.get(n) and not deck_dense:
+                    lines = _add_dense(lines, info)
+                lines = _shorten(lines, info, sd, deck, classes, _trial_head(header, css_head))
+            if ent and ent.get("css"):
+                k = len(lines) - len(notes_lines(sd.notes))
+                lines = [*lines[:k], *css_fence(ent["css"]), *lines[k:]]
         except Exception as e:
             diags.append(
                 Diagnostic(
@@ -270,8 +305,14 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
     if solo_titles and not deck.sections:
         header.append("sections: off")
     body = "\n\n".join("\n".join(c) for c in chunks)
-    text = ("\n".join(header) + "\n\n" if header else "") + body + "\n"
+    top = [*header, *([""] if header and css_head else []), *css_head]
+    text = ("\n".join(top) + "\n\n" if top else "") + body + "\n"
     return text, diags
+
+
+def _trial_head(header: list[str], css_head: list[str]) -> list[str]:
+    """Header lines for trial builds: the real design (tokens and css fence) must be in effect."""
+    return [*header, *([""] if css_head else []), *css_head]
 
 
 def _variants(tokens: list[str]) -> list[list[str]]:

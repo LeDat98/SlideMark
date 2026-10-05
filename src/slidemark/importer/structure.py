@@ -935,7 +935,6 @@ def build_slide(
     blocks = make_blocks(pool, deck, icons)
     _attach_icons(icons, blocks)
     arrows = sum(1 for i in pool if i.kind == "shape" and i.prst and "rrow" in i.prst)
-    notes: list[str] = []
     dia = recover_diagram(blocks, data.conns, data.items)
     if dia is not None:
         x, y, w, h = dia.box
@@ -1100,9 +1099,14 @@ def build_slide(
         txt = one_line(by_role["conclusion"][0].paras, accent=deck.accent, classes=classes, plain_bold=True)
         if txt:
             lines.append("> " + txt)
-    if data.notes:
-        nl = data.notes.replace("\r", "").split("\n")
-        nl = [(" " + x) if re.match(r"^(#|---)", x) else x for x in nl]
-        notes = ["??? " + nl[0].strip(), *nl[1:]]
-        lines.extend(notes)
+    lines.extend(notes_lines(data.notes))
     return lines
+
+
+def notes_lines(text: str | None) -> list[str]:
+    """Speaker notes as a ``???`` block (empty when there are none)."""
+    if not text:
+        return []
+    nl = text.replace("\r", "").split("\n")
+    nl = [(" " + x) if re.match(r"^(#|---)", x) else x for x in nl]
+    return ["??? " + nl[0].strip(), *nl[1:]]
