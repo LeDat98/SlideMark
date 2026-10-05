@@ -16,7 +16,7 @@ step does not apply (no visual risk to lint, or no syntax).
 | Lists (native bullets/numbers), line-per-line text | x | x | x | x | x | x | x | x |
 | Images (contain/cover/stretch) | x | x | x | x | x | x | x | x |
 | SVG pictures (`![](a.svg)`, ```` ```svg ````): native svgBlip + PNG fallback, sanitized | x | x | x | x | x | | - | x |
-| Video / audio (`![](a.mp4){poster autoplay loop}`) | x | x | x | x | x | | x | x |
+| Video / audio (`![](a.mp4){poster autoplay loop}`) | x | x | x | x | x | x | x | x |
 | Tables + merges, CSV table, table options | x | x | x | x | x | x | x | x |
 | Charts (10 kinds) + options | x | x | x | x | x | x | - | x |
 | Code highlighting | x | x | x | x | x | x | x | x |
