@@ -17,6 +17,14 @@ CORPUS = [
 SYNTAX = Path(__file__).parent.parent / "docs" / "SYNTAX.md"
 
 FRAGMENTS = [
+    "```column {legend=sideways labels=maybe fmt= min=x max=1e999 colors=red,#zz axis=2 titel=x}",
+    "```pie {colors=primary,#abc,#12345G legend=none labels=percent}",
+    "```table {widths=3:x:-1 align=lxr header=-2 hcol=99}",
+    "{widths=1:1 align=lcrrr header=0 hcol=1}",
+    '"1,240","１２．５",▲3,－3,12%,(4),\ufeff',
+    ",Q1,Q2\ns;1;2\nt\t3\t4\n\n\n",
+    '"unclosed,1,2',
+    "a,b\n1\n1,2,3,4",
     "# ",
     "## ",
     "### ",
