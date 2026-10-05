@@ -384,3 +384,7 @@ Goal: `docs/AGENT_COST.md` work packages 1–6 in order; design freedom stays a 
 - **Wave 2 (WP5, WP6):** one-edit contrast warning (token + nearest passing shade, contrast-safe derived defaults);
   brand deck from `colors:` + `fonts:` alone (title band, table header, chart palette, KPI colour derived).
 - **Then:** smoke test 3 briefs × `skill-only` × 1 with fresh subagents outside the repo; record in bench history.
+- **Status (18:35 UTC):** WP1 harness + acceptance + 9 briefs ✓, python-pptx baseline for all 9 briefs (4–6 calls,
+  37–96k units above start); WP2 SKILL.md ✓ (patterns must never reuse brief content: sm1-b01 copied one, invalid);
+  WP3 one-command build ✓; `※` kept in footnotes; decimal commas for vi/de/fr + `contrast.py` ✓. Smoke before WP4:
+  b01 3 calls / 48% cost, b05 9 calls rejected (`※`), b09 5 calls / 42%. Running: WP4 (B), WP5+6 colours.
