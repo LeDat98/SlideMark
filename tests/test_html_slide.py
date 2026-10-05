@@ -208,6 +208,15 @@ def test_html_slide_builds_native_and_reopens(chromium, tmp_path):
     assert not [s for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE]
 
 
+def test_html_slide_percent_height_fills_the_slide(chromium, tmp_path):
+    out = tmp_path / "h.pptx"
+    body = '<div style="height:100%;padding:9px"><div style="height:100%;background:#123456">Tall</div></div>'
+    build(md(body), out)
+    prs = Presentation(str(out))
+    card = max(prs.slides[0].shapes, key=lambda s: s.height if s.shape_type != MSO_SHAPE_TYPE.PICTURE else 0)
+    assert card.height > 0.85 * prs.slide_height  # html/body are 100% high, so % heights resolve
+
+
 def test_not_convertible_slide_is_one_picture(chromium, tmp_path):
     out = tmp_path / "c.pptx"
     deck = build(md('<canvas width="100" height="50"></canvas>'), out)

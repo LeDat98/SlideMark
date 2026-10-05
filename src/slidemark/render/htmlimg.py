@@ -76,7 +76,7 @@ def _page(source: str, theme: Theme) -> str:
     return (
         '<!doctype html><html><head><meta charset="utf-8">'
         f"<style>{_tokens(theme)}"
-        f"*{{box-sizing:border-box}}html,body{{margin:0;padding:0;background:#{bg};}}"
+        f"*{{box-sizing:border-box}}html,body{{margin:0;padding:0;height:100%;background:#{bg};}}"
         f"body{{font-family:{_family(theme)};font-size:{size:.1f}px;color:#{fg};overflow:hidden}}"
         f"</style></head><body>{source}</body></html>"
     )
