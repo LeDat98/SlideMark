@@ -58,6 +58,12 @@ class LayoutTokens(BaseModel):
     chevron_adj_step: float = 0.02  # step of that search
     chevron_word_slack: float = 1.08  # a word must fit this much narrower (wider fonts)
     chevron_head_min_steps: int = 5  # rows of this many chevrons keep each bold heading on one line ...
+    chevron_head_lines: int = (
+        2  # ... a heading that does not fit one line wraps at a space to this many lines ...
+    )
+    chevron_head_keep: float = (
+        0.9  # ... it stays on one line when that costs at most 1 - this of the size ...
+    )
     chevron_head_min_scale: float = 0.7  # ... shrinking the text at most to this share of the base size
     chevron_head_slack: float = 1.25  # a heading must fit this much narrower (DejaVu-like fallback fonts)
     chevron_pad: Length = "4pt"
@@ -201,6 +207,9 @@ class LayoutTokens(BaseModel):
     sparse_air: float = 1.0  # ... paragraph gap (em) of plain body text, at most (lists on a sparse slide)
     sparse_card_air: float = 1.15  # ... a lone row of cards may reach this multiple of its natural height
     sparse_kpi_air: float = 1.15  # ... KPI cards may be this much taller than their content
+    sparse_lead_grow: float = 1.4  # ... the lead line grows with the body text, at most this factor ...
+    sparse_lead_title_max: float = 0.65  # ... and never beyond this share of the title size (stays secondary)
+    sparse_footnote_grow: float = 1.2  # ... footnotes may grow by at most this factor
     chevron_alone_share_sparse: float = (
         0.4  # ... a chevron row alone aims at this share of the body height ...
     )

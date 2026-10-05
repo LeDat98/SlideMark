@@ -113,6 +113,8 @@ def _tables() -> dict[str, dict[str, dict[int, int]]]:
 
 
 def is_cjk(ch: str) -> bool:
+    if ch < "\u1100":  # nothing below the Hangul Jamo block is wide or full-width
+        return False
     return unicodedata.east_asian_width(ch) in ("W", "F")
 
 
@@ -169,7 +171,23 @@ def list_indent(size_pt: float, level: int) -> tuple[int, int]:
 Segment = tuple[str, bool, bool] | tuple[str, bool, bool, bool]  # (text, bold, mono[, badge])
 
 
+_UNITS_CACHE: dict = {}
+
+
 def _units(
+    segments: list[Segment], font: str | None = None, extra: float = 0.0
+) -> list[tuple[float, float, str, bool, str]]:
+    """Memoised ``_units0``: the same text is measured at many widths and sizes (units are width-free)."""
+    key = (tuple(segments), font, extra, _default_font)
+    hit = _UNITS_CACHE.get(key)
+    if hit is None:
+        if len(_UNITS_CACHE) > 100_000:
+            _UNITS_CACHE.clear()
+        hit = _UNITS_CACHE[key] = _units0(segments, font, extra)
+    return hit
+
+
+def _units0(
     segments: list[Segment], font: str | None = None, extra: float = 0.0
 ) -> list[tuple[float, float, str, bool, str]]:
     """Split styled text into wrap units: (width_em, trailing_space_em, first_char, hard_break, last_char).

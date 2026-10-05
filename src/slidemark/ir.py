@@ -75,16 +75,32 @@ class Style(Model):
         for other in others:
             if other is None:
                 continue
-            for k, v in other.__dict__.items():
-                if v is not None:
-                    data[k] = v
+            data.update({k: v for k, v in other.__dict__.items() if v is not None})
         # values come from validated Styles: build the instance directly (model_construct is slow)
         out = object.__new__(Style)
         object.__setattr__(out, "__dict__", data)
-        object.__setattr__(out, "__pydantic_fields_set__", set(data))
+        object.__setattr__(out, "__pydantic_fields_set__", set())  # never read: skip the 60-key copy
         object.__setattr__(out, "__pydantic_extra__", None)
         object.__setattr__(out, "__pydantic_private__", None)
         return out
+
+
+_STYLE_BLANK: dict | None = None
+
+
+def fast_style(**kw) -> Style:
+    """Build a Style from trusted values without pydantic validation (layout internals, hot path)."""
+    global _STYLE_BLANK
+    if _STYLE_BLANK is None:
+        _STYLE_BLANK = dict(Style().__dict__)
+    data = dict(_STYLE_BLANK)
+    data.update(kw)
+    out = object.__new__(Style)
+    object.__setattr__(out, "__dict__", data)
+    object.__setattr__(out, "__pydantic_fields_set__", set(kw))
+    object.__setattr__(out, "__pydantic_extra__", None)
+    object.__setattr__(out, "__pydantic_private__", None)
+    return out
 
 
 class CssRule(Model):
