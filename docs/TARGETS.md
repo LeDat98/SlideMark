@@ -51,7 +51,7 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 - [x] Feature matrix (`docs/FEATURES.md`) ≥ 90% of rows fully Done (all 8 DoD steps): 27/29 = 93% (2026-10-05)
 
 ## L6: Production grade
-- [ ] 0 "repair" prompts: XSD-valid on 10k fuzzed decks + spot-checked in real PowerPoint each release (`bench/xsd_fuzz.py`: 10k decks, 0 crashes, only error kind = negative chart axId, fix in progress)
+- [ ] 0 "repair" prompts: XSD-valid on 10k fuzzed decks + spot-checked in real PowerPoint each release (XSD half ✓: `bench/xsd_fuzz.py` 10k decks seed 7 → 0 invalid, 2026-10-05; real-PowerPoint spot check pending, owner)
 - [x] Import `.pptx → Markdown` (edit existing decks); build → import → build is stable (all 9 examples, 2026-10-05)
 - [ ] Build ≤ 50 ms/slide, import time ≤ 300 ms, core install ≤ 15 MB (build 27 ms/slide ✓; `import slidemark` 165–240 ms ✓ with lazy python-pptx; install 50 MB ✗: python-pptx alone pulls lxml + Pillow ≈ 31 MB, slidemark wheel ≈ 0.2 MB)
 - [ ] Published on PyPI with semver, changelog, CI on 3 Python versions, coverage ≥ 90% (CI 3.10–3.12 ✓, coverage 93% ✓, changelog ✓; PyPI publish needs the owner's token)
