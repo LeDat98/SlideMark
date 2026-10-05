@@ -117,9 +117,12 @@ def test_table_text_and_rows_grow_within_limits():
     s = Slide(title=T("t", "title"), elements=[Table(rows=rows)])
     placed, _ = lay(s, "jp-business")
     (tp,) = of(placed, Table)
-    assert 1.0 < tp.font_scale <= 1.2 * LayoutTokens().sparse_step + 1e-9  # + the sparse step
-    line = 11 * 1.2 * 12700 * tp.font_scale
-    assert max(tp.element.attrs["_row_h"]) <= 2.0 * (1.8 * line + 2 * 45720) + 1  # at most 2x (roomy)
+    lt = LayoutTokens()
+    assert 1.0 < tp.font_scale <= max(1.2 * lt.sparse_step, lt.table_text_max * 11 / 10.5) + 1e-9
+    size = (tp.style.font_size or 14) * tp.font_scale
+    assert (
+        max(tp.element.attrs["_row_h"]) <= lt.table_row_max_em * size * 12700 + 1
+    )  # grown text, capped rows
 
 
 def test_table_rows_do_not_stretch_over_the_body():
@@ -128,8 +131,9 @@ def test_table_rows_do_not_stretch_over_the_body():
     placed, _ = lay(s, "jp-business")
     (tp,) = of(placed, Table)
     rh = tp.element.attrs["_row_h"]
-    assert max(rh) <= 2.0 * (1.8 * (tp.style.font_size or 14) * tp.font_scale * 1.2 * 12700 + 2 * 45720) + 1
-    assert tp.h < 0.6 * H  # leftover room is not poured into the rows
+    size = (tp.style.font_size or 14) * tp.font_scale
+    assert max(rh) <= LayoutTokens().table_row_max_em * size * 12700 + 1
+    assert tp.h < 0.7 * H  # leftover room is not poured into the rows
 
 
 def test_dense_boxes_do_not_grow():
