@@ -15,7 +15,7 @@ from slidemark.ir import Container, Placed
 from slidemark.layout import layout_slide, measure
 from slidemark.parser import parse
 from slidemark.template import deck_theme
-from slidemark.units import to_emu
+from slidemark.units import slide_size, to_emu
 
 ROOT = Path(__file__).resolve().parent.parent
 SPARSE = 0.35
@@ -104,8 +104,62 @@ def card_tails(items: list[Placed]) -> list[tuple[str, float, bool | None]]:
     return out
 
 
+def body_band(items: list[Placed], top_gap: int, H: int, my: int) -> tuple[float, float, float] | None:
+    """(free above, free below, body height) of the slide body, in EMU.
+
+    The body runs from the bottom of the title / lead to the top of the conclusion / footnote / footer.
+    Free space is measured between those limits and the content (everything else, incl. card fills).
+    """
+    head, tail, content = [], [], []
+    for p in items:
+        el = p.element
+        role = getattr(el, "role", None)
+        if role in ("title", "subtitle", "lead") or getattr(el, "id", None) == "band":
+            head.append(p.y + p.h)
+        elif role in ("footnote", "conclusion") or (role == "caption" and el.attrs.get("field")):
+            tail.append(p.y)
+        else:
+            content.append(p)
+    if not content or not head:
+        return None
+    top = max(head)
+    bottom = min(tail) if tail else H - my
+    if bottom <= top:
+        return None
+    c0, c1 = min(p.y for p in content), max(p.y + p.h for p in content)
+    return max(c0 - top - top_gap, 0), max(bottom - c1, 0), bottom - top
+
+
+def bands(verbose: bool) -> None:
+    """Per slide: the share of the body left empty above / below the content (``--bands``)."""
+    worst = []
+    for md in sorted((ROOT / "examples").glob("*.md")):
+        deck = parse(md.read_text(encoding="utf-8"))
+        theme, _ = deck_theme(deck, md.parent)
+        if "--top" in sys.argv:  # baseline: no vertical fill
+            theme.layout.body_valign = "top"
+        measure.set_tokens(theme.layout)
+        tg = to_emu(theme.layout.top_gap)
+        for i, s in enumerate(deck.slides):
+            b = body_band(
+                layout_slide(s, deck, theme, i), tg, slide_size(deck.size)[1], to_emu(theme.margin_y)
+            )
+            if b is None:
+                continue
+            a, d, h = b
+            worst.append((max(a, d) / h, md.stem, i + 1, a / h, d / h))
+    for w, stem, n, a, d in worst:
+        if verbose or w > 0.2:
+            print(f"  band {w:4.0%} {stem} slide {n}: above {a:4.0%} below {d:4.0%}")
+    over = sum(w > 0.2 for w, *_ in worst)
+    print(f"body band: slides {len(worst)}, empty band > 20%: {over}")
+
+
 def main() -> int:
     verbose = "--verbose" in sys.argv
+    if "--bands" in sys.argv:
+        bands("--all" in sys.argv)
+        return 0
     tails: list[float] = []
     leads: list[float] = []
     pinned: list[float] = []

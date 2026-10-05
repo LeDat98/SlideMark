@@ -13,7 +13,7 @@ import difflib
 import re
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -138,7 +138,9 @@ class LayoutTokens(BaseModel):
     grow_max: float = (
         1.3  # normal-density slides: body text never grows beyond this factor (dense: dense_*_body)
     )
-    center_beside: bool = True  # a card as tall as the chart / image beside it centers its content vertically
+    center_beside: bool = (
+        False  # True: a card as tall as the chart / image beside it centers its content vertically
+    )
     hug_cards: bool = True  # cards are as tall as their content (row_slack_hug)
     # --- sparse step: a slide whose content fills less than sparse_fill of the body takes ONE step up
     sparse_fill: float = (
@@ -149,6 +151,19 @@ class LayoutTokens(BaseModel):
     sparse_step_min: float = 1.15  # ... or this one when the larger step overflows / wraps more lines
     sparse_max_pt: float = 20  # ... but body text never beyond this size (pt)
     sparse_para_gap: float = 0.6  # paragraph gap (em) of a card at the sparse step
+    callout_pad_min: Length = "6pt"  # a callout / note box has at least this padding on every side
+    footnote_gap: Length = "0.14in"  # min air between a chart (legend included) and the footnote band
+    body_size_unify: bool = True  # table text on a slide with boxes is never smaller than the box body text
+    unify_max: float = 1.3  # ... lifting a table by more than this factor is refused
+    reserve_lead: Literal["auto", "on", "off"] = (
+        "auto"  # slides without a lead keep its slot (auto: >= half have one)
+    )
+    # --- vertical balance of the body (consulting rhythm)
+    body_free_max: float = 0.2  # more than this share of the body free: spread it, then center the block
+    body_valign: Literal["top", "center", "auto"] = (
+        "auto"  # auto: center while free space above body_free_max
+    )
+    body_spread_max: float = 0.4  # table rows, chevron rows and row gaps grow by at most this share first
 
 
 class RenderTokens(BaseModel):
