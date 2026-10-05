@@ -20,3 +20,9 @@ Newest at the bottom. ≤ 10 lines per day: done · metrics · problems · next.
 - Metrics: tests 196 passed / 1 skipped; q3 deck 155 tokens = 30% of python-pptx, 48% of HTML; jp-dense 482 vs HTML 828 (58%); unchanged vs day 1.
 - Problems: libreoffice-impress had to be apt-installed again; jp-dense slide 2 table now renders but is squeezed into one grid cell.
 - Next: slide-level visuals below a chevron/grid row, day 3 (components, dense JP, connectors).
+
+## 2026-10-05 (days 3–4, Opus-led run)
+Run goal:
+- [ ] Day 2 leftover: slide-level visual under a chevron/grid row gets its own full-width row
+- [ ] Day 3: components (kpi, callouts, badges, connectors, heading band, dense), ≥ 5 dense JP decks
+- [ ] Day 4: chart/table options, all chart kinds, OMML math, `check` linter v1 + JSON

@@ -184,6 +184,19 @@ class Raw(ElementBase):
     source: str = ""
 
 
+class Link(Model):
+    """A connector between two blocks of the same grid (``@`` token ``a>b`` or ``a-b``).
+
+    ``src``/``dst`` are 0-based indices into the owner's blocks (``Slide.elements`` or ``Container.children``)
+    in source order. ``arrow`` is False for a plain line (``a-b``).
+    """
+
+    src: int
+    dst: int
+    arrow: bool = True
+    label: str | None = None
+
+
 class Container(ElementBase):
     """A box that lays out its children: a ``## heading`` box, or the slide body itself.
 
@@ -197,6 +210,7 @@ class Container(ElementBase):
     grid: str | None = None
     gap: Length | None = None
     children: list[Element] = Field(default_factory=list)
+    links: list[Link] = Field(default_factory=list)  # connectors between children (`@` tokens a>b)
 
 
 Element = Annotated[
@@ -219,6 +233,7 @@ class Slide(Model):
     conclusion: Text | None = None  # `>` as the last block
     footnotes: list[Text] = Field(default_factory=list)  # `※` / `^` lines
     elements: list[Element] = Field(default_factory=list)  # the blocks, in source order
+    links: list[Link] = Field(default_factory=list)  # connectors between blocks (`@` tokens a>b)
     notes: str | None = None
     background: str | None = None  # color, "linear-gradient(...)" or image path
     transition: str | None = None
@@ -273,6 +288,11 @@ class Placed(Model):
       carrying their paragraphs.
     - ``Placed.style`` is already merged (theme role -> classes -> inline); colors may still be theme names,
       resolve them with ``Theme.color``. ``font_scale`` multiplies every font size of the element.
+    - Connectors (``Link``) are ``Shape(shape="line")`` with ``attrs={"head": "arrow"|"none",
+      "flip_h": bool, "flip_v": bool}``: a straight line from one corner of the box to the opposite one.
+    - ``.kpi`` boxes: the first paragraph is the big number (role style ``kpi``), the rest is caption text.
+    - Callouts (``> [!note]``) are ``Text`` with classes ``["callout", "<kind>"]``; badges are runs with
+      ``highlight`` set (theme color name) and ``color`` for the text.
     - Slide-level settings (background, notes, hidden, transition, ids) come from ``Slide``.
     """
 

@@ -72,6 +72,9 @@ class Theme(BaseModel):
     table_body_fill: str = "bg"
     table_border: str = "border"
     table_zebra_fill: str | None = None  # alternate body row fill for `.zebra` tables (None = derived)
+    heading_band: str | None = None  # fill of a full-width band behind `##` box headings (None = plain)
+    heading_band_color: str = "bg"  # heading text color on the band
+    columns: int = 12  # layout track grid: ratio/area columns snap to multiples of width/columns
     dense_scale: float = 0.8  # body/table/code size factor for `density: dense` / `.dense` slides
     palette: list[str] = Field(
         default_factory=lambda: ["primary", "secondary", "accent", "danger", "success", "muted"]
@@ -84,6 +87,15 @@ class Theme(BaseModel):
         return self.colors.get(value, value)
 
 
+# callout kinds (`> [!note]` ...): fill tint + border color. Badges: `[x]{.badge}`.
+_COMMON = {
+    "note": Style(line="primary"),
+    "tip": Style(line="success"),
+    "warn": Style(line="accent"),
+    "caution": Style(line="danger"),
+    "badge": Style(fill="primary", color="bg", bold=True),
+}
+
 DEFAULT = Theme(
     name="default",
     classes={
@@ -92,6 +104,7 @@ DEFAULT = Theme(
         "muted": Style(color="muted"),
         "dense": Style(font_size=11),
         "kpi": Style(font_size=36, bold=True, color="primary", align="center", valign="middle"),
+        **_COMMON,
     },
 )
 
@@ -117,6 +130,7 @@ MIDNIGHT = Theme(
         "muted": Style(color="muted"),
         "dense": Style(font_size=11),
         "kpi": Style(font_size=36, bold=True, color="primary", align="center", valign="middle"),
+        **_COMMON,
     },
 )
 
@@ -166,7 +180,10 @@ JP_BUSINESS = Theme(
         "muted": Style(color="muted"),
         "dense": Style(font_size=10.5),
         "kpi": Style(font_size=26, bold=True, color="primary", align="center", valign="middle"),
+        **_COMMON,
     },
+    heading_band="primary",
+    heading_band_color="#FFFFFF",
 )
 
 _REGISTRY: dict[str, Theme] = {"default": DEFAULT, "midnight": MIDNIGHT, "jp-business": JP_BUSINESS}

@@ -128,3 +128,43 @@ keeps climbing L4 → L7, picking the unchecked gates with the best value.
 - [x] B: dropped-content diag, autofit/kinsoku, table styling, image cover
 - [x] Orchestrator: golden images, BASELINE.json token gate
 - [x] Merge, gallery, bench
+
+## Day 3 work packages (incl. day 2 leftover)
+Contract (committed by orchestrator): `ir.Link` + `Slide.links`/`Container.links`; theme `heading_band`,
+`heading_band_color`, `columns`, classes `note`/`tip`/`warn`/`caution`/`badge`; SYNTAX.md Components section.
+- **A: parser + CLI** (`src/slidemark/parser/`, `src/slidemark/cli.py`, `tests/test_parser*.py`, `tests/test_cli.py`):
+  - `@` tokens `a>b`, `a-b`, `1>3` → `Link` on the slide (or on the box for a box `@` line); out-of-range → warning + hint.
+  - `> [!note|tip|warn|warning|caution|important] text` → `Text(role="body", classes=["callout", kind])`, never lead/conclusion; works inside boxes.
+  - `[x]{.badge .success}` → `Run(highlight=<color class or "primary">, color="bg", bold=True)`.
+  - `.kpi` box: keep first line and caption lines as separate paragraphs (no list markers); verify nested `@` in boxes (`###` sub-boxes) end-to-end.
+  - Fuzz covers the new tokens.
+- **B: layout + renderer** (`src/slidemark/layout/`, `src/slidemark/render/`, `tests/test_layout*.py`, `tests/test_render*.py`):
+  - Leftover: blocks beyond the grid's cell count → full-width rows below the grid; a chevron/flow row takes its natural height (compact), not half the slide.
+  - Bug: jp-dense slide 2 table (5 cols, one `colspan=3`) renders 7 columns.
+  - `.kpi` (big number + caption, centered), callouts (tinted fill + left accent bar/border by kind), badges (run highlight), connectors (`Link` → `Shape(shape="line")` edge-to-edge between block rects, arrowhead via `a:tailEnd`).
+  - Box heading band (`theme.heading_band`): heading drawn as a filled band across the card top (jp-business).
+  - `density: dense` / `.dense` also tightens gaps and paddings; ratio/area columns snap to `theme.columns` tracks.
+- **Orchestrator:** ≥ 5 dense JP example decks (`examples/04-…`), visual review, lessons.
+
+## Day 4 work packages
+- **A: parser + CLI**: chart fence options (`legend labels fmt min max colors axis`, validated with hints) into
+  `Chart.options`; CSV edge cases (quotes, `1,240`, `12%`, full-width digits, ragged rows, blank lines, BOM);
+  table attrs `widths align header hcol` → `col_widths`/cell styles/`header_rows`/`header_cols`;
+  `check --format json` runs the layout linter (`slidemark.lint`) as well.
+- **B: layout + renderer**: all 10 chart kinds native with the options above (legend position, data labels,
+  number formats, axis bounds, per-series/per-point colors, axis off), numeric table columns right-aligned;
+  ` ```math ` → native OMML equation (LaTeX subset) instead of a placeholder.
+- **Orchestrator:** `src/slidemark/lint.py` v1 on `Placed` lists: overflow, off-slide, overlap, low contrast,
+  missing alt → `Diagnostic`s; JSON output; tests.
+
+## Day 3 status
+- [x] Contract: Link, theme tokens, SYNTAX.md components
+- [ ] Leftover: slide-level visuals under a chevron/grid row get full-width rows
+- [ ] A: links, callouts, badges, kpi parsing
+- [ ] B: kpi/callout/badge/connector rendering, heading band, dense spacing, 12-col snap
+- [ ] Orchestrator: ≥ 5 dense JP examples, review
+
+## Day 4 status
+- [ ] A: chart/table options, CSV edge cases, check JSON via linter
+- [ ] B: all chart kinds + options, OMML math
+- [ ] Orchestrator: lint v1

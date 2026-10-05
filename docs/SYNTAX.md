@@ -79,6 +79,9 @@ A `>` anywhere else is a quote.
 `@end` on its own line closes the current `##` box: what follows belongs to the slide again (a table under a
 row of chevron boxes, a closing `>` conclusion). Without it a box runs to the end of the slide.
 
+Blocks beyond the cells of the slide grid (for example a table after `@end` under `@4 chevron`, or a fourth
+block under `@aab/aac`) are stacked **full width below the grid**, each in its own row.
+
 `### Heading` inside a box is a sub-heading. It becomes a nested box only when the box has its own `@` line.
 
 ## Layout: `@` line
@@ -106,6 +109,7 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `chevron` | blocks drawn as chevrons (steps) | `@4 chevron` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
 | `key=value` | `bg=` color or image, `t=` transition (`fade`, `push`, ...), `id=`, `gap=` | `@bg=#0F172A t=fade` |
+| `a>b` `a-b` | **connector** from block `a` to block `b` (arrow / plain line). Letters count blocks in source order (`a` = 1st), digits work too (`1>3`) | `@3 a>b a>c` |
 | `hidden` | hide the slide in the show | |
 | any other word | class applied to the slide (`dense`, `dark`, ...) | `@3 dense` |
 
@@ -131,6 +135,28 @@ Keys:
 | Style | `size` (pt), `color`, `fill`, `line`, `align`, `valign`, `bold`, `radius`, `pad` |
 | Image | `fit=contain` (default), `cover`, `stretch` |
 | Classes | theme colors (`.primary`, `.accent`, `.danger`, `.success`, `.muted`), `.plain` (box without card), `.kpi` (big number box) |
+
+## Components
+
+**KPI box.** A box with `.kpi` shows its first line as a big number and the rest as a small caption; the
+heading is the label.
+
+```markdown
+## 売上 {.kpi}
+12.4億円
+前年比 +8%
+```
+
+**Callout.** A quote whose first word is `[!note]`, `[!tip]`, `[!warn]` or `[!caution]` is a callout box (tinted,
+colored border). It works anywhere a block can go, including inside a box, and is never a lead or conclusion.
+`[!warning]` = `[!warn]`, `[!important]` = `[!note]`.
+
+```markdown
+> [!warn] 価格改定は11月から
+```
+
+**Badge.** `[text]{.badge}` is a small filled label inside text; add a color class to change it:
+`[済]{.badge .success}`, `[NEW]{.badge .danger}`.
 
 ## Inline text
 
@@ -175,11 +201,40 @@ and each following row is one series.
 ```
 ````
 
+Chart options go in the fence attributes:
+
+| Key | Values | Default |
+|---|---|---|
+| `title` | text | none |
+| `legend` | `bottom`, `right`, `top`, `left`, `none` | `bottom` when >1 series, else `none` |
+| `labels` | `on` (values), `percent` (pie/doughnut), `off` | `off` |
+| `fmt` | Excel number format for labels and the value axis, e.g. `0.0`, `#,##0`, `0%` | general |
+| `min`, `max` | value axis bounds | auto |
+| `colors` | comma list of theme names or hex, one per series (per point for pie) | theme palette |
+| `axis` | `off` hides the value axis and gridlines | `on` |
+
+CSV cells may be quoted (`"1,240"`), may carry `%` or thousands separators (`1,240`, `12%` → number), and may
+use full-width digits; an empty cell is a gap. A cell that is not a number becomes a gap plus a warning.
+
+## Table options
+
+Attributes on a table (`{...}` on the line before a GFM table, or on a `table` fence):
+
+| Key | Meaning | Example |
+|---|---|---|
+| `widths` | column width ratios | `widths=3:1:1:1` |
+| `align` | per-column alignment letters `l` `c` `r` | `align=lcrr` |
+| `header` | number of header rows (0 = none) | `header=2` |
+| `hcol` | number of header columns | `hcol=1` |
+| `.zebra` | alternate row fill | |
+
+Numeric columns are right-aligned automatically.
+
 ## Other fences
 
 | Fence | Result |
 |---|---|
 | ` ```python ` or any other language | code with native syntax highlighting |
 | ` ```mermaid ` | diagram |
-| ` ```math ` | equation (LaTeX) |
+| ` ```math ` | native, editable equation (LaTeX subset: `\frac`, `^`, `_`, `\sqrt`, `\sum`, `\int`, Greek, `\times`, ...) |
 | ` ```html ` | HTML/CSS rendered to native shapes, falling back to an image |
