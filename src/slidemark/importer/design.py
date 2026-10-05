@@ -53,6 +53,46 @@ def css_fence(rules: list[list[str]]) -> list[str]:
     return ["```css", *(f"{sel} {{ {decl} }}" for sel, decl in rules), "```"]
 
 
+def design_rules(design: dict[str, Any]) -> list[Any]:
+    """The stored deck-level css as parsed ``CssRule`` objects (empty on any problem)."""
+    try:
+        from ..parser import parse
+
+        rules = design.get("css") or []
+        text = "\n".join(f"{sel} {{ {decl} }}" for sel, decl in rules)
+        return list(parse(f"```css\n{text}\n```\n\n# x\n").css or []) if rules else []
+    except Exception:
+        return []
+
+
+def implied_style(rules: list[Any], role: str, colors: dict[str, str]) -> Any:
+    """The color / bold / italic that css rules for ``.role`` already give its text (so no inline markup)."""
+    from ..ir import Style
+
+    out: dict[str, Any] = {}
+    for r in rules:
+        if r.selector.strip() != "." + role:
+            continue
+        st = r.style
+        if st.color is not None:
+            col = st.color.lstrip("#") if st.color.startswith("#") else colors.get(st.color)
+            if col:
+                out["color"] = col.upper()
+        for k in ("bold", "italic"):
+            if getattr(st, k) is not None:
+                out[k] = getattr(st, k)
+    return Style(**out)
+
+
+def heading_sized(rules: list[Any]) -> bool:
+    """True when a css rule sets the font size of ``##`` box headings (``h2``, ``.box > h2``)."""
+    return any(
+        r.style.font_size is not None
+        and any(re.split(r"[\s>]+", sel.strip())[-1] == "h2" for sel in r.selector.split(","))
+        for r in rules
+    )
+
+
 def is_template_path(theme: Any) -> bool:
     """True for a ``theme:`` that names a .pptx/.potx template file rather than a preset."""
     return isinstance(theme, str) and theme.lower().endswith((".pptx", ".potx"))
@@ -247,27 +287,59 @@ def _key(text: str) -> str:
 
 
 def tag_boxes(lines: list[str], ent: dict[str, Any] | None) -> list[str]:
-    """Re-attach the stored classes and ids (``el``) to the ``##`` / ``###`` box headings they belonged to."""
-    todo = [e for e in (ent or {}).get("el") or [] if isinstance(e, list) and len(e) > 1]
-    if not todo:
+    """Re-attach the stored classes, ids and source casing to the boxes, title and text blocks they belong to.
+
+    ``el`` (``[heading, name, ...]``) gives ``##`` / ``###`` headings their ``{.class}`` and the heading its
+    stored casing (a CSS ``text-transform`` shows it re-cased on the slide), ``ttl`` does the same for the
+    ``#`` title, ``tx`` puts a ``{.class}`` line before the text block it names.
+    """
+    ent = ent or {}
+    todo = [e for e in ent.get("el") or [] if isinstance(e, list) and e]
+    texts = [e for e in ent.get("tx") or [] if isinstance(e, list) and len(e) > 1]
+    ttl = ent.get("ttl")
+    if not (todo or texts or ttl):
         return lines
-    out = list(lines)
+    out: list[str] = []
     in_fence = False
-    for k, ln in enumerate(out):
+    for ln in lines:
         if ln.startswith(("```", "~~~")):
             in_fence = not in_fence
-        m = None if in_fence else re.match(r"(#{2,3} )(.*?)(?: \{([^{}]*)\})?$", ln)
-        if not m:
+        if in_fence:
+            out.append(ln)
             continue
-        for e in todo:
-            if _key(str(e[0])) == _key(m.group(2)):
-                have = (m.group(3) or "").split()
-                add = [("." + n if not n.startswith("#") else n) for n in map(str, e[1:])]
-                add = [t for t in add if t not in have]
-                out[k] = f"{m.group(1)}{m.group(2)} {{{' '.join([*add, *have])}}}" if add else ln
-                todo.remove(e)
-                break
+        m = re.match(r"(#{2,3} )(.*?)(?: \{([^{}]*)\})?$", ln)
+        if m:
+            for e in todo:
+                if _key(str(e[0])) == _key(m.group(2)):
+                    text = esc(str(e[0])) if _same_words(str(e[0]), m.group(2)) else m.group(2)
+                    have = (m.group(3) or "").split()
+                    add = [("." + n if not n.startswith("#") else n) for n in map(str, e[1:])]
+                    add = [t for t in add if t not in have]
+                    attrs = " ".join([*add, *have])
+                    ln = f"{m.group(1)}{text} {{{attrs}}}" if attrs else f"{m.group(1)}{text}"
+                    todo.remove(e)
+                    break
+        elif ttl and ln.startswith("# ") and _same_words(str(ttl), ln[2:]):
+            ln = "# " + esc(str(ttl))
+            ttl = None
+        elif texts and not ln.startswith(("#", "@", "{", ">", "|", "-", "※", "?")):
+            for e in texts:
+                if _key(str(e[0])) == _key(ln):
+                    out.append(
+                        "{"
+                        + " ".join(("." + n if not n.startswith("#") else n) for n in map(str, e[1:]))
+                        + "}"
+                    )
+                    texts.remove(e)
+                    break
+        out.append(ln)
     return out
+
+
+def _same_words(source: str, shown: str) -> bool:
+    """True when ``shown`` is ``source`` in other casing (what ``text-transform`` does to a heading)."""
+    strip = lambda t: re.sub(r"[\W_]+", "", t)  # noqa: E731
+    return strip(source) != strip(shown) and strip(source).lower() == strip(shown).lower()
 
 
 def edited(ent: dict[str, Any], sd) -> bool:

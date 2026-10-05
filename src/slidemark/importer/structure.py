@@ -31,6 +31,8 @@ class DeckInfo:
     )  # PowerPoint sections (name, slide numbers)
     margin_x: int = 0  # theme side margin and column gap (EMU); 0 = unknown
     gap: int = 0
+    implied: dict[str, object] = field(default_factory=dict)  # role (lead, ...) -> Style a css rule gives it
+    css_heading: bool = False  # a css rule sets the font size of ## headings (sizes say nothing about a KPI)
 
 
 @dataclass
@@ -690,6 +692,8 @@ def plan_grid(
             return [], ordered, extras
         return [str(ncols)], ordered, extras
     if full_cells and equal:
+        if C == 1:  # one column of blocks: ``@1`` stacks them at their natural heights
+            return ["1"], ordered, extras
         if not extras and (C, R) == (3, 2):
             return [], ordered, extras
         return [f"{C}x{R}"], ordered, extras
@@ -741,7 +745,7 @@ class Out:
     img_n: int = 0
 
 
-def _kpi(b: Block) -> bool:
+def _kpi(b: Block, css_heading: bool = False) -> bool:
     if len(b.children) != 1 or b.children[0].kind != "text":
         return False
     ps = b.children[0].paras
@@ -749,7 +753,7 @@ def _kpi(b: Block) -> bool:
         return False
     s0 = ps[0].size
     if len(ps) == 1:  # a lone value: big next to the heading
-        s1 = b.heading[0].size if b.heading else None
+        s1 = None if css_heading else (b.heading[0].size if b.heading else None)
     else:
         s1 = ps[1].size
     return bool(s0 and s1 and s0 >= 1.5 * s1)
@@ -892,7 +896,7 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     # box
     mark = "###" if b.sub else "##"
     chunks: list[tuple[str, list[str]]] = []
-    kpi = _kpi(b)
+    kpi = _kpi(b, out.deck.css_heading)
     cname = None if kpi or b.chevron else _box_class(b, out)
     attrs = (".kpi " if kpi else "") + (f".{cname} " if cname else "") + (f"icon={b.icon}" if b.icon else "")
     head = f"{mark} {_head(b.heading or [], out)}" + (f" {{{attrs.strip()}}}" if attrs else "")
@@ -1038,7 +1042,10 @@ def build_slide(
             tokens = ["blank"]
     lead = by_role["lead"]
     if lead:
-        lines.append("> " + one_line(lead[0].paras, accent=deck.accent, classes=classes))
+        lines.append(
+            "> "
+            + one_line(lead[0].paras, accent=deck.accent, classes=classes, implied=deck.implied.get("lead"))
+        )
     n_boxes = sum(1 for b in grid if b.kind == "box")
     if not groups and arrows and "chevron" not in tokens and n_boxes > 1 and arrows >= n_boxes - 1:
         tokens.append("flow")
@@ -1108,11 +1115,17 @@ def build_slide(
     lines.extend(join_chunks(chunks, True))
     for it in sorted(by_role["footnote"], key=lambda i: (i.y, i.x)):
         for p in it.paras:
-            txt = one_line([p], accent=deck.accent, classes=classes)
+            txt = one_line([p], accent=deck.accent, classes=classes, implied=deck.implied.get("footnote"))
             if txt:
                 lines.append("※ " + txt)
     if by_role["conclusion"]:
-        txt = one_line(by_role["conclusion"][0].paras, accent=deck.accent, classes=classes, plain_bold=True)
+        txt = one_line(
+            by_role["conclusion"][0].paras,
+            accent=deck.accent,
+            classes=classes,
+            plain_bold=True,
+            implied=deck.implied.get("conclusion"),
+        )
         if txt:
             lines.append("> " + txt)
     lines.extend(notes_lines(data.notes))
