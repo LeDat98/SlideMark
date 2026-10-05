@@ -63,13 +63,17 @@ ICON_KPI = 2.0  # icon side / label font size (icon above a kpi number)
 ICON_GAP = 0.4  # gap between icon and text, in icon sides
 CHEVRON_ADJ = 0.3  # chevron point depth / shorter side; the renderer sets the same adjustment
 CHEVRON_PAD_PT = 4  # text padding inside a chevron (the preset's text rectangle already clears the points)
-CHEVRON_H = 0.45  # chevron height / width (room for 3 lines of text between the point paddings)
+CHEVRON_MIN_H = 0.7  # inches: a chevron row is its text height + padding, at least this tall ...
+CHEVRON_MAX_H = 1.3  # ... and at most this tall
+CHEVRON_VPAD = 0.17  # inches above and below the text of a chevron
 CODE_GROW = 1.25  # code text grows with the sparse-slide growth, up to this factor
 TABLE_GROW = 1.4  # rows of a table with spare room grow up to this factor (a row stays near its text)
 TABLE_FONT_GROW = 1.2  # table text grows with the sparse-slide growth, up to this factor
 ROW_SLACK = 1.35  # a grid row is at most this much taller than its tallest content ...
+TREE_SLACK = 1.15  # org-tree boxes are at most this much taller than their content
 ROW_MIN_TAIL = 0.12  # ... when blocks (a chart, a table) follow the grid: the row hugs its content
 STACK_MIN = 0.4  # stacked boxes beside a tall block: each gets at least this share of the natural total
+ROW_MIN_DENSE = 0.42  # dense slides: a lone row of boxes is at least this share of the body (fuller boxes)
 ROW_MIN = 0.3  # ... but never shorter than this share of the body height (0.12 when blocks follow the grid)
 GROW_SMALL = (
     1.35  # sparse slides: text grows up to this factor when the theme body size is <= GROW_SMALL_PT ...
@@ -87,8 +91,10 @@ SPARSE_LINE_EM = 22  # a "short" line
 GROW_FILL = 0.85  # growth stops when the content would fill more than this share of the grid
 GROW_BOX_FILL = 0.92  # ... or more than this share of a box
 LEFT_KEEP = 0.12  # rows of a sparse slide expand until at most this share of the body is left over ...
-LEFT_ABOVE_TABLE = 0.2  # slides without boxes (a table, a chart) stay closer to the top
-LEFT_ABOVE = 0.35  # ... and that leftover is split: this share above the block, the rest below
+VERY_SPARSE_FILL = 0.4  # content below this share of the body (after growth) is "very sparse" ...
+LEFT_SHIFT = 1 / 3  # ... and only then moves down, by at most this share of the leftover (boxes) ...
+LEFT_SHIFT_TABLE = 0.2  # ... or this share (slides without boxes: a lone table, a chart)
+DENSE_GROW_BODY = 1.25  # dense slides: text may grow up to this multiple of the theme body size
 MATH_GROW = 1.6  # an equation alone in its cell is this much larger than body text
 TOP_GAP = 0.25  # inches between the title band (or lead) and the body, the same on every slide
 KPI_MIN_H = 1.1  # inches
@@ -1016,6 +1022,7 @@ def _row_heights(
     gap: int,
     inherit: Style,
     has_tail: bool = False,
+    tree: bool = False,
 ) -> list[int] | None:
     """Row heights of a slide-level grid: sparse rows do not stretch over the whole body.
 
@@ -1052,8 +1059,12 @@ def _row_heights(
             caps.append(max(n, round(KPI_MIN_H * EMU_PER_INCH)))
         elif kinds[row] == {"table"}:
             caps.append(n)
+        elif tree:  # org-tree levels hug their boxes (+ modest slack): the connectors fill the gaps
+            caps.append(round(n * TREE_SLACK))
         else:
-            caps.append(max(round(n * ROW_SLACK), round((ROW_MIN_TAIL if has_tail else ROW_MIN) * body.h)))
+            lone = nr == 1 and not has_tail and ctx.dense_k < 1.0
+            floor = ROW_MIN_TAIL if has_tail else (ROW_MIN_DENSE if lone else ROW_MIN)
+            caps.append(max(round(n * ROW_SLACK), round(floor * body.h)))
     extra_h = 0  # natural height that spanning blocks need beyond their rows
     for r0, r1, n in spans:
         rows = range(r0, r1 + 1)
@@ -1083,7 +1094,9 @@ def _row_heights(
         tot = sum(nat)  # type: ignore[arg-type]
         w = [max(n or 0, STACK_MIN * tot) for n in nat]
         return grid_row_heights(replace(gs, rows=[float(x) for x in w]), grid_area.h, gap, caps)
-    if ctx.expand > 0 and nr >= 2:  # sparse slide: spread extra height over the capped rows (not kpi / table)
+    if (
+        ctx.expand > 0 and nr >= 2 and not tree
+    ):  # sparse slide: spread extra height over the capped rows (not kpi / table)
         rows = [r for r in range(nr) if caps[r] is not None and "other" in kinds[r]]
         tot = sum(caps[r] or 0 for r in rows)
         for r in rows:
@@ -1158,7 +1171,8 @@ def _place_blocks(
         grid_area, tail_area = _split_grid_tail(ctx, area, gap, gs, flow, extra, inherit, flags)
     cells = cell_rects(gs, len(flow), grid_area, gap, ctx.theme.columns)
     if "chevron" not in flags and ctx.depth == 0:
-        row_h = _row_heights(ctx, gs, flow, cells, grid_area, area, gap, inherit, tail_area is not None)
+        tree = bool(links) and gs.areas is not None and len(gs.rows) >= 2
+        row_h = _row_heights(ctx, gs, flow, cells, grid_area, area, gap, inherit, tail_area is not None, tree)
         if row_h is not None:
             cells = cell_rects(gs, len(flow), grid_area, gap, ctx.theme.columns, row_h)
             used = sum(row_h) + gap * (len(row_h) - 1)
@@ -1168,10 +1182,12 @@ def _place_blocks(
                 tail_area = Rect(area.x, ty, area.w, max(area.bottom - ty, 0))
     start = len(ctx.out)
     chev_eff: float | None = None  # one text size for the whole chevron row
+    chev_h: int | None = None
     if "chevron" in flags:
+        chev_h = _chevron_row_h(ctx, [b for _, b in flow], min((r.w for r in cells), default=area.w), inherit)
         chev_eff = min(
             (
-                _chevron_eff(ctx, blk, _apply_box(ctx, blk, r, False), inherit)
+                _chevron_eff(ctx, blk, _apply_box(ctx, blk, r, False), inherit, chev_h)
                 for (_i, blk), r in zip(flow, cells, strict=True)
                 if isinstance(blk, (Text, Shape, Container))
             ),
@@ -1181,7 +1197,7 @@ def _place_blocks(
         r = _apply_box(ctx, blk, r, False)
         rects[i] = r
         if "chevron" in flags and isinstance(blk, (Text, Shape, Container)):
-            rects[i] = _place_chevron(ctx, blk, r, inherit, chev_eff)
+            rects[i] = _place_chevron(ctx, blk, r, inherit, chev_eff, chev_h)
         else:
             _place_block(ctx, blk, r, inherit)
     if "flow" in flags:
@@ -1242,8 +1258,8 @@ def _split_grid_tail(
     tail_nat = sum(n for n in nat if n is not None) + gap * (len(extra) - 1)
     has_flex = any(n is None for n in nat)
     if "chevron" in flags:
-        cw = (area.w - gap * (len(gs.cols) - 1)) / max(len(gs.cols), 1)
-        compact = max(round(cw * CHEVRON_H), round(0.9 * EMU_PER_INCH))
+        cw = round((area.w - gap * (len(gs.cols) - 1)) / max(len(gs.cols), 1))
+        compact = _chevron_row_h(ctx, [b for _, b in flow], cw, inherit)
         has_extras = any(
             isinstance(b, Container) and any(not isinstance(ch, (Text, Shape)) for ch in b.children)
             for _, b in flow
@@ -1259,12 +1275,22 @@ def _split_grid_tail(
     )
 
 
-def _chevron_geom(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> tuple[Shape, Style, Rect]:
+def _chevron_font(ctx: _Ctx, sh: Shape, st: Style) -> Style:
+    """Chevron text is at least the theme body size and never smaller than the table text beside it."""
+    if sh.style and sh.style.font_size:
+        return st
+    t = ctx.theme
+    floor = max(t.sizes.get("body", 18), t.sizes.get("table", 14) * ctx.dense_k * TABLE_FONT_GROW)
+    return st.merged(Style(font_size=max(st.font_size or 18, floor)))
+
+
+def _chevron_geom(
+    ctx: _Ctx, blk, rect: Rect, inherit: Style, hcap: int | None = None
+) -> tuple[Shape, Style, Rect]:
     sh = _chevron_shape(blk)
-    st = _text_style(ctx, sh, inherit)
-    rect = Rect(
-        rect.x, rect.y, rect.w, min(rect.h, max(round(rect.w * CHEVRON_H), round(0.9 * EMU_PER_INCH)))
-    )
+    st = _chevron_font(ctx, sh, _text_style(ctx, sh, inherit))
+    if hcap is not None:
+        rect = Rect(rect.x, rect.y, rect.w, min(rect.h, hcap))
     # the preset text rectangle already starts a point depth inside both ends: add only a small padding
     st = st.merged(Style(padding=f"{CHEVRON_PAD_PT}pt", align="center", valign="middle"))
     if icon := _icon_name(blk):  # the icon sits left of the text: reserve its room as a left inset
@@ -1288,13 +1314,29 @@ def _chevron_text_w(rect: Rect, st: Style, sh: Shape | None = None) -> int:
     return rect.w - 2 * round(CHEVRON_ADJ * min(rect.w, rect.h)) - 2 * _pad(st) - inset
 
 
-def _chevron_eff(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> float:
+def _chevron_row_h(ctx: _Ctx, blocks: list, width: int, inherit: Style) -> int:
+    """Height of a chevron row: tallest text + padding, clamped to ``CHEVRON_MIN_H`` .. ``CHEVRON_MAX_H``."""
+    lo, hi = round(CHEVRON_MIN_H * EMU_PER_INCH), round(CHEVRON_MAX_H * EMU_PER_INCH)
+    h = round(EMU_PER_INCH)
+    for _ in range(3):  # the point depth depends on the height, the height on the wrapped text
+        need = 0
+        for blk in blocks:
+            if not isinstance(blk, (Text, Shape, Container)):
+                continue
+            sh, st, rect = _chevron_geom(ctx, blk, Rect(0, 0, width, h), inherit)
+            eff = measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
+            need = max(need, measure.paragraphs_height(sh.paragraphs, _chevron_text_w(rect, st, sh), st, eff))
+        h = min(max(round(need / 0.8), round(need + 2 * CHEVRON_VPAD * EMU_PER_INCH), lo), hi)
+    return h
+
+
+def _chevron_eff(ctx: _Ctx, blk, rect: Rect, inherit: Style, hcap: int | None = None) -> float:
     """Font scale of a chevron whose wrapping survives a renderer that is ~12% narrower than the estimate.
 
     A label that just fits would leave a lone character on its last line when the real font is wider (e.g.
     "KPI モニタリン / グ"): shrink until the line count no longer changes in a 12% narrower area (>= 80%).
     """
-    sh, st, rect = _chevron_geom(ctx, blk, rect, inherit)
+    sh, st, rect = _chevron_geom(ctx, blk, rect, inherit, hcap)
     width = _chevron_text_w(rect, st, sh)
     base = st.font_size or 18
     first = measure.effective_scale(base, ctx.scale, ctx.theme.min_font_size)
@@ -1307,9 +1349,11 @@ def _chevron_eff(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> float:
     return first
 
 
-def _place_chevron(ctx: _Ctx, blk, rect: Rect, inherit: Style, eff_cap: float | None = None) -> Rect:
+def _place_chevron(
+    ctx: _Ctx, blk, rect: Rect, inherit: Style, eff_cap: float | None = None, hcap: int | None = None
+) -> Rect:
     full = rect
-    sh, st, rect = _chevron_geom(ctx, blk, rect, inherit)
+    sh, st, rect = _chevron_geom(ctx, blk, rect, inherit, hcap)
     eff = measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
     if eff_cap is not None:
         eff = min(eff, eff_cap)
@@ -1401,10 +1445,11 @@ def _very_sparse(elements: list) -> bool:
 
 
 def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
-    """Vertical policy of a sparse slide body: no empty band taller than ~``LEFT_KEEP`` of the body.
+    """Vertical policy of a sparse slide body: top-anchored, the leftover stays at the bottom.
 
-    1. capped rows expand until the leftover is at most ``LEFT_KEEP`` of the body, 2. the whole block moves
-    down so that ``LEFT_ABOVE`` of what is still left sits above it and the rest below it.
+    1. capped rows of multi-row content expand until the leftover is at most ``LEFT_KEEP`` of the body;
+    2. only a very sparse slide (content < ``VERY_SPARSE_FILL`` of the body) moves down, by at most
+       ``LEFT_SHIFT`` of what is left. Anything else keeps its body top at ``head_bottom + TOP_GAP``.
     """
     if fin.scale < 1.0 or fin.over or not any(isinstance(e, (Container, Table)) for e in elements):
         return fin
@@ -1415,12 +1460,15 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
         if not c.over and c.out:
             fin = c
             left = body.bottom - _bottom(fin)
-    above = LEFT_ABOVE if any(isinstance(e, Container) for e in elements) else LEFT_ABOVE_TABLE
-    dy = round(left * above)
-    if dy > 0:
-        c = run(Rect(body.x, body.y + dy, body.w, body.h - dy), grow=fin.grow, expand=fin.expand)
-        if not c.over and c.out:
-            fin = c
+    top = min((p.y for p in fin.out), default=body.y)
+    if _bottom(fin) - top < VERY_SPARSE_FILL * body.h:
+        dy = round(
+            left * (LEFT_SHIFT if any(isinstance(e, Container) for e in elements) else LEFT_SHIFT_TABLE)
+        )
+        if dy > 0:
+            c = run(Rect(body.x, body.y + dy, body.w, body.h - dy), grow=fin.grow, expand=fin.expand)
+            if not c.over and c.out:
+                fin = c
     return fin
 
 
@@ -1677,6 +1725,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         if final_ctx.scale >= 1.0 and not final_ctx.over:
             # sparse slide: grow text uniformly (siblings share one factor), more for small themes
             top = GROW_SMALL if (body_pt <= GROW_SMALL_PT) else GROW_BIG
+            if ctx.dense_k < 1.0:  # dense slides: up to DENSE_GROW_BODY x the theme body size
+                top = max(top, DENSE_GROW_BODY / ctx.dense_k)
             if very:
                 top = max(top, min(GROW_VERY_SPARSE, GROW_VERY_SPARSE_MAX_PT / body_pt))
             n = round((top - 1.05) / 0.05)

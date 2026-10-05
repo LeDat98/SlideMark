@@ -47,6 +47,9 @@ def _min_em(text: str) -> float:
     return min(max((measure.text_em(w) for w in text.split()), default=0.0), 12.0)
 
 
+TEXT_FAVOUR = 3.0  # a text column takes this many times the share of spare width of a numeric column
+
+
 def column_widths(
     t: Table, ncols: int, anchors: list[tuple[int, int, Cell]], total: int, size_pt: float = 14.0
 ) -> list[int]:
@@ -83,8 +86,18 @@ def column_widths(
     pad_em = 2 * measure.CELL_PAD_X / EMU_PER_PT / max(size_pt, 1.0)
     weights = [w + pad_em for w in weights]
     min_w = [(m + pad_em) * 1.08 for m in mins]  # a little headroom: fallback fonts run wider
-    # water-filling: columns below their minimum are pinned to it, the rest share what is left by weight
     em_total = total / EMU_PER_PT / max(size_pt, 1.0)
+    nat = [max(w, m) for w, m in zip(weights, min_w, strict=True)]
+    if sum(nat) < em_total:  # room to spare: natural widths first, the extra favours text columns
+        num = numeric_columns(t, ncols, anchors)
+        share = [1.0 if c in num else TEXT_FAVOUR for c in range(ncols)]
+        ssum = sum(share)
+        extra = em_total - sum(nat)
+        ems = [nat[c] + extra * share[c] / ssum for c in range(ncols)]
+        widths = [round(total * e / em_total) for e in ems]
+        widths[-1] += total - sum(widths)
+        return widths
+    # water-filling: columns below their minimum are pinned to it, the rest share what is left by weight
     pinned: dict[int, float] = {}
     for _ in range(ncols):
         rest = em_total - sum(pinned.values())
@@ -128,6 +141,20 @@ NUMERIC_SHARE = (
 )
 
 
+def numeric_columns(t: Table, ncols: int, anchors: list[tuple[int, int, Cell]]) -> set[int]:
+    """Columns where >= ``NUMERIC_SHARE`` of the non-empty body cells are figures."""
+    body: dict[int, list[str]] = {c: [] for c in range(ncols)}
+    for r, c, cell in anchors:
+        txt = "".join(p.plain for p in cell.paragraphs).strip()
+        if r >= t.header_rows and c >= t.header_cols and cell.colspan == 1 and txt:
+            body[c].append(txt)
+    return {
+        c
+        for c, items in body.items()
+        if items and sum(is_numeric(x) for x in items) >= NUMERIC_SHARE * len(items)
+    }
+
+
 def right_align_numbers(t: Table) -> Table:
     """Copy of ``t`` where mostly numeric body columns (and their headers) are right-aligned as a whole.
 
@@ -137,19 +164,11 @@ def right_align_numbers(t: Table) -> Table:
     """
     _, ncols, anchors = table_grid(t)
     col_of = {id(cell): c for _r, c, cell in anchors}
+    num_cols = numeric_columns(t, ncols, anchors)
 
     def text(cell: Cell) -> str:
         return "".join(p.plain for p in cell.paragraphs).strip()
 
-    body: dict[int, list[str]] = {c: [] for c in range(ncols)}
-    for r, c, cell in anchors:
-        if r >= t.header_rows and c >= t.header_cols and cell.colspan == 1 and text(cell):
-            body[c].append(text(cell))
-    num_cols = {
-        c
-        for c, items in body.items()
-        if items and sum(is_numeric(x) for x in items) >= NUMERIC_SHARE * len(items)
-    }
     rows = [list(row) for row in t.rows]
     changed = False
     for ri, row in enumerate(t.rows):

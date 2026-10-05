@@ -181,6 +181,52 @@ def _legend_pos(opts: dict, pie: bool, nseries: int):
     return default if (pie or nseries > 1) else None
 
 
+def _positive_axis_ids(chart) -> None:
+    """python-pptx templates write negative ``c:axId`` / ``c:crossAx`` (``xs:unsignedInt`` in ECMA-376).
+
+    Every negative id becomes a positive one, the same for ``axId`` and ``crossAx`` references in the chart.
+    """
+    els = [e for e in chart._chartSpace.iter(qn("c:axId"), qn("c:crossAx"))]
+    ids = []
+    for e in els:
+        try:
+            ids.append(int(e.get("val", "0")))
+        except ValueError:
+            ids.append(0)
+    used = {i for i in ids if i >= 0}
+    mapping: dict[int, int] = {}
+    for old in dict.fromkeys(i for i in ids if i < 0):
+        new = min(abs(old), 2**32 - 2)
+        while new in used:
+            new += 1
+        used.add(new)
+        mapping[old] = new
+    for e, i in zip(els, ids, strict=True):
+        if i in mapping:
+            e.set("val", str(mapping[i]))
+
+
+def _luminance(hex_rgb: str) -> float:
+    def lin(v: int) -> float:
+        x = v / 255
+        return x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (int(hex_rgb[i : i + 2], 16) for i in (0, 2, 4))
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+
+
+def label_color_on(fill_hex: str) -> str:
+    """White on dark fills, near-black on light ones (WCAG-style: the higher contrast wins)."""
+    lum = _luminance(fill_hex)
+    dark = _luminance("1F2937")
+    return "FFFFFF" if 1.05 / (lum + 0.05) > (lum + 0.05) / (dark + 0.05) else "1F2937"
+
+
+def _distinct(colors: list[str]) -> list[str]:
+    """Drop repeated colors (``accent`` and ``danger`` may share one value), keep the order."""
+    return list(dict.fromkeys(c.upper() for c in colors))
+
+
 def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     ch: Chart = pl.element  # type: ignore[assignment]
     theme = rc.theme
@@ -224,6 +270,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     gf = slide.shapes.add_chart(ctype, Emu(pl.x), Emu(pl.y), Emu(pl.w), Emu(pl.h), data)
     gf.name = name
     chart = gf.chart
+    _positive_axis_ids(chart)
     size = (pl.style.font_size or theme.sizes.get("table", 14)) * pl.font_scale
     fg = rgb(theme, pl.style.color or "fg")
     _chart_font(chart, theme, pl.style.font or theme.fonts.body, size, fg)
@@ -250,6 +297,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         cl = [p.strip() for p in cl.replace(";", ",").split(",") if p.strip()]
     use = cl if isinstance(cl, (list, tuple)) and cl else theme.palette
     pal = [hex6(theme, str(c)) for c in use] or ["4472C4"]
+    if use is theme.palette:  # distinct theme colors in order; they wrap only after all of them are used
+        pal = _distinct(pal)
     # number formats
     pct_flag = flag(opts.get("percent"))
     nf = opts.get("fmt") or opts.get("number_format") or opts.get("format")
@@ -304,6 +353,15 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             else:
                 ser.format.fill.solid()
                 ser.format.fill.fore_color.rgb = RGBColor.from_string(color)
+                if lab_on and kind in ("stacked-bar", "stacked-column"):  # labels sit inside the fill
+                    sdl = ser.data_labels
+                    sdl.show_value = True
+                    sdl.font.size = Pt(size * 0.9)
+                    sdl.font.color.rgb = RGBColor.from_string(label_color_on(color))
+                    sdl.position = XL_LABEL_POSITION.CENTER
+                    if nf:
+                        sdl.number_format = nf
+                        sdl.number_format_is_linked = False
     if kind == "doughnut":
         hole = chart.plots[0]._element.find(qn("c:holeSize"))
         if hole is not None:
