@@ -95,6 +95,12 @@ _COMMON = {
     "warn": Style(line="accent"),
     "caution": Style(line="danger"),
     "badge": Style(fill="primary", color="bg", bold=True),
+    # mermaid flowchart nodes
+    "node": Style(
+        fill="surface", line="primary", line_width=1, padding="6pt", align="center", valign="middle"
+    ),
+    "round": Style(radius=12),
+    "decision": Style(fill="bg", line="accent"),
 }
 
 DEFAULT = Theme(

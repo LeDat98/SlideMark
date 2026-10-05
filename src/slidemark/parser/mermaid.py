@@ -343,4 +343,4 @@ def build_mermaid(source: str, ctx: Ctx, line: int | None) -> Container | Raw:
             continue
         seen.add(key)
         links.append(Link(src=index[a], dst=index[b], arrow=arrow, label=label))
-    return Container(classes=["diagram"], grid=grid, children=children, links=links, line=line)
+    return Container(classes=["diagram", "plain"], grid=grid, children=children, links=links, line=line)

@@ -13,8 +13,9 @@ from .theme import get_theme
 
 
 def build(source: str | Path, out: str | Path, *, base_dir: str | Path | None = None) -> Deck:
-    """Build a .pptx from Markdown text or a path to a .md/.json file. Returns the Deck (with diagnostics)."""
-    is_path = isinstance(source, Path) or ("\n" not in source and str(source).endswith((".md", ".json")))
+    """Build a .pptx from text or a .md/.json/.html path. Returns the Deck (with diagnostics)."""
+    exts = (".md", ".json", ".html")
+    is_path = isinstance(source, Path) or ("\n" not in source and str(source).endswith(exts))
     if is_path:
         path = Path(source)
         base_dir = base_dir or path.parent
