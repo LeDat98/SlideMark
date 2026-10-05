@@ -94,6 +94,7 @@ class Item:
     cropped: bool = False  # image: a:srcRect crop (``fit=cover``)
     latex: str | None = None  # math: the equation as LaTeX (``` math fence)
     missing: tuple[str, str] | None = None  # image: a "[image: label]" placeholder of a file that was absent
+    line_color: str | None = None  # RRGGBB of a solid outline (box classes color the card border)
 
     @property
     def cx(self) -> float:
@@ -678,6 +679,9 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
             data.items.append(_new(ctx, "math", box, sid=sh.shape_id, name=name, latex=latex))
             return
         fill, line = _fill_of(el)
+        ln_el = el.find(qn("p:spPr") + "/" + qn("a:ln"))
+        ln_fill = ln_el.find(qn("a:solidFill")) if ln_el is not None else None
+        line_color = _hex(ln_fill) if line and ln_fill is not None else None
         geom = el.find(qn("p:spPr") + "/" + qn("a:prstGeom"))
         prst = geom.get("prst") if geom is not None else None
         radius = _radius(geom, box) if prst == "roundRect" else None
@@ -703,6 +707,7 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
             ph=ph_type,
             fill=fill,
             line=line,
+            line_color=line_color,
             prst=prst,
             radius=radius,
             paras=paras,

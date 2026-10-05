@@ -755,6 +755,21 @@ def _kpi(b: Block) -> bool:
     return bool(s0 and s1 and s0 >= 1.5 * s1)
 
 
+def _box_class(b: Block, out: Out) -> str | None:
+    """The color class of a box: its card border in a class color, or body text all in the muted color."""
+    cols = out.deck.colors
+    lc = b.item.line_color if b.item is not None else None
+    if lc and lc != cols.get("border"):
+        for cname in ("primary", "success", "danger", "accent"):
+            if cols.get(cname) == lc:
+                return cname
+    muted = cols.get("muted")
+    runs = [r for ch in b.children if ch.kind == "text" for p in ch.paras for r in p.runs if r.text.strip()]
+    if muted and muted != cols.get("fg") and runs and all(r.color == muted for r in runs):
+        return "muted"
+    return None
+
+
 def _head(paras: list[ParaT], out: Out) -> str:
     txt = one_line(paras, plain_bold=True, accent=None, classes=out.classes)
     return txt[:-1] + "\\}" if txt.endswith("}") else txt
@@ -878,7 +893,8 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     mark = "###" if b.sub else "##"
     chunks: list[tuple[str, list[str]]] = []
     kpi = _kpi(b)
-    attrs = (".kpi " if kpi else "") + (f"icon={b.icon}" if b.icon else "")
+    cname = None if kpi or b.chevron else _box_class(b, out)
+    attrs = (".kpi " if kpi else "") + (f".{cname} " if cname else "") + (f"icon={b.icon}" if b.icon else "")
     head = f"{mark} {_head(b.heading or [], out)}" + (f" {{{attrs.strip()}}}" if attrs else "")
     if b.chevron:
         content = text_lines(b.paras, accent=acc, classes=cls)

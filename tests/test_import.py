@@ -285,3 +285,13 @@ def test_chart_kinds(kind: str, tmp_path: Path):
     assert b.options.get("legend") == "right"
     if kind != "scatter":  # the renderer draws no data labels on XY charts
         assert b.options.get("labels") == a.options.get("labels")
+
+
+def test_box_color_classes_survive_import(tmp_path):
+    src = (
+        "theme: jp-business\nlang: ja\n\n# 課題\n@3\n## 市場 {.muted}\n- 縮小\n- 競争\n"
+        "## 課題 {.danger}\n- 粗利率\n## 方針 {.primary}\n1. 投入\n"
+    )
+    build(src, tmp_path / "a.pptx")
+    md, _ = import_pptx(tmp_path / "a.pptx")
+    assert "## 市場 {.muted}" in md and "## 課題 {.danger}" in md and "## 方針 {.primary}" in md
