@@ -116,7 +116,7 @@ def has_cjk(text: str) -> bool:
 
 
 @cache
-def _char_em(ch: str, kind: str, font: str) -> float:
+def _base_em(ch: str, kind: str, font: str) -> float:
     if is_cjk(ch):
         return 1.0
     if unicodedata.east_asian_width(ch) == "H":
@@ -134,9 +134,12 @@ def _char_em(ch: str, kind: str, font: str) -> float:
     return _DEFAULT_EM
 
 
+_char_em = _base_em
+
+
 def char_em(ch: str, kind: str = "regular", font: str | None = None) -> float:
     """Advance width of one character in em units (kind: regular, bold, mono; font: family name or None)."""
-    return _char_em(ch, kind, font_key(font))
+    return _base_em(ch, kind, font_key(font))
 
 
 def text_em(text: str, bold: bool = False, mono: bool = False, font: str | None = None) -> float:
@@ -154,14 +157,20 @@ def list_indent(size_pt: float, level: int) -> tuple[int, int]:
 Segment = tuple[str, bool, bool] | tuple[str, bool, bool, bool]  # (text, bold, mono[, badge])
 
 
-def _units(segments: list[Segment], font: str | None = None) -> list[tuple[float, float, str, bool, str]]:
+def _units(
+    segments: list[Segment], font: str | None = None, extra: float = 0.0
+) -> list[tuple[float, float, str, bool, str]]:
     """Split styled text into wrap units: (width_em, trailing_space_em, first_char, hard_break, last_char).
 
     A badge segment (4th item true) is one unbreakable unit: its text plus the full-width padding the
-    renderer adds around CJK badge text.
+    renderer adds around CJK badge text. ``extra`` is the letter spacing (em) added after every character.
     """
     units: list[tuple[float, float, str, bool, str]] = []
     key = font_key(font)
+
+    def _char_em(ch: str, kind: str, key: str) -> float:  # noqa: F811 - adds the letter spacing
+        return _base_em(ch, kind, key) + extra
+
     st = {"word": "", "w": 0.0, "sp": 0.0}
 
     def flush():
@@ -201,12 +210,16 @@ def _units(segments: list[Segment], font: str | None = None) -> list[tuple[float
     return units
 
 
-def count_lines(segments: list[Segment], width_pt: float, size_pt: float, font: str | None = None) -> int:
-    """Number of lines the styled text needs in ``width_pt`` at ``size_pt`` (with kinsoku)."""
+def count_lines(
+    segments: list[Segment], width_pt: float, size_pt: float, font: str | None = None, spacing_pt: float = 0.0
+) -> int:
+    """Number of lines the styled text needs in ``width_pt`` at ``size_pt`` (with kinsoku).
+
+    ``spacing_pt`` is the CSS letter spacing added after every character."""
     width = max(width_pt / max(size_pt, 1.0), 1.0)  # in em
     lines, cur = 1, 0.0
     line: list[tuple[float, float, str, bool, str]] = []  # units on the current line
-    for u in _units(segments, font):
+    for u in _units(segments, font, spacing_pt / max(size_pt, 1.0)):
         w, sp, first, hard, _last = u
         if hard:
             lines += 1
@@ -236,8 +249,29 @@ def count_lines(segments: list[Segment], width_pt: float, size_pt: float, font: 
     return lines
 
 
-def para_segments(p: Paragraph, bold: bool = False, mono: bool = False) -> list[Segment]:
-    return [(r.text, bold or r.bold or bool(r.highlight), mono or r.code, bool(r.highlight)) for r in p.runs]
+def para_segments(
+    p: Paragraph, bold: bool = False, mono: bool = False, transform: str | None = None
+) -> list[Segment]:
+    """Styled segments of a paragraph; ``transform`` (CSS text-transform) is applied as the renderer does."""
+    from .css import transform_text
+
+    return [
+        (
+            transform_text(r.text, transform),
+            bold or r.bold or bool(r.highlight),
+            mono or r.code,
+            bool(r.highlight),
+        )
+        for r in p.runs
+    ]
+
+
+def text_spacing(style: Style, p: Paragraph | None = None) -> tuple[float, str | None]:
+    """(letter spacing pt, text transform) of a paragraph: its own style over the element style."""
+    ps = p.style if p is not None else None
+    ls = ps.letter_spacing if ps and ps.letter_spacing is not None else style.letter_spacing
+    tf = ps.text_transform if ps and ps.text_transform else style.text_transform
+    return ls or 0.0, tf
 
 
 def paragraphs_height(
@@ -263,7 +297,8 @@ def paragraphs_height(
         indent = list_indent(size, p.level)[0] if p.marker else 0
         wpt = (width_emu - indent) / EMU_PER_PT
         bold = bool((p.style and p.style.bold) or style.bold)
-        lines = count_lines(para_segments(p, bold, mono), wpt, size, font)
+        spc, tf = text_spacing(style, p)
+        lines = count_lines(para_segments(p, bold, mono, tf), wpt, size, font, spc * scale)
         ls = (p.style.line_spacing if p.style and p.style.line_spacing else style.line_spacing) or 1.0
         lh = size * (_tok.line_cjk if has_cjk(p.plain) else _tok.line_latin) * ls
         total_pt += lines * lh + (size * gap if i > 0 else 0)

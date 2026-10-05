@@ -29,7 +29,7 @@ from ..ir import (
 from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
-from . import measure
+from . import css, measure
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
 from .score import score as score_layout
@@ -82,6 +82,9 @@ def _emu(value) -> int:
         return 0
 
 
+_NOCSS = css.CssIndex(Deck(), Slide())
+
+
 @dataclass
 class _Ctx:
     deck: Deck
@@ -117,6 +120,7 @@ class _Ctx:
     out: list[Placed] = field(default_factory=list)
     over: list[str] = field(default_factory=list)
     diags: list[Diagnostic] = field(default_factory=list)
+    css: css.CssIndex = field(default_factory=lambda: _NOCSS)  # selector matching of the slide's css rules
 
     @property
     def lt(self) -> LayoutTokens:
@@ -222,6 +226,40 @@ def _class_styles(ctx: _Ctx, el, skip: tuple[str, ...] = ()) -> list[Style]:
     return out
 
 
+def _styled(ctx: _Ctx, el, st: Style, classes: bool = True) -> Style:
+    """``st`` (theme role) -> inherited CSS -> theme classes -> CSS rules -> inline style."""
+    own = ctx.css.own(el)
+    out = st.merged(
+        ctx.css.inherited(el), *(_class_styles(ctx, el) if classes else ()), own, getattr(el, "style", None)
+    )
+    if own.line_width and not out.line:  # `border: 2px` without a color: the border color token
+        out = out.merged(Style(line="border"))
+    return out
+
+
+def _cstyle(ctx: _Ctx, el) -> Style:
+    """Classes + CSS + inline of ``el`` only (margin, gap, grid, rotation lookups)."""
+    return Style().merged(*_class_styles(ctx, el), ctx.css.own(el), getattr(el, "style", None))
+
+
+def _cgrid(ctx: _Ctx, c) -> str | None:
+    """The ``@`` spec of a container: its own, else the CSS ``grid-template-*`` of its rules."""
+    if getattr(c, "grid", None):
+        return c.grid
+    return _cstyle(ctx, c).grid if ctx.css.active else None
+
+
+def _cgap(ctx: _Ctx, c):
+    if getattr(c, "gap", None) is not None:
+        return c.gap
+    return _cstyle(ctx, c).gap if ctx.css.active else None
+
+
+def _margin(ctx: _Ctx, el) -> int:
+    return css.margin_emu(_cstyle(ctx, el)) if isinstance(el, _MARGIN_TYPES) else 0
+
+
+_MARGIN_TYPES = (Text, Shape, Container, Table, Code, Chart, Image, Media, Raw)
 _CALLOUT_KINDS = ("note", "tip", "warn", "caution")
 
 
@@ -246,13 +284,18 @@ def _tint(theme: Theme, color: str | None, amount: float = 0.12) -> str | None:
 
 def _tighten(ctx: _Ctx, st: Style) -> Style:
     """Dense slides shrink paddings as well as fonts."""
-    if ctx.tight >= 1.0 or st.padding is None:
+    if ctx.tight >= 1.0:
         return st
-    try:
-        pt = to_emu(st.padding) / EMU_PER_PT
-    except ValueError:
-        return st
-    return st.merged(Style(padding=f"{round(pt * ctx.tight, 2)}pt"))
+    upd = {}
+    for f in ("padding", "padding_top", "padding_right", "padding_bottom", "padding_left"):
+        v = getattr(st, f)
+        if v is None:
+            continue
+        try:
+            upd[f] = f"{round(to_emu(v) / EMU_PER_PT * ctx.tight, 2)}pt"
+        except ValueError:
+            continue
+    return st.merged(Style(**upd)) if upd else st
 
 
 def _text_style(ctx: _Ctx, el: Text | Shape, inherit: Style) -> Style:
@@ -273,8 +316,13 @@ def _text_style(ctx: _Ctx, el: Text | Shape, inherit: Style) -> Style:
         st = _role_style(ctx, role)
     if role in _INHERIT_ROLES or role == "shape":
         st = st.merged(_only_inheritable(inherit))
-    st = st.merged(*_class_styles(ctx, el), el.style)
-    if isinstance(el, Text) and "callout" in el.classes and not (el.style and el.style.fill):
+    st = _styled(ctx, el, st)
+    if (
+        isinstance(el, Text)
+        and "callout" in el.classes
+        and not (el.style and el.style.fill)
+        and not ctx.css.own(el).fill
+    ):
         kind = next((k for k in _CALLOUT_KINDS if k in el.classes), None)
         if kind and (tint := _tint(ctx.theme, st.line)):
             st = st.merged(Style(fill=tint))
@@ -348,7 +396,11 @@ def _fit(ctx: _Ctx, need_fn, avail: int, base_size: float) -> float:
 
 
 def _grown(ctx: _Ctx, el, eff: float) -> float:
-    """Autofit scale ``eff`` times the sparse-grid growth for body text inside boxes."""
+    """Autofit scale ``eff`` times the sparse-grid growth for body text inside boxes.
+
+    A CSS ``font-size`` is explicit: it is never grown (autofit may still shrink it)."""
+    if ctx.css.active and ctx.css.own(el).font_size is not None:
+        return eff
     if ctx.grow > 1.0 and (ctx.depth > 0 or ctx.text_only) and ctx.scale >= 1.0 and isinstance(el, Text):
         if el.role == "body" and "callout" not in el.classes:
             ctx.grew = True
@@ -372,13 +424,21 @@ def _grown(ctx: _Ctx, el, eff: float) -> float:
 
 
 def _text_need(ctx: _Ctx, el: Text | Shape, style: Style, width: int, scale: float) -> float:
-    pad = _pad(style)
+    ph, pv = css.inset_hv(style)
     gap = ctx.gaps.get(id(el))
-    return measure.paragraphs_height(el.paragraphs, width - 2 * pad, style, scale, gap=gap) + 2 * pad
+    return measure.paragraphs_height(el.paragraphs, width - ph, style, scale, gap=gap) + pv
 
 
 def _natural_height(ctx: _Ctx, el, width: int, inherit: Style) -> int | None:
-    """Natural height for stackable elements, ``None`` for flexible ones."""
+    """Natural height for stackable elements, ``None`` for flexible ones (CSS margin included)."""
+    m = _margin(ctx, el)
+    if not m:
+        return _natural_height0(ctx, el, width, inherit)
+    h = _natural_height0(ctx, el, max(width - 2 * m, 1), inherit)
+    return None if h is None else h + 2 * m
+
+
+def _natural_height0(ctx: _Ctx, el, width: int, inherit: Style) -> int | None:
     if isinstance(el, Text):
         st = _text_style(ctx, el, inherit)
         eff = _grown(ctx, el, measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size))
@@ -386,8 +446,8 @@ def _natural_height(ctx: _Ctx, el, width: int, inherit: Style) -> int | None:
     if isinstance(el, Code):
         st = _code_style(ctx, el)
         eff = _code_eff(ctx, st)
-        pad = _pad(st)
-        return round(measure.code_height(el.text, width - 2 * pad, (st.font_size or 14) * eff) + 2 * pad)
+        ph, pv = css.inset_hv(st)
+        return round(measure.code_height(el.text, width - ph, (st.font_size or 14) * eff) + pv)
     if isinstance(el, Table):
         _, _, _, _, rh = _table_geom(ctx, el, width)
         return sum(rh)
@@ -415,7 +475,7 @@ def _code_style(ctx: _Ctx, el: Code) -> Style:
         valign="top",
         align="left",
     )
-    return _tighten(ctx, st.merged(*_class_styles(ctx, el), el.style))
+    return _tighten(ctx, _styled(ctx, el, st))
 
 
 def _table_style(ctx: _Ctx, el: Table) -> Style:
@@ -428,7 +488,7 @@ def _table_style(ctx: _Ctx, el: Table) -> Style:
         align="left",
         valign="middle",
     )
-    return st.merged(*_class_styles(ctx, el), el.style)
+    return _styled(ctx, el, st)
 
 
 def _table_grow(ctx: _Ctx) -> float:
@@ -437,21 +497,30 @@ def _table_grow(ctx: _Ctx) -> float:
 
 def _has_box_text(ctx: _Ctx) -> bool:
     """The slide holds a box with body text (it grows with the sparse-slide growth)."""
-    if "chevron" in (ctx.slide.grid or "") or "chevron" in ctx.slide.classes:  # chevron text: own size
+    if "chevron" in (_slide_grid(ctx) or "") or "chevron" in ctx.slide.classes:  # chevron text: own size
         return False
     return any(
         isinstance(e, Container)
         and not {"kpi", "chevron", "diagram"} & set(e.classes)
-        and "chevron" not in (e.grid or "")
+        and "chevron" not in (_cgrid(ctx, e) or "")
         and any(isinstance(ch, Text) and ch.role == "body" for ch in e.children)
         for e in ctx.slide.elements
     )
 
 
+def _slide_grid(ctx: _Ctx) -> str | None:
+    if ctx.slide.grid:
+        return ctx.slide.grid
+    return ctx.css.own(ctx.slide).grid if ctx.css.active else None
+
+
 def _table_geom(ctx: _Ctx, el: Table, width: int):
+    el = ctx.css.table(el)
     st = _table_style(ctx, el)
     eff = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
-    if ctx.grow > 1.0 and ctx.scale >= 1.0:  # sparse slide: table text grows too (less than box text)
+    if (
+        ctx.grow > 1.0 and ctx.scale >= 1.0 and not (ctx.css.active and ctx.css.own(el).font_size is not None)
+    ):  # sparse slide: table text grows too (less than box text)
         t = min(ctx.grow, ctx.lt.table_font_grow)
         if _has_box_text(ctx):  # ... but stays within one step of the box text on the same slide
             body = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
@@ -477,6 +546,10 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
 def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
     if rect.w <= 0 or rect.h <= 0:
         return
+    if m := _margin(ctx, el):  # CSS margin: the element shrinks inside its cell
+        rect = rect.inset(m)
+        if rect.w <= 0 or rect.h <= 0:
+            return
     if isinstance(el, (Text, Shape)):
         st = _text_style(ctx, el, inherit)
         eff = _grown(ctx, el, measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size))
@@ -499,12 +572,13 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
     elif isinstance(el, Code):
         st = _code_style(ctx, el)
         eff = _code_eff(ctx, st)
-        pad = _pad(st)
-        need = measure.code_height(el.text, rect.w - 2 * pad, (st.font_size or 14) * eff) + 2 * pad
+        ph, pv = css.inset_hv(st)
+        need = measure.code_height(el.text, rect.w - ph, (st.font_size or 14) * eff) + pv
         if need > rect.h * _TOL:
             ctx.over.append(_label(el))
         ctx.emit(el, Rect(rect.x, rect.y, rect.w, min(round(need), rect.h)), st, eff)
     elif isinstance(el, Table):
+        el = ctx.css.table(el)
         st, eff, _anchors, cw, rh = _table_geom(ctx, el, rect.w)
         if not rh or not cw:  # an empty table places nothing
             return
@@ -530,10 +604,10 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
             font_ea=t.fonts.ea,
             font_size=t.sizes.get("table", DEFAULT_SIZES["table"]),
             color="fg",
-        ).merged(el.style)
-        ctx.emit(el, rect, st)
+        )
+        ctx.emit(el, rect, _styled(ctx, el, st, classes=False))
     elif isinstance(el, (Image, Media)):
-        ctx.emit(el, rect, Style().merged(*_class_styles(ctx, el), el.style))
+        ctx.emit(el, rect, _styled(ctx, el, Style()))
     elif isinstance(el, Raw):
         t = ctx.theme
         st = Style(
@@ -544,7 +618,8 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
             line="border",
             align="center",
             valign="middle",
-        ).merged(el.style)
+        )
+        st = _styled(ctx, el, st, classes=False)
         fs = 1.0
         if el.kind == "math" and ctx.depth == 0:
             fs = _math_scale(
@@ -574,7 +649,18 @@ def _card_style(ctx: _Ctx, c: Container) -> Style:
     else:
         base = ctx.theme.classes.get("card", Style(padding=ctx.lt.box_pad))
     others = _class_styles(ctx, c, skip=("plain", "kpi"))
-    return _tighten(ctx, Style().merged(base, *others, c.style))
+    own = ctx.css.own(c)
+    st = Style().merged(ctx.css.inherited(c), base, *others, own, c.style)
+    if own.line_width and not st.line:
+        st = st.merged(Style(line="border"))
+    return _tighten(ctx, st)
+
+
+def _cpads(ctx: _Ctx, c: Container) -> tuple[Style, int, tuple[int, int, int, int]]:
+    """(card style, scalar padding, (left, top, right, bottom) insets) of a box."""
+    style = _card_style(ctx, c)
+    dflt = _emu(ctx.lt.box_pad) * ctx.tight
+    return style, _pad(style, dflt), css.insets(style, dflt)
 
 
 def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
@@ -620,7 +706,9 @@ def _box_body_pt(ctx: _Ctx, c: Container) -> float:
     return best
 
 
-def _head_metrics(ctx: _Ctx, c: Container, rect_w: int, pad: int, kpi: bool, row: bool = True):
+def _head_metrics(
+    ctx: _Ctx, c: Container, rect_w: int, pad: int, kpi: bool, row: bool = True, hpad: int | None = None
+):
     """(parts, icon side, text shift, heading height) of a box ``rect_w`` wide, or ``None`` without heading.
 
     The height is the heading band (or the plain heading text); with ``row`` it is raised to the tallest
@@ -642,7 +730,7 @@ def _head_metrics(ctx: _Ctx, c: Container, rect_w: int, pad: int, kpi: bool, row
         if icon:
             hh = max(hh, isz + 2 * pad)
     else:
-        hh = round(_text_need(ctx, h_el, hst, rect_w - 2 * pad - shift, eff))
+        hh = round(_text_need(ctx, h_el, hst, rect_w - (2 * pad if hpad is None else hpad) - shift, eff))
         if icon and not kpi:
             hh = max(hh, isz)
     if row:
@@ -655,8 +743,8 @@ def _equalize_heads(ctx: _Ctx, boxes: list[tuple[Container, int, int]]) -> None:
     rows: dict[int, list[tuple[Container, int, int]]] = {}
     for c, w, key in boxes:
         if isinstance(c, Container) and "kpi" not in c.classes and c.title is not None:
-            pad = _pad(_card_style(ctx, c), _emu(ctx.lt.box_pad) * ctx.tight)
-            m = _head_metrics(ctx, c, w, pad, False, row=False)
+            _st, pad, (pl, _pt, pr, _pb) = _cpads(ctx, c)
+            m = _head_metrics(ctx, c, w, pad, False, row=False, hpad=pl + pr)
             if m is not None:
                 rows.setdefault(key, []).append((c, w, m[3]))
     for items in rows.values():
@@ -682,20 +770,40 @@ def _icon_side(ctx: _Ctx, hst: Style, eff: float, kpi: bool) -> tuple[int, int]:
     return side, side + round(ctx.lt.icon_gap * side)
 
 
+def _inset4(rect: Rect, pl: int, pt: int, pr: int, pb: int) -> Rect:
+    """``rect`` shrunk by per-side insets (never below zero size)."""
+    w, h = max(rect.w - pl - pr, 0), max(rect.h - pt - pb, 0)
+    return Rect(rect.x + min(pl, rect.w // 2), rect.y + min(pt, rect.h // 2), w, h)
+
+
 def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> None:
-    style = _card_style(ctx, c)
-    pad = _pad(style, _emu(ctx.lt.box_pad) * ctx.tight)
+    """Place a box and its children; CSS ``rotate()`` turns the whole subtree about the box center."""
+    start = len(ctx.out)
+    _place_container0(ctx, c, rect, inherit)
+    deg = _cstyle(ctx, c).rotation if ctx.css.active else None
+    if deg and len(ctx.out) > start:
+        subtree = ctx.out[start + 1 :]  # the card (first item) already carries the rotation in its style
+        if not css.rotate_placed(subtree, rect.x + rect.w / 2, rect.y + rect.h / 2, deg):
+            ctx.diag(
+                "css-unsupported",
+                "rotate() on a box with connectors: the connectors are not rotated",
+                "rotate boxes without a>b links, or remove the transform",
+            )
+
+
+def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> None:
+    style, pad, (pl, pt, pr, pb) = _cpads(ctx, c)
     if "diagram" in c.classes and c.title is None:
         from .diagram import place_diagram  # flowcharts size and route their own nodes
 
-        if place_diagram(ctx, c, rect.inset(pad), inherit.merged(_only_inheritable(style))):
+        if place_diagram(ctx, c, _inset4(rect, pl, pt, pr, pb), inherit.merged(_only_inheritable(style))):
             return
     ctx.emit(c, rect, style)
-    inner = rect.inset(pad)
+    inner = _inset4(rect, pl, pt, pr, pb)
     y = inner.y
     child_inherit = inherit.merged(_only_inheritable(style))
     kpi = "kpi" in c.classes
-    if metrics := _head_metrics(ctx, c, rect.w, pad, kpi):
+    if metrics := _head_metrics(ctx, c, rect.w, pad, kpi, hpad=pl + pr):
         (h_el, hst, eff, band), isz, shift, hh = metrics
         icon = _icon_name(c)
         if icon and kpi:  # icon centered above the label and the number
@@ -729,8 +837,9 @@ def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> Non
     area = Rect(inner.x, y, inner.w, max(inner.bottom - y, 0))
     if not c.children:
         return
-    gap = _gap(ctx, c.gap, inner.w, small=True)
+    gap = _gap(ctx, _cgap(ctx, c), inner.w, small=True)
     children = c.children
+    grid = _cgrid(ctx, c)
     if kpi:
         children = _kpi_children(ctx, children, area.w)
     saved = (ctx.depth, ctx.grow)
@@ -738,8 +847,8 @@ def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> Non
     if kpi:
         ctx.grow = 1.0
     try:
-        if c.grid or any(n in ("flow", "chevron") for n in c.classes):
-            _place_blocks(ctx, children, area, child_inherit, c.grid, c.classes, gap, c, c.links)
+        if grid or any(n in ("flow", "chevron") for n in c.classes):
+            _place_blocks(ctx, children, area, child_inherit, grid, c.classes, gap, c, c.links)
         else:
             rects = _place_stack(
                 ctx, children, area, child_inherit, gap, c, center=kpi and len(children) == 1
@@ -754,19 +863,26 @@ def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> Non
 
 
 def _box_nat(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None:
-    """Natural height of a ``##`` box (heading, children, padding); ``None`` if content is flexible."""
-    if c.grid or c.links or any(n in ("flow", "chevron") for n in c.classes):
+    """Natural height of a ``##`` box (heading, children, padding, CSS margin); ``None`` if flexible."""
+    m = _margin(ctx, c)
+    if not m:
+        return _box_nat0(ctx, c, width, inherit)
+    h = _box_nat0(ctx, c, max(width - 2 * m, 1), inherit)
+    return None if h is None else h + 2 * m
+
+
+def _box_nat0(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None:
+    if _cgrid(ctx, c) or c.links or any(n in ("flow", "chevron") for n in c.classes):
         return None
-    style = _card_style(ctx, c)
-    pad = _pad(style, _emu(ctx.lt.box_pad) * ctx.tight)
+    style, pad, (pl, pt, pr, pb) = _cpads(ctx, c)
     kpi = "kpi" in c.classes
-    total = 2 * pad if c.children or c.title else 0
-    if metrics := _head_metrics(ctx, c, width, pad, kpi):
+    total = pt + pb if c.children or c.title else 0
+    if metrics := _head_metrics(ctx, c, width, pad, kpi, hpad=pl + pr):
         (_h_el, _hst, _eff, band), isz, _shift, hh = metrics
         if kpi and _icon_name(c):
             total += isz + round(pad * 0.4)
         if band:
-            total = hh + round(pad * 0.5) + pad
+            total = hh + round(pad * 0.5) + pb
         else:
             total += hh + round(pad * 0.5)
     children = c.children
@@ -774,7 +890,7 @@ def _box_nat(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None:
         return total
     if any(_is_abs(ch) for ch in children):
         return None
-    inner_w = max(width - 2 * pad, 1)
+    inner_w = max(width - pl - pr, 1)
     if kpi:
         children = _kpi_children(ctx, children, inner_w)
     saved = (ctx.depth, ctx.grow)
@@ -788,7 +904,7 @@ def _box_nat(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None:
         ctx.depth, ctx.grow = saved
     if any(n is None for n in nat):
         return None
-    return total + sum(nat) + _gap(ctx, c.gap, inner_w, small=True) * (len(nat) - 1)
+    return total + sum(nat) + _gap(ctx, _cgap(ctx, c), inner_w, small=True) * (len(nat) - 1)
 
 
 def _kpi_children(ctx: _Ctx, children: list, width: int) -> list:
@@ -973,6 +1089,7 @@ def _chevron_shape_raw(blk) -> Shape:
     return Shape(
         shape="chevron",
         paragraphs=paras,
+        attrs={"_css_src": id(blk)},  # css matching: this shape is the box ``blk``
         id=getattr(blk, "id", None),
         classes=[c for c in blk.classes if c not in ("card", "plain")],
         style=getattr(blk, "style", None),
@@ -1174,10 +1291,10 @@ def _emit_links(ctx: _Ctx, links: list[Link], rects: dict[int, Rect]) -> None:
 def _group_nat(ctx: _Ctx, g: Container, width: int, inherit: Style) -> tuple[int | None, str]:
     """Natural height of a row group (one row of boxes): its tallest box; kind kpi if all boxes are KPIs."""
     kids = [c for c in g.children if isinstance(c, Container)]
-    m = re.match(r"\d+", g.grid or "")
+    m = re.match(r"\d+", _cgrid(ctx, g) or "")
     if not kids or len(kids) != len(g.children) or not m or len(kids) > int(m.group()):
         return None, "other"
-    gap = _gap(ctx, g.gap, width, small=True)
+    gap = _gap(ctx, _cgap(ctx, g), width, small=True)
     w = max((width - gap * (len(kids) - 1)) // len(kids), 1)
     _equalize_heads(ctx, [(k, w, 0) for k in kids])
     nats = [_box_nat(ctx, k, w, inherit) for k in kids]
@@ -1970,6 +2087,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         kind = "content"
         if slide.title and not slide.elements and not slide.conclusion:
             kind = "cover" if index == 0 else "section"
+    if deck.css or slide.css:
+        ctx.css = css.CssIndex(deck, slide, index, kind)
 
     Mx, My = to_emu(theme.margin_x), to_emu(theme.margin_y)
     gap = to_emu(theme.gap)
@@ -2015,14 +2134,15 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             if theme.title_band:
                 st = st.merged(Style(color=theme.title_band_color))
             r = Rect(Mx, by, inner_w, round(band_h * 0.65))
-            put(head, slide.title, r, st.merged(slide.title.style), fit_text(slide.title, r, st))
+            st = _styled(ctx, slide.title, st, classes=False)
+            put(head, slide.title, r, st, fit_text(slide.title, r, st))
         sub = slide.subtitle or slide.lead
         if sub:
             st = _role_style(ctx, "subtitle", cover=True)
             if theme.title_band:
                 st = st.merged(Style(color=theme.title_band_color))
             r = Rect(Mx, by + round(band_h * 0.68), inner_w, round(band_h * 0.3))
-            st = st.merged(Style(valign="top"), sub.style)
+            st = _styled(ctx, sub, st.merged(Style(valign="top")), classes=False)
             put(head, sub, r, st, fit_text(sub, r, st))
         body = Rect(Mx, by + band_h + sg, inner_w, H - (by + band_h + sg) - My) if slide.elements else None
         y_top = 0
@@ -2049,12 +2169,12 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 r = Rect(Mx, My, inner_w, tr_h)
                 y = My + tr_h
                 head_bottom = y
-            st = st.merged(slide.title.style)
+            st = _styled(ctx, slide.title, st, classes=False)
             put(head, slide.title, r, st, fit_text(slide.title, r, st))
         for role, el in (("subtitle", slide.subtitle), ("lead", slide.lead)):
             if kind == "blank" or el is None or not el.paragraphs:
                 continue
-            st = _role_style(ctx, role).merged(*_class_styles(ctx, el), el.style)
+            st = _styled(ctx, el, _role_style(ctx, role))
             size = st.font_size or 18
             h = round(_text_need(ctx, el, st, inner_w, 1.0))
             max_h = round(H * 0.18)
@@ -2099,7 +2219,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     if kind not in ("cover", "section"):
         notes = [f for f in slide.footnotes if f.paragraphs]
         if notes:
-            sts = [_role_style(ctx, "footnote").merged(f.style) for f in notes]
+            sts = [_styled(ctx, f, _role_style(ctx, "footnote"), classes=False) for f in notes]
             max_h = round(H * ctx.lt.footnote_max)
             effs = [1.0] * len(notes)
             hs = [round(_text_need(ctx, f, st, inner_w, 1.0)) for f, st in zip(notes, sts, strict=True)]
@@ -2138,7 +2258,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             bottom = bottom - sum(hs) - sg // 2
         if slide.conclusion is not None and slide.conclusion.paragraphs:
             c = slide.conclusion
-            st = _role_style(ctx, "conclusion").merged(*_class_styles(ctx, c), c.style)
+            st = _styled(ctx, c, _role_style(ctx, "conclusion"))
             h = max(round(_text_need(ctx, c, st, inner_w, 1.0)), round(0.4 * EMU_PER_INCH))
             h = min(h, round(H * ctx.lt.footnote_max))
             eff = fit_text(c, Rect(0, 0, inner_w, h), st)
@@ -2156,9 +2276,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         for n in slide.classes:
             if n in theme.classes:
                 slide_inherit = slide_inherit.merged(_only_inheritable(theme.classes[n]))
+        slide_inherit = slide_inherit.merged(_only_inheritable(ctx.css.own(slide)))
         if kind == "center":
             slide_inherit = slide_inherit.merged(Style(align="center", valign="middle"))
-        sgap = _gap(ctx, slide.attrs.get("gap"), body.w)
+        sgap = _gap(ctx, slide.attrs.get("gap") or ctx.css.own(slide).gap, body.w)
 
         body_pt = theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k
         very = body_pt >= ctx.lt.grow_very_sparse_pt and _very_sparse(elements)
@@ -2178,12 +2299,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     dense_k=ctx.dense_k,
                     tight=ctx.tight,
                     head_grow=very,
+                    css=ctx.css,
                     arrange=arrange,
                     text_only=text_only,
                     **kw,
                 )
                 _place_blocks(
-                    c, elements, area, slide_inherit, slide.grid, slide.classes, sgap, None, slide.links
+                    c, elements, area, slide_inherit, _slide_grid(ctx), slide.classes, sgap, None, slide.links
                 )
                 return c
 
@@ -2230,5 +2352,6 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     elif body is not None and body.h <= 0 and elements:
         ctx.diag("overflow", "no room left for the body", "shorten text or split the slide")
 
+    ctx.diags += ctx.css.diagnostics()
     deck.diagnostics.extend(ctx.diags)
     return head + (final_ctx.out if final_ctx else []) + tail
