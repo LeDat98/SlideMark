@@ -503,6 +503,22 @@ def parse_slide(
             else:
                 boxes[-1][1].append(it)
 
+    # `@chevron` written at the very end of the slide lands in the last box; when that box has no `###`
+    # sub-boxes to lay out and the slide has no `@` line of its own, it was meant for the slide
+    if boxes and not any(sec_ats):
+        h2, content, ats = boxes[-1]
+        last = max([h2.line, *(c.line for c in content)])
+        if ats and all(a.line > last for a in ats) and not any(c.kind == "h3" for c in content):
+            sec_ats[sec].extend(ats)
+            ats.clear()
+            ctx.add(
+                "info",
+                "'@' line after the last box applies to the slide",
+                sec_ats[sec][0].line,
+                "at-hoisted",
+                "put the '@' line right after the title to make this explicit",
+            )
+
     # elements in source order: top-level runs and boxes interleave (items before the first box, only)
     sec_count = [0] * len(sec_ats)
     sec_boxes: list[list[Container]] = [[] for _ in sec_ats]

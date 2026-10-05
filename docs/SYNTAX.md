@@ -135,7 +135,8 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `build` | bullets and blocks appear one by one on click (`{.build}` on one block does it for that block only) | `@build` |
 | any other word | class applied to the slide (`dense`, `dark`, ...) | `@3 dense` |
 
-Inside a box, an `@` line lays out that box's `###` sub-boxes in the same way.
+Inside a box, an `@` line lays out that box's `###` sub-boxes in the same way. An `@` line after the last box of a slide
+whose box has no `###` sub-boxes applies to the slide (info `at-hoisted`).
 
 `@aab/aac` reads as two rows. In the first row, block `a` takes two columns and `b` one. In the second row, `a`
 continues and `c` takes the last column. The result: a tall box on the left two-thirds and two stacked boxes on

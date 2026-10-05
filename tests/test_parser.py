@@ -523,3 +523,16 @@ def test_column_count_with_matching_ratios_is_accepted():
     deck = parse("# T\n@2 1:2\n## a\n- x\n## b\n- y\n")
     assert deck.slides[0].grid == "1:2"
     assert not [d for d in deck.diagnostics if d.rule == "bad-grid"]
+
+
+def test_trailing_at_line_after_last_box_applies_to_slide():
+    deck = parse("# T\n## a\nx\n## b\ny\n@chevron\n")
+    s = deck.slides[0]
+    assert "chevron" in s.classes
+    assert not s.elements[-1].classes
+    assert any(d.rule == "at-hoisted" for d in deck.diagnostics)
+
+
+def test_box_at_line_with_sub_boxes_stays_in_the_box():
+    deck = parse("# T\n## a\n### x\n- 1\n### y\n- 2\n@2\n")
+    assert deck.slides[0].elements[0].grid == "2"
