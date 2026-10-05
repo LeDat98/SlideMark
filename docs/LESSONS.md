@@ -29,3 +29,9 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [parser] markdown-it keeps `\n` inside a paragraph as a soft break → `.kpi` boxes split lines into separate Paragraphs explicitly.
 - [parser] Connector letters index `slide.elements` after lead/conclusion are removed, so a `>` lead does not shift them.
 - [lint] Lint overflow re-measures with the same `measure.paragraphs_height`; build dedupes lint vs layout diagnostics by (rule, slide).
+- [layout] `parse_spec` sized rows from the total block count, so `@4 chevron` + a table became two rows → a flow/chevron grid is one row; extra blocks go full width below.
+- [layout] `zip(classes, _class_styles(...))` misaligns when a class is unknown → `_class_styles(skip=)`.
+- [render] `add_connector` with begin/end points sets flipH/flipV itself; remove `p:style` to avoid a shadow.
+- [render] Equations must be `mc:AlternateContent` → `mc:Choice Requires="a14"` → `a14:m` → `m:oMathPara` inside `a:p`, with an `mc:Fallback` run; LibreOffice 24.2 shows only the fallback text.
+- [render] A pie chart draws only its first series → fold one-point-per-row CSV into categories; reversed bar charts need `c:crosses val=max` set on the value axis XML directly.
+- [parser] CSV delimiter detection must ignore quoted segments (`"a,b";1`).

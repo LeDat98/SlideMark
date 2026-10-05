@@ -101,7 +101,7 @@ keeps climbing L4 → L7, picking the unchecked gates with the best value.
 
 ## Day 1 leftovers (carried to day 2)
 - [x] Box terminator `@end` + `dropped-content` diagnostic (day 2)
-- [ ] Slide-level table after an `@end` (with `chevron` grid) is placed in ONE grid cell, cramped; slide-level visuals should get their own full-width row below the grid (jp-dense slide 2)
+- [x] Slide-level table after an `@end` (with `chevron` grid) is placed in ONE grid cell, cramped; slide-level visuals should get their own full-width row below the grid (jp-dense slide 2)
 
 ## Day 2 work packages (incl. day 1 leftover)
 - **A: parser + CLI** (`src/slidemark/parser/`, `src/slidemark/cli.py`, `tests/test_parser*.py`, `tests/test_cli.py`):
@@ -159,15 +159,15 @@ Contract (committed by orchestrator): `ir.Link` + `Slide.links`/`Container.links
 
 ## Day 3 status
 - [x] Contract: Link, theme tokens, SYNTAX.md components
-- [ ] Leftover: slide-level visuals under a chevron/grid row get full-width rows
-- [ ] A: links, callouts, badges, kpi parsing
-- [ ] B: kpi/callout/badge/connector rendering, heading band, dense spacing, 12-col snap
+- [x] Leftover: slide-level visuals under a chevron/grid row get full-width rows
+- [x] A: links, callouts, badges, kpi parsing
+- [x] B: kpi/callout/badge/connector rendering, heading band, dense spacing, 12-col snap
 - [ ] Orchestrator: ≥ 5 dense JP examples, review
 
 ## Day 4 status
-- [ ] A: chart/table options, CSV edge cases, check JSON via linter
-- [ ] B: all chart kinds + options, OMML math
-- [ ] Orchestrator: lint v1
+- [x] A: chart/table options, CSV edge cases, check JSON via linter
+- [x] B: all chart kinds + options, OMML math
+- [x] Orchestrator: lint v1
 
 ## Day 5 work packages
 Contract: skill files live in `src/slidemark/skill/` (`SKILL.md` ≤ 1,500 tokens, `reference/*.md` ≤ 800 tokens
@@ -183,6 +183,6 @@ each, o200k proxy), shipped as package data; written by the orchestrator.
   budget test, AGENT_TIPS review.
 
 ## Day 5 status
-- [ ] Orchestrator: SKILL.md + reference/ + budget test
+- [x] Orchestrator: SKILL.md + reference/ + budget test
 - [ ] A: docs, schema, JSON input, skill install
 - [ ] B: user templates, master placeholders for footer/number
