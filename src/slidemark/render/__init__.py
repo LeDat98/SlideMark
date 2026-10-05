@@ -16,6 +16,7 @@ from ..ir import Chart, Code, Container, Deck, Image, Placed, Raw, Shape, Slide,
 from ..layout.engine import CHEVRON_ADJ
 from ..theme import Theme
 from ..units import slide_size
+from .math import add_math
 from .objects import add_chart, add_image, add_table, code_paragraphs, resolve_image
 from .text import fill_text, insert_rpr_child
 from .util import RenderCtx, emu, rgb
@@ -299,6 +300,8 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
     elif isinstance(el, Code):
         shp = _autoshape(rc, s, pl, MSO_SHAPE.RECTANGLE, name)
         fill_text(rc, shp.text_frame, code_paragraphs(el), st, pl.font_scale, para_gap=False)
+    elif isinstance(el, Raw) and el.kind == "math" and add_math(rc, s, pl, name):
+        pass
     elif isinstance(el, Raw):
         _placeholder(rc, s, pl, name, f"[{el.kind}]")
         rc.diag(

@@ -6,14 +6,15 @@ from pathlib import Path
 
 from lxml import etree
 from pptx.chart.data import CategoryChartData, XyChartData
-from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
+from pptx.dml.color import RGBColor
+from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 from pygments import lex
 from pygments.lexers import TextLexer, get_lexer_by_name
 from pygments.token import Comment, Keyword, Name, Number, Operator, String
 
-from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Style, Table
+from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Series, Style, Table
 from ..layout import measure
 from ..layout.tables import column_widths, table_grid
 from .text import fill_text
@@ -136,124 +137,205 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
 # --------------------------------------------------------------------------- chart
 
 
+def _num(v) -> float | None:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if f == f and abs(f) != float("inf") else None
+
+
+def _chart_font(chart, theme, face: str, size_pt: float, color) -> None:
+    """Chart-wide text: size, color, latin + East Asian typeface."""
+    f = chart.font
+    f.size = Pt(size_pt)
+    f.color.rgb = color
+    f.name = face
+    d_rpr = chart._chartSpace.find(qn("c:txPr")).find(qn("a:p")).find(qn("a:pPr")).find(qn("a:defRPr"))
+    latin = d_rpr.find(qn("a:latin"))
+    ea = etree.Element(qn("a:ea"))
+    ea.set("typeface", theme.fonts.ea)
+    if latin is not None:
+        latin.addnext(ea)
+    else:
+        d_rpr.append(ea)
+
+
+def _legend_pos(opts: dict, pie: bool, nseries: int):
+    legend = opts.get("legend")
+    pos_map = {
+        "bottom": XL_LEGEND_POSITION.BOTTOM,
+        "top": XL_LEGEND_POSITION.TOP,
+        "left": XL_LEGEND_POSITION.LEFT,
+        "right": XL_LEGEND_POSITION.RIGHT,
+    }
+    default = XL_LEGEND_POSITION.RIGHT if pie else XL_LEGEND_POSITION.BOTTOM
+    if isinstance(legend, str) and legend.strip().lower() in pos_map:
+        return pos_map[legend.strip().lower()]
+    if isinstance(legend, str) and legend.strip().lower() == "none":
+        return None
+    if legend is not None:
+        return default if flag(legend, True) else None
+    return default if (pie or nseries > 1) else None
+
+
 def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     ch: Chart = pl.element  # type: ignore[assignment]
     theme = rc.theme
     opts = {str(k).lower().replace("-", "_"): v for k, v in ch.options.items()}
-    ctype = CHART_TYPES.get(ch.kind, XL_CHART_TYPE.COLUMN_CLUSTERED)
-    cats = list(ch.categories) or [
-        str(i + 1) for i in range(max((len(s.values) for s in ch.series), default=0))
-    ]
-    if ch.kind == "scatter":
+    kind = ch.kind
+    ctype = CHART_TYPES.get(kind, XL_CHART_TYPE.COLUMN_CLUSTERED)
+    pie = kind in ("pie", "doughnut")
+    series = ch.series
+    cats_in = list(ch.categories)
+    if pie and len(series) > 1 and len(cats_in) <= 1 and all(len(s.values) == 1 for s in series):
+        # one slice per CSV row ("APAC,48"): a pie wants one series with a category per slice
+        cats_in = [s.name for s in series]
+        series = [
+            Series(name=ch.categories[0] if ch.categories else "", values=[s.values[0] for s in series])
+        ]
+    ncat = max([len(cats_in), *(len(s.values) for s in series)])
+    cats = [str(c) for c in cats_in] or [str(i + 1) for i in range(ncat)]
+    cats += [str(i + 1) for i in range(len(cats), ncat)]  # more values than categories
+    if kind == "scatter":
         data = XyChartData()
         xs = []
         for i, c in enumerate(cats):
-            try:
-                xs.append(float(str(c).replace(",", "")))
-            except ValueError:
-                xs.append(float(i + 1))
-        for s in ch.series:
+            x = _num(str(c).replace(",", ""))
+            xs.append(x if x is not None else float(i + 1))
+        for s in series:
             ser = data.add_series(s.name)
             for x, v in zip(xs, s.values, strict=False):
-                if v is not None:
-                    ser.add_data_point(x, v)
+                if _num(v) is not None:
+                    ser.add_data_point(x, _num(v))
+        if not series:
+            data.add_series("")
     else:
         data = CategoryChartData()
-        data.categories = cats
-        for s in ch.series:
-            vals = list(s.values) + [None] * (len(cats) - len(s.values))
-            data.add_series(s.name, vals[: len(cats)])
-        if not ch.series:
-            data.add_series("", [None] * len(cats))
+        data.categories = cats or [" "]
+        for s in series:
+            vals = [_num(v) for v in s.values]
+            vals = (vals + [None] * len(cats))[: len(cats) or 1]
+            data.add_series(s.name, vals)
+        if not series:
+            data.add_series("", [None] * (len(cats) or 1))
     gf = slide.shapes.add_chart(ctype, Emu(pl.x), Emu(pl.y), Emu(pl.w), Emu(pl.h), data)
     gf.name = name
     chart = gf.chart
-    size = pl.style.font_size or 12
-    chart.font.size = Pt(size * pl.font_scale)
-    chart.font.color.rgb = rgb(theme, pl.style.color or "fg")
-    chart.font.name = pl.style.font or theme.fonts.body
+    size = (pl.style.font_size or theme.sizes.get("table", 14)) * pl.font_scale
+    fg = rgb(theme, pl.style.color or "fg")
+    _chart_font(chart, theme, pl.style.font or theme.fonts.body, size, fg)
     if ch.title:
         chart.has_title = True
         tf = chart.chart_title.text_frame
         tf.text = ch.title
         run = tf.paragraphs[0].runs[0]
-        run.font.size = Pt(size * 1.2 * pl.font_scale)
+        run.font.size = Pt(size * 1.2)
         run.font.bold = True
         run.font.color.rgb = rgb(theme, "fg")
+        chart.chart_title.include_in_layout = False
     else:
         chart.has_title = False
-    pie = ch.kind in ("pie", "doughnut")
-    legend = opts.get("legend", None)
-    show_legend = pie or len(ch.series) > 1
-    pos = XL_LEGEND_POSITION.BOTTOM
-    if isinstance(legend, str):
-        low = legend.lower()
-        pos_map = {
-            "bottom": XL_LEGEND_POSITION.BOTTOM,
-            "top": XL_LEGEND_POSITION.TOP,
-            "left": XL_LEGEND_POSITION.LEFT,
-            "right": XL_LEGEND_POSITION.RIGHT,
-        }
-        if low in pos_map:
-            show_legend, pos = True, pos_map[low]
-        else:
-            show_legend = flag(legend, show_legend)
-    elif legend is not None:
-        show_legend = bool(legend)
-    chart.has_legend = show_legend
-    if show_legend:
+    pos = _legend_pos(opts, pie, len(series))
+    chart.has_legend = pos is not None
+    if pos is not None:
         chart.legend.position = pos
         chart.legend.include_in_layout = False
-    palette = [hex6(theme, c) for c in theme.palette]
+        chart.legend.font.size = Pt(size)
+    # colors: explicit list (theme names / hex) else the theme palette
+    cl = opts.get("colors")
+    if isinstance(cl, str):
+        cl = [p.strip() for p in cl.replace(";", ",").split(",") if p.strip()]
+    use = cl if isinstance(cl, (list, tuple)) and cl else theme.palette
+    pal = [hex6(theme, str(c)) for c in use] or ["4472C4"]
+    # number formats
+    pct_flag = flag(opts.get("percent"))
+    nf = opts.get("fmt") or opts.get("number_format") or opts.get("format")
+    nf = str(nf) if nf else ('0"%"' if pct_flag else None)
+    labels = opts.get("labels", opts.get("data_labels"))
+    lab_pct = isinstance(labels, str) and labels.strip().lower() == "percent"
+    lab_on = lab_pct or flag(labels)
     plot = chart.plots[0]
-    if flag(opts.get("labels")) or flag(opts.get("data_labels")):
-        nf = opts.get("number_format") or opts.get("format")
-        if ch.kind != "scatter":  # python-pptx has no data labels for XY series
-            plot.has_data_labels = True
-            dl = plot.data_labels
+    if lab_on and kind != "scatter":  # python-pptx has no data labels for XY series
+        plot.has_data_labels = True
+        dl = plot.data_labels
+        dl.font.size = Pt(size * 0.9)
+        dl.font.color.rgb = fg
+        if lab_pct and pie:
+            dl.show_value, dl.show_percentage = False, True
+            dl.number_format = nf if (nf and "%" in nf) else "0%"
+            dl.number_format_is_linked = False
+        else:
             dl.show_value = True
             if nf:
-                dl.number_format = str(nf)
+                dl.number_format = nf
                 dl.number_format_is_linked = False
-            dl.font.size = Pt(size * 0.9 * pl.font_scale)
+        if kind == "pie":
+            dl.position = XL_LABEL_POSITION.BEST_FIT
+        elif kind in ("column", "bar"):
+            dl.position = XL_LABEL_POSITION.OUTSIDE_END
+        elif kind == "line":
+            dl.position = XL_LABEL_POSITION.ABOVE
     for plot in chart.plots:
         for si, ser in enumerate(plot.series):
-            color = palette[si % len(palette)]
+            color = pal[si % len(pal)]
             if pie:
                 for pi in range(len(cats)):
                     pt = ser.points[pi]
                     pt.format.fill.solid()
-                    pt.format.fill.fore_color.rgb = rgb(theme, "#" + palette[pi % len(palette)])
-            elif ch.kind in ("line", "radar", "scatter"):
-                if ch.kind == "scatter":
+                    pt.format.fill.fore_color.rgb = RGBColor.from_string(pal[pi % len(pal)])
+                    pt.format.line.color.rgb = rgb(theme, "bg")
+            elif kind in ("line", "radar", "scatter"):
+                if kind == "scatter":
                     ser.format.line.fill.background()
                 else:
-                    ser.format.line.color.rgb = rgb(theme, "#" + color)
+                    ser.format.line.color.rgb = RGBColor.from_string(color)
                     ser.format.line.width = Pt(2.25)
                 if hasattr(ser, "smooth"):
                     ser.smooth = False
                 try:
                     ser.marker.format.fill.solid()
-                    ser.marker.format.fill.fore_color.rgb = rgb(theme, "#" + color)
-                    ser.marker.format.line.color.rgb = rgb(theme, "#" + color)
+                    ser.marker.format.fill.fore_color.rgb = RGBColor.from_string(color)
+                    ser.marker.format.line.color.rgb = RGBColor.from_string(color)
                 except Exception:
                     pass
             else:
                 ser.format.fill.solid()
-                ser.format.fill.fore_color.rgb = rgb(theme, "#" + color)
-    if not pie:
+                ser.format.fill.fore_color.rgb = RGBColor.from_string(color)
+    if kind == "doughnut":
+        hole = chart.plots[0]._element.find(qn("c:holeSize"))
+        if hole is not None:
+            hole.set("val", "55")
+    if kind in ("bar", "column", "stacked-bar", "stacked-column"):
         try:
-            va = chart.value_axis
+            chart.plots[0].gap_width = 60
+        except Exception:
+            pass
+    if pie:
+        return
+    try:
+        va = chart.value_axis
+        if str(opts.get("axis", "on")).lower() in ("off", "false", "no", "0"):
+            va.visible = False
+            va.has_major_gridlines = False
+        else:
             va.has_major_gridlines = True
             va.major_gridlines.format.line.color.rgb = rgb(theme, "border")
             va.format.line.fill.background()
-            nf = opts.get("axis_format") or opts.get("number_format")
             if nf:
-                va.tick_labels.number_format = str(nf)
+                va.tick_labels.number_format = nf
                 va.tick_labels.number_format_is_linked = False
-            chart.category_axis.format.line.color.rgb = rgb(theme, "border")
-        except Exception:
-            pass  # radar / scatter axes differ; defaults are fine
+        lo, hi = _num(opts.get("min")), _num(opts.get("max"))
+        if lo is not None:
+            va.minimum_scale = lo
+        if hi is not None:
+            va.maximum_scale = hi
+        if kind in ("bar", "stacked-bar"):  # first category on top, value axis stays at the bottom
+            chart.category_axis.reverse_order = True
+            va._element.find(qn("c:crosses")).set("val", "max")
+        chart.category_axis.format.line.color.rgb = rgb(theme, "border")
+    except Exception:
+        pass  # radar / scatter axes differ; defaults are fine
 
 
 # --------------------------------------------------------------------------- image
