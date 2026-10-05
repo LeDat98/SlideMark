@@ -13,7 +13,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
       - run: uv venv --python ${{ matrix.python }} .venv
-      - run: uv pip install -e ".[dev]" --python .venv
+      - run: uv pip install -e ".[dev,html]" --python .venv
+      - run: .venv/bin/playwright install --with-deps chromium
       - run: .venv/bin/ruff check .
       - run: .venv/bin/ruff format --check .
       - run: .venv/bin/pytest -q --cov=slidemark --cov-report=term:skip-covered
