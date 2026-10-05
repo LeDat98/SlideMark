@@ -73,6 +73,25 @@ def cmd_check(args: argparse.Namespace) -> int:
     text = _read(args.input)
     if text is None:
         return 2
+    fixed: list = []
+    if args.output and not args.fix:
+        print("error: -o needs --fix", file=sys.stderr)
+        return 2
+    if args.fix and not _is_json(args.input):
+        from .fix import fix_text
+
+        new_text, fixed = fix_text(text, lambda t: parse(t).diagnostics)
+        dest = Path(args.output) if args.output else Path(args.input)
+        if fixed or args.output:
+            try:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(new_text, encoding="utf-8", newline="")
+            except OSError as e:
+                print(f"error: cannot write {dest}: {e}", file=sys.stderr)
+                return 2
+        text = new_text
+    elif args.fix:
+        print("note: --fix applies to Markdown decks only", file=sys.stderr)
     if _is_json(args.input):
         from .jsonio import load_deck
 
@@ -82,13 +101,21 @@ def cmd_check(args: argparse.Namespace) -> int:
     else:
         deck = parse(text)
         _add_layout_diagnostics(deck, args.input)
-    if args.format == "json":
+    if args.fix and args.format == "json":
+        payload = {
+            "fixed": [f.model_dump() for f in fixed],
+            "diagnostics": [d.model_dump() for d in deck.diagnostics],
+        }
+        _say(json.dumps(payload, ensure_ascii=False))
+    elif args.format == "json":
         _say(json.dumps([d.model_dump() for d in deck.diagnostics], ensure_ascii=False))
-    elif deck.diagnostics:
+    else:
+        for f in fixed:
+            _say(str(f))
         for d in deck.diagnostics:
             _say(str(d))
-    else:
-        print(f"ok: {len(deck.slides)} slides")
+        if not deck.diagnostics:
+            print(f"ok: {len(deck.slides)} slides")
     return 1 if _has_errors(deck) else 0
 
 
@@ -339,6 +366,10 @@ def make_parser() -> argparse.ArgumentParser:
     c = sub.add_parser("check", help="print diagnostics for a .md or .json deck, one per line")
     c.add_argument("input")
     c.add_argument("--format", choices=["text", "json"], default="text")
+    c.add_argument(
+        "--fix", action="store_true", help="rewrite the source for mechanical fixes, then re-check"
+    )
+    c.add_argument("-o", "--output", help="with --fix: write the fixed deck here, leave the input alone")
     c.set_defaults(func=cmd_check)
 
     r = sub.add_parser("review", help="design critique: check + layout/design rules + score (never fails)")

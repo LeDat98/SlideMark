@@ -492,11 +492,43 @@ def test_closing_quote_needs_no_end():
     assert deck.slides[0].conclusion is not None
 
 
-def test_flow_duplicate_links_dropped():
+def test_flow_links_override_flow():
     deck = parse("# T\n@3 flow a>b b>c c>a\n## A\n- a\n## B\n- b\n## C\n- c\n")
     s = deck.slides[0]
-    assert [(link.src, link.dst) for link in s.links] == [(2, 0)]
-    assert sum(d.rule == "duplicate-link" for d in deck.diagnostics) == 2
+    assert [(link.src, link.dst) for link in s.links] == [(0, 1), (1, 2), (2, 0)]
+    assert "flow" not in s.classes and s.grid == "3"
+    assert sum(d.rule == "flow-links" for d in deck.diagnostics) == 1
+
+
+def test_flow_links_without_grid_keeps_one_row():
+    deck = parse("# T\n@flow a>c\n## A\n- a\n## B\n- b\n## C\n- c\n")
+    s = deck.slides[0]
+    assert "flow" not in s.classes and s.grid == "3" and len(s.links) == 1
+
+
+def test_flow_alone_untouched():
+    s = parse("# T\n@3 flow\n## A\n- a\n## B\n- b\n## C\n- c\n").slides[0]
+    assert "flow" in s.classes and not s.links
+
+
+def test_box_grid_unused():
+    deck = parse("# T\n@2\n## A\ntext\n@3\n## B\n- x\n- y\n")
+    a = deck.slides[0].elements[0]
+    assert a.grid is None
+    assert [d.rule for d in deck.diagnostics if d.rule == "box-grid-unused"] == ["box-grid-unused"]
+
+
+def test_box_grid_used_with_two_blocks():
+    deck = parse("# T\n@2\n## A\n@2\n### X\nx\n### Y\ny\n## B\n- y\n")
+    assert deck.slides[0].elements[0].grid == "2"
+    assert not any(d.rule == "box-grid-unused" for d in deck.diagnostics)
+
+
+def test_missing_end_paragraph_before_trailing_chevron():
+    src = "# T\n## A\n- a\n## B\n- b\n\nTotal text\n@chevron\n"
+    deck = parse(src)
+    d = [d for d in deck.diagnostics if d.rule == "missing-end"]
+    assert len(d) == 1 and d[0].line == 7
 
 
 def test_icon_attr():

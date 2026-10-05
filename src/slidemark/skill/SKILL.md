@@ -6,7 +6,7 @@ description: Write PowerPoint decks as compact SlideMark text and build native, 
 # SlideMark
 
 ```bash
-slidemark check deck.md     # "warning slide 2 L14 rule: message -> hint"
+slidemark check deck.md     # "warning slide 2 L14 rule: message -> hint"; --fix repairs simple ones
 slidemark review deck.md    # design critique + score
 slidemark build deck.md -o deck.pptx
 ```
