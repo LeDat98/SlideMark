@@ -35,10 +35,17 @@ Run goal:
 - Open: dense ≤ 40% of HTML gate is content-bound (markup overhead is ~16% of HTML's); PowerPoint repair check for animations/morph/sections/OMML not possible here.
 - Next: L3 consulting-grade review pass, video/audio, Chromium HTML measurement, XSD validation, PyPI packaging.
 
-## 2026-10-05 (run 2, manual, 04:10 UTC–)
+## 2026-10-05 (run 2, manual, 04:10–07:05 UTC)
 Run goal:
-- [ ] Leftover: sparse box slides + consulting-grade layout pass (box height ∝ content, table rows, gaps)
-- [ ] Leftover: importer reconstructs connectors (`a>b`) and mermaid diagrams
-- [ ] L5: video/audio natively embedded
-- [ ] L3: dense JP consulting deck ≥ 8 slides (examples/11) reviewed
-- [ ] L6: XSD validation of generated decks; CI on 3 Python versions; coverage measured
+- [x] Leftover: sparse box slides + consulting-grade layout pass (top anchoring, content-sized cards/chevrons/trees/tables, growth, layout search)
+- [x] Leftover: importer reconstructs connectors (`a>b`) and mermaid diagrams; round trip 59.5% → 97–98% lossless (112 decks)
+- [x] L5: video/audio natively embedded; HTML → native via Chromium; SVG pictures
+- [ ] L3: dense JP consulting deck (examples/11, 9 slides) reviewed: much better, slide 9 still half empty → gate stays open
+- [x] L6: XSD validation (10k fuzzed decks, 0 invalid); CI on 3.10–3.12 with Chromium; coverage 93%
+- Done: 9 waves, 16 Sonnet coding subagents + 2 eval agents; also `slidemark review`, `check --fix`, eval to 100 tasks.
+- Metrics: tests 866 passed (1 skipped, 1 xfail); q3 155 tokens = 30% of python-pptx (unchanged); markup ratio vs HTML 13–28%.
+- Eval (Sonnet, SKILL.md only): tasks 21–100 80/80 after fixes (79/80 first run) → 100 tasks 100%; review mean 97.25.
+- Whitespace: sparse cards 12 → 0, mean card fill 56% → 70%; layout inference 100% (40 slides); foreign import 0.975.
+- Bugs found by new tooling: title > 255 chars crashed, negative chart axIds, empty media timing sequence (XSD), image line swallowed under a list (eval).
+- Problems: a parallel owner session pushed to main (merged); I pushed one red commit (pipe hid pytest's exit code), fixed in minutes.
+- Next: L3 consulting judgement (slide 9 fill), PowerPoint spot check of media/SVG/animation XML (owner), PyPI token (owner).

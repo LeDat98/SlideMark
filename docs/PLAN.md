@@ -270,4 +270,10 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
 - [x] L5: video/audio; HTML → native via Chromium
 - [x] L6: XSD validation (10k fuzzed decks valid), CI 3.10–3.12 + coverage 93%
 - [x] L7: agent eval 100 tasks (99%), `slidemark review`, layout search, `check --fix`
-- [ ] L3 consulting-grade judgement of examples/11 (close; heading/body scale + paragraph spacing in wave 8)
+- [x] Waves 6–9: diagram growth, consistent growth in grids, heading ≥ body, paragraph spacing, SVG, `check --fix`
+
+## Leftovers for the next run
+- [ ] L3 consulting-grade: examples/11 slide 9 (two sparse cards) still ~45% empty; 11 slide 8 cards ~40% empty
+- [ ] Chromium HTML imports as boxes, not back to an html fence (xfail in test_import); math shows LibreOffice fallback
+- [ ] Owner: open media/SVG/animation/morph decks in real PowerPoint (repair check); PyPI token
+- [ ] L7 tokens ≤ 20% of python-pptx (now 30%): needs a syntax design pass

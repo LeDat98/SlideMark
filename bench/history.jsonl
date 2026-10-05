@@ -27,3 +27,13 @@
 {"date": "2026-10-05T03:18:35+00:00", "commit": "3b005c7", "metric": "layout_inferred", "value": 1.0, "slides": 28}
 {"date": "2026-10-05T04:52:04+00:00", "commit": "945817b", "metric": "import_fidelity", "import_fidelity": 0.977, "value": 0.977, "decks": 19, "worst": [["05-org", 0.854], ["09-process", 0.952], ["15-timeline", 0.969]]}
 {"date": "2026-10-05T06:04:40+00:00", "commit": "3b57df1", "metric": "roundtrip", "roundtrip": 0.991, "value": 0.991, "decks": 111, "lossless": 110, "token_ratio": 0.975, "failures": {"geometry": 1}}
+{"date": "2026-10-05T07:02:09+00:00", "commit": "c5e5be2", "metric": "syntax_tokens", "deck": "jp-dense", "format": "html", "tokens_proxy": 828, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T07:02:09+00:00", "commit": "c5e5be2", "metric": "syntax_tokens", "deck": "jp-dense", "format": "slidemark", "tokens_proxy": 482, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T07:02:09+00:00", "commit": "c5e5be2", "metric": "syntax_tokens", "deck": "jp-kpi", "format": "html", "tokens_proxy": 914, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T07:02:09+00:00", "commit": "c5e5be2", "metric": "syntax_tokens", "deck": "jp-kpi", "format": "slidemark", "tokens_proxy": 551, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T07:02:09+00:00", "commit": "c5e5be2", "metric": "syntax_tokens", "deck": "q3-review", "format": "html", "tokens_proxy": 321, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T07:02:09+00:00", "commit": "c5e5be2", "metric": "syntax_tokens", "deck": "q3-review", "format": "python-pptx", "tokens_proxy": 518, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T07:02:09+00:00", "commit": "c5e5be2", "metric": "syntax_tokens", "deck": "q3-review", "format": "slidemark", "tokens_proxy": 155, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T07:02:10+00:00", "commit": "c5e5be2", "metric": "layout_inferred", "value": 1.0, "slides": 40}
+{"date": "2026-10-05T07:03:11+00:00", "commit": "c5e5be2", "metric": "roundtrip", "roundtrip": 0.973, "value": 0.973, "decks": 112, "lossless": 109, "token_ratio": 0.965, "failures": {"size": 2, "style": 2, "geometry": 2, "shape": 1, "objects": 1, "text-order": 1}}
+{"date": "2026-10-05T07:03:23+00:00", "commit": "c5e5be2", "metric": "import_fidelity", "import_fidelity": 0.975, "value": 0.975, "decks": 19, "worst": [["05-org", 0.854], ["09-process", 0.945], ["08-math", 0.948]]}
