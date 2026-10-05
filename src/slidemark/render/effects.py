@@ -47,6 +47,7 @@ class Gradient:
     kind: str  # "linear" | "radial"
     css_angle: float  # degrees, CSS convention (0 = to top, 90 = to right); linear only
     stops: list[tuple[str, float | None, int]]  # (RRGGBB, alpha, position in 1/1000 %)
+    center: tuple[float, float] = (50.0, 50.0)  # radial only: ``at x y`` of the CSS gradient, in percent
 
 
 def _angle(part: str) -> float | None:
@@ -60,11 +61,40 @@ def _angle(part: str) -> float | None:
     return None
 
 
+_KEYWORD_POS = {"left": 0.0, "top": 0.0, "center": 50.0, "right": 100.0, "bottom": 100.0}
+
+
+def _center(part: str) -> tuple[float, float]:
+    """Center of ``circle at 25% 30%`` / ``at left top`` in percent; 50 50 when absent or unreadable."""
+    m = re.search(r"\bat\s+(.+)$", part.strip().lower())
+    if not m:
+        return 50.0, 50.0
+    toks = m.group(1).split()[:2]
+    vals: list[float | None] = []
+    for t in toks:
+        if t in _KEYWORD_POS:
+            vals.append(_KEYWORD_POS[t])
+        elif re.fullmatch(r"-?[\d.]+%", t):
+            vals.append(float(t[:-1]))
+        else:
+            vals.append(None)
+    if len(toks) == 2 and toks[0] in ("top", "bottom") and toks[1] in ("left", "right", "center"):
+        vals = [vals[1], vals[0]]  # ``at top left`` = y x order with keywords
+    if len(vals) == 1:
+        vals.append(50.0)
+    x, y = vals[0], vals[1]
+    clamp = lambda v: 50.0 if v is None else min(max(v, 0.0), 100.0)  # noqa: E731
+    return clamp(x), clamp(y)
+
+
 def parse_gradient(rc: RenderCtx, css: str) -> Gradient | None:
     """A ``Gradient`` from a CSS gradient string, or None when it has fewer than two usable stops."""
     kind, args = gradient_args(css)
     angle = 180.0  # CSS default: to bottom
+    center = (50.0, 50.0)
     if args and is_direction(args[0]):
+        if kind == "radial":
+            center = _center(args[0])
         a = _angle(args[0])
         if a is not None:
             angle = a
@@ -103,7 +133,7 @@ def parse_gradient(rc: RenderCtx, css: str) -> Gradient | None:
     for (hx, al, _), p in zip(raw, pos, strict=True):
         last = max(last, min(max(p or 0.0, 0.0), 100.0))  # positions never go backwards
         stops.append((hx, al, round(last * 1000)))
-    return Gradient(kind, angle, stops)
+    return Gradient(kind, angle, stops, center)
 
 
 def _clr(parent, hex_: str, alpha: float | None) -> None:
@@ -150,8 +180,9 @@ def set_gradient(spPr, g: Gradient, opacity: float | None) -> None:
         path = etree.SubElement(fill, qn("a:path"))
         path.set("path", "circle")
         rect = etree.SubElement(path, qn("a:fillToRect"))
-        for side in "ltrb":
-            rect.set(side, "50000")
+        cx, cy = g.center
+        for side, v in zip("ltrb", (cx, cy, 100 - cx, 100 - cy), strict=True):
+            rect.set(side, str(round(v * 1000)))
     else:
         lin = etree.SubElement(fill, qn("a:lin"))
         lin.set("ang", str(round(((g.css_angle - 90) % 360) * 60000)))

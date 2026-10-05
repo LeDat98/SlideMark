@@ -76,6 +76,12 @@ class LayoutTokens(BaseModel):
     dense_roomy_body: float = 1.6  # dense slides: body text stays at most this multiple of the body size
     roomy_row: float = 0.62  # a lone row of boxes reaches this share of the body height
     roomy_row_air: float = 1.9  # ... but never taller than this multiple of the natural height
+    balance_air: float = (
+        1.7  # normal density: a lone row of boxes may grow to this multiple of its height (0 = off)
+    )
+    balance_row: float = 0.72  # ... but never beyond this share of the body
+    balance_shift: float = 0.0  # ... and the part of the rest above the 20% band that moves the block down
+    balance_left: float = 0.2  # ... when more than this share of the body would stay empty
     roomy_row_air_dense: float = 1.6  # ... dense slides
     peer_step: float = 1.12  # table text is at most this much smaller than the box text on the same slide
     beside_min: float = 0.5  # a box beside a chart / image is at least this share of the visual height

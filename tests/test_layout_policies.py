@@ -74,7 +74,7 @@ def test_sparse_boxes_are_capped_and_top_aligned():
         assert cs[0].h > 0.2 * H  # but not tiny either
         below, body_h = _gap_below(placed, theme)
         assert (
-            0.22 * body_h <= cs[0].h <= (0.5 if theme == "default" else 0.65) * body_h
+            0.22 * body_h <= cs[0].h <= (0.6 if theme == "default" else 0.65) * body_h
         )  # follows content; consulting rows reach ~60%
         title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
         above = cs[0].y - (title.y + title.h)
@@ -474,3 +474,49 @@ def test_stacked_boxes_share_the_gap():
     placed, _ = lay(s, "default")
     g = _gaps(placed)
     assert g[0] == g[1]
+
+
+def test_cover_title_band_spans_the_slide_width_behind_the_title():
+    theme = get_theme("default").model_copy(update={"title_band": "primary"})
+    for kind in ("cover", "section"):
+        s = Slide(title=T("Velocity", "title"), layout=kind, subtitle=T("Run together", "subtitle"))
+        placed = layout_slide(s, Deck(slides=[s]), theme, 0)
+        band = next(p for p in placed if isinstance(p.element, Shape) and p.element.id == "band")
+        assert (band.x, band.w) == (0, W)
+        title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
+        assert band.y <= title.y and title.y + title.h <= band.y + band.h
+        assert placed.index(band) < placed.index(title)  # drawn behind the text
+
+
+def test_unknown_font_heading_wraps_before_the_body_is_placed():
+    """'Inter' has no metrics table: it is measured wide, so the wrapped heading pushes the body down."""
+
+    def body_gap(font):
+        theme = get_theme("default").model_copy(deep=True)
+        theme.fonts.heading = font
+        theme.fonts.body = font
+        s = Slide(
+            title=T("t", "title"),
+            grid="3",
+            elements=[box("Machine perception", "x"), box("A", "x"), box("B", "x")],
+        )
+        placed = layout_slide(s, Deck(slides=[s]), theme, 0)
+        c = cards(placed)[0]
+        head = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "heading")
+        body = next(
+            p for p in placed if isinstance(p.element, Text) and p.element.role == "body" and p.y > head.y
+        )
+        return head.h, body.y - c.y
+
+    h_inter, off_inter = body_gap("Inter")
+    h_arial, off_arial = body_gap("Arial")
+    assert h_inter > h_arial and off_inter > off_arial
+
+
+def test_normal_density_lone_row_gets_taller_cards():
+    s = Slide(title=T("t", "title"), grid="3", elements=[box("a", "x", "y"), box("b", "x"), box("c", "x")])
+    placed, _ = lay(s, "default")
+    th = get_theme("default").model_copy(deep=True)
+    th.layout.balance_air = 0.0
+    off = layout_slide(s, Deck(slides=[s]), th, 0)
+    assert cards(placed)[0].h > cards(off)[0].h

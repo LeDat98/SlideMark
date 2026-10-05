@@ -107,6 +107,9 @@ class _Ctx:
     arrange: str | None = None  # layout search: a grid token that replaces the rule-based arrangement
     alts: list[str] = field(default_factory=list)  # layout search: alternative tokens for this slide
     cap_tables: bool = True  # False when another block (box row, chart, ...) spans the body: no narrow table
+    lone_air: float = (
+        0.0  # normal-density balance: a lone box row may reach this multiple of its natural height
+    )
     roomy: bool = False  # sparse dense slide with a large empty band: tables / trees may take more height
     grow_base: float = (
         1.0  # roomy pass: the growth before it; text that would wrap more at ``grow`` is refused
@@ -1386,6 +1389,8 @@ def _row_heights(
                     )
                     / body.h,
                 )  # fill stays >= ~50%
+            if ctx.lone_air > 0 and nr == 1 and not has_tail:
+                floor = max(floor, min(ctx.lt.balance_row * body.h, ctx.lone_air * n) / body.h)
             caps.append(max(round(n * ctx.lt.row_slack), round(floor * body.h)))
     extra_h = 0  # natural height that spanning blocks need beyond their rows
     for r0, r1, n in spans:
@@ -1997,6 +2002,28 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
                 fin = c
                 left = body.bottom - _bottom(fin)
                 break
+    if (
+        ctx.lt.balance_air > 0
+        and fin.dense_k >= 1.0
+        and not small_theme
+        and not fin.roomy
+        and body.bottom - _bottom(fin) > ctx.lt.balance_left * body.h
+    ):  # normal density: a lone row of boxes gets taller cards instead of a 40% empty band
+        c = run(body, grow=fin.grow, expand=fin.expand, lone_air=ctx.lt.balance_air)
+        if not c.over and c.out and _bottom(c) > _bottom(fin):
+            fin = c
+            left = body.bottom - _bottom(fin)
+        dy = round((left - ctx.lt.balance_left * body.h) * ctx.lt.balance_shift)
+        if dy > 0:  # what is still empty is split: part above the block, the rest below
+            c = run(
+                Rect(body.x, body.y + dy, body.w, body.h - dy),
+                grow=fin.grow,
+                expand=fin.expand,
+                lone_air=fin.lone_air,
+            )
+            if not c.over and c.out:
+                fin = c
+                left = body.bottom - _bottom(fin)
     top = min((p.y for p in fin.out), default=body.y)
     if _bottom(fin) - top < ctx.lt.very_sparse_fill * body.h:
         dy = round(
