@@ -549,6 +549,29 @@ def _units(widths: list[float]) -> list[int]:
     return [x // g for x in u]
 
 
+def split_row_groups(blocks: list[Block], W: int, H: int) -> list[list[Block]] | None:
+    """Rows of boxes with different column counts are row groups (``@end`` + a new ``@`` line each)."""
+    if len(blocks) < 3 or any(b.kind != "box" for b in blocks):
+        return None
+    toly = 0.03 * H
+    ys = _clusters([b.y for b in blocks], toly)
+    if len(ys) < 2:
+        return None
+    rows: list[list[Block]] = [[] for _ in ys]
+    for b in blocks:
+        rows[_nearest(ys, b.y)].append(b)
+    for r in rows:
+        r.sort(key=lambda b: b.x)
+        if max(b.w for b in r) > 1.12 * min(b.w for b in r) and not all(b.chevron for b in r):
+            return None
+    for a, b in zip(rows, rows[1:], strict=False):
+        if max(x.y + x.h for x in a) > min(x.y for x in b) + toly:
+            return None  # a box spans several rows: one grid
+    if len({len(r) for r in rows}) == 1:
+        return None  # same count per row: a plain grid
+    return rows
+
+
 def plan_grid(
     blocks: list[Block], W: int, H: int, diags: list[str], margin: int = 0, gap: int = 0
 ) -> tuple[list[str], list[Block], list[Block]]:
@@ -839,7 +862,23 @@ def build_slide(
         data.conns = []
         lost = 0
     gdiag: list[str] = []
-    tokens, grid, extras = plan_grid(blocks, deck.width, deck.height, gdiag, deck.margin_x, deck.gap)
+    groups = None if (top or inner) else split_row_groups(blocks, deck.width, deck.height)
+    group_tokens: list[list[str]] = []
+    arrow_items = [i for i in pool if i.kind == "shape" and i.prst and "rrow" in i.prst]
+    if groups:
+        grid, extras = [], []
+        for gi, g in enumerate(groups):
+            tk, gr, ex = plan_grid(g, deck.width, deck.height, gdiag, deck.margin_x, deck.gap)
+            tk = tk or [str(len(gr))]
+            top_y, bot_y = min(b.y for b in g), max(b.y + b.h for b in g)
+            nar = sum(1 for a in arrow_items if top_y - 0.03 * deck.height <= a.cy <= bot_y + 0.03 * deck.height)
+            if nar and "chevron" not in tk and len(gr) > 1 and nar >= len(gr) - 1:
+                tk = [*tk, "flow"]
+            group_tokens.append(tk)
+            grid += gr
+        tokens = group_tokens[0]
+    else:
+        tokens, grid, extras = plan_grid(blocks, deck.width, deck.height, gdiag, deck.margin_x, deck.gap)
     for g in gdiag:
         diags.append(
             Diagnostic(level="info", message=g, slide=n, rule="import-layout", hint="check the arrangement")
@@ -867,10 +906,10 @@ def build_slide(
     if lead:
         lines.append("> " + one_line(lead[0].paras, accent=deck.accent, classes=classes))
     n_boxes = sum(1 for b in grid if b.kind == "box")
-    if arrows and "chevron" not in tokens and n_boxes > 1 and arrows >= n_boxes - 1:
+    if not groups and arrows and "chevron" not in tokens and n_boxes > 1 and arrows >= n_boxes - 1:
         tokens.append("flow")
     if info is not None:
-        info["tokens"] = [t for t in tokens if t != "blank"]
+        info["tokens"] = [] if groups else [t for t in tokens if t != "blank"]
         info["at"] = None
     seq = [*grid, *extras]
     links = link_tokens(top, seq, drop_next="flow" in tokens)
@@ -915,7 +954,15 @@ def build_slide(
             info["at"] = len(lines)
         lines.append("@" + " ".join(tokens))
     chunks: list[tuple[str, list[str]]] = []
+    starts: dict[int, list[str]] = {}
+    if groups:
+        pos = 0
+        for g, tk in zip(groups, group_tokens, strict=True):
+            starts[pos] = tk
+            pos += len(g)
     for i, b in enumerate(seq):
+        if i in starts and i > 0:
+            chunks.append(("meta", ["@end", "@" + " ".join(starts[i])]))
         chunks.extend(emit_block(b, out))
         if b.kind == "box":
             nxt = seq[i + 1] if i + 1 < len(seq) else None
