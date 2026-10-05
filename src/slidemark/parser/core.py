@@ -22,6 +22,7 @@ from .attrs import (
     split_trailing_attrs,
 )
 from .blocks import convert
+from .css import extract_fences, parse_css
 from .ctx import Ctx, closest
 from .inline import inline_runs
 from .lenient import Rec, normalize
@@ -855,12 +856,33 @@ def parse_deck(text: str) -> Deck:
         lines[unclosed] = "\\" + lines[unclosed]
     else:
         inside, _ = fence_map(lines)
+    css_fences = extract_fences(lines)  # css fences are consumed here: never code blocks, never drawn
+    if css_fences:
+        inside, _ = fence_map(lines)
     start = parse_header(lines, inside, deck, ctx)
     recs = normalize(lines, inside, start, deck)
     chunks = split_slides(lines, inside, start)
     if not chunks:
         ctx.warn("no slides found", None, "no-slides", "start a slide with '# Title'")
     by_chunk: dict[int, list[Rec]] = {}
+    first_line = (
+        min((c.title_idx if c.title_idx is not None else c.start) for c in chunks) if chunks else None
+    )
+    slide_css: dict[int, list[tuple[int, str]]] = {}
+    for fi, body in css_fences:
+        if first_line is None or fi < first_line:
+            deck.css += parse_css(body, fi + 2, ctx, deck, header=True)
+        else:
+            # the slide whose chunk starts last before the fence (blank separator slides are dropped)
+            k = max(
+                (
+                    ci
+                    for ci, c in enumerate(chunks)
+                    if (c.title_idx if c.title_idx is not None else c.start) <= fi
+                ),
+                default=0,
+            )
+            slide_css.setdefault(k, []).append((fi, body))
     for r in recs:
         # a record belongs to the first slide that ends after its line (blank separator slides are dropped)
         k = next((ci for ci, c in enumerate(chunks) if c.end > r.idx), len(chunks) - 1)
@@ -871,7 +893,10 @@ def parse_deck(text: str) -> Deck:
     for idx, chunk in enumerate(chunks):
         ctx.slide = idx + 1
         try:
-            deck.slides.append(parse_slide(chunk, lines, inside, ctx, idx, by_chunk.get(idx)))
+            slide = parse_slide(chunk, lines, inside, ctx, idx, by_chunk.get(idx))
+            for fi, body in slide_css.get(idx, []):
+                slide.css += parse_css(body, fi + 2, ctx, deck)
+            deck.slides.append(slide)
         except Exception as e:  # never raise on bad input
             ctx.error(
                 f"internal error: {type(e).__name__}: {e}",
