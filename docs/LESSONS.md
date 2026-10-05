@@ -80,3 +80,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] The review score has threshold cliffs (empty band 55%, very sparse 40%): tiny heading changes moved scores → 2% tolerance. The search scorer must measure text exactly like lint/critique (incl. paragraph spacing).
 - [process] `pytest -q | tail -1 && git commit` commits even when tests fail (the pipe's exit code is tail's) → check the summary line, or use `set -o pipefail`. Pushed one red commit this way (fixed minutes later).
 - [layout] Boxes sharing a grid row or stacked column share one paragraph gap (the minimum); lint, critique, score and whitespace all measure with `measure.element_gap()`.
+- [layout] On a lone-row slide the card height cap (ROOMY_ROW_AIR) moves fill more than font growth does.
