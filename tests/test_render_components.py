@@ -129,6 +129,16 @@ def test_badge_run_is_highlighted_bold_with_theme_color(tmp_path):
     assert not tb.text_frame.paragraphs[0].runs[0].font.bold
 
 
+def test_cjk_badge_is_padded_so_bold_glyphs_stay_inside_the_highlight(tmp_path):
+    runs = [Run(text="好調", highlight="success", color="bg"), Run(text="OK", highlight="success")]
+    s = Slide(elements=[Text(paragraphs=[Paragraph(runs=runs)])])
+    prs, _, _ = build(Deck(slides=[s]), tmp_path, "jp-business")
+    tb = next(x for x in prs.slides[0].shapes if x.has_text_frame)
+    cjk, latin = tb.text_frame.paragraphs[0].runs
+    assert cjk.text == "\u3000好調\u3000"  # full-width space on both sides
+    assert latin.text == "OK"  # Latin glyphs fit; padding would leave a visible gap
+
+
 def test_heading_band_drawn_on_jp_business(tmp_path):
     s = Slide(title=T("t", "title"), elements=[box("Heading", "content")])
     prs, _, th = build(Deck(slides=[s]), tmp_path, "jp-business")

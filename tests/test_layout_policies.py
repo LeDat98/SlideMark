@@ -48,29 +48,64 @@ def cards(placed):
     return of(placed, Container)
 
 
+def _gap_below(placed, theme):
+    """(empty band below the lowest content, body height) of a slide laid out without footer / conclusion."""
+    from slidemark.units import to_emu
+
+    th = get_theme(theme)
+    bottom = H - to_emu(th.margin_y)
+    title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
+    body_h = bottom - (title.y + title.h)
+    low = max(p.y + p.h for p in placed if p is not title and p.h > 0 and p.y >= title.y + title.h)
+    return bottom - low, body_h
+
+
 def test_sparse_boxes_are_capped_and_top_aligned():
     s = Slide(
         title=T("t", "title"),
         grid="3",
         elements=[box("a", "x", "y"), box("b", "x", "y"), box("c", "x", "y")],
     )
-    placed, _ = lay(s)
-    cs = cards(placed)
-    assert len({c.h for c in cs}) == 1 and len({c.y for c in cs}) == 1  # equal heights in a row
-    assert cs[0].h < 0.45 * H  # not stretched over the body
-    assert cs[0].h > 0.2 * H  # but not tiny either
+    for theme in ("default", "jp-business"):
+        placed, _ = lay(s, theme)
+        cs = cards(placed)
+        assert len({c.h for c in cs}) == 1 and len({c.y for c in cs}) == 1  # equal heights in a row
+        assert cs[0].h < 0.75 * H  # not stretched over the whole body
+        assert cs[0].h > 0.2 * H  # but not tiny either
+        below, body_h = _gap_below(placed, theme)
+        assert below <= 0.2 * body_h  # no empty band taller than 20% of the body
 
 
-def test_sparse_boxes_grow_text_uniformly():
+def test_sparse_slide_keeps_the_block_low_enough_with_a_third_above():
+    s = Slide(title=T("t", "title"), grid="3", elements=[box("a"), box("b"), box("c")])
+    placed, _ = lay(s, "default")
+    title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
+    above = cards(placed)[0].y - (title.y + title.h)
+    below, _ = _gap_below(placed, "default")
+    assert 0 <= above < below  # the leftover is split towards the bottom (1/3 above, 2/3 below)
+
+
+def test_sparse_boxes_grow_text_uniformly_within_the_theme_limit():
     s = Slide(
         title=T("t", "title"),
         grid="3",
         elements=[box("a", "x", "y"), box("b", "x" * 10, "y"), box("c", "x", "y")],
     )
-    placed, _ = lay(s)
-    scales = {p.font_scale for p in of(placed, Text) if p.element.role == "body"}
-    assert len(scales) == 1
-    assert 1.0 < scales.pop() <= 1.25
+    for theme, limit in (("default", 1.15), ("jp-business", 1.35)):
+        placed, _ = lay(s, theme)
+        scales = {p.font_scale for p in of(placed, Text) if p.element.role == "body"}
+        assert len(scales) == 1
+        assert 1.0 < scales.pop() <= limit + 1e-9
+
+
+def test_table_text_and_rows_grow_within_limits():
+    rows = [[cell("項目"), cell("値")]] + [[cell("a"), cell("12")] for _ in range(2)]
+    s = Slide(title=T("t", "title"), elements=[Table(rows=rows)])
+    placed, _ = lay(s, "jp-business")
+    (tp,) = of(placed, Table)
+    assert 1.0 < tp.font_scale <= 1.2 + 1e-9
+    nat = 11 * 1.2 * 12700  # rough single-line row height, grows well beyond it but stays capped
+    assert max(tp.element.attrs["_row_h"]) <= 2.2 * (nat * tp.font_scale * 1.6 + 2 * 45720)
 
 
 def test_dense_boxes_do_not_grow():
@@ -211,3 +246,22 @@ def test_horizontal_elbow_for_offset_neighbours():
     a, b = cards(placed)
     assert ln.element.attrs["route"] == "h"
     assert ln.x == a.x + a.w and ln.x + ln.w == b.x
+
+
+def test_mixed_numeric_columns_stay_left_aligned_but_mostly_numeric_ones_go_right():
+    rows = [
+        [cell("項目"), cell("価格"), cell("導入"), cell("数")],
+        [cell("a"), cell("5万円〜"), cell("1か月"), cell("12")],
+        [cell("b"), cell("20万円〜"), cell("即日"), cell("8")],
+        [cell("c"), cell("3万円〜"), cell("6か月"), cell("40%")],
+        [cell("d"), cell("4万円〜"), cell("即時"), cell("-")],
+        [cell("e"), cell("要相談"), cell("3か月"), cell("7")],
+    ]
+    s = Slide(title=T("t", "title"), elements=[Table(rows=rows)])
+    placed, _ = lay(s)
+    (tp,) = of(placed, Table)
+    al = [[(c.style.align if c.style else None) for c in r] for r in tp.element.rows]
+    price = [r[1] for r in al]
+    assert price == ["right"] * 6  # 4 of 5 (80%) numeric: whole column and header right-aligned
+    assert [r[2] for r in al] == [None] * 6  # only 3 of 5 numeric: the whole column stays left
+    assert [r[3] for r in al] == ["right"] * 6  # "-" counts as a figure placeholder

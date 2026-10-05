@@ -55,11 +55,20 @@ _INHERIT_FIELDS = (
 _VISUALS = (Image, Chart, Table, Code)
 _TOL = 1.01
 CHEVRON_ADJ = 0.3  # chevron point depth / shorter side; the renderer sets the same adjustment
-TABLE_GROW = 1.6  # rows of a table with spare room grow up to this factor
+CHEVRON_H = 0.45  # chevron height / width (room for 3 lines of text between the point paddings)
+TABLE_GROW = 2.2  # rows of a table with spare room grow up to this factor
+TABLE_FONT_GROW = 1.2  # table text grows with the sparse-slide growth, up to this factor
 ROW_SLACK = 1.35  # a grid row is at most this much taller than its tallest content ...
 ROW_MIN = 0.35  # ... but never shorter than this share of the body height
-GROW_MAX = 1.25  # sparse boxes: body text grows up to this factor
-GROW_FILL = 0.7  # ... as long as the content fills at most this share of the grid
+GROW_SMALL = (
+    1.35  # sparse slides: text grows up to this factor when the theme body size is <= GROW_SMALL_PT ...
+)
+GROW_SMALL_PT = 14
+GROW_BIG = 1.15  # ... and up to this factor for larger themes
+GROW_FILL = 0.85  # growth stops when the content would fill more than this share of the grid
+GROW_BOX_FILL = 0.92  # ... or more than this share of a box
+LEFT_KEEP = 0.2  # rows of a sparse slide expand until at most this share of the body is left over ...
+LEFT_ABOVE = 1 / 3  # ... and that leftover is split: this share above the block, the rest below
 KPI_MIN_H = 1.1  # inches
 DENSE_TIGHT = 0.7  # gap / padding factor on dense slides
 _SCALES = [round(1.0 - 0.05 * i, 2) for i in range(15)]  # 1.0 .. 0.3
@@ -80,6 +89,7 @@ class _Ctx:
     depth: int = 0  # 0 = slide level, > 0 inside a box
     grew: bool = False  # set when ``grow`` actually scaled some text
     fill: float | None = None  # natural content height / grid height of the slide-level grid, if known
+    expand: int = 0  # extra height (EMU) the capped rows of the slide-level grid may take
     out: list[Placed] = field(default_factory=list)
     over: list[str] = field(default_factory=list)
     diags: list[Diagnostic] = field(default_factory=list)
@@ -371,6 +381,9 @@ def _table_style(ctx: _Ctx, el: Table) -> Style:
 def _table_geom(ctx: _Ctx, el: Table, width: int):
     st = _table_style(ctx, el)
     eff = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
+    if ctx.grow > 1.0 and ctx.scale >= 1.0:  # sparse slide: table text grows too (less than box text)
+        eff *= min(ctx.grow, TABLE_FONT_GROW)
+        ctx.grew = True
     nrows, ncols, anchors = table_grid(el)
     cw = column_widths(el, ncols, anchors, width, (st.font_size or 14) * eff)
     rh = row_heights(el, anchors, cw, st, eff)
@@ -628,7 +641,8 @@ def _place_stack(
         y += h + gap
         used += h + gap
     used -= gap
-    if used > area.h * _TOL:
+    limit = GROW_BOX_FILL if ctx.grow > 1.0 and ctx.depth > 0 else _TOL  # grown text keeps some headroom
+    if used > area.h * limit:
         ctx.over.append(_label(owner) if owner is not None else "content")
     return rects
 
@@ -858,6 +872,11 @@ def _row_heights(
         ctx.fill = total / max(grid_area.h, 1)
     if all(c is None for c in caps):
         return None
+    if ctx.expand > 0:  # sparse slide: spread extra height over the capped rows that are not kpi / table rows
+        rows = [r for r in range(nr) if caps[r] is not None and "other" in kinds[r]]
+        tot = sum(caps[r] or 0 for r in rows)
+        for r in rows:
+            caps[r] = (caps[r] or 0) + round(ctx.expand * (caps[r] or 0) / max(tot, 1))
     return grid_row_heights(gs, grid_area.h, gap, caps)
 
 
@@ -972,7 +991,7 @@ def _split_grid_tail(
     has_flex = any(n is None for n in nat)
     if "chevron" in flags:
         cw = (area.w - gap * (len(gs.cols) - 1)) / max(len(gs.cols), 1)
-        compact = max(round(cw * 0.45), round(0.9 * EMU_PER_INCH))
+        compact = max(round(cw * CHEVRON_H), round(0.9 * EMU_PER_INCH))
         has_extras = any(
             isinstance(b, Container) and any(not isinstance(ch, (Text, Shape)) for ch in b.children)
             for _, b in flow
@@ -992,12 +1011,16 @@ def _place_chevron(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> Rect:
     sh = _chevron_shape(blk)
     st = _text_style(ctx, sh, inherit)
     full = rect
-    rect = Rect(rect.x, rect.y, rect.w, min(rect.h, max(round(rect.w * 0.45), round(0.9 * EMU_PER_INCH))))
+    rect = Rect(
+        rect.x, rect.y, rect.w, min(rect.h, max(round(rect.w * CHEVRON_H), round(0.9 * EMU_PER_INCH)))
+    )
     pad_pt = round(CHEVRON_ADJ * min(rect.w, rect.h) * 1.05 / EMU_PER_PT, 1)
     st = st.merged(Style(padding=f"{pad_pt}pt", align="center", valign="middle"))
     eff = measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
-    need = _text_need(ctx, sh, st, rect.w, eff)
-    if need > rect.h * _TOL:
+    # the padding only keeps text clear of the points: centered text may use the middle 80% of the height
+    pad = _pad(st)
+    need = measure.paragraphs_height(sh.paragraphs, rect.w - 2 * pad, st, eff)
+    if need > rect.h * 0.8:
         ctx.over.append(_label(blk))
     ctx.emit(sh, rect, st, eff)
     # a chevron shape only carries text: place the other children (table, chart, ...) under it
@@ -1031,6 +1054,33 @@ def _run(text: str):
     from ..ir import Run
 
     return Run(text=text)
+
+
+def _bottom(c: _Ctx) -> int:
+    return max((p.y + p.h for p in c.out), default=0)
+
+
+def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
+    """Vertical policy of a sparse slide body: no empty band taller than ~``LEFT_KEEP`` of the body.
+
+    1. capped rows expand until the leftover is at most ``LEFT_KEEP`` of the body, 2. the whole block moves
+    down so that ``LEFT_ABOVE`` of what is still left sits above it and the rest below it.
+    """
+    if fin.scale < 1.0 or fin.over or not any(isinstance(e, (Container, Table)) for e in elements):
+        return fin
+    left = body.bottom - _bottom(fin)
+    keep = round(LEFT_KEEP * body.h)
+    if left > keep:
+        c = run(body, grow=fin.grow, expand=left - keep)
+        if not c.over and c.out:
+            fin = c
+            left = body.bottom - _bottom(fin)
+    dy = round(left * LEFT_ABOVE)
+    if dy > 0:
+        c = run(Rect(body.x, body.y + dy, body.w, body.h - dy), grow=fin.grow, expand=fin.expand)
+        if not c.over and c.out:
+            fin = c
+    return fin
 
 
 def layout_slide(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
@@ -1256,27 +1306,29 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         if kind == "center":
             slide_inherit = slide_inherit.merged(Style(align="center", valign="middle"))
         sgap = _gap(ctx, slide.attrs.get("gap"), body.w)
-        for s in _SCALES:
-            c2 = _Ctx(deck, theme, slide, index, W, H, scale=s, dense_k=ctx.dense_k, tight=ctx.tight)
+
+        def run(area: Rect, **kw) -> _Ctx:
+            c = _Ctx(deck, theme, slide, index, W, H, dense_k=ctx.dense_k, tight=ctx.tight, **kw)
             _place_blocks(
-                c2, elements, body, slide_inherit, slide.grid, slide.classes, sgap, None, slide.links
+                c, elements, area, slide_inherit, slide.grid, slide.classes, sgap, None, slide.links
             )
-            final_ctx = c2
-            if not c2.over:
+            return c
+
+        for s in _SCALES:
+            final_ctx = run(body, scale=s)
+            if not final_ctx.over:
                 break
         assert final_ctx is not None
-        if final_ctx.scale >= 1.0 and not final_ctx.over and final_ctx.fill is not None:
-            # sparse grid of boxes: grow body text uniformly (all sibling boxes share one factor)
-            for g in (1.25, 1.2, 1.15, 1.1, 1.05):
-                if g > GROW_MAX:
-                    continue
-                c3 = _Ctx(deck, theme, slide, index, W, H, grow=g, dense_k=ctx.dense_k, tight=ctx.tight)
-                _place_blocks(
-                    c3, elements, body, slide_inherit, slide.grid, slide.classes, sgap, None, slide.links
-                )
-                if c3.grew and not c3.over and c3.fill is not None and c3.fill <= GROW_FILL:
+        if final_ctx.scale >= 1.0 and not final_ctx.over:
+            # sparse slide: grow text uniformly (siblings share one factor), more for small themes
+            top = GROW_SMALL if (theme.sizes.get("body", 18) <= GROW_SMALL_PT) else GROW_BIG
+            n = round((top - 1.05) / 0.05)
+            for g in [round(top - 0.05 * i, 2) for i in range(n + 1)]:
+                c3 = run(body, grow=g)
+                if c3.grew and not c3.over and (c3.fill is None or c3.fill <= GROW_FILL):
                     final_ctx = c3
                     break
+            final_ctx = _spread(ctx, final_ctx, run, body, elements)
         ctx.diags += final_ctx.diags
         seen: set[str] = set()
         for lab in final_ctx.over:
