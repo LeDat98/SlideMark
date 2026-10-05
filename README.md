@@ -3,7 +3,7 @@
 Thư viện Python giúp AI Agent tạo file PowerPoint (.pptx) **native, chỉnh sửa được** chỉ bằng cách viết văn bản
 theo cú pháp riêng của SlideMark: ngắn gọn, tốn ít token và hỗ trợ cả slide dày đặc kiểu Nhật.
 
-> Trạng thái: đang phát triển (giai đoạn nền móng 7 ngày). Mục tiêu từng cấp L1 → L7: [docs/TARGETS.md](docs/TARGETS.md).
+> Trạng thái: đang phát triển (đã xong 7 ngày nền móng, đang leo các cấp L2 → L4). Mục tiêu từng cấp L1 → L7: [docs/TARGETS.md](docs/TARGETS.md).
 
 ## Ví dụ
 
@@ -28,6 +28,21 @@ lang: ja
 - `>` dưới tiêu đề là thông điệp chính, dòng `※` là chú thích nguồn.
 
 Cú pháp đầy đủ: [docs/SYNTAX.md](docs/SYNTAX.md).
+
+## Tính năng chính
+
+- Box, lưới `@`, KPI `{.kpi}`, callout `> [!warn]`, badge `[x]{.badge}`, mũi tên nối `@ a>b`, chevron/flow.
+- 10 loại biểu đồ native từ CSV (nhãn, legend, định dạng số), bảng có gộp ô, công thức toán (OMML),
+  sơ đồ Mermaid → shape native, HTML → native (hoặc ảnh dự phòng qua Chromium).
+- Theme `default`, `midnight`, `jp-business` hoặc template `.pptx/.potx` của bạn; hiệu ứng xuất hiện, chuyển slide, section.
+- `slidemark check` kiểm tra tràn chữ, chồng lấn, tương phản, alt ảnh… và gợi ý cách sửa trên 1 dòng (JSON được).
+- `slidemark docs` / `skill install`: tài liệu cho agent, SKILL.md ≤ 1.500 token.
+
+```bash
+pip install -e .
+slidemark check deck.md && slidemark build deck.md -o deck.pptx
+slidemark skill install      # cài skill cho Claude Code
+```
 
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
