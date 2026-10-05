@@ -226,3 +226,9 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
 ## Day 7 status
 - [x] A+B: build animations, transitions, sections, jumps
 - [x] Orchestrator: packaging, changelog
+
+## After plan day 7: TARGETS gates (run 2026-10-05)
+- [ ] L3 icons: `icon=name` on boxes → native custGeom icons (≥ 30 names, did-you-mean), `slidemark docs icons`
+- [ ] L6 import: `slidemark import deck.pptx` → SlideMark text; build → import → build stable for our decks
+- [ ] L2 layout inference ≥ 90% (auto-arrangement v2)
+- [ ] L4 fuzz: 0 crashes in 100k inputs (`bench/fuzz_long.py`)

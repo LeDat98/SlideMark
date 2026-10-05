@@ -159,6 +159,12 @@ colored border). It works anywhere a block can go, including inside a box, and i
 > [!warn] 価格改定は11月から
 ```
 
+**Icon.** `icon=name` on a box heading draws a native, recolorable vector icon next to the heading (above
+the number in a `.kpi` box): `## 売上 {.kpi icon=chart}`. `slidemark docs icons` lists the names (check, x,
+warning, info, user, users, building, factory, chart, money, yen, target, rocket, lightbulb, gear, clock,
+calendar, document, mail, phone, globe, lock, shield, cloud, database, search, star, heart, truck, cart, leaf,
+arrow-up, arrow-down, arrow-right). An unknown name is a warning with a did-you-mean hint.
+
 **Badge.** `[text]{.badge}` is a small filled label inside text; add a color class to change it:
 `[済]{.badge .success}`, `[NEW]{.badge .danger}`.
 
