@@ -34,6 +34,7 @@ from ..theme import Theme
 from ..units import slide_size
 from .anim import build_timing
 from .htmlimg import add_html_image, close_html
+from .icons import add_icon
 from .math import add_math
 from .objects import add_chart, add_image, add_table, code_paragraphs, resolve_image
 from .text import fill_text, insert_rpr_child
@@ -440,6 +441,8 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
             _accent_bar(rc, s, pl, name)
     elif isinstance(el, Shape) and el.shape == "line":
         _connector(rc, s, pl, name)
+    elif isinstance(el, Shape) and el.shape == "icon":
+        add_icon(rc, s, pl, name)  # unknown names draw nothing (the parser warns)
     elif isinstance(el, Shape):
         kind = _SHAPES.get(el.shape)
         if kind is None:
@@ -453,6 +456,8 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
         shp = _autoshape(rc, s, pl, kind, name)
         if el.paragraphs:
             fill_text(rc, shp.text_frame, el.paragraphs, st, pl.font_scale)
+            if inset := el.attrs.get("icon_inset"):  # room for the icon the layout placed before the text
+                shp.text_frame.margin_left = Emu(shp.text_frame.margin_left + int(inset))
         if el.shape == "chevron":
             shp.adjustments[0] = CHEVRON_ADJ
     elif isinstance(el, Table):
@@ -520,14 +525,19 @@ def _connector(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
 
 
 def _find_box(slide, box) -> object | None:
-    """The first plain rectangle / rounded rectangle on ``slide`` with exactly this (x, y, w, h)."""
+    """The first rectangle / rounded rectangle / diamond on ``slide`` with exactly this (x, y, w, h).
+
+    All three have the same connection sites (0 top, 1 left, 2 bottom, 3 right). A diamond used to be skipped,
+    so a connector leaving a decision node stayed unglued and LibreOffice drew its rotated geometry wrongly
+    (the bend ran along the top edge of the target).
+    """
     if not box:
         return None
     for shp in slide.shapes:
         if shp.shape_type != MSO_SHAPE_TYPE.AUTO_SHAPE:
             continue
         if (shp.left, shp.top, shp.width, shp.height) == tuple(box):
-            if shp.auto_shape_type in (MSO_SHAPE.RECTANGLE, MSO_SHAPE.ROUNDED_RECTANGLE):
+            if shp.auto_shape_type in (MSO_SHAPE.RECTANGLE, MSO_SHAPE.ROUNDED_RECTANGLE, MSO_SHAPE.DIAMOND):
                 return shp
     return None
 
