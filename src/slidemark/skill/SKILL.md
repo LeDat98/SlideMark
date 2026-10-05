@@ -196,7 +196,8 @@ Chart fence kinds: `column bar line area pie doughnut scatter radar stacked-colu
 first row = categories (first cell empty), then one row per series (name first). Options: `title="..."`
 `labels=on|percent|off` `legend=bottom|right|top|none` `fmt="0.0"|"#,##0"|"0%"` `min=` `max=`
 `colors=primary,accent,#888888` `axis=off`. Numbers may be `1,240`, `12%`, `▲3`; with `lang: vi`/`de`/`fr`… a decimal comma is fine when quoted
-(`"1,6"`) or when the rows use `;` (`T1;1,6;1,9`). One value axis per chart.
+(`"1,6"`) or when the rows use `;` (`T1;1,6;1,9`); charts store numbers, and PowerPoint shows them in the viewer's
+locale (4,1 in Vietnamese), so a `4.1` in an English preview is fine. One value axis per chart.
 
 ## Design tokens (header lines)
 
