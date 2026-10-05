@@ -201,6 +201,9 @@ class LayoutTokens(BaseModel):
     sparse_air: float = 1.0  # ... paragraph gap (em) of plain body text, at most (lists on a sparse slide)
     sparse_card_air: float = 1.15  # ... a lone row of cards may reach this multiple of its natural height
     sparse_kpi_air: float = 1.15  # ... KPI cards may be this much taller than their content
+    sparse_lead_grow: float = 1.4  # ... the lead line grows with the body text, at most this factor ...
+    sparse_lead_title_max: float = 0.65  # ... and never beyond this share of the title size (stays secondary)
+    sparse_footnote_grow: float = 1.2  # ... footnotes may grow by at most this factor
     chevron_alone_share_sparse: float = (
         0.4  # ... a chevron row alone aims at this share of the body height ...
     )

@@ -2774,6 +2774,90 @@ def _sparse_step(ctx: _Ctx, fc: _Ctx, run, body: Rect, stepped: list[float]) -> 
     return fc
 
 
+def _grow_head(
+    ctx: _Ctx, fin: _Ctx, head: list[Placed], tail: list[Placed], body: Rect, inner_w: int
+) -> None:
+    """A sparse slide's lead and footnotes follow its grown body text (no extra layout pass).
+
+    The body is already placed; the lead / footnotes are re-measured at the larger size and the body moves
+    down (footnotes move up) by the extra height, only when the content still ends above the footnotes.
+    The lead stays below ``sparse_lead_title_max`` x the title size; explicit sizes never change.
+    """
+    lt = ctx.lt
+    g = fin.grow
+    if g <= 1.0 or not fin.out or (lt.sparse_lead_grow <= 1.0 and lt.sparse_footnote_grow <= 1.0):
+        return
+    H = ctx.H
+    title_pt = ctx.theme.sizes.get("title", DEFAULT_SIZES["title"])
+    lead_pt = ctx.theme.sizes.get("lead", DEFAULT_SIZES["lead"])
+    lead_k = min(g, lt.sparse_lead_grow, lt.sparse_lead_title_max * title_pt / max(lead_pt, 1.0))
+    foot_k = min(g, lt.sparse_footnote_grow)
+    li = next(
+        (
+            i
+            for i, p in enumerate(head)
+            if isinstance(p.element, Text)
+            and p.element.role == "lead"
+            and p.element.paragraphs
+            and p.font_scale >= 1.0
+            and p.style.font_size
+            and not _explicit_size(ctx, p.element)
+        ),
+        None,
+    )
+    fis = [
+        i
+        for i, p in enumerate(tail)
+        if isinstance(p.element, Text)
+        and p.element.role == "footnote"
+        and p.font_scale >= 1.0
+        and p.style.font_size
+        and not _explicit_size(ctx, p.element)
+    ]
+    if li is None and not fis:
+        return
+    content_bottom = _content_bottom(fin.out)
+    for t in (1.0, 0.6, 0.3):
+        lk, fk = 1 + (lead_k - 1) * t, 1 + (foot_k - 1) * t
+        new_lead = None
+        dlead = 0
+        if li is not None and lk > 1.0:
+            p = head[li]
+            st = p.style.merged(fast_style(font_size=p.style.font_size * lk))
+            h = round(_text_need(ctx, p.element, st, inner_w, 1.0))
+            if h <= round(H * 0.18):
+                new_lead, dlead = (st, h), max(h - p.h, 0)
+        new_foot: dict[int, tuple[Style, int]] = {}
+        dfoot = 0
+        if fis and fk > 1.0:
+            for i in fis:
+                p = tail[i]
+                st = p.style.merged(fast_style(font_size=p.style.font_size * fk))
+                new_foot[i] = (st, round(_text_need(ctx, p.element, st, inner_w, 1.0)))
+            dfoot = sum(h for _st, h in new_foot.values()) - sum(tail[i].h for i in fis)
+            if sum(h for _st, h in new_foot.values()) > round(H * lt.footnote_max):
+                new_foot, dfoot = {}, 0
+        if new_lead is None and not new_foot:
+            continue
+        if content_bottom + dlead + max(dfoot, 0) > body.bottom:
+            continue
+        if new_lead is not None:
+            p = head[li]
+            head[li] = p.model_copy(update={"style": new_lead[0], "h": new_lead[1]})
+            fin.out = [q.model_copy(update={"y": q.y + dlead}) for q in fin.out]
+        if new_foot:
+            end = max(tail[i].y + tail[i].h for i in fis)
+            y = end - sum(h for _st, h in new_foot.values())
+            for i in fis:
+                st, h = new_foot[i]
+                tail[i] = tail[i].model_copy(update={"style": st, "y": y, "h": h})
+                y += h
+            for i, q in enumerate(tail):
+                if isinstance(q.element, Text) and q.element.role == "conclusion":
+                    tail[i] = q.model_copy(update={"y": q.y - dfoot})
+        return
+
+
 def _table_text(ctx: _Ctx, fc: _Ctx, run, body: Rect, elements: list) -> _Ctx:
     """A table that leaves the body mostly empty grows its text first, then its rows (``table_row_max_em``).
 
@@ -3280,6 +3364,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 ctx.lt.card_stretch_share,
                 ctx.lt.table_row_max_em,
             )
+        if (
+            ctx.dense_k >= 1.0
+            and ctx.lt.grow
+            and not final_ctx.over
+            and (final_ctx.completed or final_ctx.step > 1.0)
+        ):
+            _grow_head(ctx, final_ctx, head, tail, body, inner_w)  # dense decks keep their size ratios
         ctx.diags += final_ctx.diags
         seen: set[str] = set()
         for lab in final_ctx.over:
