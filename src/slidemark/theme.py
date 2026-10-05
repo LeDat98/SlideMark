@@ -411,28 +411,248 @@ def _value(raw: str) -> Any:
 def apply_tokens(theme: Theme, tokens: dict[str, str]) -> tuple[Theme, list[Diagnostic]]:
     """Apply canonical ``path -> raw value`` tokens (``Deck.tokens``) on top of ``theme``.
 
-    Never raises: a token that does not validate is skipped with a ``bad-token`` diagnostic.
+    Values are checked by field type and CSS-like shorthands are mapped (:func:`normalize_token`). Never
+    raises: a token that does not validate is skipped with a ``bad-token`` diagnostic.
     """
     diags: list[Diagnostic] = []
     data = theme.model_dump()
+    names = set(theme.colors) | {p.split(".", 1)[1] for p in tokens if p.startswith("colors.")}
     for path, raw in tokens.items():
         trial = copy.deepcopy(data)
         try:
-            _set_path(trial, path.split("."), _value(raw) if isinstance(raw, str) else raw)
+            pairs = normalize_token(path, raw, names) if isinstance(raw, str) else [(path, raw)]
+            for p, v in pairs:
+                _set_path(trial, p.split("."), v)
             Theme.model_validate(trial)
+        except TokenValueError as e:
+            diags.append(_bad_token(path, raw, str(e), e.hint))
+            continue
         except (ValidationError, ValueError, TypeError, KeyError) as e:
             why = e.errors()[0]["msg"] if isinstance(e, ValidationError) else str(e) or type(e).__name__
-            diags.append(
-                Diagnostic(
-                    level="warning",
-                    message=f"token {path}={raw!s}: {why[:100]}",
-                    rule="bad-token",
-                    hint="check the value type (color #RRGGBB or name, number, length like 12pt/0.3in)",
-                )
-            )
+            diags.append(_bad_token(path, raw, why, _HINT_GENERIC))
             continue
         data = trial
     return Theme.model_validate(data), diags
+
+
+def _bad_token(path: str, raw: Any, why: str, hint: str) -> Diagnostic:
+    return Diagnostic(
+        level="warning",
+        message=f"token {path}={raw!s}: {why[:100]}",
+        rule="bad-token",
+        hint=hint.replace("\n", " "),
+    )
+
+
+# --------------------------------------------------------------------------- token value types
+
+
+class TokenValueError(ValueError):
+    """A token value of the wrong type; ``hint`` is a one-line fix with a valid example."""
+
+    def __init__(self, message: str, hint: str):
+        super().__init__(message)
+        self.hint = hint
+
+
+_HINT_GENERIC = "check the value type (color #RRGGBB or name, number, length like 12pt/0.3in)"
+_HINT_COLOR = "use #RRGGBB, rgb(...), a CSS color name, a theme color name, or none, e.g. #B08D57"
+_HINT_FILL = "use a color, none, linear-gradient(135deg, #AAA, #BBB) or url(path), e.g. #F3F4F6"
+_HINT_LEN = "use a number (pt) or a length like 12pt, 0.3in, 8px, 1cm"
+_HINT_BORDER = (
+    "write '<width> <solid|dashed|dotted> <color>' in any order, e.g. 0.75pt solid #B08D57, or none"
+)
+_HINT_SHADOW = "write none, on, or '<x> <y> <blur> <color>' in pt, e.g. 0 2 6 #00000040"
+_IDENT = re.compile(r"[A-Za-z][\w-]*")
+_KEYWORDS = {"none", "hidden", "solid", "dashed", "dotted", "double", "thin", "medium", "thick"}
+_PT_FIELDS = {"font_size", "line_width", "radius", "letter_spacing"}
+_PT_PATHS = {"min_font_size", "render.line_width", "render.connector_width", "render.chart_line_width"}
+_THEME_COLOR_SUFFIX = ("_fill", "_color", "_band", "_border")
+_OPTIONAL_COLORS = {"title_band", "heading_band", "table_zebra_fill"}
+_MEDIUM_PT = 2.25  # CSS `medium` border width (3px)
+
+
+def _is_length_type(annotation: Any) -> bool:
+    return {a for a in getattr(annotation, "__args__", ()) if a is not type(None)} == {str, float, int}
+
+
+@cache
+def _length_fields() -> frozenset[str]:
+    out = {f"layout.{k}" for k, f in LayoutTokens.model_fields.items() if _is_length_type(f.annotation)}
+    out |= {k for k, f in Theme.model_fields.items() if _is_length_type(f.annotation)}
+    return frozenset(out)
+
+
+def _unquote(v: str) -> str:
+    v = v.strip()
+    return v[1:-1] if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'" else v
+
+
+def _color_value(raw: str, names: set[str] | None, hint: str = _HINT_COLOR) -> str:
+    """Normalized color; ``names=None`` (parse time) accepts any bare word: it may be declared later."""
+    from .parser.css import parse_color
+
+    v = _unquote(raw)
+    if v.lower() in ("none", "null", "off"):
+        return "#00000000"
+    c = parse_color(v, names or set())
+    if c is None and names is None and _IDENT.fullmatch(v):
+        return v
+    if c is None:
+        raise TokenValueError(f"'{v}' is not a color", hint)
+    return c
+
+
+def _pt_value(raw: str) -> float:
+    """A length as a pt number: bare numbers are pt, units convert (``0.3in`` -> 21.6)."""
+    from .units import to_emu
+
+    v = _unquote(raw)
+    if _NUM.match(v):
+        return float(v)
+    try:
+        return round(to_emu(v) / 12700, 3)
+    except (ValueError, KeyError):
+        raise TokenValueError(f"'{v}' is not a length", _HINT_LEN) from None
+
+
+def _length_value(raw: str) -> str | float | int:
+    from .units import to_emu
+
+    v = _unquote(raw)
+    if _NUM.match(v):
+        return float(v) if "." in v else int(v)
+    try:
+        to_emu(v, 100)
+    except (ValueError, KeyError):
+        raise TokenValueError(f"'{v}' is not a length", _HINT_LEN) from None
+    return v
+
+
+def _border_parts(raw: str, names: set[str] | None) -> tuple[float | None, str | None, str | None, bool]:
+    """(width pt, dash, color, none) of a border shorthand, like the css parser's ``border``."""
+    from .parser.css import BadValue, Maps, split_tokens
+
+    toks = [f"{t}pt" if _NUM.match(t) else t for t in split_tokens(_unquote(raw))]
+    if not toks:
+        raise TokenValueError("empty border", _HINT_BORDER)
+    if names is None:  # parse time: a bare word may be a color declared later
+        toks = ["#000" if _IDENT.fullmatch(t) and t.lower() not in _KEYWORDS else t for t in toks]
+    try:
+        return Maps(names or set(), None)._border_parts(" ".join(toks))
+    except BadValue as e:
+        raise TokenValueError(str(e), _HINT_BORDER) from None
+
+
+def _side_value(raw: str, names: set[str] | None) -> str:
+    from .parser.css import fmt
+
+    width, dash, color, none = _border_parts(raw, names)
+    if none:
+        return "none"
+    return f"{fmt(_MEDIUM_PT if width is None else width)}pt {dash or 'solid'} {color or 'fg'}"
+
+
+def _shadow_value(raw: str, names: set[str] | None) -> bool | str:
+    from .parser.css import fmt, parse_color, split_tokens
+
+    v = _unquote(raw)
+    low = v.lower()
+    if low in ("none", "off", "false", "no"):
+        return False
+    if low in ("on", "true", "yes"):
+        return True
+    lens: list[float] = []
+    color: str | None = None
+    for t in split_tokens(v):
+        if _NUM.match(t) or re.fullmatch(r"-?[\d.]+(pt|px|in|cm|mm)", t):
+            lens.append(_pt_value(t))
+            continue
+        c = parse_color(t, names or set())
+        if c is None and names is None and _IDENT.fullmatch(t):
+            c = t
+        if c is None:
+            raise TokenValueError(f"'{t}' is not a number or color in shadow", _HINT_SHADOW)
+        color = c
+    if not 2 <= len(lens) <= 4:
+        raise TokenValueError("a shadow needs x, y [, blur [, spread]]", _HINT_SHADOW)
+    while len(lens) < 3:
+        lens.append(0.0)
+    if color is None:
+        color = "#00000040"
+    elif re.fullmatch(r"#[0-9A-F]{6}", color):
+        color += "FF"
+    return " ".join([*(fmt(x) for x in lens), color])
+
+
+def _line_pairs(base: str, raw: str, names: set[str] | None) -> list[tuple[str, Any]]:
+    """``<class>.line`` (``border``): a color, or a CSS border shorthand (width, style, color, none)."""
+    width, dash, color, none = _border_parts(raw, names)
+    if none:
+        return [(f"{base}.line_width", 0.0)]
+    out: list[tuple[str, Any]] = []
+    if color:
+        out.append((f"{base}.line", color))
+    if width is not None:
+        out.append((f"{base}.line_width", round(width, 3)))
+    if dash:
+        out.append((f"{base}.line_dash", dash))
+    return out
+
+
+def _fill_value(path: str, raw: str, names: set[str] | None) -> list[tuple[str, Any]]:
+    from .parser.css import BadValue, gradient, is_gradient
+
+    v = _unquote(raw)
+    if is_gradient(v):
+        try:
+            return [(path, gradient(v, names or set()))]
+        except BadValue as e:
+            raise TokenValueError(str(e), _HINT_FILL) from None
+    if re.fullmatch(r"url\(.*\)", v, re.I | re.S):
+        return [(path, v)]
+    return [(path, _color_value(v, names, _HINT_FILL))]
+
+
+def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[str, Any]]:
+    """Validate a raw token value by its field type and map CSS-like shorthands.
+
+    Returns the ``(canonical path, typed value)`` pairs to set (a border shorthand sets up to three).
+    ``names`` are the known theme color names; ``None`` is the lenient parse-time mode where any bare word
+    passes as a possibly later-declared color. Raises :class:`TokenValueError` (message + one-line hint).
+    """
+    parts = path.split(".")
+    leaf = parts[-1]
+    in_class = len(parts) == 3 and parts[0] == "classes"
+    if in_class and leaf == "line":
+        return _line_pairs(".".join(parts[:2]), raw, names)
+    if in_class and leaf == "fill":
+        return _fill_value(path, raw, names)
+    if in_class and leaf == "color":
+        return [(path, _color_value(raw, names))]
+    if in_class and leaf.startswith("border_"):
+        return [(path, _side_value(raw, names))]
+    if (in_class and leaf == "shadow") or path == "render.shadow":
+        val = _shadow_value(raw, names)
+        if path == "render.shadow" and not isinstance(val, str):
+            raise TokenValueError("render.shadow needs x y blur color", _HINT_SHADOW)
+        return [(path, val)]
+    if path == "palette":
+        items = [p.strip() for p in _unquote(raw).split(",") if p.strip()]
+        return [(path, [_color_value(p, names) for p in items])]
+    if parts[0] == "colors" or path in ("render.ink_dark", "render.ink_light", "render.highlight"):
+        return [(path, _color_value(raw, names))]
+    if len(parts) == 1 and leaf.endswith(_THEME_COLOR_SUFFIX) and leaf in Theme.model_fields:
+        if leaf in _OPTIONAL_COLORS and _unquote(raw).lower() in ("none", "null", "off"):
+            return [(path, None)]
+        return [(path, _color_value(raw, names))]
+    if (in_class and leaf in _PT_FIELDS) or path in _PT_PATHS or parts[0] == "sizes":
+        return [(path, _pt_value(raw))]
+    if path in _length_fields() or (
+        in_class and leaf in Style.model_fields and _is_length_type(Style.model_fields[leaf].annotation)
+    ):
+        return [(path, _length_value(raw))]
+    return [(path, _value(raw))]
 
 
 def _set_path(data: dict, parts: list[str], value: Any) -> None:
