@@ -163,3 +163,58 @@ def test_docs_switch(monkeypatch, capsys):
         assert capsys.readouterr().err.strip() == "docs are disabled here: SKILL.md has everything"
     monkeypatch.setenv("SLIDEMARK_NO_DOCS", "")
     assert main(["docs"]) == 0
+
+
+BRAND_DECK = """colors: bg=#0B1F3A fg=#FFFFFF primary=#FF6B57 accent=#FF6B57
+fonts: heading=Montserrat body="Open Sans"
+
+# Brand
+
+- one
+"""
+
+
+def _look(capsys) -> list[str]:
+    return [ln for ln in capsys.readouterr().out.splitlines() if ln.startswith("look:")]
+
+
+def test_look_line_for_brand_deck(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    _stdin(monkeypatch, BRAND_DECK)
+    assert main(["build", "-", "-o", "d.pptx"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[-1].startswith("wrote ") and out[-2].startswith("look: ")
+    look = out[-2]
+    assert len(look) <= 170
+    for want in ("bg #0B1F3A", "text #FFFFFF", "primary #FF6B57", "accent #FF6B57", "Montserrat (headings)"):
+        assert want in look
+    assert "Open Sans (body)" in look and "title band off" in look and "(ea)" not in look
+
+
+def test_look_line_absent_for_default_deck(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    _stdin(monkeypatch, BULLET_DECK)
+    assert main(["build", "-", "-o", "d.pptx"]) == 0
+    assert _look(capsys) == []
+
+
+def test_look_line_shows_ea_font_for_japanese(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    _stdin(monkeypatch, "lang: ja\nfonts: ea=Meiryo\n\n# 見出し\n\n- 一\n")
+    assert main(["build", "-", "-o", "d.pptx"]) == 0
+    assert "Meiryo (ea)" in _look(capsys)[0]
+
+
+def test_look_line_reports_contrast_shift(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    _stdin(monkeypatch, "colors: bg=#FFFFFF fg=#111111 primary=#84CC16\n\n# Hi\n\n- one\n")
+    assert main(["build", "-", "-o", "d.pptx"]) == 0
+    assert "text shades adjusted for contrast: primary #84CC16 -> #" in _look(capsys)[0]
+
+
+def test_build_help_mentions_look_line(capsys):
+    try:
+        main(["build", "--help"])
+    except SystemExit:
+        pass
+    assert "'look:' line" in capsys.readouterr().out.replace("\n", " ")
