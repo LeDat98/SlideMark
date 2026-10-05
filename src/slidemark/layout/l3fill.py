@@ -18,7 +18,7 @@ unchanged.
 
 from __future__ import annotations
 
-from ..ir import Chart, Container, Image, Media, Placed, Text
+from ..ir import Chart, Container, Image, Media, Placed, Shape, Text
 from ..theme import LayoutTokens
 from ..units import EMU_PER_PT, to_emu
 from . import measure
@@ -51,22 +51,45 @@ def _inner_texts(card: Placed, out: list[Placed]) -> list[Placed] | None:
     return inner
 
 
-def _spread(p: Placed, avail: int, lt: LayoutTokens, pad: int) -> Placed:
-    """Paragraph gaps of ``p`` grow (capped) so its text spans ``avail`` EMU; ``p.h`` becomes ``avail``."""
+def _text_pad(p: Placed) -> int:
+    if p.style.padding is None:
+        return 0
+    try:
+        return to_emu(p.style.padding)
+    except ValueError:
+        return 0
+
+
+def _spread(
+    p: Placed, avail: int, lt: LayoutTokens, pad: int, s: float = 1.0, short: bool = False
+) -> tuple[Placed, float] | None:
+    """Text of ``p`` grown by ``s`` and its paragraph gaps spread (capped) to span ``avail`` EMU.
+
+    Returns the new item (``h`` = ``avail``) and the free height left under the text; ``None`` when the
+    grown text would wrap onto more lines or not fit (the caller keeps the smaller step)."""
     paras = p.element.paragraphs
+    pad = _text_pad(p)  # the text's own inset (what lint and the renderer measure with)
+    width = p.w - 2 * pad
+    if s > 1.0:
+        h0 = measure.paragraphs_height(paras, width, p.style, p.font_scale, gap=0.0)
+        p = p.model_copy(update={"font_scale": p.font_scale * s})
+        tight = round(width * (1.0 - lt.l3_wrap_margin))  # the render wraps a bit earlier than the estimate
+        if measure.paragraphs_height(paras, tight, p.style, p.font_scale, gap=0.0) > h0 * s * 1.015:
+            return None  # a new wrapped line / orphan (CJK wrap guard)
     p = p.model_copy(update={"h": avail})
     n = len(paras)
-    if n < 2:
-        return p
     g0 = measure.element_gap(p.element)
     g0 = measure.para_gap() if g0 is None else g0
-    width = p.w - 2 * pad
     need = measure.paragraphs_height(paras, width, p.style, p.font_scale, gap=g0)
     free = avail - 2 * pad - need
+    if free < 0 and s > 1.0:
+        return None
     size = (p.style.font_size or 18) * p.font_scale * EMU_PER_PT
-    if free <= 0 or size <= 0:
-        return p
+    if n < 2 or free <= 0 or size <= 0:
+        return p, max(free, 0.0)
     cap = lt.l3_gap_extra_numbered if paras[0].marker == "number" else lt.l3_gap_extra
+    if short and n <= lt.l3_short_items:
+        cap = max(cap, lt.l3_gap_extra_short)
     extra = min(max(cap, 0.0), free / ((n - 1) * size))
     for _ in range(10):  # the estimate carries a safety factor: shrink until it surely fits
         if extra <= 0.01 or measure.paragraphs_height(
@@ -75,20 +98,45 @@ def _spread(p: Placed, avail: int, lt: LayoutTokens, pad: int) -> Placed:
             break
         extra *= 0.9
     if extra <= 0.01:
-        return p
-    return p.model_copy(
+        return p, free
+    need = measure.paragraphs_height(paras, width, p.style, p.font_scale, gap=g0 + extra)
+    p = p.model_copy(
         update={
             "element": p.element.model_copy(
                 update={"attrs": {**p.element.attrs, "para_gap": round(g0 + extra, 3)}}
             )
         }
     )
+    return p, max(avail - 2 * pad - need, 0.0)
+
+
+def _max_step(card: Placed, inner: list[Placed], lt: LayoutTokens) -> float:
+    """Largest text growth factor a card's body text may take (explicit sizes never grow)."""
+    heads = [p for p in inner if p.element.role == "heading"]
+    mains = [p for p in inner if p.element.role != "heading" and not _is_note(p)]
+    if len(mains) != 1 or getattr(mains[0].element, "style", None) and mains[0].element.style.font_size:
+        return 1.0
+    m = mains[0]
+    pt = (m.style.font_size or 18) * m.font_scale
+    cap = lt.sparse_low_max_pt
+    if heads:
+        hp = max((h.style.font_size or 18) * h.font_scale for h in heads)
+        cap = min(cap, hp * lt.l3_body_head_max)
+    return max(cap / pt, 1.0) if pt > 0 else 1.0
 
 
 def _fill_card(
-    card: Placed, inner: list[Placed], top: int, bottom: int, lt: LayoutTokens
-) -> dict[int, Placed] | None:
-    """New geometry of ``card`` and its texts for the box ``top..bottom``; ``None`` = leave it alone."""
+    card: Placed,
+    inner: list[Placed],
+    top: int,
+    bottom: int,
+    lt: LayoutTokens,
+    s: float = 1.0,
+    short: bool = False,
+) -> tuple[dict[int, Placed], float, float] | None:
+    """New geometry of ``card`` and its texts for the box ``top..bottom``; ``None`` = leave it alone.
+
+    Also returns the free height under the body text and the text's end below ``top`` (EMU)."""
     dy = top - card.y
     heads = [p for p in inner if p.element.role == "heading"]
     notes = [p for p in inner if p.element.role != "heading" and _is_note(p)]
@@ -110,8 +158,14 @@ def _fill_card(
     avail = floor - m.y
     if avail < main.h - 2:  # never squeeze the text
         return None
-    res[id(main)] = m.model_copy(update={"h": avail}) if kpi else _spread(m, avail, lt, pad)
-    return res
+    if kpi:
+        res[id(main)] = m.model_copy(update={"h": avail})
+        return res, 0.0, avail
+    sp = _spread(m, avail, lt, pad, s, short)
+    if sp is None:
+        return None
+    res[id(main)], free = sp
+    return res, free + pad, m.y - top + (avail - free)  # the card's bottom inset is empty too
 
 
 def _apply(out: list[Placed], res: dict[int, Placed]) -> list[Placed]:
@@ -136,6 +190,24 @@ def fill_row(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool =
         return out
 
 
+def _row_extras(items: list[Placed], cards: list[Placed], covered: set[int]):
+    """Arrows between the cards and notes under them; ``None`` when anything else shares the body."""
+    top = min(c.y for c in cards)
+    bottom = max(c.y + c.h for c in cards)
+    arrows: list[Placed] = []
+    tails: list[Placed] = []
+    for p in items:
+        if id(p) in covered:
+            continue
+        if isinstance(p.element, Shape) and p.h <= to_emu("0.05in") and top <= p.y <= bottom:
+            arrows.append(p)  # a flow arrow: stays centred between the cards
+        elif isinstance(p.element, Text) and p.y >= bottom - 2:
+            tails.append(p)  # a callout / conclusion bar under the row: follows the cards
+        else:
+            return None
+    return arrows, tails
+
+
 def _fill_row(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool) -> list[Placed]:
     if not lt.l3_fill or lt.body_valign == "top" or body.h <= 0:
         return out
@@ -152,20 +224,76 @@ def _fill_row(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool)
             return out
         plan[id(c)] = inner
     covered = {id(p) for ps in plan.values() for p in ps} | set(plan)
-    if any(id(p) not in covered for p in items):  # free text / tables / shapes next to the cards
+    extras = _row_extras(items, cards, covered)
+    if extras is None:  # free text / tables / shapes next to the cards
         return out
+    arrows, tails = extras
     if min(c.y + c.h for c in cards) <= max(c.y for c in cards):  # not one row
         return out
+    old_bottom = max(c.y + c.h for c in cards)
     top = body.y
-    bottom = body.bottom - round(lt.sparse_row_bottom_band * body.h)
+    tail_h = max((p.y + p.h for p in tails), default=old_bottom) - old_bottom
+    bottom = body.bottom - round(lt.sparse_row_bottom_band * body.h) - tail_h
     if bottom - top < max(c.h for c in cards) or any(c.y < top for c in cards):
         return out
-    res: dict[int, Placed] = {}
-    for c in cards:
-        r = _fill_card(c, plan[id(c)], top, bottom, lt)
-        if r is None:
-            return out  # one card refuses: the row stays as it was
-        res.update(r)
+    kpi = all("kpi" in c.element.classes for c in cards)
+    full = bottom - top
+
+    def run(h: int, s: float, short: bool):
+        """(placed items, free heights, text ends) of every card at row height ``h``; ``None`` = refused."""
+        res: dict[int, Placed] = {}
+        frees: list[float] = []
+        ends: list[float] = []
+        for c in cards:
+            r = _fill_card(c, plan[id(c)], top, top + h, lt, s, short)
+            if r is None:
+                return None
+            res.update(r[0])
+            frees.append(r[1])
+            ends.append(r[2])
+        return res, frees, ends
+
+    r = run(full, 1.0, False)
+    if r is None:
+        return out  # one card refuses: the row stays as it was
+    h, s_ok = full, 1.0
+    tail_max = lt.l3_tail_max * full
+    if (
+        not kpi and max(r[1]) > tail_max
+    ):  # (a) grow the text, (b) wider gaps of short lists, (c) shorter cards
+        s_top = min(_max_step(c, plan[id(c)], lt) for c in cards)
+        k = 1
+        while s_top > 1.0 + 1e-6 and max(r[1]) > tail_max:
+            s = min(1.0 + k * lt.l3_grow_step, s_top)
+            nxt = run(full, s, False)
+            if nxt is None:
+                break
+            r, s_ok = nxt, s
+            k += 1
+            if s >= s_top:
+                break
+        if max(r[1]) > tail_max:
+            nxt = run(full, s_ok, True)
+            r = nxt if nxt is not None else r
+        if max(r[1]) > tail_max:  # (c) the shortest row whose emptiest card keeps its tail within the limit
+            nat = max(c.h for c in cards)
+            h0 = max((full - max(r[1])) / (1.0 - lt.l3_tail_aim), nat)
+            for k in range(0, 40):
+                h = round(min(h0 * (1.0 + 0.03 * k), full))
+                nxt = run(h, s_ok, True)
+                if nxt is not None or h >= full:
+                    break
+            if nxt is not None:
+                r = nxt
+            else:
+                h = full
+    res = dict(r[0])
+    if arrows:  # keep the arrows on the middle of the new card row
+        old_mid = (min(c.y for c in cards) + old_bottom) / 2
+        for a in arrows:
+            res[id(a)] = a.model_copy(update={"y": round(top + h / 2 - (old_mid - a.y))})
+    for p in tails:
+        res[id(p)] = p.model_copy(update={"y": top + h + (p.y - old_bottom)})
     return _apply(out, res)
 
 
@@ -197,5 +325,50 @@ def _fill_panels(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed
             continue
         r = _fill_card(c, inner, c.y, c.y + c.h, lt)
         if r is not None:
-            res.update(r)
+            res.update(r[0])
     return _apply(out, res) if res else out
+
+
+def fill_chevron_row(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+    """A lone chevron row is top-anchored right under the lead (never floating mid-slide)."""
+    try:
+        return _fill_chevron_row(out, body, lt)
+    except Exception:  # never raise on bad input
+        return out
+
+
+def _fill_chevron_row(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+    if not lt.l3_fill or lt.sparse_left_max <= 0 or lt.body_valign == "top" or body.h <= 0:
+        return out
+    items = _body_items(out, body)
+    chevs = [p for p in items if isinstance(p.element, Shape) and p.element.shape == "chevron"]
+    if len(chevs) < 2:
+        return out
+    ids = {id(c) for c in chevs}
+    for p in items:  # only icons sitting on a chevron may share the body
+        if id(p) not in ids and not (
+            isinstance(p.element, Shape) and p.element.shape == "icon" and any(_contains(c, p) for c in chevs)
+        ):
+            return out
+    if min(c.y + c.h for c in chevs) <= max(c.y for c in chevs):  # not one row
+        return out
+    top = min(c.y for c in chevs)
+    h0 = max(c.h for c in chevs)
+    if body.bottom - (body.y + h0) <= round(lt.sparse_left_max * body.h):
+        return out  # the row already fills the body (a conclusion bar may sit below it)
+    grow = max(round(lt.chevron_fill_share * body.h) - h0, 0)
+    if grow > body.bottom - (top + h0):  # never past the body
+        grow = max(body.bottom - (top + h0), 0)
+    dy = body.y - top
+    if dy >= 0 and not grow:
+        return out
+    dy = min(dy, 0)
+    res: dict[int, Placed] = {}
+    for p in items:
+        if id(p) in ids:  # the point depth (adj x shorter side) stays, so the text area keeps its width
+            adj = p.element.attrs.get("adj", lt.chevron_adj) * min(p.w, p.h) / max(min(p.w, p.h + grow), 1)
+            el = p.element.model_copy(update={"attrs": {**p.element.attrs, "adj": round(adj, 4)}})
+            res[id(p)] = p.model_copy(update={"y": p.y + dy, "h": p.h + grow, "element": el})
+        else:  # an icon stays centred on its chevron
+            res[id(p)] = p.model_copy(update={"y": p.y + dy + grow // 2})
+    return _apply(out, res)
