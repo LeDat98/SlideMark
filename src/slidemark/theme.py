@@ -189,6 +189,7 @@ class LayoutTokens(BaseModel):
         28  # ... body text may reach this size (pt), at most sparse_step_max x the theme body
     )
     sparse_row_gap_max: Length = "0.5in"  # ... rows of blocks move apart by at most this much per gap, first
+    kpi_fit_margin: float = 0.9  # ... a grown KPI number fills at most this share of the width it fits in
     sparse_air: float = 1.0  # ... paragraph gap (em) of plain body text, at most (lists on a sparse slide)
     sparse_card_air: float = 1.15  # ... a lone row of cards may reach this multiple of its natural height
     sparse_kpi_air: float = 1.15  # ... KPI cards may be this much taller than their content
