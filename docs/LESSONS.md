@@ -101,3 +101,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [env] Worktree subagents that install only `.[dev]` see `tests/test_design_roundtrip.py` html cases fail (no Playwright) → tell them `.[dev,html]`.
 - [layout] Roomy/balance floors skipped any slide with a tail (callout under a flow row) → use the grid area as reference when the tail is text. A lone html block hugs the top of its box → wrap its source in a `100vh` flex column (`layout.html_fit`, `{fit=off}`).
 - [import] Foreign decks: derived look tokens (`importer/look.py`) must win a trial build (a dominant-text-color guess misfired on SlideMark decks: roundtrip 113 → 98 without the check); strict majority for bg; skip radii that vary per card.
+- [layout] Stretching a lone HTML block to the body made 70%-empty cards → `layout.html_fit` is opt-in (default off).

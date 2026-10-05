@@ -31,9 +31,14 @@ def test_flow_row_with_callout_fills_the_body():  # 05-jp-process slide 2
     assert all(c.y + c.h <= callout.y for c in cards)  # the callout still closes the slide
 
 
-def test_lone_html_block_is_stretched_to_the_box():  # 12-html-svg-math slide 1
-    items, _ = _slide("12-html-svg-math", 1)
+def test_lone_html_block_fit_is_opt_in():  # 12-html-svg-math slide 1
+    items, _ = _slide("12-html-svg-math", 1)  # default: stretched cards had ~70% empty interiors
     raw = next(p for p in items if isinstance(p.element, Raw))
+    assert "100vh" not in raw.element.source
+    md = ROOT / "examples" / "12-html-svg-math.md"
+    deck = parse("style: layout.html_fit=on\n" + md.read_text(encoding="utf-8"))
+    theme, _ = deck_theme(deck, md.parent)
+    raw = next(p for p in layout_slide(deck.slides[0], deck, theme, 0) if isinstance(p.element, Raw))
     assert "100vh" in raw.element.source and raw.h > 0.6 * 6858000
 
 
