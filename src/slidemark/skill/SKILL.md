@@ -106,7 +106,8 @@ num: on
 ````
 
 Japanese: half-width digits, units in Japanese (`12.4億円`), one-line bullets (≈ 25 full-width chars per
-column of a 3-column slide), `▲3` = −3 in tables, `density: dense` (deck) or `@dense` (slide) for packed slides.
+column of a 3-column slide), `▲3` = −3 in tables. `jp-business` is already compact: add `@dense` only to a slide
+that is still too full, not `density: dense` for the whole deck.
 
 ## Pattern 3: brand colours and fonts
 
