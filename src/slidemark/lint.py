@@ -201,6 +201,11 @@ def _fix_hint(
         token = f"{sel}.band.color" if p.style.fill and sel in ("title", "heading") else f"{sel}.color"
     else:
         return f"{label}: add {{color={ink}}} to this block"
+    if token.endswith(".color") and not on_fill and token != "kpi.color" and not token.startswith("colors."):
+        # a selector colors text of every size on bg and on cards: suggest one value that passes everywhere
+        every = list(dict.fromkeys([*back_hex, *(h for h in theme.surface_backs() if h)]))
+        ink = nearest_passing(theme.hexval(color) or ink, every, theme.render.contrast_min)
+        label = f"set the color to {ink} (passes {theme.render.contrast_min:g}:1 on {back_hex[0]})"
     return f"{label}: style: {token}={ink}"
 
 

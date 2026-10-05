@@ -105,7 +105,7 @@ def inline(
                 body = f"**{body}**"
             if imp_color and r.color == imp_color:
                 pass
-            elif accent and r.color == accent and not r.badge:
+            elif accent and r.color in accent.split("|") and not r.badge:  # `A|B`: accent shades
                 body = f"=={body}=="
             elif r.color and not r.badge and (cname := (classes or {}).get(r.color)) in ("success", "danger"):
                 body = f"[{body}]{{.{cname}}}"

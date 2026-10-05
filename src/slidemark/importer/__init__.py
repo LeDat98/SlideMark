@@ -203,8 +203,10 @@ def _drawn_accent(theme, tokens: dict, accent: str) -> str:
         from ..theme import apply_tokens
 
         th, _ = apply_tokens(theme, {k: str(v) for k, v in tokens.items()})
-        got = th.hexval(th.legible("accent"))
-        return got.lstrip("#").upper() if got else accent
+        # the legible shade depends on the text size (large text needs only 3:1): accept every variant
+        shades = [th.hexval(th.legible("accent", size)) for size in (None, 100.0)]
+        got = [s.lstrip("#").upper() for s in dict.fromkeys(shades) if s]
+        return "|".join(got) if got else accent
     except Exception:  # never raise on a foreign deck: fall back to the plain accent
         return accent
 

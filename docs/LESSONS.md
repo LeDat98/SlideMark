@@ -131,3 +131,5 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [tokens] Contrast-safe ink is derived once in `deck_theme` (`theme.derive_ink`): text on a theme fill → `best_ink`, text in a theme colour → `nearest_passing`; explicit deck tokens and hex run colours are never changed (lint reports them with a paste-ready `style: x.color=#…`). `ink.auto=off` disables it. `_value("off")` is None → parse booleans explicitly.
 - [lint] Lint judged the KPI Text as `fg` while the renderer drew `primary` → silent 1.9:1 numbers. Lint and render must share one colour resolver (`Theme.run_color`, `Theme.badge_ink`). Tables are still not contrast-linted.
 - [import] A derived accent shade broke `==x==` detection on import → `_drawn_accent` maps it back.
+- [process] `tail -2 log && git push` pushed a red suite (tail succeeds) → check for "failed" explicitly: `grep -q ' failed' log || git push`. Fixed within minutes (run 5).
+- [import] Legible accent shades depend on text size (3:1 large, 4.5:1 normal) → the importer accepts every variant (`A|B` in `emit.inline`).
