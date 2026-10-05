@@ -954,8 +954,25 @@ def _emit_links(ctx: _Ctx, links: list[Link], rects: dict[int, Rect]) -> None:
         ctx.emit(Shape(shape="line", attrs=attrs), rect, Style(line="primary", line_width=1.5))
 
 
+def _group_nat(ctx: _Ctx, g: Container, width: int, inherit: Style) -> tuple[int | None, str]:
+    """Natural height of a row group (one row of boxes): its tallest box; kind kpi if all boxes are KPIs."""
+    kids = [c for c in g.children if isinstance(c, Container)]
+    m = re.match(r"\d+", g.grid or "")
+    if not kids or len(kids) != len(g.children) or not m or len(kids) > int(m.group()):
+        return None, "other"
+    gap = _gap(ctx, g.gap, width, small=True)
+    w = max((width - gap * (len(kids) - 1)) // len(kids), 1)
+    nats = [_box_nat(ctx, k, w, inherit) for k in kids]
+    if any(n is None for n in nats):
+        return None, "other"
+    kind = "kpi" if all("kpi" in k.classes for k in kids) else "other"
+    return max(nats), kind
+
+
 def _cell_nat(ctx: _Ctx, blk, width: int, inherit: Style) -> tuple[int | None, str]:
     """(natural height, kind) of a grid cell; kind is ``kpi``, ``table`` or ``other``."""
+    if isinstance(blk, Container) and "group" in blk.classes:
+        return _group_nat(ctx, blk, width, inherit)
     if isinstance(blk, Container):
         return _box_nat(ctx, blk, width, inherit), "kpi" if "kpi" in blk.classes else "other"
     if isinstance(blk, Table):

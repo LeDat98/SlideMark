@@ -58,7 +58,9 @@ def table(path: str, ranges: list[tuple[int, int]]) -> dict[str, list[int]]:
             ch = chr(cp)
             w = round(font.getlength(ch))
             blank = ch.isspace() or cp in range(0x200B, 0x2010)
-            has = font.getmask(ch).getbbox() is not None or (blank and w != round(notdef))
+            has = font.getmask(ch).getbbox() is not None or (
+                blank and (cp in (0x20, 0xA0) or w != round(notdef))
+            )
             if has and w > 0:
                 if start is None:
                     start = cp

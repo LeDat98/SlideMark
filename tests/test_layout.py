@@ -392,7 +392,7 @@ def test_long_table_shrinks_then_reports():
 
 
 def test_footnotes_shrink_and_report():
-    notes = [T("※ 注記の文章がここに入ります。" * 6, "footnote") for _ in range(6)]
+    notes = [T("※ 注記の文章がここに入ります。" * 9, "footnote") for _ in range(6)]
     placed, deck = lay(Slide(title=T("t", "title"), elements=[T("body")], footnotes=notes))
     fn = [p for p in placed if isinstance(p.element, Text) and p.element.role == "footnote"]
     assert fn and all(p.font_scale < 1.0 for p in fn)
