@@ -24,8 +24,8 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 - [x] Syntax tokens ≤ 35% of python-pptx on the corpus
 
 ## L2: Looks good by default (target: day 4)
-- [ ] Layout inferred for ≥ 90% of example slides (no `layout:` written)
-- [ ] Autofit with real font metrics: 0 overflow on all examples; overflow diagnostic when below `min_font_size`
+- [ ] Layout inferred for ≥ 90% of example slides (no `layout:` written) — `bench/layout_inference.py`: 65% (2026-10-05)
+- [x] Autofit with real font metrics: 0 overflow on all examples; overflow diagnostic when below `min_font_size`
 - [ ] CJK correct: `<a:ea>` font set, full-width measurement, no broken line wrapping in JP examples
 - [ ] ≥ 3 polished themes (light, dark, `jp-business` dense)
 - [x] Golden image tests catch any visual regression (tests/test_golden.py)
@@ -34,12 +34,12 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 - [ ] Dense JP slide set (≥ 8 slides: 3–4 column boxes, KPI tables, process arrows, lead line, ※ footnotes,
       source line, 10–12pt) built from Markdown only, judged "consulting-grade" in review
 - [ ] Components: cards, callouts, KPI, steps/chevrons, badges, connectors, icons, 12-column grid
-- [ ] All 10 chart kinds native with labels/legend/number formats; OMML math
-- [ ] `check` linter: overflow, off-slide, overlap, low contrast, missing alt → one-line JSON diagnostics
-- [ ] Syntax tokens ≤ 30% of python-pptx; dense slide ≤ 40% of the equivalent HTML
+- [x] All 10 chart kinds native with labels/legend/number formats; OMML math (OMML verified in XML; LibreOffice shows the fallback)
+- [x] `check` linter: overflow, off-slide, overlap, low contrast, missing alt → one-line JSON diagnostics
+- [ ] Syntax tokens ≤ 30% of python-pptx; dense slide ≤ 40% of the equivalent HTML (30% ✓; dense 58–60% ✗: content text dominates)
 
 ## L4: Agent-native
-- [ ] `slidemark docs`, `schema`, `skill install`; SKILL.md ≤ 1,500 tokens, each reference file ≤ 800
+- [x] `slidemark docs`, `schema`, `skill install`; SKILL.md ≤ 1,500 tokens, each reference file ≤ 800
 - [ ] Lenient parser: Marp/Slidev/common-mistake variants accepted with warnings (fuzz: 0 crashes in 100k inputs)
 - [ ] Agent eval (≥ 20 tasks): first-pass `check` success ≥ 90%, mean fix rounds ≤ 0.3
 - [ ] Total agent tokens per deck (docs + output + fixes) ≤ 40% of a python-pptx agent on the same tasks
