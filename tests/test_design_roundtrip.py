@@ -168,3 +168,34 @@ def test_style_to_css_is_exact(decl):
 
 def test_empty_style_is_empty_css():
     assert style_to_css(Style()) == ""
+
+
+def test_token_class_on_a_box_is_recovered(tmp_path):
+    text = "style: hero.fill=#112233 hero.color=#FFFFFF\n\n# T\n## A {.hero}\n- x\n## B\n- y\n"
+    a = tmp_path / "A.pptx"
+    build(text, a)
+    t, _ = import_pptx(a, tmp_path)
+    assert "## A {.hero}" in t
+    assert "## B\n" in t or t.rstrip().endswith("## B\n- y")
+    assert parse(t).slides[0].elements[0].classes == ["hero"]
+
+
+def test_css_id_and_class_on_a_box_are_recovered(tmp_path):
+    text = (
+        "```css\n#top { color: #C00 }\n.note { color: #080 }\n```\n\n# T\n## A {#top .note}\n- x\n## B\n- y\n"
+    )
+    a = tmp_path / "A.pptx"
+    build(text, a)
+    t, _ = import_pptx(a, tmp_path)
+    box = parse(t).slides[0].elements[0]
+    assert box.id == "top"
+    assert "note" in box.classes
+
+
+def test_template_theme_path_follows_the_imported_file(tmp_path):
+    text = (EXAMPLES / "10-template.md").read_text(encoding="utf-8")
+    a = tmp_path / "A.pptx"
+    build(text, a, base_dir=EXAMPLES)
+    t, diags = import_pptx(a, tmp_path)
+    assert t.startswith("theme: A.pptx")
+    assert any(d.rule == "import-template" for d in diags)

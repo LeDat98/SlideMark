@@ -5,7 +5,11 @@ and does not flag for repair. The item is ``<sm:design xmlns:sm="urn:slidemark:d
 
     {"v": 1, "theme": "none", "tokens": {"colors.primary": "#7C5CFF"},
      "css": [["h1, h2", "color: #fff; font-size: 54pt"]],
-     "slides": [{"id": 256, "css": [...], "html": "<div>..</div>", "title": "Launch", "cls": ["dark"]}]}
+     "slides": [{"id": 256, "css": [...], "html": "<div>..</div>", "title": "Launch", "cls": ["dark"],
+                 "el": [["Signal", "hero", "#intro"]]}]}
+
+``el`` lists the ``##`` boxes of a slide that carry a class or id the design refers to (a token class, a css
+selector): ``[heading, name, ...]`` in document order, ``name`` being ``hero`` for ``.hero`` or ``#intro``.
 
 Slides are keyed by their ``p:sldId`` id, so reordering or deleting slides in PowerPoint keeps the match.
 The importer reads it back (``slidemark import``); nothing here ever raises.
@@ -145,6 +149,33 @@ def rules_payload(rules: list[CssRule]) -> list[list[str]]:
 # --------------------------------------------------------------------------- payload
 
 
+def _referenced(deck: Deck) -> set[str]:
+    """Class names (``hero``) and ids (``#intro``) that token paths or css selectors of the deck mention."""
+    names: set[str] = set()
+    for path in deck.tokens or {}:
+        parts = path.split(".")
+        if len(parts) >= 3 and parts[0] == "classes":
+            names.add(parts[1])
+    for sl in [deck, *deck.slides]:
+        for r in sl.css or []:
+            names.update(re.findall(r"\.([A-Za-z_][\w-]*)", r.selector))
+            names.update("#" + m for m in re.findall(r"#([A-Za-z_][\w-]*)", r.selector))
+    return names
+
+
+def _boxes(elements: list[Any], names: set[str], out: list[list[str]]) -> None:
+    """Append ``[heading, name, ...]`` for each container whose classes or id are in ``names``."""
+    for el in elements:
+        if getattr(el, "type", None) != "container":
+            continue
+        mine = [c for c in el.classes if c in names]
+        if el.id and "#" + el.id in names:
+            mine.append("#" + el.id)
+        if mine and el.title is not None:
+            out.append(["".join(p.plain for p in el.title.paragraphs), *mine])
+        _boxes(el.children, names, out)
+
+
 def design_payload(deck: Deck, slide_ids: list[int | None]) -> dict[str, Any]:
     """The JSON-able design source of ``deck``; ``{}`` when there is nothing worth storing."""
     data: dict[str, Any] = {}
@@ -155,10 +186,16 @@ def design_payload(deck: Deck, slide_ids: list[int | None]) -> dict[str, Any]:
     if deck.css:
         data["css"] = rules_payload(deck.css)
     slides: list[dict[str, Any]] = []
+    names = _referenced(deck)
     for i, sl in enumerate(deck.slides):
         ent: dict[str, Any] = {}
         if sl.css:
             ent["css"] = rules_payload(sl.css)
+        if names:
+            els: list[list[str]] = []
+            _boxes(sl.elements, names, els)
+            if els:
+                ent["el"] = els
         if sl.html is not None:
             ent["html"] = sl.html
             if sl.title is not None:

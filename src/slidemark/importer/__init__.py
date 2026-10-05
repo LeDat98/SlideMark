@@ -17,7 +17,9 @@ from .design import (
     edited,
     edited_diag,
     html_slide_lines,
+    is_template_path,
     match_slide,
+    tag_boxes,
 )
 from .read import ReadCtx, SlideData, read_sections, read_slide
 from .structure import DeckInfo, build_slide, notes_lines
@@ -220,8 +222,18 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
     header: list[str] = []
     css_head: list[str] = []
     if design:
-        head_lines, css_head = design_header(design)
+        own = bool(src_name) and is_template_path(design.get("theme")) and _custom_theme(prs)
+        head_lines, css_head = design_header(design, src_name if own else "")
         header.extend(head_lines)
+        if own:
+            diags.append(
+                Diagnostic(
+                    level="info",
+                    message=f"built on a template; 'theme: {src_name}' reuses this file as one",
+                    rule="import-template",
+                    hint="keep the .pptx next to the .md (or change the theme: path)",
+                )
+            )
     elif theme is not DEFAULT:
         header.append(f"theme: {theme.name}")
     elif src_name and _custom_theme(prs):
@@ -257,6 +269,7 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
             sdc = copy.deepcopy(sd)
             info: dict = {}
             lines = build_slide(n, sdc, deck, [], lambda *a: "", classes, info)
+            lines = tag_boxes(lines, ent)
             tried, dense = _dense_decision(lines, info, sdc, deck, _trial_head(header, css_head), theme)
             if tried:
                 flags[n] = dense
@@ -276,6 +289,7 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
             diags.extend(sdiags)
             solo_titles = solo_titles or (n > 1 and bool(info.get("title_only")))
             ent = match_slide(design, n, slide_ids[n - 1]) if design else None
+            lines = tag_boxes(lines, ent)
             html_slide = False
             if ent and ent.get("html") is not None:
                 if edited(ent, sd):
