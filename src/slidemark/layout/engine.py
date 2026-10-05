@@ -1360,6 +1360,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         W, H = slide_size(deck.size)
     except ValueError:
         W, H = slide_size("16:9")
+    measure.set_default_font(theme.fonts.body)
     ctx = _Ctx(deck, theme, slide, index, W, H)
     dense = deck.density == "dense" or "dense" in slide.classes
     ctx.dense_k = theme.dense_scale if dense else 1.0
