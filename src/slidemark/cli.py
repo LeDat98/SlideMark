@@ -44,10 +44,13 @@ def _add_layout_diagnostics(deck: Deck, input_path: str) -> None:
     try:
         from .layout import layout_slide
         from .lint import lint
-        from .theme import get_theme
+        from .template import resolve_theme, template_size
 
         deck.attrs.setdefault("base_dir", str(Path(input_path).resolve().parent))
-        theme = get_theme(deck.theme)
+        theme, diags = resolve_theme(deck.theme, deck.attrs["base_dir"])
+        deck.diagnostics.extend(diags)
+        if size := template_size(theme):
+            deck.size = size
         placed = [layout_slide(slide, deck, theme, i) for i, slide in enumerate(deck.slides)]
         seen = {(d.rule, d.slide) for d in deck.diagnostics}
         deck.diagnostics.extend(d for d in lint(deck, placed, theme) if (d.rule, d.slide) not in seen)

@@ -116,14 +116,8 @@ def _build_with(theme_name: str, tmp_path: Path):
     return deck, out
 
 
-def test_render_uses_template(tpl, tmp_path, monkeypatch):
-    import importlib
-
-    b = importlib.import_module("slidemark.build")
-
-    theme, _ = resolve_theme(str(tpl), tmp_path)
-    monkeypatch.setattr(b, "get_theme", lambda name: theme)
-    deck, out = _build_with("whatever", tmp_path)
+def test_render_uses_template(tpl, tmp_path):
+    deck, out = _build_with(str(tpl), tmp_path)
     prs = Presentation(str(out))
     assert prs.slide_width == 9144000
     assert len(prs.slides) == 3  # the template's own slide is gone

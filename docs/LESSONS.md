@@ -36,3 +36,7 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [render] A pie chart draws only its first series → fold one-point-per-row CSV into categories; reversed bar charts need `c:crosses val=max` set on the value axis XML directly.
 - [parser] CSV delimiter detection must ignore quoted segments (`"a,b";1`).
 - [cli] A default arg `file=sys.stderr` binds at import time and escapes pytest capture → default None, resolve at call time.
+- [render] A .potx opens in python-pptx only after its main content type is patched to presentation; `add_slide` skips date/footer/number placeholders (clone them); drop template section lists with the slides.
+- [layout] Sparse slides: grow text (≤ 1.35× for body ≤ 14pt) → expand rows until ≤ 20% body is free → shift the block 1/3 down. Pure fill brings back empty boxes; pure shift leaves a 50% band.
+- [render] LibreOffice clips bold CJK glyphs in `a:highlight` → pad CJK badges with U+3000; Latin spaces leave a gap.
+- [env] Subagent worktrees refuse compound Bash commands; tell them to run one command per call.

@@ -185,7 +185,7 @@ each, o200k proxy), shipped as package data; written by the orchestrator.
 ## Day 5 status
 - [x] Orchestrator: SKILL.md + reference/ + budget test
 - [x] A: docs, schema, JSON input, skill install
-- [ ] B: user templates, master placeholders for footer/number
+- [x] B: user templates, master placeholders for footer/number
 
 ## Day 6 work packages
 - **A: parser + CLI**: ` ```mermaid ` flowcharts (`graph`/`flowchart` TD/LR, `A[text]`, `A(text)`, `A{text}`,
