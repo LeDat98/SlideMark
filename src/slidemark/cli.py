@@ -471,6 +471,11 @@ def main(argv: list[str] | None = None) -> int:
         return int(e.code) if isinstance(e.code, int) else 2
     try:
         return int(args.func(args))
+    except BrokenPipeError:  # `slidemark tokens | head`: the reader closed the pipe, not an error
+        import os
+
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        return 0
     except Exception as e:  # the CLI contract: a message and an exit code, never a traceback
         print(f"error: {type(e).__name__}: {e}", file=sys.stderr)
         return 2
