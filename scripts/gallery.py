@@ -14,6 +14,11 @@ TITLES = {
     "01-basics": "Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ",
     "02-jp-dense": "Slide dày đặc kiểu Nhật (jp-business)",
     "03-vi-report": "Báo cáo tiếng Việt",
+    "04-jp-kpi": "Tiếng Nhật: KPI, badge, bảng kết quả, mũi tên nối",
+    "05-jp-process": "Tiếng Nhật: quy trình chevron + bảng, luồng phê duyệt",
+    "06-jp-market": "Tiếng Nhật: biểu đồ thị trường, bảng so sánh đối thủ",
+    "07-jp-org": "Tiếng Nhật: sơ đồ tổ chức, ma trận rủi ro",
+    "08-jp-roadmap": "Tiếng Nhật: kế hoạch trung hạn, lộ trình",
 }
 
 
