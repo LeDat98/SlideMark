@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 from markdown_it.token import Token
 
@@ -261,6 +261,11 @@ def build_fence(tok: Token, line: int, ctx: Ctx) -> Any:
         if els is not None:
             return els
         el = Raw(kind="html", source=body, line=line)
+    elif lang == "svg":  # inline source rides in a data: URI, so layout/lint treat it as any Image
+        title = re.search(r"<title[^>]*>([^<]*)</title>", body)
+        alt = str(attrs.kv.get("alt", "")) if attrs else ""
+        alt = alt or (title.group(1).strip() if title else "")
+        el = Image(src="data:image/svg+xml," + quote(body, safe=""), alt=alt, line=line)
     elif lang in RAW_KINDS:
         el = Raw(kind=lang, source=body, line=line)
     else:
