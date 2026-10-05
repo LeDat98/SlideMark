@@ -45,7 +45,7 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 - [x] Total agent tokens per deck (docs + output + fixes) ≤ 40% of a python-pptx agent on the same tasks (run-4: (SKILL.md 909 + deck 152) / python-pptx 2,704 = 0.39, 20/20 first pass, no reference pages read)
 
 ## L5: Full PowerPoint
-- [ ] HTML → native shapes (Chromium measurement) with image fallback; Mermaid → native shapes (HTML subset parser + Chromium image fallback ✓, Mermaid flowcharts ✓; no Chromium measurement yet)
+- [x] HTML → native shapes (Chromium measurement) with image fallback; Mermaid → native shapes (`slidemark.htmlnative`: grid/flex cards, runs, lists, tables → native, canvas/svg/gradients → image; 2026-10-05)
 - [ ] Transitions, build animations, hyperlinks/slide jumps, sections, hidden slides, video/audio (all ✓ incl. native video/audio since run 2026-10-05b; PowerPoint repair check of the timing XML pending, owner)
 - [x] User templates `.potx`/`.pptx`: placeholders, masters, theme colors/fonts reused (examples/10-template)
 - [x] Feature matrix (`docs/FEATURES.md`) ≥ 90% of rows fully Done (all 8 DoD steps): 27/29 = 93% (2026-10-05)
