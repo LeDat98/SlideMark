@@ -76,3 +76,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [import] Drop an `@` line only if the trial slide matches geometry, not just grid tokens; cluster rows by vertical overlap (visuals are centered in cells); the code language is not stored in the .pptx → try lexers until colors map one-to-one.
 - [layout] Judge the roomy pass before row expansion and cap grown rows at ≈ 1.9× natural, or multi-row grids get empty cards; table text needs a growth floor tied to box text on the same slide.
 - [fix] `check --fix` applies edits bottom-up, idempotent, never touches content text; token regexes need `(?<![^\s@])` because `@` is glued to the first token.
+- [render] Inline-source blocks (```svg) ride in `Image.src` as a `data:` URI, so layout/lint/score need no hooks; SVG pictures = PNG fallback blip + `asvg:svgBlip` ext (unverified in real PowerPoint); sanitize SVG before embedding and rasterizing.
