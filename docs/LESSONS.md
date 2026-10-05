@@ -65,3 +65,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [render] Theme palettes can repeat a color (accent == danger in jp-business) → de-duplicate before assigning series colors; inside data labels need per-series dLbls for contrast.
 - [render] An empty `mainSeq` `p:childTnLst` is invalid PresentationML (likely a repair prompt) → drop the `p:seq` when nothing is in it. `python -m slidemark.xsd` caught it; run it on new timing/media XML.
 - [render] Two `sync_playwright` instances in one process conflict (probe and close before build). `html.escape` inside `<style>` silently drops font-family. Styled ```html cards hit the structural subset first; `{render=native}` forces Chromium.
+- [import] Foreign decks: box bodies must be emitted as children (`Block.paras` was dropped); a KPI inside a card is not the title; org-chart buses are unglued T-junctions (tee tolerance ≈ 0.1 in); cap column stacks at 3 texts.
