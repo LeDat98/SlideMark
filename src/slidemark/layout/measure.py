@@ -42,9 +42,15 @@ _FONT_PATHS = {
     ],
 }
 
+# Kinsoku shori. No line may start with a NO_START char (closing punctuation, small kana, long vowel mark)
+# or end with a NO_END char (opening bracket). Violations are fixed by pushing the previous character down
+# to the next line (oikomi-free "oidashi"), which is the conservative choice: it never needs fewer lines than
+# the real renderer. The renderer writes ``eaLnBrk="1" hangingPunct="0"`` so PowerPoint behaves the same.
 NO_START = set(
-    "、。，．・：；！？）］｝〕〉》」』】ー゛゜ゝゞぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵヶ,.!?:;)]}%"
+    "、。，．・：；！？）］｝〕〉》」』】ー゛゜ゝゞぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵヶ々〻‼⁇⁈⁉"
+    "､｡｣ﾞﾟ,.!?:;)]}%"
 )
+NO_END = set("（［｛〔〈《「『【｢([{")
 
 
 @cache
@@ -96,14 +102,14 @@ def list_indent(size_pt: float, level: int) -> tuple[int, int]:
     return hang * (level + 1), -hang
 
 
-def _units(segments: list[tuple[str, bool, bool]]) -> list[tuple[float, float, str, bool]]:
-    """Split styled text into wrap units: (width_em, trailing_space_em, first_char, hard_break)."""
-    units: list[tuple[float, float, str, bool]] = []
+def _units(segments: list[tuple[str, bool, bool]]) -> list[tuple[float, float, str, bool, str]]:
+    """Split styled text into wrap units: (width_em, trailing_space_em, first_char, hard_break, last_char)."""
+    units: list[tuple[float, float, str, bool, str]] = []
     st = {"word": "", "w": 0.0, "sp": 0.0}
 
     def flush():
         if st["word"] or st["sp"]:
-            units.append((st["w"], st["sp"], st["word"][:1], False))
+            units.append((st["w"], st["sp"], st["word"][:1], False, st["word"][-1:]))
         st["word"], st["w"], st["sp"] = "", 0.0, 0.0
 
     for text, bold, mono in segments:
@@ -111,12 +117,18 @@ def _units(segments: list[tuple[str, bool, bool]]) -> list[tuple[float, float, s
         for ch in text:
             if ch in "\n\v":
                 flush()
-                units.append((0.0, 0.0, "", True))
+                units.append((0.0, 0.0, "", True, ""))
             elif ch in " \t":
                 st["sp"] += char_em(" ", kind)
-            elif is_cjk(ch):
-                flush()
-                units.append((1.0, 0.0, ch, False))
+            elif is_cjk(ch) or ch in NO_START or ch in NO_END:
+                if is_cjk(ch):
+                    flush()
+                    units.append((char_em(ch, kind), 0.0, ch, False, ch))
+                else:  # ASCII/half-width punctuation stays glued to its word
+                    if st["sp"]:
+                        flush()
+                    st["word"] += ch
+                    st["w"] += char_em(ch, kind)
             else:
                 if st["sp"]:
                     flush()
@@ -127,23 +139,36 @@ def _units(segments: list[tuple[str, bool, bool]]) -> list[tuple[float, float, s
 
 
 def count_lines(segments: list[tuple[str, bool, bool]], width_pt: float, size_pt: float) -> int:
-    """Number of lines the styled text needs in ``width_pt`` at ``size_pt``."""
+    """Number of lines the styled text needs in ``width_pt`` at ``size_pt`` (with kinsoku)."""
     width = max(width_pt / max(size_pt, 1.0), 1.0)  # in em
     lines, cur = 1, 0.0
-    for w, sp, first, hard in _units(segments):
+    line: list[tuple[float, float, str, bool, str]] = []  # units on the current line
+    for u in _units(segments):
+        w, sp, first, hard, _last = u
         if hard:
             lines += 1
             cur = 0.0
+            line = []
             continue
-        if cur > 0 and cur + w > width + 1e-6 and first not in NO_START:
+        if cur > 0 and cur + w > width + 1e-6:
+            # wrap before ``u``; kinsoku may drag trailing CJK units of this line down with it
+            carry: list[tuple[float, float, str, bool, str]] = []
+            starts_bad = first in NO_START and is_cjk(first)
+            while len(line) > 1 and (starts_bad or (line[-1][4] in NO_END and is_cjk(line[-1][4]))):
+                prev = line.pop()
+                carry.insert(0, prev)
+                starts_bad = prev[2] in NO_START and is_cjk(prev[2])
             lines += 1
-            cur = 0.0
+            line = carry
+            cur = sum(c[0] + c[1] for c in carry)
         if w > width:  # long word: breaks anywhere
             n = int(-(-w // width))
             lines += n - 1
             cur = w - (n - 1) * width
+            line = [u]
         else:
             cur += w
+            line.append(u)
         cur += sp
     return lines
 

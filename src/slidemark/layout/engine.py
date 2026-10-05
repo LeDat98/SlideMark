@@ -508,7 +508,7 @@ def _place_blocks(
     rects = cell_rects(gs, len(flow), area, gap)
     for blk, r in zip(flow, rects, strict=True):
         r = _apply_box(ctx, blk, r, False)
-        if "chevron" in flags:
+        if "chevron" in flags and isinstance(blk, (Text, Shape, Container)):
             _place_chevron(ctx, blk, r, inherit)
         else:
             _place_block(ctx, blk, r, inherit)
@@ -528,6 +528,7 @@ def _place_blocks(
 def _place_chevron(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> None:
     sh = _chevron_shape(blk)
     st = _text_style(ctx, sh, inherit)
+    full = rect
     rect = Rect(rect.x, rect.y, rect.w, min(rect.h, max(round(rect.w * 0.45), round(0.9 * EMU_PER_INCH))))
     pad_pt = round(CHEVRON_ADJ * min(rect.w, rect.h) * 1.05 / EMU_PER_PT, 1)
     st = st.merged(Style(padding=f"{pad_pt}pt", align="center", valign="middle"))
@@ -536,6 +537,23 @@ def _place_chevron(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> None:
     if need > rect.h * _TOL:
         ctx.over.append(_label(blk))
     ctx.emit(sh, rect, st, eff)
+    # a chevron shape only carries text: place the other children (table, chart, ...) under it
+    extra = (
+        [ch for ch in blk.children if not isinstance(ch, (Text, Shape))] if isinstance(blk, Container) else []
+    )
+    if not extra:
+        return
+    gap = _gap(ctx, getattr(blk, "gap", None), full.w, small=True)
+    area = Rect(full.x, rect.bottom + gap, full.w, full.bottom - rect.bottom - gap)
+    if area.h < round(0.4 * EMU_PER_INCH):
+        ctx.diag(
+            "dropped-content",
+            f"{len(extra)} non-text item(s) in {_label(blk)} have no room next to the chevron",
+            "end the box with `@end` or move the visual out of the chevron box",
+            line=getattr(blk, "line", None),
+        )
+        return
+    _place_stack(ctx, extra, area, _only_inheritable(st), gap, blk)
 
 
 # --------------------------------------------------------------------------- slide frame
@@ -615,7 +633,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             ctx.diag(
                 "overflow",
                 f"{el.role} text does not fit its area",
-                "split the slide or cut text",
+                "shorten text or split the slide",
                 line=el.line,
             )
         return eff
@@ -714,10 +732,40 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         notes = [f for f in slide.footnotes if f.paragraphs]
         if notes:
             sts = [_role_style(ctx, "footnote").merged(f.style) for f in notes]
+            max_h = round(H * 0.2)
+            effs = [1.0] * len(notes)
             hs = [round(_text_need(ctx, f, st, inner_w, 1.0)) for f, st in zip(notes, sts, strict=True)]
+            if sum(hs) > max_h:
+                base = min(st.font_size or 10 for st in sts)
+
+                def total(s_: float) -> float:
+                    return sum(
+                        _text_need(
+                            ctx,
+                            f,
+                            st,
+                            inner_w,
+                            measure.effective_scale(st.font_size or 10, s_, theme.min_font_size),
+                        )
+                        for f, st in zip(notes, sts, strict=True)
+                    )
+
+                eff0 = _fit(ctx, total, max_h, base)
+                effs = [measure.effective_scale(st.font_size or 10, eff0, theme.min_font_size) for st in sts]
+                hs = [
+                    round(_text_need(ctx, f, st, inner_w, e))
+                    for f, st, e in zip(notes, sts, effs, strict=True)
+                ]
+                if sum(hs) > max_h * _TOL:
+                    ctx.diag(
+                        "overflow",
+                        "footnotes overflow their area at the minimum font size",
+                        "shorten text or split the slide",
+                        line=notes[0].line,
+                    )
             fy0 = bottom - sum(hs)
-            for f, st, h in zip(notes, sts, hs, strict=True):
-                put(tail, f, Rect(Mx, fy0, inner_w, h), st)
+            for f, st, h, e in zip(notes, sts, hs, effs, strict=True):
+                put(tail, f, Rect(Mx, fy0, inner_w, h), st, e)
                 fy0 += h
             bottom = bottom - sum(hs) - sg // 2
         if slide.conclusion is not None and slide.conclusion.paragraphs:
@@ -758,10 +806,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 ctx.diag(
                     "overflow",
                     f"{lab} overflows its area at the minimum font size",
-                    "split the slide or cut text",
+                    "shorten text or split the slide",
                 )
     elif body is not None and body.h <= 0 and elements:
-        ctx.diag("overflow", "no room left for the body", "split the slide or cut text")
+        ctx.diag("overflow", "no room left for the body", "shorten text or split the slide")
 
     deck.diagnostics.extend(ctx.diags)
     return head + (final_ctx.out if final_ctx else []) + tail

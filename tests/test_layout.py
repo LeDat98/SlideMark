@@ -4,6 +4,7 @@ import pytest
 
 from slidemark.ir import (
     Box,
+    Cell,
     Chart,
     Container,
     Deck,
@@ -310,11 +311,113 @@ def test_measure_wrap_and_cjk():
 
 
 def test_kinsoku_no_line_start_punct():
+    # 10 columns. The full stop would be the 11th char: it must not start a line, so the 10th goes down too.
     text = "あ" * 9 + "。" + "い"
-    # 10 columns: the full stop would fit; the 11th char wraps -> 2 lines
     assert count_lines([(text, False, False)], 100, 10) == 2
     text = "あ" * 10 + "。"
-    assert count_lines([(text, False, False)], 100, 10) == 1  # hangs instead of starting a line
+    assert count_lines([(text, False, False)], 100, 10) == 2  # no hanging punctuation
+    # the pushed-down char plus punctuation still fits on one extra line, never more
+    assert count_lines([("あ" * 10 + "、」", False, False)], 100, 10) == 2
+    assert count_lines([("あ" * 10 + "。。。", False, False)], 100, 10) == 2
+
+
+def test_kinsoku_no_line_end_opening():
+    # an opening bracket may not end a line: it moves down with the next char
+    text = "あ" * 9 + "「" + "い"
+    assert count_lines([(text, False, False)], 100, 10) == 2
+    # without kinsoku this is 2 lines (10 + 10); with it the bracket moves down: 9 / 10 / 1
+    text = "あ" * 9 + "「" + "い" * 10
+    assert count_lines([(text, False, False)], 100, 10) == 3
+    text = "あ" * 9 + "【「" + "い"
+    assert count_lines([(text, False, False)], 100, 10) == 2
+
+
+def test_kinsoku_ascii_unaffected():
+    seg = [("(hello) world, (foo) bar.", False, False)]
+    assert count_lines(seg, 1000, 10) == 1
+
+
+def test_dense_jp_box_shrinks_to_fit():
+    jp = "新規顧客の獲得数は前年同期比で十二パーセント増加し、既存顧客の解約率も一・五ポイント改善した。" * 5
+    boxes = [
+        Container(
+            title=T(f"施策{i}", "heading"),
+            children=[
+                Text(
+                    paragraphs=[
+                        Paragraph(runs=[Run(text=jp)], marker="bullet"),
+                        Paragraph(runs=[Run(text=jp)], marker="bullet"),
+                    ]
+                )
+            ],
+        )
+        for i in range(4)
+    ]
+    s = Slide(title=T("現状分析", "title"), grid="2x2", elements=boxes)
+    placed, deck = lay(s, theme="jp-business")
+    body = [p for p in placed if isinstance(p.element, Text) and p.element.role == "body"]
+    assert len(body) == 4 and all(p.font_scale < 1.0 for p in body)
+    th = get_theme("jp-business")
+    assert all(p.font_scale * p.style.font_size >= th.min_font_size - 0.01 for p in body)
+    assert not [d for d in deck.diagnostics if d.rule == "overflow"]
+
+
+def test_absurd_text_overflow_diagnostic_jp_and_latin():
+    for word in ("日本語の長い文章がここに入ります。" * 400, "lorem ipsum dolor sit amet " * 600):
+        s = Slide(title=T("t", "title"), elements=[T(word)])
+        placed, deck = lay(s)
+        body = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "body")
+        assert abs(body.font_scale * body.style.font_size - get_theme("default").min_font_size) < 0.01
+        ov = [d for d in deck.diagnostics if d.rule == "overflow"]
+        assert ov and "shorten" in ov[0].hint and "split" in ov[0].hint
+
+
+def test_long_table_shrinks_then_reports():
+    def c(t):
+        return Cell(paragraphs=[Paragraph(runs=[Run(text=t)])])
+
+    rows = [[c("項目"), c("内容")]] + [[c(f"行{i}"), c("説明文がここに入ります " * 3)] for i in range(16)]
+    placed, deck = lay(Slide(title=T("t", "title"), elements=[Table(rows=rows)]))
+    tb = next(p for p in placed if isinstance(p.element, Table))
+    assert tb.font_scale < 1.0 and not [d for d in deck.diagnostics if d.rule == "overflow"]
+    rows = [[c("項目"), c("内容")]] + [[c(f"行{i}"), c("説明文がここに入ります " * 3)] for i in range(200)]
+    _, deck = lay(Slide(title=T("t", "title"), elements=[Table(rows=rows)]))
+    assert [d for d in deck.diagnostics if d.rule == "overflow"]
+
+
+def test_footnotes_shrink_and_report():
+    notes = [T("※ 注記の文章がここに入ります。" * 6, "footnote") for _ in range(6)]
+    placed, deck = lay(Slide(title=T("t", "title"), elements=[T("body")], footnotes=notes))
+    fn = [p for p in placed if isinstance(p.element, Text) and p.element.role == "footnote"]
+    assert fn and all(p.font_scale < 1.0 for p in fn)
+    assert all(p.y >= 0 and p.y + p.h <= slide_size("16:9")[1] for p in fn)
+    notes = [T("※ 注記の文章がここに入ります。" * 80, "footnote") for _ in range(6)]
+    _, deck = lay(Slide(title=T("t", "title"), elements=[T("body")], footnotes=notes))
+    assert [d for d in deck.diagnostics if d.rule == "overflow" and "footnote" in d.message]
+
+
+def test_chevron_box_keeps_table_child():
+    tbl = Table(rows=[[Cell(paragraphs=[Paragraph(runs=[Run(text="a")])])]])
+    s = Slide(
+        title=T("t", "title"),
+        classes=["chevron"],
+        grid="2",
+        elements=[
+            Container(title=T("Step 1", "heading"), children=[T("text"), tbl]),
+            Container(title=T("Step 2", "heading"), children=[T("text")]),
+        ],
+    )
+    placed, deck = lay(s)
+    chev = [p for p in placed if isinstance(p.element, Shape) and p.element.shape == "chevron"]
+    tables = [p for p in placed if isinstance(p.element, Table)]
+    assert len(chev) == 2 and len(tables) == 1
+    assert tables[0].y >= chev[0].y + chev[0].h
+    assert not [d for d in deck.diagnostics if d.rule == "dropped-content"]
+    # a bare visual in a chevron grid is placed as a normal block instead of an empty chevron
+    s = Slide(title=T("t", "title"), classes=["chevron"], grid="2", elements=[T("a"), tbl])
+    placed, _ = lay(s)
+    assert len([p for p in placed if isinstance(p.element, Shape) and p.element.shape == "chevron"]) == 1
+    assert len([p for p in placed if isinstance(p.element, Table)]) == 1
 
 
 def test_never_raises():
