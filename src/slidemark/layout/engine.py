@@ -1816,14 +1816,15 @@ def _place_blocks(
                 area.h if alone else None,
             )
             word_cap = _chevron_word_cap(ctx, flow, cells, chev_h, inherit, last=k == len(ladder) - 1)
+            head_cap = _chevron_head_cap(ctx, flow, cells, chev_h, inherit)
+            nominal = _chevron_nominal(ctx, flow, inherit)
+            head_ok = head_cap is None or head_cap >= min(nominal, 1.0)
             roomy = all(
                 _chevron_text_w(r, Style(), None, _cadj(ctx)) >= ctx.lt.chevron_text_share * r.w
                 for r in cells
                 if r.w > 0
             )
-            if (roomy and (word_cap is None or word_cap >= _chevron_nominal(ctx, flow, inherit))) or k == len(
-                ladder
-            ) - 1:
+            if (roomy and head_ok and (word_cap is None or word_cap >= nominal)) or k == len(ladder) - 1:
                 break
         chev_eff = min(
             (
@@ -1835,6 +1836,8 @@ def _place_blocks(
         )
         if word_cap is not None:  # shrink the text (down to the deck minimum) before a word would break
             chev_eff = word_cap if chev_eff is None else min(chev_eff, word_cap)
+        if head_cap is not None and chev_eff is not None:  # ... and a bit more before a heading wraps
+            chev_eff = min(chev_eff, head_cap)
     for (i, blk), r in zip(flow, cells, strict=True):
         r = _css_width(ctx, blk, _apply_box(ctx, blk, r, False), inherit)
         rects[i] = r
@@ -2126,6 +2129,34 @@ def _chevron_word_cap(
                     line=getattr(blk, "line", None),
                 )
             fit = floor
+        cap = fit if cap is None else min(cap, fit)
+    return cap
+
+
+def _chevron_head_cap(ctx: _Ctx, flow: list, cells: list[Rect], h: int, inherit: Style) -> float | None:
+    """Text scale at which every bold heading line ("Tháng 11") fits one line, or ``None`` when no limit.
+
+    Rows of >= ``chevron_head_min_steps`` chevrons only. A heading that needs more than the allowed shrink
+    (down to ``chevron_head_min_scale`` x the base size) is left to wrap: shrinking would not save it.
+    """
+    if len(flow) < ctx.lt.chevron_head_min_steps:
+        return None
+    cap: float | None = None
+    for (_i, blk), r in zip(flow, cells, strict=True):
+        if not isinstance(blk, (Text, Shape, Container)):
+            continue
+        sh, st, rect = _chevron_geom(ctx, blk, _apply_box(ctx, blk, r, False), inherit, h)
+        paras = sh.paragraphs
+        if len(paras) < 2 or not paras[0].runs or not all(run.bold for run in paras[0].runs):
+            continue
+        em = max(measure.text_em(paras[0].plain, bold=True), 0.0)
+        if em <= 0:
+            continue
+        size = max(st.font_size or 18, 1.0)
+        avail = _chevron_text_w(rect, st, sh, _cadj(ctx)) / EMU_PER_PT
+        fit = avail / (em * size * ctx.lt.chevron_head_slack)
+        if fit < ctx.lt.chevron_head_min_scale:
+            continue
         cap = fit if cap is None else min(cap, fit)
     return cap
 

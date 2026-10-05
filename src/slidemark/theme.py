@@ -57,6 +57,9 @@ class LayoutTokens(BaseModel):
     chevron_text_share: float = 0.6  # text area >= this share of the chevron width
     chevron_adj_step: float = 0.02  # step of that search
     chevron_word_slack: float = 1.08  # a word must fit this much narrower (wider fonts)
+    chevron_head_min_steps: int = 5  # rows of this many chevrons keep each bold heading on one line ...
+    chevron_head_min_scale: float = 0.7  # ... shrinking the text at most to this share of the base size
+    chevron_head_slack: float = 1.25  # a heading must fit this much narrower (DejaVu-like fallback fonts)
     chevron_pad: Length = "4pt"
     chevron_min_h: Length = "0.7in"
     chevron_max_h: Length = "1.3in"
