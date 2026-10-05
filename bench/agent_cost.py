@@ -202,7 +202,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if args.report:
         rows = [json.loads(x) for x in HISTORY.read_text(encoding="utf-8").splitlines() if x.strip()]
-        report(rows)
+        report([r for r in rows if not r.get("note", "").startswith("INVALID")])
         return 0
     if not args.transcripts:
         ap.error("give transcript paths or --report")
