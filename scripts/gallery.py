@@ -21,6 +21,7 @@ TITLES = {
     "08-jp-roadmap": "Tiếng Nhật: kế hoạch trung hạn, lộ trình",
     "09-midnight-tech": "Theme tối (midnight): KPI, biểu đồ, Mermaid, công thức, code",
     "10-template": "Template .pptx của người dùng, ảnh (cover crop), biểu đồ, callout",
+    "11-jp-consulting": "Tiếng Nhật: bộ 9 slide tư vấn dày đặc (tóm tắt, KPI, tổ chức, lộ trình, rủi ro)",
 }
 
 
