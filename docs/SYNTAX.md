@@ -130,7 +130,7 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `chevron` | blocks drawn as chevrons (steps) | `@4 chevron` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
 | `key=value` | `bg=` color or image, `t=` transition (`fade`, `push`, `wipe`, `split`, `cover`, `zoom`, `morph`; `t=fade:0.5` sets seconds), `id=`, `gap=` | `@bg=#0F172A t=fade` |
-| `a>b` `a-b` | **connector** from block `a` to block `b` (arrow / plain line). Letters count blocks in source order (`a` = 1st), digits work too (`1>3`) | `@3 a>b a>c` |
+| `a>b` `a-b` | **connector** from block `a` to block `b` (arrow / plain line). Letters count blocks in source order (`a` = 1st), digits work too (`1>3`). With `flow`, the links replace the flow arrows (info `flow-links`) | `@3 a>b a>c` |
 | `hidden` | hide the slide in the show | |
 | `build` | bullets and blocks appear one by one on click (`{.build}` on one block does it for that block only) | `@build` |
 | any other word | class applied to the slide (`dense`, `dark`, ...) | `@3 dense` |

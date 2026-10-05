@@ -36,5 +36,6 @@ step does not apply (no visual risk to lint, or no syntax).
 | Build animations, transitions, sections, hidden | x | x | x | x | x | - | - | x |
 | `check` linter + JSON | x | x | x | - | - | - | x | - |
 | `docs`, `schema`, `skill install`, JSON input | x | x | x | x | - | - | - | x |
+| `check --fix [-o]` mechanical source repairs (`fix.py`) | x | x | x | - | - | - | - | - |
 | `.pptx` import (round trip) | x | x | x | x | x | - | - | x |
 | `review` design critique (`design-*` rules + score, `--png`) | x | x | x | - | - | - | x | - |

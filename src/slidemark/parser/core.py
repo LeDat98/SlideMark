@@ -409,6 +409,16 @@ def _build_box(h2: Item, content: list[Item], ats: list[Item], ctx: Ctx) -> Cont
                     apply_attrs(nested, a, ctx, h3.line)
             nested.children.extend(_build_flat(sub, ctx))
             box.children.append(nested)
+        if box.grid is not None and len(box.children) < 2:
+            n = len(box.children)
+            ctx.add(
+                "info",
+                f"grid '{box.grid}' on a box with {n} block{'s' if n != 1 else ''} ignored",
+                ats[0].line,
+                "box-grid-unused",
+                "put the '@' line right after the '#' title for the slide",
+            )
+            box.grid = None
     else:
         box.children.extend(_build_flat(content, ctx, kpi))
     return box
@@ -505,12 +515,14 @@ def parse_slide(
 
     # `@chevron` written at the very end of the slide lands in the last box; when that box has no `###`
     # sub-boxes to lay out and the slide has no `@` line of its own, it was meant for the slide
+    trail: int | None = None
     if boxes and not any(sec_ats):
         h2, content, ats = boxes[-1]
         last = max([h2.line, *(c.line for c in content)])
         if ats and all(a.line > last for a in ats) and not any(c.kind == "h3" for c in content):
             sec_ats[sec].extend(ats)
             ats.clear()
+            trail = _trailing_para(boxes)
             ctx.add(
                 "info",
                 "'@' line after the last box applies to the slide",
@@ -539,7 +551,7 @@ def parse_slide(
 
     for sc in range(len(sec_ats)):
         if sec_last_box[sc]:
-            _hint_missing_end(sec_boxes[sc], ctx)
+            _hint_missing_end(sec_boxes[sc], ctx, trail)
 
     # slide-level `@` lines (one per row-group section) and heading attributes
     specs = [
@@ -580,7 +592,7 @@ def parse_slide(
             if spec.gap is not None:
                 g.gap = spec.gap
             g.children = els
-            g.links = _resolve_links(spec.links, len(els), "group", ctx, "flow" in flags)
+            g.links = _resolve_links(spec.links, len(els), "group", ctx, g, els)
             slide_els.append(g)
         slide.elements = slide_els
         slide.grid = f"1x{len(slide_els)}"
@@ -629,17 +641,18 @@ def parse_slide(
             slide.attrs.update(kv)
 
     _infer_cover(slide, index)
-    slide.links = _resolve_links(slide_links, len(slide.elements), "slide", ctx, "flow" in slide.classes)
+    slide.links = _resolve_links(slide_links, len(slide.elements), "slide", ctx, slide, slide.elements)
     for box, raw in ctx.box_links:
-        box.links = _resolve_links(raw, len(box.children), "box", ctx, "flow" in box.classes)
+        box.links = _resolve_links(raw, len(box.children), "box", ctx, box, box.children)
     ctx.box_links = []
     return slide
 
 
-def _hint_missing_end(box_els: list[Container], ctx: Ctx) -> None:
+def _hint_missing_end(box_els: list[Container], ctx: Ctx, trail: int | None = None) -> None:
     """Info when the last `##` box seems to swallow slide-level content (a forgotten `@end`).
 
-    Runs per row-group section. A closing `>` needs no `@end`: it becomes the conclusion anyway."""
+    Runs per row-group section. A closing `>` needs no `@end`: it becomes the conclusion anyway.
+    ``trail`` is the line of a plain paragraph after the last box's list (see ``_trailing_para``)."""
     if len(box_els) < 2:
         return
     *rest, last = box_els
@@ -648,35 +661,66 @@ def _hint_missing_end(box_els: list[Container], ctx: Ctx) -> None:
         return isinstance(e, (Table, Chart)) or (isinstance(e, Text) and "callout" in e.classes)
 
     odd = next((e for e in last.children if visual(e)), None)
-    if odd is None or any(visual(c) for b in rest for c in b.children):
+    if odd is None and trail is not None:
+        what, line = "a paragraph", trail
+    elif odd is None or any(visual(c) for b in rest for c in b.children):
         return
-    what = "a callout" if isinstance(odd, Text) else f"a {odd.type}"
+    else:
+        what = "a callout" if isinstance(odd, Text) else f"a {odd.type}"
+        line = getattr(odd, "line", None) or last.line
     ctx.add(
         "info",
         f"the last box '{_box_title(last)}' holds {what} that its sibling boxes do not",
-        getattr(odd, "line", None) or last.line,
+        line,
         "missing-end",
         "if it belongs to the slide, put a line '@end' before it",
     )
+
+
+LIST_LINE = re.compile(r"^\s*([-*+]|\d+[.)])\s")
+
+
+def _trailing_para(boxes: list[tuple[Item, list[Item], list[Item]]]) -> int | None:
+    """Line of a plain paragraph after the last box's list while every sibling box ends with a list."""
+    if len(boxes) < 2:
+        return None
+    content = boxes[-1][1]
+    if not content or content[-1].kind != "md":
+        return None
+    it = content[-1]
+    ls = list(it.lines)
+    while ls and not ls[-1].strip():
+        ls.pop()
+    j = max((k for k, x in enumerate(ls) if not x.strip()), default=-1)
+    before = [x for x in ls[:j] if x.strip()]
+    if j < 1 or not before or not LIST_LINE.match(before[0]):
+        return None
+    first = ls[j + 1]
+    if LIST_LINE.match(first) or first.startswith((">", "|", "!", "{")):
+        return None
+    for _h2, sib, _ats in boxes[:-1]:
+        if not sib or sib[-1].kind != "md":
+            return None
+        last = [x for x in sib[-1].lines if x.strip()]
+        if not last or not LIST_LINE.match(last[-1]):
+            return None
+    return it.line + j + 1
 
 
 def _box_title(c: Container) -> str:
     return c.title.paragraphs[0].plain[:20] if c.title and c.title.paragraphs else "box"
 
 
-def _resolve_links(raw: list[RawLink], n: int, owner: str, ctx: Ctx, flow: bool = False) -> list[Link]:
-    """Keep the connectors whose ends are existing, distinct blocks; warn about the rest."""
+def _resolve_links(
+    raw: list[RawLink], n: int, owner: str, ctx: Ctx, obj: Any = None, kids: list[Any] | None = None
+) -> list[Link]:
+    """Keep the connectors whose ends are existing, distinct blocks; warn about the rest.
+
+    With ``flow`` on ``obj``, explicit links replace the flow arrows: the flag is dropped and the one-row
+    grid it implied is written out (one column per leading box), so only the links are drawn."""
     out: list[Link] = []
     for r in raw:
-        if flow and r.dst == r.src + 1:
-            ctx.add(
-                "info",
-                f"connector '{r.token}' repeats a flow arrow",
-                r.line,
-                "duplicate-link",
-                "flow already draws arrows between neighbours: keep only the other links",
-            )
-        elif r.src == r.dst:
+        if r.src == r.dst:
             ctx.warn(
                 f"connector '{r.token}' joins a block to itself",
                 r.line,
@@ -693,6 +737,21 @@ def _resolve_links(raw: list[RawLink], n: int, owner: str, ctx: Ctx, flow: bool 
             )
         else:
             out.append(Link(src=r.src, dst=r.dst, arrow=r.arrow))
+    if out and obj is not None and "flow" in obj.classes:
+        obj.classes.remove("flow")
+        if getattr(obj, "grid", None) is None:
+            k = 0
+            while k < len(kids or []) and isinstance((kids or [])[k], Container):
+                k += 1
+            if k >= 2:
+                obj.grid = str(k)
+        ctx.add(
+            "info",
+            "explicit connectors replace the flow arrows",
+            raw[0].line,
+            "flow-links",
+            "use either 'flow' or a>b links; only the links are drawn",
+        )
     return out
 
 
