@@ -45,15 +45,15 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 - [x] Total agent tokens per deck (docs + output + fixes) ≤ 40% of a python-pptx agent on the same tasks (run-4: (SKILL.md 909 + deck 152) / python-pptx 2,704 = 0.39, 20/20 first pass, no reference pages read)
 
 ## L5: Full PowerPoint
-- [ ] HTML → native shapes (Chromium measurement) with image fallback; Mermaid → native shapes
-- [ ] Transitions, build animations, hyperlinks/slide jumps, sections, hidden slides, video/audio
-- [ ] User templates `.potx`/`.pptx`: placeholders, masters, theme colors/fonts reused
+- [ ] HTML → native shapes (Chromium measurement) with image fallback; Mermaid → native shapes (HTML subset parser + Chromium image fallback ✓, Mermaid flowcharts ✓; no Chromium measurement yet)
+- [ ] Transitions, build animations, hyperlinks/slide jumps, sections, hidden slides, video/audio (all but video/audio ✓; PowerPoint repair check pending)
+- [x] User templates `.potx`/`.pptx`: placeholders, masters, theme colors/fonts reused (examples/10-template)
 - [ ] Feature matrix (`docs/FEATURES.md`) ≥ 90% of rows fully Done (all 8 DoD steps)
 
 ## L6: Production grade
 - [ ] 0 "repair" prompts: XSD-valid on 10k fuzzed decks + spot-checked in real PowerPoint each release
 - [x] Import `.pptx → Markdown` (edit existing decks); build → import → build is stable (all 9 examples, 2026-10-05)
-- [ ] Build ≤ 50 ms/slide, import time ≤ 300 ms, core install ≤ 15 MB
+- [ ] Build ≤ 50 ms/slide, import time ≤ 300 ms, core install ≤ 15 MB (build 27 ms/slide ✓; `import slidemark` 304 ms; install size not measured)
 - [ ] Published on PyPI with semver, changelog, CI on 3 Python versions, coverage ≥ 90%
 
 ## L7: Breakthrough

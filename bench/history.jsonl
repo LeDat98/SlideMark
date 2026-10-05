@@ -17,3 +17,11 @@
 {"date": "2026-10-05T00:26:43+00:00", "commit": "bd9d7f8", "metric": "syntax_tokens", "deck": "q3-review", "format": "html", "tokens_proxy": 321, "tokens_claude": null, "tokenizer": "o200k_base"}
 {"date": "2026-10-05T00:26:43+00:00", "commit": "bd9d7f8", "metric": "syntax_tokens", "deck": "q3-review", "format": "python-pptx", "tokens_proxy": 518, "tokens_claude": null, "tokenizer": "o200k_base"}
 {"date": "2026-10-05T00:26:43+00:00", "commit": "bd9d7f8", "metric": "syntax_tokens", "deck": "q3-review", "format": "slidemark", "tokens_proxy": 155, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T03:18:30+00:00", "commit": "3b005c7", "metric": "syntax_tokens", "deck": "jp-dense", "format": "html", "tokens_proxy": 828, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T03:18:30+00:00", "commit": "3b005c7", "metric": "syntax_tokens", "deck": "jp-dense", "format": "slidemark", "tokens_proxy": 482, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T03:18:30+00:00", "commit": "3b005c7", "metric": "syntax_tokens", "deck": "jp-kpi", "format": "html", "tokens_proxy": 914, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T03:18:30+00:00", "commit": "3b005c7", "metric": "syntax_tokens", "deck": "jp-kpi", "format": "slidemark", "tokens_proxy": 551, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T03:18:30+00:00", "commit": "3b005c7", "metric": "syntax_tokens", "deck": "q3-review", "format": "html", "tokens_proxy": 321, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T03:18:30+00:00", "commit": "3b005c7", "metric": "syntax_tokens", "deck": "q3-review", "format": "python-pptx", "tokens_proxy": 518, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T03:18:30+00:00", "commit": "3b005c7", "metric": "syntax_tokens", "deck": "q3-review", "format": "slidemark", "tokens_proxy": 155, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T03:18:35+00:00", "commit": "3b005c7", "metric": "layout_inferred", "value": 1.0, "slides": 28}
