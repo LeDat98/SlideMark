@@ -105,7 +105,7 @@ def test_cli_build_shows_bad_token(tmp_path, capsys):
     f = tmp_path / "a.md"
     f.write_text("style: card.radius=banana\n# A\n- x\n", encoding="utf-8")
     assert main(["build", str(f)]) == 0
-    assert "bad-token" in capsys.readouterr().err
+    assert "bad-token" in capsys.readouterr().out
 
 
 def test_cli_tokens_text_and_json(capsys):

@@ -114,3 +114,33 @@ def pptx_to_pngs(
             paths.append(path)
         doc.close()
     return paths
+
+
+def contact_sheet(pngs: list[Path], out: str | Path, tile_width: int = 420) -> Path:
+    """All slides in one PNG grid (3 columns from 5 slides, else 2), numbered, at most 1400 px wide."""
+    from PIL import Image, ImageDraw
+
+    if not pngs:
+        raise ValueError("no slides to put on a contact sheet")
+    cols, gap = (3 if len(pngs) >= 5 else 2), 10
+    tile_width = min(tile_width, (1400 - gap * (cols + 1)) // cols)
+    tiles = []
+    for p in pngs:
+        with Image.open(p) as im:
+            im = im.convert("RGB")
+            tiles.append(
+                im.resize((tile_width, max(1, round(im.height * tile_width / im.width))), Image.LANCZOS)
+            )
+    th = max(t.height for t in tiles)
+    rows = -(-len(tiles) // cols)
+    sheet = Image.new("RGB", (cols * tile_width + (cols + 1) * gap, rows * (th + gap) + gap), (235, 235, 235))
+    draw = ImageDraw.Draw(sheet)
+    for i, t in enumerate(tiles):
+        x, y = gap + (i % cols) * (tile_width + gap), gap + (i // cols) * (th + gap)
+        sheet.paste(t, (x, y))
+        draw.rectangle((x, y, x + 26 + 8 * (len(str(i + 1)) - 1), y + 18), fill=(30, 30, 30))
+        draw.text((x + 6, y + 3), str(i + 1), fill=(255, 255, 255))
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(out, optimize=True)
+    return out
