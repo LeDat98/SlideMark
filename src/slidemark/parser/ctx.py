@@ -21,6 +21,7 @@ class Ctx:
     def __init__(self, diagnostics: list[Diagnostic]):
         self.diagnostics = diagnostics
         self.slide: int | None = None
+        self.lang: str | None = None  # deck lang, set once the header is read
         self.box_links: list[
             tuple[Any, list[Any]]
         ] = []  # (Container, raw `@` connectors) of the current slide

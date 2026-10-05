@@ -121,3 +121,51 @@ def test_table_attr_count_mismatch_warns_and_applies():
 def test_table_bad_attrs_never_raise(info):
     d = parse(f"# A\n```table {{{info}}}\na,b\n1,2\n```\n")
     assert any(x.rule == "bad-table-option" for x in d.diagnostics)
+
+
+def _vals(lang, cells, delim=","):
+    head = f"---\nlang: {lang}\n---\n" if lang else ""
+    row = delim.join(cells)
+    d = parse(f"{head}# A\n```column\n,{','.join('abcdef'[: len(cells)])}\ns,{row}\n```\n")
+    return d.slides[0].elements[0].series[0].values
+
+
+@pytest.mark.parametrize(
+    "cell,vi,en",
+    [
+        ('"1,6"', 1.6, 16.0),
+        ('"1.900"', 1900.0, 1.9),
+        ('"12,45"', 12.45, 1245.0),
+        ('"1.234,5"', 1234.5, 1.2345),
+        ('"1,240"', 1240.0, 1240.0),
+        ('"-1,6"', -1.6, -16.0),
+        ('"▲1,6"', -1.6, -16.0),
+        ('"12,5%"', 12.5, 125.0),
+        ('"3.5"', 3.5, 3.5),
+    ],
+)
+def test_decimal_comma_locale(cell, vi, en):
+    assert _vals("vi", [cell]) == [vi]
+    assert _vals("en", [cell]) == [en]
+    assert _vals(None, [cell]) == [en]
+    assert _vals("ja", [cell]) == [en]
+
+
+def test_decimal_comma_langs_with_region():
+    assert _vals("de-DE", ['"1,6"']) == [1.6]
+    assert _vals("fr", ['"1,6"']) == [1.6]
+
+
+def test_decimal_comma_semicolon_csv_unquoted():
+    d = parse("---\nlang: vi\n---\n# A\n```column\n;Q1;Q2\nDT;1,6;2.5\n```\n")
+    assert d.slides[0].elements[0].series[0].values == [1.6, 2.5]
+    assert not d.diagnostics
+
+
+def test_decimal_comma_table_cell_numeric_and_text_kept():
+    from slidemark.layout.tables import is_numeric
+
+    assert is_numeric("1,6")
+    d = parse('---\nlang: vi\n---\n# A\n```table\nx,y\na,"1,6"\n```\n')
+    t = d.slides[0].elements[0]
+    assert t.rows[1][1].paragraphs[0].plain == "1,6"

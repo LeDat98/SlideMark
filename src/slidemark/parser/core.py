@@ -964,6 +964,7 @@ def parse_deck(text: str) -> Deck:
     if css_fences:
         inside, _ = fence_map(lines)
     start = parse_header(lines, inside, deck, ctx)
+    ctx.lang = deck.lang
     recs = normalize(lines, inside, start, deck)
     chunks = split_slides(lines, inside, start)
     if not chunks:

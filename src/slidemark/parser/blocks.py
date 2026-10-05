@@ -14,7 +14,7 @@ from .ctx import Ctx, closest
 from .html import html_blocks
 from .inline import MD, ImageRef, inline_items, inline_runs
 from .mermaid import build_mermaid
-from .tabular import numbers_row, read_csv
+from .tabular import is_decimal_comma_lang, numbers_row, read_csv
 
 CHART_KINDS = (
     "bar",
@@ -205,7 +205,7 @@ def build_table_csv(body: str, ctx: Ctx, line: int) -> Table:
 
 
 def build_chart(kind: str, body: str, ctx: Ctx, line: int) -> Chart:
-    rows = read_csv(body)
+    rows = read_csv(body, is_decimal_comma_lang(ctx.lang))
     chart = Chart(kind=kind, line=line)  # type: ignore[arg-type]
     if not rows:
         ctx.error("chart has no data", line, "empty-chart", "add a header row and one row per series")

@@ -35,12 +35,19 @@ _AMAP = {"l": "left", "c": "center", "r": "right"}
 # --------------------------------------------------------------------------- CSV
 
 
-def read_csv(body: str) -> list[list[str]]:
-    """Rows of stripped cells: BOM, quotes, `;`/tab separators (when no comma), blank lines."""
+def read_csv(body: str, decimal_comma: bool = False) -> list[list[str]]:
+    """Rows of stripped cells: BOM, quotes, `;`/tab separators (when no comma), blank lines.
+
+    With ``decimal_comma`` (chart data in a decimal-comma language) a body whose every line holds a
+    ``;`` is split on ``;`` even when commas are present, so ``Q1;1,6;2,4`` keeps its decimals.
+    """
     body = body.replace(_BOM, "").replace("\x00", "")
     probe = _QUOTED.sub("", body)
     delim = ","
-    if "," not in probe:
+    lines = [ln for ln in probe.split("\n") if ln.strip()]
+    if decimal_comma and lines and all(";" in ln for ln in lines):
+        delim = ";"
+    elif "," not in probe:
         if "\t" in probe:
             delim = "\t"
         elif ";" in probe:
@@ -54,8 +61,32 @@ def read_csv(body: str) -> list[list[str]]:
 
 _MINUS = "▲△▼−–‐ー"  # JP "▲3" = -3; U+2212 and dashes as minus
 
+# Languages that write 1,6 for 1.6 (and 1.900 for 1900).
+DECIMAL_COMMA_LANGS = frozenset(
+    "vi de fr es it pt id ru nl pl tr cs sv da nb nn no fi uk ro hu el bg sk sl hr sr lt lv et".split()
+)
+_DEC_A = re.compile(r"\d{1,3}(?:\.\d{3})*,\d+")
+_DEC_B = re.compile(r"\d{1,3}(?:\.\d{3})+")
 
-def parse_number(raw: str) -> tuple[float | None, bool, bool]:
+
+def is_decimal_comma_lang(lang: str | None) -> bool:
+    if not lang:
+        return False
+    return re.split(r"[-_]", lang.strip().lower())[0] in DECIMAL_COMMA_LANGS
+
+
+def _locale_decimal(num: str) -> str:
+    """``1,6`` -> ``1.6``, ``1.900`` -> ``1900``, ``1.234,5`` -> ``1234.5``; ``1,240`` stays (thousands)."""
+    if re.fullmatch(r"\d{1,3},\d{3}", num):  # ambiguous: keep the thousands reading
+        return num
+    if _DEC_A.fullmatch(num) or re.fullmatch(r"\d+,\d{1,2}", num):
+        return num.replace(".", "").replace(",", ".")
+    if _DEC_B.fullmatch(num):
+        return num.replace(".", "")
+    return num
+
+
+def parse_number(raw: str, decimal_comma: bool = False) -> tuple[float | None, bool, bool]:
     """Return (value, is_percent, is_bad). An empty cell is (None, False, False)."""
     s = unicodedata.normalize("NFKC", raw).strip()
     if not s:
@@ -63,7 +94,12 @@ def parse_number(raw: str) -> tuple[float | None, bool, bool]:
     neg = False
     if s[0] in _MINUS:
         neg, s = True, s[1:]
-    s = s.replace(" ", "").replace(",", "")
+    s = s.replace(" ", "")
+    if decimal_comma:
+        m = re.fullmatch(r"(\(?[-+]?)([\d.,]+)(%?\)?)", s)
+        if m:
+            s = m.group(1) + _locale_decimal(m.group(2)) + m.group(3)
+    s = s.replace(",", "")
     pct = s.endswith("%")
     if pct:
         s = s[:-1]
@@ -84,7 +120,7 @@ def numbers_row(
     """Parse one series; ``pct`` collects, for every non-empty value, whether it carried a ``%``."""
     out: list[float | None] = []
     for c in cells:
-        v, is_pct, bad = parse_number(c)
+        v, is_pct, bad = parse_number(c, is_decimal_comma_lang(ctx.lang))
         if bad:
             ctx.warn(
                 f"'{c}' in series '{name}' is not a number",
