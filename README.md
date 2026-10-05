@@ -47,7 +47,7 @@ slidemark skill install      # cài skill cho Claude Code
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-05 · commit `dd695cc` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-05 · commit `4c5e930` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -141,6 +141,13 @@ Nguồn: [`examples/11-jp-consulting.md`](examples/11-jp-consulting.md)
 ![11-jp-consulting slide 7](docs/gallery/11-jp-consulting/slide-07.png)
 ![11-jp-consulting slide 8](docs/gallery/11-jp-consulting/slide-08.png)
 ![11-jp-consulting slide 9](docs/gallery/11-jp-consulting/slide-09.png)
+
+### HTML/CSS → shape gốc (đo bằng Chromium), logo SVG, công thức
+
+Nguồn: [`examples/12-html-svg-math.md`](examples/12-html-svg-math.md)
+
+![12-html-svg-math slide 1](docs/gallery/12-html-svg-math/slide-01.png)
+![12-html-svg-math slide 2](docs/gallery/12-html-svg-math/slide-02.png)
 <!-- gallery:end -->
 
 ## Tài liệu

@@ -15,7 +15,7 @@ step does not apply (no visual risk to lint, or no syntax).
 | Inline styles, links, slide jumps | x | x | x | x | x | x | - | x |
 | Lists (native bullets/numbers), line-per-line text | x | x | x | x | x | x | x | x |
 | Images (contain/cover/stretch) | x | x | x | x | x | x | x | x |
-| SVG pictures (`![](a.svg)`, ```` ```svg ````): native svgBlip + PNG fallback, sanitized | x | x | x | x | x | | - | x |
+| SVG pictures (`![](a.svg)`, ```` ```svg ````): native svgBlip + PNG fallback, sanitized | x | x | x | x | x | x | - | x |
 | Video / audio (`![](a.mp4){poster autoplay loop}`) | x | x | x | x | x | x | x | x |
 | Tables + merges, CSV table, table options | x | x | x | x | x | x | x | x |
 | Charts (10 kinds) + options | x | x | x | x | x | x | - | x |
@@ -31,7 +31,7 @@ step does not apply (no visual risk to lint, or no syntax).
 | Math (OMML) | x | x | x | x | x | | - | x |
 | Mermaid flowcharts → native | x | x | x | x | x | x | x | x |
 | HTML subset → native, image fallback | x | x | x | x | x | | - | x |
-| HTML (Chromium-measured) → native shapes, `{render=native\|image}` | x | x | x | x | x | | - | x |
+| HTML (Chromium-measured) → native shapes, `{render=native\|image}` | x | x | x | x | x | x | - | x |
 | Themes default / midnight / jp-business | x | x | - | x | x | x | x | - |
 | User templates `.pptx/.potx/.yaml` | x | x | x | x | x | x | - | - |
 | Build animations, transitions, sections, hidden | x | x | x | x | x | - | - | x |

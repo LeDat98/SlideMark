@@ -3,6 +3,7 @@
 Regenerate with ``SLIDEMARK_UPDATE_GOLDEN=1 pytest tests/test_golden.py``.
 """
 
+import importlib.util
 import os
 from pathlib import Path
 
@@ -27,6 +28,8 @@ def _thumb(path: Path) -> Image.Image:
 @needs_soffice
 @pytest.mark.parametrize("md", sorted((ROOT / "examples").glob("*.md")), ids=lambda p: p.stem)
 def test_example_matches_golden(md, tmp_path):
+    if "html" in md.stem and importlib.util.find_spec("playwright") is None:
+        pytest.skip("needs the html extra (Playwright) for native HTML/SVG rendering")
     build(md, tmp_path / "d.pptx")
     pngs = pptx_to_pngs(tmp_path / "d.pptx", tmp_path / "png")
     gdir = GOLDEN / md.stem
