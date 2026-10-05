@@ -248,8 +248,12 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
   near their natural height (no stretched 64 px rows of 10.5 pt text), same title→body gap on every slide,
   box rows above a chart/table take their natural height, no empty band above the conclusion bar (07 slide 2),
   stacked boxes in one column get height in proportion to content (02 slide 1), chevron lists without bullets.
-- **Wave 2 A+B: video/audio** (contract `ir.Media` committed by orchestrator): `![](x.mp4)`/`![](x.mp3)` →
-  native embedded media with poster frame; missing file → placeholder + diagnostic.
-- **Wave 2 B / 3: fixes from the gallery review** of wave 1 and of the new dense JP consulting deck.
+- **Wave 2 A: video/audio end to end** (contract `ir.Media` committed): parser (`![](x.mp4)`, `{poster= autoplay
+  loop}`), small hooks in layout (Media sized like Image) and render (`render/media.py`, python-pptx
+  `add_movie`, generated poster with a play icon), lint alt; `slidemark preview deck.pptx` accepts a .pptx.
+- **Wave 2 B: charts and tables from the 11-jp-consulting review**: stacked-bar series 3 and 4 share a color
+  (palette repeats), data labels dark on dark fills (auto white), chart `axId` written negative (XSD error,
+  python-pptx template), table column widths from content (numeric columns too wide), org tree boxes far taller
+  than one line of content.
 - **Orchestrator:** `examples/11-jp-consulting.md` (≥ 8 dense slides, L3 gate), CI on 3 Python versions +
   coverage report, XSD/schema validation script for generated decks (L6), docs.
