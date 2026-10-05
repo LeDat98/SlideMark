@@ -18,6 +18,7 @@ from pygments.token import Comment, Keyword, Name, Number, Operator, String
 from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Series, Style, Table
 from ..layout import measure
 from ..layout.tables import column_widths, table_grid
+from ..theme import DEFAULT_SIZES, Theme
 from .text import fill_text
 from .util import RenderCtx, hex6, rgb
 
@@ -132,8 +133,8 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             inset=0,
         )
         cell.vertical_anchor = MSO_ANCHOR.MIDDLE
-        cell.margin_left = cell.margin_right = Emu(measure.CELL_PAD_X)
-        cell.margin_top = cell.margin_bottom = Emu(measure.CELL_PAD_Y)
+        cell.margin_left = cell.margin_right = Emu(measure.cell_pad()[0])
+        cell.margin_top = cell.margin_bottom = Emu(measure.cell_pad()[1])
 
 
 # --------------------------------------------------------------------------- chart
@@ -215,11 +216,16 @@ def _luminance(hex_rgb: str) -> float:
     return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
 
 
-def label_color_on(fill_hex: str) -> str:
-    """White on dark fills, near-black on light ones (WCAG-style: the higher contrast wins)."""
+def label_color_on(fill_hex: str, theme: Theme | None = None) -> str:
+    """Light ink on dark fills, dark ink on light ones (WCAG-style: the higher contrast wins).
+
+    The inks are ``theme.render.ink_light`` / ``ink_dark`` ('RRGGBB' is returned).
+    """
+    theme = theme or Theme(name="none")
+    light, dark_hex = hex6(theme, theme.render.ink_light), hex6(theme, theme.render.ink_dark)
     lum = _luminance(fill_hex)
-    dark = _luminance("1F2937")
-    return "FFFFFF" if 1.05 / (lum + 0.05) > (lum + 0.05) / (dark + 0.05) else "1F2937"
+    dark = _luminance(dark_hex)
+    return light if 1.05 / (lum + 0.05) > (lum + 0.05) / (dark + 0.05) else dark_hex
 
 
 def _distinct(colors: list[str]) -> list[str]:
@@ -271,7 +277,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     gf.name = name
     chart = gf.chart
     _positive_axis_ids(chart)
-    size = (pl.style.font_size or theme.sizes.get("table", 14)) * pl.font_scale
+    size = (pl.style.font_size or theme.sizes.get("table", DEFAULT_SIZES["table"])) * pl.font_scale
     fg = rgb(theme, pl.style.color or "fg")
     _chart_font(chart, theme, pl.style.font or theme.fonts.body, size, fg)
     if ch.title:
@@ -279,7 +285,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         tf = chart.chart_title.text_frame
         tf.text = ch.title
         run = tf.paragraphs[0].runs[0]
-        run.font.size = Pt(size * 1.2)
+        run.font.size = Pt(size * theme.render.chart_title_scale)
         run.font.bold = True
         run.font.color.rgb = rgb(theme, "fg")
         chart.chart_title.include_in_layout = False
@@ -296,7 +302,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     if isinstance(cl, str):
         cl = [p.strip() for p in cl.replace(";", ",").split(",") if p.strip()]
     use = cl if isinstance(cl, (list, tuple)) and cl else theme.palette
-    pal = [hex6(theme, str(c)) for c in use] or ["4472C4"]
+    pal = [hex6(theme, str(c)) for c in use] or [hex6(theme, "primary")]
     if use is theme.palette:  # distinct theme colors in order; they wrap only after all of them are used
         pal = _distinct(pal)
     # number formats
@@ -310,7 +316,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     if lab_on and kind != "scatter":  # python-pptx has no data labels for XY series
         plot.has_data_labels = True
         dl = plot.data_labels
-        dl.font.size = Pt(size * 0.9)
+        dl.font.size = Pt(size * theme.render.chart_label_scale)
         dl.font.color.rgb = fg
         if lab_pct and pie:
             dl.show_value, dl.show_percentage = False, True
@@ -341,7 +347,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     ser.format.line.fill.background()
                 else:
                     ser.format.line.color.rgb = RGBColor.from_string(color)
-                    ser.format.line.width = Pt(2.25)
+                    ser.format.line.width = Pt(theme.render.chart_line_width)
                 if hasattr(ser, "smooth"):
                     ser.smooth = False
                 try:
@@ -356,8 +362,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 if lab_on and kind in ("stacked-bar", "stacked-column"):  # labels sit inside the fill
                     sdl = ser.data_labels
                     sdl.show_value = True
-                    sdl.font.size = Pt(size * 0.9)
-                    sdl.font.color.rgb = RGBColor.from_string(label_color_on(color))
+                    sdl.font.size = Pt(size * theme.render.chart_label_scale)
+                    sdl.font.color.rgb = RGBColor.from_string(label_color_on(color, theme))
                     sdl.position = XL_LABEL_POSITION.CENTER
                     if nf:
                         sdl.number_format = nf
@@ -461,7 +467,7 @@ def add_image(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
 # --------------------------------------------------------------------------- code
 
 
-def _token_color(ttype) -> tuple[str | None, bool]:
+def _token_color(ttype) -> tuple[str | None, bool]:  # default style: theme color names
     if ttype in Comment:
         return "muted", True
     if ttype in Keyword:
@@ -477,7 +483,36 @@ def _token_color(ttype) -> tuple[str | None, bool]:
     return None, False
 
 
-def code_paragraphs(c: Code) -> list[Paragraph]:
+def _pygments_colors(name: str):
+    """``ttype -> (color, italic)`` from a pygments style (``render.code_style``), or None if unknown."""
+    try:
+        from pygments.styles import get_style_by_name
+
+        style = get_style_by_name(name)
+    except Exception:
+        return None
+
+    def color(ttype) -> tuple[str | None, bool]:
+        st = style.style_for_token(ttype)
+        return (st["color"].upper() if st["color"] else None), bool(st["italic"])
+
+    return color
+
+
+def code_paragraphs(c: Code, style_name: str = "default", diag=None) -> list[Paragraph]:
+    """Syntax-highlighted lines. ``style_name`` "default" colors tokens with theme colors; any other value
+    is a pygments style name (``render.code_style``); an unknown one falls back with a diagnostic."""
+    pick = _token_color
+    if style_name and style_name != "default":
+        pick = _pygments_colors(style_name)
+        if pick is None:
+            if diag:
+                diag(
+                    "bad-token",
+                    f"unknown code style {style_name!r}",
+                    "use a pygments style such as monokai, friendly or default",
+                )
+            pick = _token_color
     try:
         lexer = get_lexer_by_name(c.lang) if c.lang else TextLexer()
     except Exception:
@@ -485,7 +520,7 @@ def code_paragraphs(c: Code) -> list[Paragraph]:
     text = c.text.expandtabs(4).rstrip("\n")
     lines: list[list[Run]] = [[]]
     for ttype, value in lex(text, lexer):
-        color, italic = _token_color(ttype)
+        color, italic = pick(ttype)
         parts = value.split("\n")
         for i, part in enumerate(parts):
             if i > 0:

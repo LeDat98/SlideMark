@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass
 
 from ..ir import Container, Paragraph, Run, Shape, Style, Text
+from ..theme import DEFAULT_SIZES
 from ..units import EMU_PER_INCH as IN
 from ..units import EMU_PER_PT
 from . import measure
@@ -28,11 +29,8 @@ TOL = 1.01
 RANK_GK_MIN = 0.75  # arrows between ranks keep at least this share of the base gap
 STEP = round(0.04 * IN)  # node width search step
 LABEL_MIN_PT = 10  # edge labels never shrink below this (or their own base size when that is smaller)
-GROW_MAX = 1.6  # a diagram on a sparse slide grows its nodes up to this factor ...
-GROW_H_FILL = 0.85  # ... while it fills at most this share of the height it has
 _SQUEEZE = [round(0.95 - 0.05 * i, 2) for i in range(14)]  # own fit: 0.95 .. 0.3
 _GROW_STEPS_H = [1.5, 1.4, 1.3, 1.2, 1.1]  # height-only growth of the nodes
-_GROW_STEPS = [round(GROW_MAX - 0.1 * i, 2) for i in range(6)]  # 1.6 .. 1.1
 _WORD = re.compile(r"[^\s\u3000-\u9fff\uff00-\uffef]+|[\u3000-\u9fff\uff00-\uffef]")
 
 
@@ -235,19 +233,20 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
             best, qf = build(q), q
             if fits(best, 1.0):
                 break
-    if fits(best) and top_level and ctx.scale >= 1.0 and ctx.dense_k >= 1.0:
+    if fits(best) and top_level and ctx.scale >= 1.0 and ctx.dense_k >= 1.0 and ctx.lt.grow:
         # 2. sparse slide: grow the nodes (and their text, up to the theme body size) while the diagram fits
-        body_pt = ctx.theme.sizes.get("body", 18)
+        body_pt = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"])
         done = False
-        for sz in _GROW_STEPS if qf >= 1.0 else ():
+        grow_steps = [round(ctx.lt.diagram_grow - 0.1 * i, 2) for i in range(6)]  # 1.6 .. 1.1
+        for sz in grow_steps if qf >= 1.0 else ():
             cand = build(sz=sz, body_pt=body_pt)
-            if fits(cand, 1.0) and cand.bh <= area.h * GROW_H_FILL:
+            if fits(cand, 1.0) and cand.bh <= area.h * ctx.lt.diagram_fill:
                 best, done = cand, True
                 break
         if not done:  # the width is the limit: taller nodes at the same text size
             for szh in _GROW_STEPS_H:
                 cand = build(qf, szh=szh)
-                if fits(cand, 1.0) and cand.bh <= area.h * GROW_H_FILL:
+                if fits(cand, 1.0) and cand.bh <= area.h * ctx.lt.diagram_fill:
                     best = cand
                     break
     if not fits(best):
@@ -522,7 +521,11 @@ def _emit(ctx, E, c: Container, area: Rect, frame: _Frame, cap_style: Style, b: 
                     "side": True,
                 }
                 box = Rect(min(u[0], v[0]), min(u[1], v[1]), abs(v[0] - u[0]), abs(v[1] - u[1]))
-                ctx.emit(Shape(shape="line", attrs=attrs), box, Style(line="primary", line_width=1.5))
+                ctx.emit(
+                    Shape(shape="line", attrs=attrs),
+                    box,
+                    Style(line="primary", line_width=ctx.theme.render.connector_width),
+                )
             continue
         p0, p1 = frame.unpt(rt.p0), frame.unpt(rt.p1)
         p0, p1 = (p0[0] + dx, p0[1] + dy), (p1[0] + dx, p1[1] + dy)
@@ -541,7 +544,11 @@ def _emit(ctx, E, c: Container, area: Rect, frame: _Frame, cap_style: Style, b: 
             "dst_box": [sb.x, sb.y, sb.w, sb.h],
         }
         box = Rect(min(p0[0], p1[0]), min(p0[1], p1[1]), abs(p1[0] - p0[0]), abs(p1[1] - p0[1]))
-        ctx.emit(Shape(shape="line", attrs=attrs), box, Style(line="primary", line_width=1.5))
+        ctx.emit(
+            Shape(shape="line", attrs=attrs),
+            box,
+            Style(line="primary", line_width=ctx.theme.render.connector_width),
+        )
     for i, r in label_real.items():
         text = " ".join((c.links[i].label or "").split())
         el = Text(role="caption", paragraphs=[Paragraph(runs=[Run(text=text)])])

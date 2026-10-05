@@ -260,6 +260,7 @@ def _connector_crossings(items: list[Placed]) -> list[tuple[Placed, Placed]]:
 def lint(deck: Deck, placed: list[list[Placed]], theme: Theme) -> list[Diagnostic]:
     """Lint every slide. ``placed[i]`` is the layout output of slide ``i``."""
     out: list[Diagnostic] = []
+    measure.set_tokens(theme.layout)
     for i, items in enumerate(placed):
         try:
             out.extend(lint_slide(items, deck, theme, i))

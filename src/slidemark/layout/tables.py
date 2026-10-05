@@ -60,7 +60,7 @@ def _measured_em(
         n = max((measure.text_em(p.plain, bold=bold) for p in cell.paragraphs), default=0.0)
         weights[c] = max(weights[c], min(n, 30.0))
         mins[c] = max(mins[c], *(_min_em(p.plain) for p in cell.paragraphs), 0.0)
-    pad_em = 2 * measure.CELL_PAD_X / EMU_PER_PT / max(size_pt, 1.0)
+    pad_em = 2 * measure.cell_pad()[0] / EMU_PER_PT / max(size_pt, 1.0)
     weights = [w + pad_em for w in weights]
     min_w = [(m + pad_em) * 1.08 for m in mins]  # a little headroom: fallback fonts run wider
     return weights, min_w
@@ -228,14 +228,14 @@ def row_heights(
     """Natural row heights in EMU at the given autofit ``scale``."""
     nrows = len(t.rows)
     size = (base.font_size or 14) * scale
-    heights = [round((size * measure.LINE_LATIN * 12700) * 1.0 + 2 * measure.CELL_PAD_Y)] * nrows
+    heights = [round((size * measure.tokens().line_latin * 12700) * 1.0 + 2 * measure.cell_pad()[1])] * nrows
     for r, c, cell in anchors:
         if cell.rowspan > 1:
             continue
-        w = sum(widths[c : c + max(cell.colspan, 1)]) - 2 * measure.CELL_PAD_X
+        w = sum(widths[c : c + max(cell.colspan, 1)]) - 2 * measure.cell_pad()[0]
         st = base.merged(cell.style)
         if r < t.header_rows or c < t.header_cols:
             st = st.merged(Style(bold=True))
-        need = measure.paragraphs_height(cell.paragraphs, w, st, scale) + 2 * measure.CELL_PAD_Y
+        need = measure.paragraphs_height(cell.paragraphs, w, st, scale) + 2 * measure.cell_pad()[1]
         heights[r] = max(heights[r], round(need))
     return heights

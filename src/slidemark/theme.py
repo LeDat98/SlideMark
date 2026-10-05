@@ -59,6 +59,58 @@ class LayoutTokens(BaseModel):
     footnote_max: float = 0.2  # footnotes never take more than this share of the slide height
     math_grow: float = 1.6  # an equation alone in its cell is this much larger than body text
     grow: bool = True  # sparse slides grow text / cards to fill the body (False = keep nominal sizes)
+    box_pad: Length = "10pt"  # inner padding of a box whose style has none
+    # --- icons and chevrons
+    chevron_max_alone: Length = "2.0in"  # a chevron row that is all the slide holds may be this tall ...
+    chevron_alone_share: float = 0.28  # ... aiming at this share of the body height
+    # --- growth of sparse slides (ratios of the nominal size)
+    code_grow: float = 1.25  # code text grows up to this factor
+    table_grow: float = 1.4  # rows of a table with spare room grow up to this factor
+    table_font_grow: float = 1.2  # table text grows up to this factor
+    table_grow_roomy: float = 2.0  # table rows grow up to this factor when a quarter of the body stays empty
+    tree_slack_roomy: float = 1.3  # org-tree boxes may be this much taller than their content (roomy slides)
+    tree_slack: float = 1.15  # org-tree boxes are at most this much taller than their content
+    roomy_left: float = 0.25  # share of the body left empty that triggers the roomy pass
+    roomy_grow: float = 1.2  # the roomy pass grows box / tree text by up to this factor more
+    roomy_grow_dense: float = 1.4  # dense slides: sparse cards may grow text this much more
+    dense_roomy_body: float = 1.6  # dense slides: body text stays at most this multiple of the body size
+    roomy_row: float = 0.62  # a lone row of boxes reaches this share of the body height
+    roomy_row_air: float = 1.9  # ... but never taller than this multiple of the natural height
+    roomy_row_air_dense: float = 1.6  # ... dense slides
+    peer_step: float = 1.12  # table text is at most this much smaller than the box text on the same slide
+    beside_min: float = 0.5  # a box beside a chart / image is at least this share of the visual height
+    beside_fill: float = 0.6  # ... a shorter one grows by this share of the way to that minimum
+    beside_slack: float = 1.12  # ... headroom over the natural height
+    full_width: float = 0.6  # a table wider than this share of the slide width is a full-width table
+    row_slack: float = 1.35  # a grid row is at most this much taller than its tallest content
+    row_min_tail: float = 0.12  # min row height share of the body when blocks follow the grid
+    stack_min: float = 0.4  # stacked boxes beside a tall block: min share of the natural total each
+    row_min_dense: float = 0.42  # dense slides: a lone row of boxes is at least this share of the body
+    row_min: float = 0.3  # any other row is at least this share of the body
+    grow_small: float = (
+        1.35  # sparse slides: text grows up to this factor when the body size <= grow_small_pt
+    )
+    grow_small_pt: float = 14
+    grow_big: float = 1.15  # ... and up to this factor for larger themes
+    grow_very_sparse: float = 1.4  # very sparse boxes grow up to this factor ...
+    grow_very_sparse_pt: float = 16  # ... when the theme body size is at least this
+    grow_very_sparse_max_pt: float = 26  # ... but never beyond this body size
+    grow_head: float = 1.25  # box headings grow along with the body text, up to this factor
+    head_body: float = 1.05  # a box heading is at least this much x the (grown) body text of its box
+    room_free: float = 0.35  # a card with more than this share of its inner height free spreads paragraphs
+    room_use: float = 0.6  # ... using this share of the free height
+    room_gap_max: float = 0.6  # ... up to this space-before (em) per paragraph
+    room_gap_max_dense: float = 0.8  # ... dense slides
+    slide_peer_step: float = 1.12  # slide-level text is at most this much smaller than the box text beside it
+    grow_fill: float = 0.85  # growth stops when the content would fill more than this share of the grid
+    grow_box_fill: float = 0.92  # ... or more than this share of a box
+    left_keep: float = 0.12  # rows of a sparse slide expand until at most this share of the body is left
+    very_sparse_fill: float = 0.4  # content below this share of the body is "very sparse" and may move down
+    left_shift: float = 1 / 3  # ... by at most this share of the leftover (boxes)
+    left_shift_table: float = 0.2  # ... or this share (slides without boxes)
+    dense_grow_body: float = 1.25  # dense slides: text may grow up to this multiple of the body size
+    diagram_grow: float = 1.6  # a diagram on a sparse slide grows its nodes up to this factor
+    diagram_fill: float = 0.85  # ... while it fills at most this share of the height it has
 
 
 class RenderTokens(BaseModel):
@@ -75,6 +127,8 @@ class RenderTokens(BaseModel):
     ink_light: str = "#FFFFFF"  # text on dark fills
     highlight: str = "#FFFF00"  # default ==highlight== color
     code_style: str = "default"  # pygments style for code blocks
+    shadow: str = "0 2 6 #00000040"  # `shadow: true`: CSS-like "x y blur [spread] color" (pt)
+    slide_bg: str = "#FFFFFF"  # slide background when neither the slide nor the theme has `bg`
 
 
 NEUTRAL_COLORS = {

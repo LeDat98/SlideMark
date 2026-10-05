@@ -303,6 +303,7 @@ def _is_field(p: Placed) -> bool:
 def critique(deck: Deck, placed: list[list[Placed]], theme: Theme) -> list[Diagnostic]:
     """Design critique of every slide. ``placed[i]`` is the layout output of slide ``i``. Never raises."""
     out: list[Diagnostic] = []
+    measure.set_tokens(theme.layout)
     for i, items in enumerate(placed):
         try:
             out.extend(critique_slide(items, deck, theme, i))

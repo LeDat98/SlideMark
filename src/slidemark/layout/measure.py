@@ -16,14 +16,43 @@ from functools import cache
 from pathlib import Path
 
 from ..ir import Paragraph, Style
-from ..units import EMU_PER_PT
+from ..theme import LayoutTokens
+from ..units import EMU_PER_PT, to_emu
 
-LINE_LATIN = 1.2  # line height / font size
-LINE_CJK = 1.3
-PARA_GAP = 0.25  # space before every paragraph but the first, x font size
 SAFETY = 1.03  # estimate inflation
-CELL_PAD_X = 91440  # 0.1in, table cell margins (renderer applies the same)
-CELL_PAD_Y = 45720  # 0.05in
+
+# The look constants live in ``theme.layout`` (LayoutTokens). Layout, lint, critique and the renderer all
+# call ``set_tokens(theme.layout)`` before measuring, so both sides agree. The aliases below are the schema
+# defaults, kept for code and tests that want "the usual value".
+_tok = LayoutTokens()
+LINE_LATIN = _tok.line_latin
+LINE_CJK = _tok.line_cjk
+PARA_GAP = _tok.para_gap
+CELL_PAD_X = to_emu(_tok.cell_pad_x)
+CELL_PAD_Y = to_emu(_tok.cell_pad_y)
+
+
+def set_tokens(tokens: LayoutTokens) -> None:
+    """Line heights, paragraph gap and cell paddings used by every measure in this process."""
+    global _tok
+    _tok = tokens
+
+
+def tokens() -> LayoutTokens:
+    return _tok
+
+
+def para_gap() -> float:
+    return _tok.para_gap
+
+
+def cell_pad() -> tuple[int, int]:
+    """(x, y) table cell margins in EMU."""
+    try:
+        return to_emu(_tok.cell_pad_x), to_emu(_tok.cell_pad_y)
+    except ValueError:
+        return CELL_PAD_X, CELL_PAD_Y
+
 
 # Kinsoku shori. No line may start with a NO_START char (closing punctuation, small kana, long vowel mark)
 # or end with a NO_END char (opening bracket). Violations are fixed by pushing the previous character down
@@ -223,9 +252,9 @@ def paragraphs_height(
 ) -> float:
     """Estimated height in EMU of ``paragraphs`` wrapped into ``width_emu`` (insets already removed).
 
-    ``gap`` is the space before every paragraph but the first, x font size (default ``PARA_GAP``).
+    ``gap`` is the space before every paragraph but the first, x font size (default: the token).
     """
-    gap = PARA_GAP if gap is None else gap
+    gap = _tok.para_gap if gap is None else gap
     base = style.font_size or default_size
     font = style.font
     total_pt = 0.0
@@ -236,7 +265,7 @@ def paragraphs_height(
         bold = bool((p.style and p.style.bold) or style.bold)
         lines = count_lines(para_segments(p, bold, mono), wpt, size, font)
         ls = (p.style.line_spacing if p.style and p.style.line_spacing else style.line_spacing) or 1.0
-        lh = size * (LINE_CJK if has_cjk(p.plain) else LINE_LATIN) * ls
+        lh = size * (_tok.line_cjk if has_cjk(p.plain) else _tok.line_latin) * ls
         total_pt += lines * lh + (size * gap if i > 0 else 0)
     return total_pt * EMU_PER_PT * SAFETY
 
@@ -253,7 +282,7 @@ def code_height(text: str, width_emu: float, size_pt: float) -> float:
     lines = 0
     for line in text.expandtabs(4).split("\n"):
         lines += max(1, -(-len(line) // cols))
-    return lines * size_pt * LINE_LATIN * EMU_PER_PT * SAFETY
+    return lines * size_pt * _tok.line_latin * EMU_PER_PT * SAFETY
 
 
 def effective_scale(base_size: float, scale: float, min_font: float) -> float:
