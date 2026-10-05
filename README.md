@@ -35,6 +35,9 @@ Cú pháp đầy đủ: [docs/SYNTAX.md](docs/SYNTAX.md).
 - 10 loại biểu đồ native từ CSV (nhãn, legend, định dạng số), bảng có gộp ô, công thức toán (OMML),
   sơ đồ Mermaid → shape native, HTML → native (hoặc ảnh dự phòng qua Chromium).
 - Theme `default`, `midnight`, `jp-business` hoặc template `.pptx/.potx` của bạn; hiệu ứng xuất hiện, chuyển slide, section.
+- **Thiết kế tự do:** không có giao diện cố định. Theme chỉ là preset token (YAML); agent tự khai báo màu, font,
+  cỡ chữ, bo góc, gradient, bóng đổ bằng vài dòng `colors:` / `fonts:` / `sizes:` / `style:`, bằng khối ` ```css `
+  (34 thuộc tính CSS → shape gốc), hoặc viết cả slide bằng HTML (`@html`, `build deck.html`) và vẫn ra shape sửa được.
 - `slidemark check` kiểm tra tràn chữ, chồng lấn, tương phản, alt ảnh… và gợi ý cách sửa trên 1 dòng (JSON được).
 - `slidemark docs` / `skill install`: tài liệu cho agent, SKILL.md ≤ 1.500 token.
 
