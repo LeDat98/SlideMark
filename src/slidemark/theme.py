@@ -70,7 +70,7 @@ class LayoutTokens(BaseModel):
     table_alone_grow: float = 2.6  # a table alone on a normal slide: rows grow up to this factor ...
     table_alone_font_grow: float = 1.45  # ... and its text up to this factor
     table_grow_roomy: float = 2.0  # table rows grow up to this factor when a quarter of the body stays empty
-    tree_slack_roomy: float = 1.3  # org-tree boxes may be this much taller than their content (roomy slides)
+    tree_slack_roomy: float = 1.15  # org-tree boxes may be this much taller than their content (roomy slides)
     tree_slack: float = 1.15  # org-tree boxes are at most this much taller than their content
     html_fit: bool = False  # True: a lone HTML block fills the body height (stretch, else center)
     html_zoom_max: float = 1.5  # a short HTML block renders zoomed up to this factor (1 = off)
@@ -81,11 +81,11 @@ class LayoutTokens(BaseModel):
     roomy_row: float = 0.86  # a lone row of boxes reaches this share of the body height
     roomy_row_air: float = 1.9  # ... but never taller than this multiple of the natural height
     balance_air: float = (
-        1.9  # normal density: a lone row of boxes may grow to this multiple of its height (0 = off)
+        1.15  # normal density: a lone row of boxes may grow to this multiple of its height (0 = off)
     )
-    balance_text_air: float = 1.3  # ... while its text still grows, cards stay within this multiple
+    balance_text_air: float = 1.15  # ... while its text still grows, cards stay within this multiple
     balance_max_pt: float = 36  # ... but body text never beyond this size (pt)
-    balance_grow: float = 1.9  # ... its text may also grow by up to this factor (no new wrapped lines)
+    balance_grow: float = 1.25  # ... its text may also grow by up to this factor (no new wrapped lines)
     balance_row: float = 0.85  # ... but never beyond this share of the body
     balance_shift: float = 0.0  # ... and the part of the rest above the 20% band that moves the block down
     balance_left: float = 0.2  # ... when more than this share of the body would stay empty
@@ -135,6 +135,11 @@ class LayoutTokens(BaseModel):
     hug_shift: float = (
         0.0  # share of the leftover body (beyond left_keep) that moves a card block down (0 = off)
     )
+    grow_max: float = (
+        1.3  # normal-density slides: body text never grows beyond this factor (dense: dense_*_body)
+    )
+    center_beside: bool = True  # a card as tall as the chart / image beside it centers its content vertically
+    hug_cards: bool = True  # cards are as tall as their content (row_slack_hug)
 
 
 class RenderTokens(BaseModel):

@@ -44,7 +44,7 @@ def test_two_by_two_with_conclusion_has_no_big_empty_band():
     cs = cards(placed)
     bar = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "conclusion")
     band = bar.y - max(c.y + c.h for c in cs)
-    assert band < 0.3 * H  # cards hug their text: the leftover is one band
+    assert band < 0.4 * H  # cards hug their text (tiny text here): the leftover is one band
     assert min(c.y for c in cs) - (_title(placed).y + _title(placed).h) < 0.12 * H
 
 
@@ -410,3 +410,20 @@ def test_dense_cards_hug_their_text_and_stay_top_anchored():
     assert cs[0].h <= 0.6 * body_h  # no stretching over the body: one empty band below
     gap = cs[0].y - (_title(placed).y + _title(placed).h)
     assert gap < 0.3 * 914400 * 2
+
+
+def test_explicit_css_size_never_grows_and_body_growth_is_capped():
+    from slidemark.parser import parse
+    from slidemark.template import deck_theme
+
+    src = (
+        "theme: none\n\n# T\n```css\n.box > h2 { font-size: 12pt }\n```\n@3\n"
+        "## One\n- short\n## Two\n- text\n## Three\n- text\n"
+    )
+    deck = parse(src)
+    theme, _ = deck_theme(deck, None)
+    placed = layout_slide(deck.slides[0], deck, theme, 0)
+    heads = [p for p in placed if isinstance(p.element, Text) and p.element.role == "heading"]
+    assert heads and all(p.font_scale == 1.0 for p in heads)
+    body = [p for p in placed if isinstance(p.element, Text) and p.element.role == "body"]
+    assert body and max(p.font_scale for p in body) <= theme.layout.grow_max + 1e-6
