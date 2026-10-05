@@ -10,7 +10,7 @@ import pytest
 from pptx import Presentation
 
 from slidemark.build import build
-from slidemark.template import resolve_theme, template_size
+from slidemark.template import footer_top, resolve_theme, template_size
 from slidemark.theme import get_theme
 
 DECK = """---
@@ -162,3 +162,33 @@ def test_unknown_layout_names_fallback(tmp_path):
     assert any(
         ph.get("type") in ("title", "ctrTitle") for ph in pick_layout(prs, "title")._element.iter("{*}ph")
     )
+
+
+def test_footer_top_reads_the_template_footer_zone(tpl, tmp_path):
+    theme, _ = resolve_theme("corp.pptx", tmp_path)
+    ft = footer_top(theme)
+    assert ft is not None and 0.85 * 6858000 < ft < 6858000
+    assert footer_top(get_theme("default")) is None
+
+
+def test_content_stays_above_the_template_footer_zone(tpl, tmp_path):
+    from slidemark.ir import Deck, Paragraph, Run, Slide, Text
+    from slidemark.layout import layout_slide
+
+    theme, _ = resolve_theme("corp.pptx", tmp_path)
+    txt = lambda s, role: Text(role=role, paragraphs=[Paragraph(runs=[Run(text=s)])])  # noqa: E731
+    slide = Slide(
+        title=txt("t", "title"),
+        elements=[txt("body", "body")],
+        footnotes=[txt("note", "footnote")],
+        conclusion=txt("so what", "conclusion"),
+    )
+    deck = Deck(slides=[slide], footer="Acme", slide_number=True, size="4:3")
+    placed = layout_slide(slide, deck, theme, 0)
+    ft = footer_top(theme)
+    for p in placed:
+        if isinstance(p.element, Text) and p.element.attrs.get("field"):
+            continue  # the footer text itself (replaced by the template placeholder)
+        assert p.y + p.h <= ft, (p.element.role, p.y + p.h, ft)
+    note = next(p for p in placed if p.element.role == "footnote")
+    assert note.y + note.h < ft  # a small gap, not touching

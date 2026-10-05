@@ -19,7 +19,7 @@ from pptx.oxml.ns import qn
 from .ir import Diagnostic
 from .theme import DEFAULT, Fonts, Theme, get_theme
 
-__all__ = ["resolve_theme", "template_size", "open_template", "pick_layout", "clone_footer"]
+__all__ = ["resolve_theme", "template_size", "footer_top", "open_template", "pick_layout", "clone_footer"]
 
 _A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 _P = "http://schemas.openxmlformats.org/presentationml/2006/main"
@@ -185,6 +185,50 @@ def template_size(theme: Theme) -> str | None:
         return f"{int(sz.get('cx'))}emux{int(sz.get('cy'))}emu"
     except Exception:
         return None
+
+
+_FOOTER_TOP: dict[tuple[str, int, int], int | None] = {}
+
+
+def _ph_tops(root) -> dict[str, int]:
+    """y (EMU) of the dt / ftr / sldNum placeholders of a master or layout XML that carry their own xfrm."""
+    out: dict[str, int] = {}
+    for sp in root.iter(f"{{{_P}}}sp"):
+        ph = sp.find(".//p:nvPr/p:ph", _NS)
+        off = sp.find("p:spPr/a:xfrm/a:off", _NS)
+        if ph is not None and off is not None and ph.get("type") in _FOOTERISH:
+            try:
+                out[ph.get("type")] = int(off.get("y"))
+            except (TypeError, ValueError):
+                pass
+    return out
+
+
+def footer_top(theme: Theme) -> int | None:
+    """Top (EMU) of the template's footer zone: the smallest y of its date / footer / slide-number
+    placeholders on the master and the layouts, or None without a template or without such placeholders.
+
+    Read from the file once per path (cached by mtime and size). Never raises.
+    """
+    if not theme.template:
+        return None
+    try:
+        st = Path(theme.template).stat()
+        key = (str(theme.template), st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+    if key in _FOOTER_TOP:
+        return _FOOTER_TOP[key]
+    tops: list[int] = []
+    try:
+        with zipfile.ZipFile(theme.template) as zf:
+            for name in zf.namelist():
+                if re.fullmatch(r"ppt/slide(Master|Layout)s/slide(Master|Layout)\d+\.xml", name):
+                    tops += _ph_tops(etree.fromstring(zf.read(name))).values()
+    except Exception:
+        tops = []
+    _FOOTER_TOP[key] = min(tops) if tops else None
+    return _FOOTER_TOP[key]
 
 
 # --------------------------------------------------------------------------- opening a template
