@@ -306,6 +306,8 @@ Chart options go in the fence attributes:
 
 CSV cells may be quoted (`"1,240"`), may carry `%` or thousands separators (`1,240`, `12%` → number), and may
 use full-width digits; an empty cell is a gap. A cell that is not a number becomes a gap plus a warning.
+Whole numbers written with thousands separators (`1,240`, `2.100` with `lang: vi`) keep them: labels and the
+axis use `#,##0` (shown in the viewer's locale) unless `fmt` is set.
 
 ## Table options
 

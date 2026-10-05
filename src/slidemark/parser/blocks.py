@@ -228,7 +228,20 @@ def build_chart(kind: str, body: str, ctx: Ctx, line: int) -> Chart:
         chart.series.append(Series(name=r[0], values=vals))
     if pct and all(pct):
         chart.options["percent"] = True
+    elif _grouped(rows[1:], chart):
+        chart.options["grouped"] = True  # labels keep the thousands separators the author wrote
     return chart
+
+
+_GROUP = re.compile(r"\d[.,\u202f ]\d{3}(?!\d)")
+
+
+def _grouped(rows: list[list[str]], chart: Chart) -> bool:
+    """Values written with thousands separators (``1,240`` / ``2.100``), all whole numbers."""
+    vals = [v for s in chart.series for v in s.values if v is not None]
+    if not vals or any(v != int(v) for v in vals):
+        return False
+    return any(_GROUP.search(c) for r in rows for c in r[1:])
 
 
 def _fence_attrs(rest: str) -> Attrs | None:

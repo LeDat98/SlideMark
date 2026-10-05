@@ -449,7 +449,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     # number formats
     pct_flag = flag(opts.get("percent"))
     nf = opts.get("fmt") or opts.get("number_format") or opts.get("format")
-    nf = str(nf) if nf else ('0"%"' if pct_flag else None)
+    nf = str(nf) if nf else ('0"%"' if pct_flag else "#,##0" if flag(opts.get("grouped")) else None)
     labels = opts.get("labels", opts.get("data_labels"))
     lab_pct = isinstance(labels, str) and labels.strip().lower() == "percent"
     lab_on = lab_pct or flag(labels)
