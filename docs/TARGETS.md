@@ -19,7 +19,7 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 
 ## L1: Works (target: day 2)
 - [x] Title, text, nested lists, inline styles, images, tables with merges, code, charts, notes → native objects
-- [ ] Every example deck opens in LibreOffice without errors; `ruff` + `pytest` green in CI  (LibreOffice ok; CI not yet seen green)
+- [x] Every example deck opens in LibreOffice without errors; `ruff` + `pytest` green in CI (CI green since run 7)
 - [x] README gallery regenerated from `examples/` daily
 - [x] Syntax tokens ≤ 35% of python-pptx on the corpus
 

@@ -25,3 +25,7 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [parser] Marp `![w:200]` maps to `{w=200}` = 200 pt, not px (use `w=200px` if fidelity matters).
 - [env] Fresh container needs `apt-get install -y libreoffice-impress` before preview/golden tests (did it on day 2).
 - [tests] Golden thumbnails: regenerate with `SLIDEMARK_UPDATE_GOLDEN=1 pytest tests/test_golden.py`; token gate in `bench/BASELINE.json`.
+- [parser] A slide with one short body block is inferred as a cover → callouts are excluded from cover inference; tests with a single paragraph need a list to stay a body slide.
+- [parser] markdown-it keeps `\n` inside a paragraph as a soft break → `.kpi` boxes split lines into separate Paragraphs explicitly.
+- [parser] Connector letters index `slide.elements` after lead/conclusion are removed, so a `>` lead does not shift them.
+- [lint] Lint overflow re-measures with the same `measure.paragraphs_height`; build dedupes lint vs layout diagnostics by (rule, slide).
