@@ -440,3 +440,37 @@ def test_badge_is_never_split_across_lines_in_the_measure():
     assert measure.count_lines(segs, 12 * 10, 10) == 1
     latin = Paragraph(runs=[Run(text="status "), Run(text="in progress", highlight="primary")])
     assert measure.count_lines(measure.para_segments(latin), 7 * 10, 10) == 2  # a Latin badge keeps its space
+
+
+def _gaps(placed):
+    return [b.element.attrs.get("para_gap") for b in _role(placed, "body")]
+
+
+def test_sibling_boxes_in_a_row_share_the_smallest_paragraph_gap():
+    full = tuple(f"line number {i} of a very full card" for i in range(9))
+    s = Slide(title=T("t", "title"), grid="2", elements=[box("a", "x", "y", "z"), box("b", *full)])
+    placed, _ = lay(s, "default")
+    assert _gaps(placed) == [None, None]  # the full box has no room to spread: the roomy one follows it
+
+
+def test_sibling_boxes_with_different_spread_end_up_equal():
+    s = Slide(
+        title=T("t", "title"), grid="2", elements=[box("a", "x", "y", "z"), box("b", "x", "y", "z", "w")]
+    )
+    placed, _ = lay(s, "default")
+    g = _gaps(placed)
+    assert g[0] == g[1]  # 3 bullets would be spread alone; the 4-bullet sibling is not
+
+
+def test_single_paragraph_sibling_does_not_pull_the_gap_down():
+    s = Slide(title=T("t", "title"), grid="2", elements=[box("a", "x", "y", "z"), box("b", "x")])
+    placed, _ = lay(s, "default")
+    assert _gaps(placed)[0] is not None
+
+
+def test_stacked_boxes_share_the_gap():
+    full = tuple(f"line number {i} of a very full card" for i in range(6))
+    s = Slide(title=T("t", "title"), grid="1", elements=[box("a", "x", "y", "z"), box("b", *full)])
+    placed, _ = lay(s, "default")
+    g = _gaps(placed)
+    assert g[0] == g[1]

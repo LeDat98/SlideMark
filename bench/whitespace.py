@@ -31,7 +31,8 @@ def _content_height(p: Placed) -> float:
             pad = to_emu(p.style.padding)
         except ValueError:
             pad = 0
-    return min(p.h, measure.paragraphs_height(paras, p.w - 2 * pad, p.style, p.font_scale) + 2 * pad)
+    gap = measure.element_gap(p.element)
+    return min(p.h, measure.paragraphs_height(paras, p.w - 2 * pad, p.style, p.font_scale, gap=gap) + 2 * pad)
 
 
 def _inside(a: Placed, b: Placed) -> bool:

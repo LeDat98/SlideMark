@@ -161,6 +161,8 @@ class _Ctx:
         default_factory=dict
     )  # (box id, box width) -> heading height shared by the boxes of one row
     gaps: dict[int, float] = field(default_factory=dict)  # text id -> paragraph gap (em) of a roomy card
+    text_out: dict[int, int] = field(default_factory=dict)  # text id -> index of its Placed in ``out``
+    boxes: dict[int, list[int]] = field(default_factory=dict)  # box id -> ids of its spreadable texts
     out: list[Placed] = field(default_factory=list)
     over: list[str] = field(default_factory=list)
     diags: list[Diagnostic] = field(default_factory=list)
@@ -534,9 +536,11 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
                 ctx.over.append(_label(el))
         if isinstance(el, Text) and "callout" in el.classes:
             rect = Rect(rect.x, rect.y, rect.w, min(rect.h, round(need)))  # callouts never stretch
-        if (pg := ctx.gaps.get(id(el))) is not None:  # spread paragraphs: the renderer writes spcBef
+        orig = id(el)
+        if (pg := ctx.gaps.get(orig)) is not None:  # spread paragraphs: the renderer writes spcBef
             el = el.model_copy(update={"attrs": {**el.attrs, "para_gap": pg}})
         ctx.emit(el, rect, st, eff)
+        ctx.text_out[orig] = len(ctx.out) - 1
     elif isinstance(el, Code):
         st = _code_style(ctx, el)
         eff = _code_eff(ctx, st)
@@ -787,6 +791,10 @@ def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> Non
             _emit_links(ctx, c.links, rects)
     finally:
         ctx.depth, ctx.grow = saved
+    if not kpi:
+        ids = [id(ch) for ch in children if _spreadable(ch) and id(ch) in ctx.text_out]
+        if ids:
+            ctx.boxes[id(c)] = ids
 
 
 def _box_nat(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None:
@@ -861,6 +869,36 @@ def _gap(ctx: _Ctx, value, ref: int, small: bool = False) -> int:
             return v
     g = to_emu(ctx.theme.gap) * ctx.tight
     return round(g * 0.5) if small else round(g)
+
+
+def _spreadable(ch) -> bool:
+    """A body text with several paragraphs: the only text whose paragraph spacing the layout varies."""
+    return (
+        isinstance(ch, Text) and ch.role == "body" and "callout" not in ch.classes and len(ch.paragraphs) > 1
+    )
+
+
+def _share_gaps(ctx: _Ctx, boxes: list) -> None:
+    """Sibling boxes (one grid row / stacked column) share ONE paragraph gap: the smallest any of them got.
+
+    A sibling without a multi-paragraph body text does not take part. Lowering a gap only shrinks text.
+    """
+    members = [ids for b in boxes if isinstance(b, Container) and (ids := ctx.boxes.get(id(b)))]
+    if len(members) < 2:
+        return
+    floor = min(ctx.gaps.get(i, measure.PARA_GAP) for ids in members for i in ids)
+    for ids in members:
+        for i in ids:
+            if ctx.gaps.get(i, measure.PARA_GAP) <= floor + 1e-9:
+                continue
+            p = ctx.out[ctx.text_out[i]]
+            attrs = {k: v for k, v in p.element.attrs.items() if k != "para_gap"}
+            if floor > measure.PARA_GAP + 1e-9:
+                attrs["para_gap"] = floor
+                ctx.gaps[i] = floor
+            else:
+                ctx.gaps.pop(i, None)
+            p.element = p.element.model_copy(update={"attrs": attrs})
 
 
 def _roomy_paragraphs(ctx: _Ctx, flow: list, nat: list, area: Rect, inherit: Style, owner, gap: int) -> None:
@@ -944,6 +982,7 @@ def _place_stack(
         y += h + gap
         used += h + gap
     used -= gap
+    _share_gaps(ctx, [ch for _, ch in flow])
     limit = GROW_BOX_FILL if ctx.grow > 1.0 and ctx.depth > 0 else _TOL  # grown text keeps some headroom
     if used > area.h * limit:
         ctx.over.append(_label(owner) if owner is not None else "content")
@@ -1436,6 +1475,26 @@ def _place_blocks(
             _place_block(ctx, blk, r, inherit)
             if isinstance(blk, (Image, Media)) and _text_mate(flow):
                 _top_align(ctx.out[-1])
+    if "chevron" not in flags:
+        parent = list(range(len(flow)))
+
+        def find(k: int) -> int:
+            while parent[k] != k:
+                k = parent[k]
+            return k
+
+        seen: dict[tuple, int] = {}
+        for k, r in enumerate(cells[: len(flow)]):
+            for key in (("row", r.y), ("col", r.x, r.w)):  # cells in one row / stacked column are linked
+                if key in seen:
+                    parent[find(k)] = find(seen[key])
+                else:
+                    seen[key] = k
+        comps: dict[int, list] = {}
+        for k, (_i, blk) in enumerate(flow):
+            comps.setdefault(find(k), []).append(blk)
+        for group in comps.values():
+            _share_gaps(ctx, group)
     if "flow" in flags:
         for a, b in zip(cells, cells[1:], strict=False):
             g = b.x - a.right

@@ -33,6 +33,17 @@ def _rules(src: str, mutate=None) -> set[str]:
     return {d.rule for d in _run(src, mutate)}
 
 
+def test_natural_height_counts_the_paragraph_gap():
+    from slidemark.critique import _natural_height
+    from slidemark.ir import Paragraph, Placed, Run, Style, Text
+
+    paras = [Paragraph(runs=[Run(text=f"line {i}")]) for i in range(6)]
+    mk = lambda **a: Placed(  # noqa: E731
+        element=Text(paragraphs=paras, attrs=a), x=0, y=0, w=3_000_000, h=2_000_000, style=Style(font_size=18)
+    )
+    assert _natural_height(mk(para_gap=0.6)) > _natural_height(mk())
+
+
 def test_good_deck_is_quiet():
     assert _run(GOOD) == []
 
