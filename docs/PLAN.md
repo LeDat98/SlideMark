@@ -257,3 +257,7 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
   than one line of content.
 - **Orchestrator:** `examples/11-jp-consulting.md` (≥ 8 dense slides, L3 gate), CI on 3 Python versions +
   coverage report, XSD/schema validation script for generated decks (L6), docs.
+- **Wave 3 A: HTML → native via Chromium measurement** (`src/slidemark/htmlnative.py`): unsupported HTML blocks
+  are laid out in headless Chromium and converted to native rects/text/images; `{render=image}` opts out;
+  canvas/complex SVG keep the image fallback.
+- **Wave 3 B: fixes from the wave 2 gallery review.**
