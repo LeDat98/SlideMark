@@ -66,3 +66,14 @@ def test_canonical_token_hints():
 def test_schema_table_lists_layout_and_render():
     paths = {p for p, _ in schema_table()}
     assert {"colors.primary", "fonts.ea", "layout.top_gap", "render.connector_width", "title_band"} <= paths
+
+
+def test_dark_brand_without_muted_gets_a_readable_muted():
+    from slidemark.theme import apply_tokens, get_theme
+
+    th, diags = apply_tokens(get_theme("default"), {"colors.bg": "#0A0A12", "colors.fg": "#F5F5F7"})
+    assert not diags and th.colors["muted"] == "#A3A3A7"
+    th, _ = apply_tokens(get_theme("default"), {"colors.bg": "#0A0A12", "colors.muted": "#555555"})
+    assert th.colors["muted"] == "#555555"  # declared muted always wins
+    th, _ = apply_tokens(get_theme("default"), {"colors.bg": "#FFFFFF"})
+    assert th.colors["muted"] == get_theme("default").colors["muted"]  # still readable: unchanged

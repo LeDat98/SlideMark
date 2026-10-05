@@ -52,7 +52,7 @@ A YAML front-matter block between `---` lines is accepted as well.
 
 ### Design tokens
 
-Every visual decision is a token (`slidemark tokens` prints all of them with their values). Built-in themes
+Every visual decision is a token (`slidemark tokens` prints all of them with their values). A deck that sets `bg`/`fg` but not `muted` gets a readable muted color mixed from them when the preset grey would fail contrast. Built-in themes
 are presets written in the same schema (`src/slidemark/presets/*.yaml`); a deck extends one and overrides any
 token inline. Values are colors (`#RRGGBB`, `#RRGGBBAA` or a color name), numbers, lengths (`12pt`, `0.3in`,
 bare numbers = pt), `none`, or quoted text.

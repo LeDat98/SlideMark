@@ -456,7 +456,38 @@ def apply_tokens(theme: Theme, tokens: dict[str, str]) -> tuple[Theme, list[Diag
             diags.append(_bad_token(path, raw, why, _HINT_GENERIC))
             continue
         data = trial
+    _derive_muted(data, tokens)
     return Theme.model_validate(data), diags
+
+
+def _hex_rgb(v: Any) -> tuple[float, float, float] | None:
+    if not isinstance(v, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?", v):
+        return None
+    return tuple(int(v[i : i + 2], 16) / 255 for i in (1, 3, 5))  # type: ignore[return-value]
+
+
+def _rel_lum(c: tuple[float, float, float]) -> float:
+    lin = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def _derive_muted(data: dict, tokens: dict[str, str]) -> None:
+    """A deck that sets its own bg/fg but no ``muted`` gets a muted color between them that stays readable.
+
+    The preset's grey is made for its own background: on a dark brand ``bg`` it fails contrast (lead lines,
+    captions). Muted = fg mixed 35% toward bg, which keeps ≥ 4.5:1 on any bg/fg pair with ≥ 10:1.
+    """
+    if "colors.muted" in tokens or not ({"colors.bg", "colors.fg"} & set(tokens)):
+        return
+    cols = data.get("colors") or {}
+    bg, fg, muted = (_hex_rgb(cols.get(k)) for k in ("bg", "fg", "muted"))
+    if not (bg and fg and muted):
+        return
+    lo, hi = sorted((_rel_lum(muted), _rel_lum(bg)))
+    if (hi + 0.05) / (lo + 0.05) >= 4.5:
+        return
+    mix = [f + (b - f) * 0.35 for f, b in zip(fg, bg, strict=True)]
+    cols["muted"] = "#" + "".join(f"{round(x * 255):02X}" for x in mix)
 
 
 def _bad_token(path: str, raw: Any, why: str, hint: str) -> Diagnostic:
