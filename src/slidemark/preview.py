@@ -66,6 +66,46 @@ def _fonts_conf(directory: str) -> str:
     return str(path)
 
 
+def _deck_locale(pptx: Path) -> str | None:
+    """The text language of the deck (``vi-VN`` ...) when it writes decimal commas, else None.
+
+    LibreOffice formats chart numbers in its own locale; previews of a Vietnamese / German deck should show
+    ``3,6`` like PowerPoint does for that audience, so agents do not re-check a correct chart.
+    """
+    import re
+    import zipfile
+    from collections import Counter
+
+    from .parser.tabular import is_decimal_comma_lang
+
+    try:
+        with zipfile.ZipFile(pptx) as z:
+            names = [n for n in z.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)][:20]
+            langs = Counter(
+                m
+                for n in names
+                for m in re.findall(r'\blang="([A-Za-z]{2,3}-[A-Za-z]{2})"', z.read(n).decode())
+            )
+    except Exception:
+        return None
+    for lang, _n in langs.most_common():
+        if is_decimal_comma_lang(lang):
+            return lang
+    return None
+
+
+def _locale_profile(profile: str, locale: str) -> None:
+    user = Path(profile) / "user"
+    user.mkdir(parents=True, exist_ok=True)
+    (user / "registrymodifications.xcu").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<oor:items xmlns:oor="http://openoffice.org/2001/registry">'
+        '<item oor:path="/org.openoffice.Setup/L10N"><prop oor:name="ooSetupSystemLocale" oor:op="fuse">'
+        f"<value>{locale}</value></prop></item></oor:items>",
+        encoding="utf-8",
+    )
+
+
 def pptx_to_pdf(pptx: str | Path, out_dir: str | Path, timeout: int = 180) -> Path:
     """Convert with an isolated LibreOffice profile so parallel runs and stale locks cannot interfere."""
     pptx, out_dir = Path(pptx), Path(out_dir)
@@ -83,6 +123,9 @@ def pptx_to_pdf(pptx: str | Path, out_dir: str | Path, timeout: int = 180) -> Pa
             str(out_dir),
             str(pptx),
         ]
+        locale = _deck_locale(pptx)
+        if locale:
+            _locale_profile(profile, locale)
         env = dict(os.environ)
         if sys.platform.startswith("linux"):  # fontconfig aliases only matter where Office fonts are missing
             env["FONTCONFIG_FILE"] = _fonts_conf(profile)

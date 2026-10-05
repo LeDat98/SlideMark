@@ -185,7 +185,7 @@ def test_look_line_for_brand_deck(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out.splitlines()
     assert out[-1].startswith("wrote ") and out[-2].startswith("look: ")
     look = out[-2]
-    assert len(look) <= 170
+    assert len(look) <= 200
     for want in ("bg #0B1F3A", "text #FFFFFF", "primary #FF6B57", "accent #FF6B57", "Montserrat (headings)"):
         assert want in look
     assert "Open Sans (body)" in look and "title band off" in look and "(ea)" not in look

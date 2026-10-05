@@ -254,6 +254,43 @@ def _facts(deck: Deck, out: Path) -> str:
     return line
 
 
+def _accent_use(deck: Deck, theme) -> str:
+    """Where the accent colour shows (agents opened slides to look for it): '; accent shows on 2 charts'."""
+    import json
+
+    acc = (theme.hexval("accent") or "").lstrip("#").upper()
+    if not acc or acc == (theme.hexval("primary") or "").lstrip("#").upper():
+        return ""  # an accent equal to primary shows wherever primary does
+    pal = theme.chart_palette(None)
+    idx = pal.index(acc) if acc in pal else None
+    charts = 0
+    marks = 0
+    for s in deck.slides:
+        dump = json.dumps(s.model_dump(mode="json"), ensure_ascii=False)
+        marks += dump.count('"color": "accent"') + dump.count('"accent"]')
+        for el in _walk_charts(s.elements):
+            if el.options.get("colors") or idx is None:
+                continue
+            n = len(el.categories) if el.kind in ("pie", "doughnut") else len(el.series)
+            charts += n > idx
+    parts = [f"{charts} chart{'s' * (charts != 1)}"] * bool(charts) + [
+        f"{marks} mark{'s' * (marks != 1)}"
+    ] * bool(marks)
+    if parts:
+        return "; accent on " + ", ".join(parts)
+    return "; accent unused (==x== shows it)"
+
+
+def _walk_charts(elements):
+    from .ir import Chart, Container
+
+    for el in elements:
+        if isinstance(el, Chart):
+            yield el
+        elif isinstance(el, Container):
+            yield from _walk_charts(el.children)
+
+
 def _look_line(deck: Deck) -> str | None:
     """Brand facts of the resolved theme (what agents open slide images to check); None for a plain deck."""
     if not (
@@ -281,6 +318,7 @@ def _look_line(deck: Deck) -> str | None:
             f"look: theme {theme.name}, bg {col['bg']}, text {col['fg']}, "
             f"primary {col['primary']}, accent {col['accent']}; {fonts}; {band}"
         )
+        line += _accent_use(deck, theme)
         # text shades the contrast derivation moved (fills never change): compare against the underived theme
         raw, _ = resolve_theme(deck.theme, base)
         if deck.tokens:
