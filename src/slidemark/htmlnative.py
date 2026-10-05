@@ -29,6 +29,7 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
+from urllib.parse import unquote
 
 from .ir import Diagnostic, Image, Paragraph, Placed, Run, Shape, Style, Text
 from .theme import Theme
@@ -723,14 +724,16 @@ def _picture(it: dict, ox: int, oy: int, png: bytes, tmp: list[Path]) -> Placed:
 def _image(it: dict, ox: int, oy: int, tmp: list[Path]) -> Placed | None:
     src = it["src"]
     if src.startswith("data:"):
-        m = re.match(r"data:image/([a-z0-9.+-]+)(;base64)?,(.*)$", src, re.S | re.I)
+        m = re.match(
+            r"data:image/([a-z0-9.+-]+)(?:;(?!base64)[a-z0-9=_.-]+)*(;base64)?,(.*)$", src, re.S | re.I
+        )
         if not m:
             return None
         ext = {"jpeg": "jpg", "svg+xml": "svg"}.get(m.group(1).lower(), m.group(1).lower())
-        if ext not in ("png", "jpg", "gif", "bmp", "webp"):
+        if ext not in ("png", "jpg", "gif", "bmp", "webp", "svg"):
             return None
         try:
-            data = base64.b64decode(m.group(3)) if m.group(2) else m.group(3).encode("latin-1")
+            data = base64.b64decode(m.group(3)) if m.group(2) else unquote(m.group(3)).encode("utf-8")
         except Exception:
             return None
         if not tmp:
@@ -797,6 +800,59 @@ def _measure(renderer, html: str, w_px: int, h_px: int, theme: Theme) -> dict | 
         return data
 
 
+_SCALE_KEYS = ("x", "y", "w", "h", "x1", "y1", "x2", "y2", "lw", "rad", "fs", "lh", "ls")
+
+
+def _content_bottom(items: list[dict]) -> float:
+    """Lowest visible edge (px) of the measured items."""
+    return max(
+        (max(it.get("y1", 0), it.get("y2", 0)) if it["k"] == "line" else it["y"] + it["h"]) for it in items
+    )
+
+
+def _scale_items(items: list[dict], z: float) -> None:
+    """Multiply every length (geometry, font sizes, borders, shadows) by ``z`` in place."""
+    for it in items:
+        for k in _SCALE_KEYS:
+            if isinstance(it.get(k), (int, float)):
+                it[k] = it[k] * z
+        for p in it.get("paras", ()):
+            p["fs"] = p["fs"] * z
+        sh = it.get("shadow")
+        if sh:
+            parts = sh.split()
+            nums = [f"{float(v) * z:.2f}" for v in parts[:-1]]
+            it["shadow"] = " ".join([*nums, parts[-1]])
+
+
+def _zoomed(renderer, html, w_px, h_px, theme, zoom, zoom_max, data):
+    """Return ``(data, z)``: the measurement at the zoom to use (z=1 keeps ``data``). Never raises."""
+    auto = zoom == "auto"
+    if auto:
+        if zoom_max < 1.05 or any(it["k"] == "pic" for it in data["items"]):
+            return data, 1.0
+        ch = _content_bottom(data["items"])
+        if ch <= 0 or ch >= 0.6 * h_px:
+            return data, 1.0
+        z = min(zoom_max, 0.9 * h_px / ch)
+    else:
+        z = max(0.25, min(float(zoom), 4.0))
+    for _ in range(4):
+        z = round(z * 20) / 20
+        if abs(z - 1) < 0.04:
+            return data, 1.0
+        d2 = _measure(renderer, html, round(w_px / z), round(h_px / z), theme)
+        if not d2 or not d2.get("items"):
+            return data, 1.0
+        if not auto:
+            return d2, z
+        ch2 = _content_bottom(d2["items"]) * z
+        if ch2 <= 0.92 * h_px and d2.get("sw", 0) <= w_px / z + 2:
+            return d2, z
+        z = max(1.0, z * 0.9 * h_px / max(ch2, 1)) if ch2 > 0 else 1.0
+    return data, 1.0
+
+
 def html_to_placed(
     html: str,
     x: int,
@@ -807,12 +863,18 @@ def html_to_placed(
     base_dir: str = ".",
     *,
     renderer=None,
+    zoom: float | str = 1.0,
+    zoom_max: float = 1.5,
 ) -> tuple[list[Placed], list[Diagnostic]] | None:
     """Lay ``html`` out in Chromium at ``w`` x ``h`` EMU and return native Placed items (absolute EMU).
 
     ``None`` when Playwright/Chromium is unavailable or nothing visible was measured. Pass a shared
     ``renderer`` (``HtmlRenderer``) so a deck launches one browser. Never raises. Elements that shapes cannot
     express are pictures of just that element, reported once each as an ``html-element-image`` info.
+
+    ``zoom``: 1 = lay out at the box size; a number z re-lays out at (w/z, h/z) and scales all lengths and
+    fonts by z back into the box; ``"auto"`` picks the largest z in [1, ``zoom_max``] that keeps the content
+    within ~90% of the box height (only when the content is under 60% of it). Pass 1 for whole slides.
     """
     own = None
     try:
@@ -824,6 +886,14 @@ def html_to_placed(
         data = _measure(renderer, html, w_px, h_px, theme)
         if not data or not data.get("items"):
             return None
+        if zoom != 1 and zoom != 1.0:
+            try:
+                data, z = _zoomed(renderer, html, w_px, h_px, theme, zoom, zoom_max, data)
+            except Exception:
+                z = 1.0
+            if z != 1.0:
+                _scale_items(data["items"], z)
+                data["sh"], data["sw"] = data.get("sh", 0) * z, data.get("sw", 0) * z
         placed: list[Placed] = []
         diags: list[Diagnostic] = []
         tmp: list[Path] = []
