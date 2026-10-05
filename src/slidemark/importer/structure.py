@@ -985,6 +985,8 @@ def build_slide(
         info["extra"] = extra
         info["title_only"] = title_only
     tokens = [*tokens, *links, *extra]
+    if info is not None:
+        info["pos"] = len(lines)
     if tokens:
         if info is not None:
             info["at"] = len(lines)
