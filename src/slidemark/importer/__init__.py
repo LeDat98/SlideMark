@@ -22,7 +22,9 @@ from .design import (
     is_template_path,
     match_slide,
     tag_boxes,
+    token_lines,
 )
+from .look import color_similarity, derive_tokens
 from .read import ReadCtx, SlideData, read_sections, read_slide
 from .structure import DeckInfo, build_slide, notes_lines
 
@@ -149,13 +151,58 @@ def import_pptx(path: str | Path, out_dir: str | Path | None = None) -> tuple[st
         return "", diags
 
 
+def _color_score(prs, text: str, out_dir) -> float:
+    """How closely the colors of ``text`` rebuilt match ``prs`` (trial build; -1 when it fails)."""
+    import tempfile
+
+    from pptx import Presentation
+
+    from ..build import build
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "t.pptx"
+            build(text, path, base_dir=out_dir or tmp)
+            return color_similarity(prs, Presentation(str(path)))
+    except Exception:
+        return -1.0
+
+
 def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[str, list[Diagnostic]]:
+    """A foreign deck keeps its look as tokens when a trial build shows the colors match better."""
+    theme = detect_theme(prs)
+    if read_design_part(prs) or (src_name and _custom_theme(prs)):
+        return _import_with(prs, out_dir, diags, src_name, {})
+    tokens = derive_tokens(prs, theme)
+    if not tokens:
+        return _import_with(prs, out_dir, diags, src_name, {})
+    base_diags: list[Diagnostic] = []
+    best_text, _ = _import_with(prs, out_dir, base_diags, src_name, {})
+    best = (_color_score(prs, best_text, out_dir), best_text, base_diags)
+    keep_text = {k: v for k, v in tokens.items() if k not in ("colors.fg", "colors.muted")}
+    for cand in (tokens, keep_text):
+        if not cand or (cand is keep_text and cand == tokens):
+            continue
+        cand_diags: list[Diagnostic] = []
+        text, _ = _import_with(prs, out_dir, cand_diags, src_name, cand)
+        score = _color_score(prs, text, out_dir)
+        if score > best[0] + 0.01:
+            best = (score, text, cand_diags)
+        if cand is tokens and score > best[0] - 0.01 and best[1] is text:
+            break  # the full look wins: no need to try the variant
+    diags.extend(best[2])
+    return best[1], diags
+
+
+def _import_with(
+    prs, out_dir, diags: list[Diagnostic], src_name: str, own_tokens: dict[str, str]
+) -> tuple[str, list[Diagnostic]]:
     W, H = int(prs.slide_width), int(prs.slide_height)
     theme = detect_theme(prs)
     design = read_design_part(prs) or {}
     tok_colors = {  # the deck's own palette (tokens) replaces the stock theme's for badge/class detection
         k.split(".", 1)[1]: v.lstrip("#").upper()
-        for k, v in (design.get("tokens") or {}).items()
+        for k, v in {**(design.get("tokens") or {}), **own_tokens}.items()
         if k.startswith("colors.") and re.fullmatch(r"#[0-9A-Fa-f]{6}", str(v))
     }
     accent = tok_colors.get("accent") or theme.colors["accent"].lstrip("#").upper()
@@ -238,6 +285,7 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
             )
     elif theme is not DEFAULT:
         header.append(f"theme: {theme.name}")
+        header.extend(token_lines(own_tokens))
     elif src_name and _custom_theme(prs):
         header.append(f"theme: {src_name}")  # its own masters and colors: the source deck is the template
         diags.append(
@@ -248,6 +296,8 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
                 hint="keep the .pptx next to the .md (or change the theme: path)",
             )
         )
+    elif own_tokens:
+        header.extend(token_lines(own_tokens))
     size = _size_token(W, H)
     if size:
         header.append(f"size: {size}")
