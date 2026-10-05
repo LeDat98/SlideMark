@@ -7,6 +7,8 @@ Rules (all warnings, cheap to read for an agent):
 - ``overlap``: two items overlap (one fully inside another, e.g. a heading in its card, is fine).
 - ``contrast``: the drawn text color (paragraph, run, badge ink) vs the fill behind it is below WCAG 3:1;
   the hint names the token to change and a passing value.
+  Table cells (header, first column, body, banded rows) and chart text (title, legend, axis and data
+  labels) are judged at 4.5:1 (3:1 for large text), one warning per table / chart and kind.
 - ``tiny-text``: text renders below the theme's minimum font size.
 - ``alt``: an image without alt text.
 - ``connector-crosses``: a connector runs through a block that is not one of its ends.
@@ -18,8 +20,9 @@ import re
 
 from .contrast import nearest_passing
 from .contrast import ratio as _ratio
-from .ir import Container, Deck, Diagnostic, Image, Media, Placed, Shape, Text
+from .ir import Chart, Container, Deck, Diagnostic, Image, Media, Placed, Shape, Table, Text
 from .layout import css, measure
+from .layout.tables import table_grid
 from .theme import Theme
 from .units import EMU_PER_PT, slide_size
 
@@ -243,6 +246,160 @@ def _contrast_findings(
     return out
 
 
+def _table_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[str, str]]:
+    """(message, hint) per table cell kind (header, first column, body, banded rows) with unreadable text.
+
+    Fills and text styles come from the renderer's own resolvers (``Theme.table_cell_fill`` /
+    ``table_cell_style`` / ``run_color``); a cell's own CSS fill and opacity paint over them.
+    """
+    from .render.objects import flag  # lazy: render pulls in python-pptx
+
+    t: Table = p.element  # type: ignore[assignment]
+    _rows, _cols, anchors = table_grid(t)
+    zebra = "zebra" in t.classes or flag(t.attrs.get("zebra"))
+    body_fill = theme.table_body_fill_of(p.style.fill)
+    top = behind[0] if behind else None
+    # per kind: (ratio, need, ink, backs, explicit run color, explicit cell color)
+    groups: dict[str, list[tuple[float, float, str, list[str], bool, bool]]] = {}
+    for r, c, ct in anchors:
+        hdr, fcol = r < t.header_rows, c < t.header_cols
+        kind = "header" if hdr else "first column" if fcol else "body"
+        if kind == "body" and zebra and (r - t.header_rows) % 2 == 1:
+            kind = "banded rows"
+        fill = theme.table_cell_fill(r, c, t.header_rows, t.header_cols, body_fill, zebra)
+        cst = ct.style
+        if cst and cst.fill:
+            fill = cst.fill
+        if _is_image(fill, theme):
+            continue
+        backs = _backs(fill, theme, top)
+        if cst and cst.opacity is not None and 0 <= cst.opacity < 1:
+            backs = [_blend((b, cst.opacity), top) for b in backs]
+        st = theme.table_cell_style(p.style, hdr, fcol, ct.colspan, cst)
+        for q in ct.paragraphs:
+            pst = st.merged(q.style)
+            size = (pst.font_size or 18) * p.font_scale
+            for run in q.runs:
+                if not run.text.strip():
+                    continue
+                col = theme.run_color(run.color, run.highlight, pst.color, size, pst.fill) or "fg"
+                use = _backs(run.highlight, theme, None) if run.highlight else backs
+                fg_c = _rgba(col, theme)
+                if not fg_c or not use:
+                    continue
+                need = theme.need_for_text(size, bool(run.bold or pst.bold or run.highlight))
+                got = min(contrast_ratio(_blend(fg_c, b), b) for b in use)
+                groups.setdefault(kind, []).append(
+                    (
+                        got,
+                        need,
+                        _hexs(fg_c[0]),
+                        [_hexs(b) for b in use],
+                        bool(run.color),
+                        bool(cst and cst.color),
+                    )
+                )
+    out = []
+    for kind, cells in groups.items():
+        bad = [x for x in cells if x[0] < x[1]]
+        if not bad:
+            continue
+        worst = min(bad, key=lambda x: x[0] - x[1])
+        # `td.color` colors every non-header kind: one value must pass on all of them
+        scope = cells if kind == "header" else [x for k, v in groups.items() if k != "header" for x in v]
+        need = max(x[1] for x in scope)
+        every = list(dict.fromkeys(h for x in scope for h in x[3]))
+        if worst[4]:  # an explicit run color cannot be reached by a token
+            ink = nearest_passing(worst[2], worst[3], worst[1])
+            fix, where = f"change the run's color to {{color={ink}}}", worst[3]
+        else:
+            ink = nearest_passing(worst[2], every, need)
+            token = ("th.color" if worst[5] else "table.header.color") if kind == "header" else "td.color"
+            fix, where = f"style: {token}={ink}", every
+        out.append(
+            (
+                f"table {kind} text has low contrast {worst[0]:.1f}:1 (< {worst[1]:g}:1) on {worst[3][0]}",
+                f"{fix} (passes {need:g}:1 on {', '.join(where)})",
+            )
+        )
+    return out
+
+
+def _chart_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[str, str]]:
+    """(message, hint) per kind of chart text (title, legend, axis labels, data labels) that is unreadable.
+
+    Colors come from the renderer's own resolvers (``Theme.chart_palette`` / ``chart_label_ink``).
+    """
+    from .render.objects import _legend_pos, flag
+    from .render.util import hex6
+    from .theme import DEFAULT_SIZES
+
+    ch: Chart = p.element  # type: ignore[assignment]
+    if not behind:
+        return []
+    back_hex = [_hexs(b) for b in behind]
+    opts = {str(k).lower().replace("-", "_"): v for k, v in ch.options.items()}
+    kind = ch.kind
+    pie = kind in ("pie", "doughnut")
+    rt = theme.render
+    size = (p.style.font_size or theme.sizes.get("table", DEFAULT_SIZES["table"])) * p.font_scale
+    base = "#" + hex6(theme, p.style.color or "fg")
+    series = ch.series
+    ncat = max([len(ch.categories), *(len(s.values) for s in series)])
+    if pie and len(series) > 1 and len(ch.categories) <= 1 and all(len(s.values) == 1 for s in series):
+        ncat = len(series)
+    # (label, ink, size, bold, backs it must read on, how the hint fixes it)
+    checks: list[tuple[str, str, float, bool, list[str], str]] = []
+    if ch.title:
+        checks.append(("title", "#" + hex6(theme, "fg"), size * rt.chart_title_scale, True, back_hex, "fg"))
+    if _legend_pos(opts, pie, len(series)) is not None:
+        checks.append(("legend", base, size, False, back_hex, "chart"))
+    if not pie:
+        checks.append(("axis labels", base, size, False, back_hex, "chart"))
+    labels = opts.get("labels", opts.get("data_labels"))
+    lab_pct = isinstance(labels, str) and labels.strip().lower() == "percent"
+    lsize = size * rt.chart_label_scale
+    pal = theme.chart_palette(opts.get("colors"))
+    if (lab_pct or flag(labels)) and kind != "scatter":
+        if pie:
+            bg = hex6(theme, "bg")
+            for i in range(ncat):
+                fill = pal[i % len(pal)]
+                ink = "#" + theme.chart_label_ink(fill, *([bg] if kind == "pie" else []))
+                # Judged on the slice only: a pie label may also land outside it (best fit), where no single
+                # ink reads on both a mid-tone slice and the page; the renderer then favors the slice.
+                checks.append(("data labels", ink, lsize, False, ["#" + fill], "labels"))
+        elif kind in ("stacked-bar", "stacked-column"):
+            for i in range(len(series)):
+                fill = pal[i % len(pal)]
+                checks.append(
+                    ("data labels", "#" + theme.chart_label_ink(fill), lsize, False, ["#" + fill], "labels")
+                )
+        elif kind in ("column", "bar", "line"):
+            checks.append(("data labels", base, lsize, False, back_hex, "chart"))
+    groups: dict[str, list[tuple[float, float, str, list[str], str]]] = {}
+    for label, ink, sz, bold, backs, fix in checks:
+        got = min(_ratio(ink, b) for b in backs)
+        groups.setdefault(label, []).append((got, theme.need_for_text(sz, bold), ink, backs, fix))
+    out = []
+    for label, cells in groups.items():
+        bad = [x for x in cells if x[0] < x[1]]
+        if not bad:
+            continue
+        got, need, ink, backs, fix = min(bad, key=lambda x: x[0] - x[1])
+        if fix == "labels":
+            hint = (
+                "add {labels=off} to the chart fence, or {colors=...} with slices the label ink can read on"
+            )
+        else:
+            every = list(dict.fromkeys([*back_hex, *backs]))
+            new = nearest_passing(ink, every, max(x[1] for x in cells))
+            hint = f"colors: fg={new}" if fix == "fg" else f"add {{color={new}}} to the chart fence"
+            hint += f" (passes {need:g}:1 on {', '.join(every)})"
+        out.append((f"chart {label} have low contrast {got:.1f}:1 (needs {need:g}:1) on {backs[0]}", hint))
+    return out
+
+
 def _label(p: Placed) -> str:
     el = p.element
     paras = getattr(el, "paragraphs", None)
@@ -341,6 +498,11 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
         if isinstance(el, (Image, Media)) and not el.alt.strip():
             what = "image" if isinstance(el, Image) else el.kind
             warn("alt", f"{what} {el.src} has no alt text", "write ![what it shows](path)", p)
+        if isinstance(el, (Table, Chart)):
+            find = _table_findings if isinstance(el, Table) else _chart_findings
+            for msg, hint in find(p, theme, _backdrop(items, i, bg, theme)):
+                warn("contrast", msg, hint, p)
+            continue
         paras = getattr(el, "paragraphs", None)
         if not paras or not any(q.plain.strip() for q in paras):
             continue

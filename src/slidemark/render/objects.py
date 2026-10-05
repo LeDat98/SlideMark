@@ -16,7 +16,6 @@ from pygments import lex
 from pygments.lexers import TextLexer, get_lexer_by_name
 from pygments.token import Comment, Keyword, Name, Number, Operator, String
 
-from ..contrast import best_ink, ratio
 from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Series, Style, Table
 from ..layout import measure
 from ..layout.css import border_spec, cell_insets
@@ -152,13 +151,6 @@ def _cell_fill(rc: RenderCtx, cell, st: Style) -> None:
         tcPr.insert(0, new)
 
 
-def _mix(a: str, b: str, t: float) -> str:
-    """Blend two RRGGBB colors: ``t`` = share of ``b``."""
-    return "".join(
-        f"{round(int(a[i : i + 2], 16) * (1 - t) + int(b[i : i + 2], 16) * t):02X}" for i in (0, 2, 4)
-    )
-
-
 def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     t: Table = pl.element  # type: ignore[assignment]
     theme = rc.theme
@@ -179,7 +171,7 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     for i, h in enumerate(rh[:nrows]):
         tbl.rows[i].height = Emu(int(h))
     border = hex6(theme, theme.table_border)
-    body_fill = pl.style.fill or theme.table_body_fill  # CSS `table { background }` = the body cell fill
+    body_fill = theme.table_body_fill_of(pl.style.fill)  # CSS `table { background }` = the body cell fill
     t_border = None
     if pl.style.line or pl.style.line_width is not None:  # CSS `table { border }`: every cell border
         t_border = (
@@ -188,16 +180,13 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         )
         border = hex6(theme, pl.style.line or theme.table_border)
     zebra = "zebra" in t.classes or flag(t.attrs.get("zebra"))
-    zebra_fill = theme.table_zebra_fill or "#" + _mix(hex6(theme, body_fill), hex6(theme, "surface"), 0.6)
     fill_of: dict[tuple[int, int], str] = {}
     # fill every grid cell first (merged-away cells included) so nothing falls back to a default style
     for r in range(nrows):
         for c in range(ncols):
             cell = tbl.cell(r, c)
             hdr = r < t.header_rows
-            fill = theme.table_header_fill if hdr else ("surface" if c < t.header_cols else body_fill)
-            if zebra and not hdr and c >= t.header_cols and (r - t.header_rows) % 2 == 1:
-                fill = zebra_fill
+            fill = theme.table_cell_fill(r, c, t.header_rows, t.header_cols, body_fill, zebra)
             fill_of[(r, c)] = fill
             cell.fill.solid()
             cell.fill.fore_color.rgb = (
@@ -227,14 +216,7 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     "check the < and ^ markers",
                 )
         hdr = r < t.header_rows
-        st = pl.style
-        if hdr:
-            st = st.merged(
-                Style(bold=True, color=theme.table_header_color, align="center" if cs > 1 else None)
-            )
-        elif c < t.header_cols:
-            st = st.merged(Style(bold=True))
-        st = st.merged(ct.style)
+        st = theme.table_cell_style(pl.style, hdr, c < t.header_cols, cs, ct.style)
         if ct.style and (ct.style.fill or ct.style.opacity is not None):
             _cell_fill(rc, cell, Style(fill=ct.style.fill or fill_of[(r, c)], opacity=ct.style.opacity))
         for rr in range(r, r + rs):  # a merged cell: the covered cells share its borders
@@ -347,12 +329,7 @@ def label_color_on(fill_hex: str, theme: Theme | None = None) -> str:
 
 def _ink_hex(theme: Theme, fill: str, fallback: str, *backs: str) -> str:
     """'RRGGBB' ink readable on ``fill`` (and on every ``backs`` color when one ink can do both)."""
-    cands = [c.lstrip("#").upper() for c in theme.ink_candidates()]
-    need = theme.render.contrast_min
-    both = [c for c in cands if all(ratio("#" + c, "#" + b) >= need for b in (fill, *backs))]
-    if both:
-        return both[0]
-    return best_ink("#" + fill, ["#" + c for c in cands], need).lstrip("#").upper() or fallback
+    return theme.chart_label_ink(fill, *backs) or fallback
 
 
 def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct) -> None:
@@ -398,11 +375,6 @@ def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct) -> None:
             anchor.addprevious(nfe)
         if kind == "pie":
             dl.position = XL_LABEL_POSITION.BEST_FIT
-
-
-def _distinct(colors: list[str]) -> list[str]:
-    """Drop repeated colors (``accent`` and ``danger`` may share one value), keep the order."""
-    return list(dict.fromkeys(c.upper() for c in colors))
 
 
 def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
@@ -473,10 +445,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     cl = opts.get("colors")
     if isinstance(cl, str):
         cl = [p.strip() for p in cl.replace(";", ",").split(",") if p.strip()]
-    use = cl if isinstance(cl, (list, tuple)) and cl else theme.palette
-    pal = [hex6(theme, str(c)) for c in use] or [hex6(theme, "primary")]
-    if use is theme.palette:  # distinct theme colors in order; they wrap only after all of them are used
-        pal = _distinct(pal)
+    pal = theme.chart_palette(cl)
     # number formats
     pct_flag = flag(opts.get("percent"))
     nf = opts.get("fmt") or opts.get("number_format") or opts.get("format")

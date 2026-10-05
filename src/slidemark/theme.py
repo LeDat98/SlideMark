@@ -416,6 +416,77 @@ class Theme(BaseModel):
             return self.legible(run_color, size_pt, [fh] if fh else None)
         return style_color
 
+    def need_for_text(self, size_pt: float | None, bold: bool = False) -> float:
+        """WCAG ratio for table / chart text: 3:1 for large text (>= 18pt, or bold >= 14pt), else 4.5:1."""
+        rt = self.render
+        big = size_pt is not None and (size_pt >= 18 or (bold and size_pt >= 14))
+        return rt.contrast_large if big else rt.contrast_min
+
+    # ---- tables: fills and text style of a cell (renderer and lint share these)
+
+    def table_body_fill_of(self, style_fill: str | None) -> str:
+        """Body cell fill: the CSS ``table { background }`` else the ``table.body.fill`` token."""
+        return style_fill or self.table_body_fill
+
+    def table_zebra_fill_of(self, body_fill: str) -> str:
+        from .render.util import hex6  # lazy: render imports theme
+
+        if self.table_zebra_fill:
+            return self.table_zebra_fill
+        a, b = hex6(self, body_fill), hex6(self, "surface")
+        return "#" + "".join(
+            f"{round(int(a[i : i + 2], 16) * (1 - 0.6) + int(b[i : i + 2], 16) * 0.6):02X}" for i in (0, 2, 4)
+        )
+
+    def table_cell_fill(
+        self, row: int, col: int, header_rows: int, header_cols: int, body_fill: str, zebra: bool
+    ) -> str:
+        """Fill of grid cell (row, col) before any per-cell CSS fill: header, first column, body or band."""
+        if row < header_rows:
+            return self.table_header_fill
+        if col < header_cols:
+            return "surface"
+        if zebra and (row - header_rows) % 2 == 1:
+            return self.table_zebra_fill_of(body_fill)
+        return body_fill
+
+    def table_cell_style(
+        self, base: Style, header: bool, first_col: bool, colspan: int, cell_style: Style | None
+    ) -> Style:
+        """Text style of a table cell: the table's, header / first-column defaults, then the cell's own."""
+        st = base
+        if header:
+            st = st.merged(
+                Style(bold=True, color=self.table_header_color, align="center" if colspan > 1 else None)
+            )
+        elif first_col:
+            st = st.merged(Style(bold=True))
+        return st.merged(cell_style)
+
+    # ---- charts: colors the renderer draws (renderer and lint share these)
+
+    def chart_palette(self, colors: Any = None) -> list[str]:
+        """Series / slice colors ('RRGGBB'): an explicit ``colors`` option, else the theme palette."""
+        from .render.util import hex6
+
+        if isinstance(colors, str):
+            colors = [p.strip() for p in colors.replace(";", ",").split(",") if p.strip()]
+        explicit = isinstance(colors, (list, tuple)) and bool(colors)
+        use = colors if explicit else self.palette
+        pal = [hex6(self, str(c)) for c in use] or [hex6(self, "primary")]
+        if not explicit:  # distinct theme colors in order; they wrap only after all of them are used
+            pal = list(dict.fromkeys(c.upper() for c in pal))
+        return pal
+
+    def chart_label_ink(self, fill: str, *backs: str) -> str:
+        """'RRGGBB' ink readable on ``fill`` (and on every ``backs`` color when one ink can do both)."""
+        cands = [c.lstrip("#").upper() for c in self.ink_candidates()]
+        need = self.render.contrast_min
+        both = [c for c in cands if all(ratio("#" + c, "#" + b) >= need for b in (fill, *backs))]
+        if both:
+            return both[0]
+        return best_ink("#" + fill, ["#" + c for c in cands], need).lstrip("#").upper()
+
 
 # --------------------------------------------------------------------------- presets (YAML data)
 
