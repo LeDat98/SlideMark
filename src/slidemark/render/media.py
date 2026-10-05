@@ -87,7 +87,8 @@ def add_media(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
             x, y, w, h = x + (w - side) // 2, y + (h - side) // 2, side, side
         else:  # 16:9 contained in the box
             dw, dh = (w, round(w * 9 / 16)) if w * 9 <= h * 16 else (round(h * 16 / 9), h)
-            x, y, w, h = x + (w - dw) // 2, y + (h - dh) // 2, dw, dh
+            top = pl.style.valign == "top"  # beside text: tops line up
+            x, y, w, h = x + (w - dw) // 2, y + (0 if top else (h - dh) // 2), dw, dh
         poster = None
         if m.poster:
             pp = resolve_image(rc, m.poster)

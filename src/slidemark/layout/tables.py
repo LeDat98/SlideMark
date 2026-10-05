@@ -47,6 +47,52 @@ def _min_em(text: str) -> float:
     return min(max((measure.text_em(w) for w in text.split()), default=0.0), 12.0)
 
 
+def _measured_em(
+    t: Table, ncols: int, anchors: list[tuple[int, int, Cell]], size_pt: float
+) -> tuple[list[float], list[float]]:
+    """(longest-text width, minimum sensible width) per column, in em, cell padding included."""
+    weights = [3.0] * ncols
+    mins = [2.0] * ncols
+    for r, c, cell in anchors:
+        if cell.colspan != 1:
+            continue
+        bold = r < t.header_rows or c < t.header_cols
+        n = max((measure.text_em(p.plain, bold=bold) for p in cell.paragraphs), default=0.0)
+        weights[c] = max(weights[c], min(n, 30.0))
+        mins[c] = max(mins[c], *(_min_em(p.plain) for p in cell.paragraphs), 0.0)
+    pad_em = 2 * measure.CELL_PAD_X / EMU_PER_PT / max(size_pt, 1.0)
+    weights = [w + pad_em for w in weights]
+    min_w = [(m + pad_em) * 1.08 for m in mins]  # a little headroom: fallback fonts run wider
+    return weights, min_w
+
+
+TABLE_MAX_COLS = 5  # a table with at most this many columns ...
+TABLE_NARROW = 0.6  # ... whose natural width is below this share of the area ...
+TABLE_KEEP_FULL = 0.85  # (the cap only applies when it saves at least this much of the area's width)
+TABLE_WIDTH_CAP = 1.6  # ... is at most this many times its natural width (left-aligned in the area)
+
+
+def capped_width(
+    t: Table, ncols: int, anchors: list[tuple[int, int, Cell]], total: int, size_pt: float = 14.0
+) -> int:
+    """Total width of a table in an area of ``total`` EMU: a few short columns do not stretch over the area.
+
+    Without explicit ``col_widths``, a table with figures and at most ``TABLE_MAX_COLS`` columns whose natural
+    width is under ``TABLE_NARROW`` of the area takes ``TABLE_WIDTH_CAP`` x its natural width, so numbers stay
+    next to their labels. Everything else uses the whole area.
+    """
+    if t.col_widths or ncols > TABLE_MAX_COLS:
+        return total
+    if not numeric_columns(t, ncols, anchors):  # text-only grids (Gantt dots, matrices) keep the full width
+        return total
+    weights, min_w = _measured_em(t, ncols, anchors, size_pt)
+    nat = sum(max(w, m) for w, m in zip(weights, min_w, strict=True)) * size_pt * EMU_PER_PT
+    if nat >= TABLE_NARROW * total:
+        return total
+    capped = round(nat * TABLE_WIDTH_CAP)
+    return total if capped >= TABLE_KEEP_FULL * total else capped  # a small gain is not worth a ragged edge
+
+
 TEXT_FAVOUR = 3.0  # a text column takes this many times the share of spare width of a numeric column
 
 
@@ -74,18 +120,7 @@ def column_widths(
         widths = [round(total * w / s) for w in weights]
         widths[-1] += total - sum(widths)
         return widths
-    weights = [3.0] * ncols
-    mins = [2.0] * ncols
-    for r, c, cell in anchors:
-        if cell.colspan != 1:
-            continue
-        bold = r < t.header_rows or c < t.header_cols
-        n = max((measure.text_em(p.plain, bold=bold) for p in cell.paragraphs), default=0.0)
-        weights[c] = max(weights[c], min(n, 30.0))
-        mins[c] = max(mins[c], *(_min_em(p.plain) for p in cell.paragraphs), 0.0)
-    pad_em = 2 * measure.CELL_PAD_X / EMU_PER_PT / max(size_pt, 1.0)
-    weights = [w + pad_em for w in weights]
-    min_w = [(m + pad_em) * 1.08 for m in mins]  # a little headroom: fallback fonts run wider
+    weights, min_w = _measured_em(t, ncols, anchors, size_pt)
     em_total = total / EMU_PER_PT / max(size_pt, 1.0)
     nat = [max(w, m) for w, m in zip(weights, min_w, strict=True)]
     if sum(nat) < em_total:  # room to spare: natural widths first, the extra favours text columns

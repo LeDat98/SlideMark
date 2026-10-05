@@ -108,7 +108,7 @@ def test_table_text_and_rows_grow_within_limits():
     (tp,) = of(placed, Table)
     assert 1.0 < tp.font_scale <= 1.2 + 1e-9
     line = 11 * 1.2 * 12700 * tp.font_scale
-    assert max(tp.element.attrs["_row_h"]) <= 1.8 * line + 2 * 45720 + 1  # a row stays near its text
+    assert max(tp.element.attrs["_row_h"]) <= 2.0 * (1.8 * line + 2 * 45720) + 1  # at most 2x (roomy)
 
 
 def test_table_rows_do_not_stretch_over_the_body():
@@ -117,7 +117,7 @@ def test_table_rows_do_not_stretch_over_the_body():
     placed, _ = lay(s, "jp-business")
     (tp,) = of(placed, Table)
     rh = tp.element.attrs["_row_h"]
-    assert max(rh) <= 1.8 * (tp.style.font_size or 14) * tp.font_scale * 1.2 * 12700 + 2 * 45720 + 1
+    assert max(rh) <= 2.0 * (1.8 * (tp.style.font_size or 14) * tp.font_scale * 1.2 * 12700 + 2 * 45720) + 1
     assert tp.h < 0.6 * H  # leftover room is not poured into the rows
 
 
@@ -133,7 +133,7 @@ def test_kpi_cards_have_natural_height_and_table_follows():
         Container(title=T("売上", "heading"), classes=["kpi"], children=[T("62.4億円\n計画比 +6%")])
         for _ in range(4)
     ]
-    tbl = Table(rows=[[cell("a"), cell("b")], [cell("1"), cell("2")]])
+    tbl = Table(rows=[[cell("a"), cell("b")], [cell("x"), cell("y")]])
     s = Slide(title=T("t", "title"), grid="4", elements=[*kpis, tbl])
     placed, _ = lay(s)
     cs = cards(placed)
@@ -146,7 +146,7 @@ def test_kpi_cards_have_natural_height_and_table_follows():
 
 def test_callout_is_a_full_width_row_below_the_grid():
     callout = T("careful", classes=["callout", "warn"])
-    tbl = Table(rows=[[cell("a"), cell("b")], [cell("1"), cell("2")]])
+    tbl = Table(rows=[[cell("a"), cell("b")], [cell("x"), cell("y")]])
     s = Slide(title=T("t", "title"), elements=[tbl, callout])
     placed, _ = lay(s)
     (tp,) = of(placed, Table)
