@@ -67,9 +67,12 @@ class LayoutTokens(BaseModel):
     code_grow: float = 1.25  # code text grows up to this factor
     table_grow: float = 1.4  # rows of a table with spare room grow up to this factor
     table_font_grow: float = 1.2  # table text grows up to this factor
+    table_alone_grow: float = 2.6  # a table alone on a normal slide: rows grow up to this factor ...
+    table_alone_font_grow: float = 1.45  # ... and its text up to this factor
     table_grow_roomy: float = 2.0  # table rows grow up to this factor when a quarter of the body stays empty
     tree_slack_roomy: float = 1.3  # org-tree boxes may be this much taller than their content (roomy slides)
     tree_slack: float = 1.15  # org-tree boxes are at most this much taller than their content
+    html_fit: bool = True  # an HTML block alone on a slide fills the body height (stretch, else center)
     roomy_left: float = 0.25  # share of the body left empty that triggers the roomy pass
     roomy_grow: float = 1.2  # the roomy pass grows box / tree text by up to this factor more
     roomy_grow_dense: float = 1.6  # dense slides: sparse cards may grow text this much more
