@@ -16,14 +16,11 @@ slidemark build - -o deck.pptx --save deck.md <<'EOF'
 EOF
 ```
 
-`build` checks, fixes simple mistakes, builds, and ends with one facts line:
-`wrote deck.pptx: 5 slides 16:9, 1 chart, 1 table, notes on 1 slide, 0 warnings (checked: fit, overlap, …)`.
-With your own design it also prints `look: bg #…, primary #…; fonts …` (the colours and fonts it applied).
-If it says 0 warnings and the counts match your brief, you are done: no render, no re-open, no other command.
-If you still want to see the slides, add `--png sheet.png` to the same command and look at that ONE image
-(all slides on one sheet), not at slide-by-slide renders.
-A warning names the slide, the line and the fix: edit `deck.md` once, run `slidemark build deck.md -o
-deck.pptx`. (No heredoc in your shell? Write `deck.md`, then build it, in the same turn.)
+`build` checks, fixes simple mistakes, builds and ends with a facts line (`wrote deck.pptx: 5 slides 16:9,
+1 chart, 1 table, notes on 1 slide, 0 warnings`) and, for your own design, a `look:` line (colours, fonts).
+0 warnings and the counts your brief asks for = done: reply now, no render, re-open or other command.
+A warning names the slide, line and fix: edit `deck.md` once, run `slidemark build deck.md -o deck.pptx`.
+(No heredoc? Write `deck.md` and build it in the same turn.) To see slides: `--png sheet.png`, one image.
 
 ## Pattern 1: business deck (default look)
 
@@ -149,8 +146,8 @@ are reported with a passing shade to paste.
 default, `4:3`, `A4`), `density: dense`, and the design lines `colors:` `fonts:` `sizes:` `style:` (below).
 
 **Slides.** `# Title` starts a slide. A title with only a `## subtitle` (or ≤ 2 short lines) is a cover
-(first slide) or a section divider; `@cover` / `@section` force it. `??? text` = speaker notes (to the end of
-the slide). `@hidden` hides a slide. `[go](#5)` jumps to slide 5.
+(first slide) or section divider (`@cover` / `@section` force it). `??? text` = speaker notes to the slide
+end. `@hidden` hides a slide. `[go](#5)` jumps to slide 5.
 
 **Blocks.** `## Heading` + its lines = a box; boxes arrange themselves (2 → 2 columns, 3 → 3, 4 → 2×2 or a
 row, 5–6 → 3×2; text + one chart/table/image → side by side). Fixed places: `>` right after the title = key
@@ -195,9 +192,8 @@ Options on the fence or the line before: `{widths=3:1:1 align=lrr header=1 hcol=
 Chart fence kinds: `column bar line area pie doughnut scatter radar stacked-column stacked-bar`. CSV body:
 first row = categories (first cell empty), then one row per series (name first). Options: `title="..."`
 `labels=on|percent|off` `legend=bottom|right|top|none` `fmt="0.0"|"#,##0"|"0%"` `min=` `max=`
-`colors=primary,accent,#888888` `axis=off`. Numbers may be `1,240`, `12%`, `▲3`; with `lang: vi`/`de`/`fr`… a decimal comma is fine when quoted
-(`"1,6"`) or when the rows use `;` (`T1;1,6;1,9`); PowerPoint shows chart numbers in the viewer's locale
-(4,1 in Vietnamese), so `4.1` in a preview is fine. One value axis per chart.
+`colors=primary,accent,#888888` `axis=off`. Numbers may be `1,240`, `12%`, `▲3`; a decimal comma needs
+quotes (`"1,6"`) or `;` rows (`T1;1,6;1,9`). Charts show numbers in the viewer's locale. One value axis.
 
 ## Design tokens (header lines)
 
