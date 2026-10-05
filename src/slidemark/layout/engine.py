@@ -3442,7 +3442,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 final_ctx.out = fill_row(
                     final_ctx.out, body, ctx.lt, consulting=final_ctx.dense_k < 1.0 or small
                 )
-            final_ctx.out = fill_panels(final_ctx.out, body, ctx.lt)
+            small_body = theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
+            final_ctx.out = fill_panels(
+                final_ctx.out, body, ctx.lt, consulting=final_ctx.dense_k < 1.0 or small_body
+            )
             final_ctx.out = fill_chevron_row(final_ctx.out, body, ctx.lt)
         if (
             ctx.dense_k >= 1.0
