@@ -28,6 +28,13 @@ Until the DF gates in `docs/TARGETS.md` are done, **every run's goal is the DF g
 leftovers that conflict with it are dropped, and other L3–L7 work waits. Suggested order: DF1 + DF2 (tokens, presets
 as data, remove hard-coded looks) → DF3 (CSS fence) → DF4 + DF5 (HTML fidelity, whole-deck HTML) → DF6 (eval).
 
+## Current direction: agent cost (owner, 2026-10-06)
+Review and spec: `docs/AGENT_COST.md`. An A/B pilot with real agents found the deck source at 10–19% of the
+python-pptx script but the whole agent run at 112% of its cost: model calls decide the cost, not file size.
+Until the AC gates are done, **every run's goal is the work packages in that file, in order**; design freedom
+stays a constraint on how they are done. First step of the next run: work package 1 (add the AC gate group to
+`docs/TARGETS.md`, re-open the L4 "total agent tokens" gate, build `bench/agent_cost.py`).
+
 ## Run routine (02:45 JST daily, or fired manually)
 1. Note the start time (`date -u`). Read `CLAUDE.md`, `docs/LESSONS.md`, this plan, `docs/TARGETS.md`,
    `docs/SYNTAX.md`, the end of `docs/DAILY_LOG.md`.

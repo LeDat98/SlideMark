@@ -6,6 +6,7 @@ Design: `docs/PROPOSAL.md`. Plan: `docs/PLAN.md`. Syntax: `docs/SYNTAX.md`.
 ## Before you start
 1. Read `docs/LESSONS.md` (known bugs, pitfalls, fixes). It is short on purpose.
 2. Check today's tasks in `docs/PLAN.md`.
+3. Read `docs/AGENT_COST.md`: what to optimize (model calls first, then output tokens, then input).
 
 ## Setup and commands
 ```bash
@@ -40,7 +41,9 @@ break the visual → bench has no token regression. Mark progress in `docs/FEATU
 - **Design freedom first (`docs/DESIGN_FREEDOM.md`).** Never hard-code a visual decision: colors, fonts, sizes,
   spacing, bands, card looks and layout constants are tokens an agent can override from the deck (tokens, CSS or
   HTML). Built-in themes are YAML presets in the public token schema, with no theme-specific code paths.
-- Token cost is the main product metric. New syntax must be the shortest unambiguous form; measure it.
+- Token cost is the main product metric, and it means the cost of the whole agent run to an accepted deck
+  (`docs/AGENT_COST.md`): model calls first, then output tokens, then input. SKILL.md must be all an agent
+  reads. New syntax must be the shortest unambiguous form that adds no lookup and no decision; measure it.
 - Never raise on bad user input: append a `Diagnostic` with a one-line, actionable `hint`.
 - Dense Japanese business slides (many boxes, 10–12pt text, tables, arrows, footnotes) are a first-class
   target. Always test CJK text (`<a:ea>` font, full-width width ≈ 1em).
