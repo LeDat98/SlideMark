@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ..ir import Container, Paragraph, Run, Shape, Style, Text
+from ..ir import Container, Paragraph, Run, Shape, Style, Text, fast_style
 from ..theme import DEFAULT_SIZES
 from ..units import EMU_PER_INCH as IN
 from ..units import EMU_PER_PT
@@ -216,7 +216,9 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
     kids: list[Text] = c.children  # type: ignore[assignment]
     vertical, sgn = _orientation(c.links, pos)
     frame = _Frame(vertical, sgn)
-    cap_style = E._role_style(ctx, "caption").merged(Style(align="center", valign="middle", padding="2pt"))
+    cap_style = E._role_style(ctx, "caption").merged(
+        fast_style(align="center", valign="middle", padding="2pt")
+    )
 
     def fits(b: _Built, tol: float = TOL) -> bool:
         return b.bw <= area.w * tol and b.bh <= area.h * tol
@@ -298,9 +300,9 @@ def _build(
         pad = E._pad(st)
         if diamond:
             pad = round(2 * EMU_PER_PT * ctx.tight)
-            st = st.merged(Style(padding=f"{round(pad / EMU_PER_PT, 2)}pt"))
+            st = st.merged(fast_style(padding=f"{round(pad / EMU_PER_PT, 2)}pt"))
         elif st.radius is None:
-            st = st.merged(Style(radius=5))
+            st = st.merged(fast_style(radius=5))
         bold = bool(st.bold)
         em = max(
             (measure.text_em(p.plain, bold=bold or any(r.bold for r in p.runs)) for p in el.paragraphs),
@@ -524,7 +526,7 @@ def _emit(ctx, E, c: Container, area: Rect, frame: _Frame, cap_style: Style, b: 
                 ctx.emit(
                     Shape(shape="line", attrs=attrs),
                     box,
-                    Style(line="primary", line_width=ctx.theme.render.connector_width),
+                    fast_style(line="primary", line_width=ctx.theme.render.connector_width),
                 )
             continue
         p0, p1 = frame.unpt(rt.p0), frame.unpt(rt.p1)
@@ -547,7 +549,7 @@ def _emit(ctx, E, c: Container, area: Rect, frame: _Frame, cap_style: Style, b: 
         ctx.emit(
             Shape(shape="line", attrs=attrs),
             box,
-            Style(line="primary", line_width=ctx.theme.render.connector_width),
+            fast_style(line="primary", line_width=ctx.theme.render.connector_width),
         )
     for i, r in label_real.items():
         text = " ".join((c.links[i].label or "").split())

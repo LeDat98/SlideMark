@@ -37,6 +37,7 @@ from ..ir import (
     Style,
     Table,
     Text,
+    fast_style,
 )
 from ..units import EMU_PER_PT, to_emu
 
@@ -433,7 +434,7 @@ class CssIndex:
         try:
             return Style(**merged)  # type: ignore[arg-type]
         except Exception:
-            return Style()
+            return fast_style()
 
     def _compute(self, n: Node) -> None:
         if n._own is not None:
@@ -485,9 +486,9 @@ class CssIndex:
         """Style of the rules that match ``el`` (empty when none)."""
         n = self.node(el)
         if n is None:
-            return Style()
+            return fast_style()
         self._compute(n)
-        return n._own or Style()
+        return n._own or fast_style()
 
     def kpi_styles(self, box) -> tuple[Style, Style]:
         """``(value, caption)`` CSS of a ``.kpi`` box.
@@ -497,7 +498,7 @@ class CssIndex:
         """
         pair = self.kpi_nodes.get(id(box)) if self.active else None
         if pair is None:
-            return Style(), Style()
+            return fast_style(), fast_style()
         box_own = self.own(box)
         keep = {
             k: getattr(box_own, k) for k in ("font_size", "bold", "italic") if getattr(box_own, k) is not None
@@ -505,17 +506,17 @@ class CssIndex:
         out = []
         for i, n in enumerate(pair):
             self._compute(n)
-            own = n._own or Style()
-            st = (n._inh or Style()).merged(own)
+            own = n._own or fast_style()
+            st = (n._inh or fast_style()).merged(own)
             out.append(Style(**keep).merged(st) if i == 0 else own)
         return out[0], out[1]
 
     def inherited(self, el) -> Style:
         n = self.node(el)
         if n is None:
-            return Style()
+            return fast_style()
         self._compute(n)
-        return n._inh or Style()
+        return n._inh or fast_style()
 
     # ---- tables
     def table(self, t: Table) -> Table:
@@ -528,7 +529,7 @@ class CssIndex:
         if tn is None or not t.rows:
             return t
         tbl_own = self.own(t)
-        tbl_text = Style(letter_spacing=tbl_own.letter_spacing, text_transform=tbl_own.text_transform)
+        tbl_text = fast_style(letter_spacing=tbl_own.letter_spacing, text_transform=tbl_own.text_transform)
         row_nodes = [Node(frozenset({"tr"}), frozenset(), "row", None, tn) for _ in t.rows]
         self._number(row_nodes)
         rows = []
@@ -554,7 +555,7 @@ class CssIndex:
         """tr rules first, then th/td rules (a cell paints over its row)."""
         if rn._own is None:
             rn._own = self._matched(rn)
-            rn._inh = Style()
+            rn._inh = fast_style()
             self._check(rn, rn._own)
         cell_own = self._matched(cn)
         self._check(cn, cell_own)
@@ -564,7 +565,7 @@ class CssIndex:
         return list(self.diags)
 
 
-_EMPTY: Style = Style()
+_EMPTY: Style = fast_style()
 
 
 def slide_style(deck: Deck, slide: Slide, index: int = 0) -> Style:
@@ -631,6 +632,19 @@ def insets(st: Style, default: float = 0.0) -> tuple[int, int, int, int]:
     ``padding_*`` over it, plus the width of each per-side ``border_*`` (CSS box model)."""
     base = _emu(st.padding)
     base = round(default) if base is None else base
+    d = st.__dict__
+    if (
+        d["padding_top"] is None
+        and d["padding_right"] is None
+        and d["padding_bottom"] is None
+        and d["padding_left"] is None
+        and d["border_top"] is None
+        and d["border_right"] is None
+        and d["border_bottom"] is None
+        and d["border_left"] is None
+    ):  # the common case: one padding on every side
+        base = max(base, 0)
+        return base, base, base, base
     vals = []
     for side in ("left", "top", "right", "bottom"):
         v = _emu(getattr(st, f"padding_{side}"))
@@ -689,5 +703,5 @@ def rotate_placed(items: list[Placed], cx: float, cy: float, deg: float) -> bool
         mx, my = p.x + p.w / 2 - cx, p.y + p.h / 2 - cy
         nx, ny = cx + mx * cos - my * sin, cy + mx * sin + my * cos
         p.x, p.y = round(nx - p.w / 2), round(ny - p.h / 2)
-        p.style = p.style.merged(Style(rotation=round(((p.style.rotation or 0) + deg) % 360, 3)))
+        p.style = p.style.merged(fast_style(rotation=round(((p.style.rotation or 0) + deg) % 360, 3)))
     return ok

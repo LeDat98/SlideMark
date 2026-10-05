@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from ..ir import Cell, Style, Table
+from ..ir import Cell, Style, Table, fast_style
 from ..units import EMU_PER_PT, to_emu
 from . import css, measure
 
@@ -220,7 +220,7 @@ def right_align_numbers(t: Table) -> Table:
             if any(p.style and p.style.align for p in cell.paragraphs):
                 continue
             rows[ri][ci] = cell.model_copy(
-                update={"style": (cell.style or Style()).merged(Style(align="right"))}
+                update={"style": (cell.style or fast_style()).merged(fast_style(align="right"))}
             )
             changed = True
     return t.model_copy(update={"rows": rows}) if changed else t
@@ -241,7 +241,7 @@ def row_heights(
         w = sum(widths[c : c + max(cell.colspan, 1)]) - cl - cr
         st = base.merged(cell.style)
         if r < t.header_rows or c < t.header_cols:
-            st = st.merged(Style(bold=True))
+            st = st.merged(fast_style(bold=True))
         need = measure.paragraphs_height(cell.paragraphs, w, st, scale) + ct + cb
         heights[r] = max(heights[r], round(need))
     return heights

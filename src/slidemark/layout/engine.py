@@ -25,6 +25,7 @@ from ..ir import (
     Style,
     Table,
     Text,
+    fast_style,
 )
 from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
@@ -176,7 +177,21 @@ def _plain(paragraphs: list[Paragraph]) -> str:
     return " ".join(p.plain for p in paragraphs)
 
 
+_ROLE_CACHE: dict = {}
+
+
 def _role_style(ctx: _Ctx, role: str, cover: bool = False) -> Style:
+    """Theme style of a text role (memoised per theme: Styles are never mutated, only merged into copies)."""
+    key = (id(ctx.theme), role, cover, ctx.dense_k)
+    hit = _ROLE_CACHE.get(key)
+    if hit is None or hit[0] is not ctx.theme:
+        if len(_ROLE_CACHE) > 512:
+            _ROLE_CACHE.clear()
+        hit = _ROLE_CACHE[key] = (ctx.theme, _role_style0(ctx, role, cover))
+    return hit[1]
+
+
+def _role_style0(ctx: _Ctx, role: str, cover: bool = False) -> Style:
     t = ctx.theme
     key = (
         "cover-title"
@@ -189,7 +204,7 @@ def _role_style(ctx: _Ctx, role: str, cover: bool = False) -> Style:
     if role in ("body", "quote"):
         size *= ctx.dense_k
     heading_font = role in ("title", "heading", "subtitle")
-    st = Style(
+    st = fast_style(
         font=t.fonts.heading if heading_font else t.fonts.body,
         font_ea=t.fonts.ea,
         font_size=size,
@@ -198,20 +213,20 @@ def _role_style(ctx: _Ctx, role: str, cover: bool = False) -> Style:
         valign="top",
     )
     if role == "title":
-        st = st.merged(Style(bold=True, color=t.title_color, valign="middle"))
+        st = st.merged(fast_style(bold=True, color=t.title_color, valign="middle"))
     elif role == "heading":
-        st = st.merged(Style(bold=True, color=t.heading_color))
+        st = st.merged(fast_style(bold=True, color=t.heading_color))
     elif role == "subtitle":
-        st = st.merged(Style(color="muted"))
+        st = st.merged(fast_style(color="muted"))
     elif role == "lead":
-        st = st.merged(Style(color=t.lead_color))
+        st = st.merged(fast_style(color=t.lead_color))
     elif role == "quote":
-        st = st.merged(Style(italic=True, color="muted"))
+        st = st.merged(fast_style(italic=True, color="muted"))
     elif role in ("footnote", "caption"):
-        st = st.merged(Style(color="muted"))
+        st = st.merged(fast_style(color="muted"))
     elif role == "conclusion":
         st = st.merged(
-            Style(
+            fast_style(
                 bold=True,
                 color=t.conclusion_color,
                 fill=t.conclusion_fill,
@@ -232,11 +247,13 @@ def _class_styles(ctx: _Ctx, el, skip: tuple[str, ...] = ()) -> list[Style]:
             out.append(ctx.theme.classes[name])
         elif name in ctx.theme.colors and name not in ("bg", "fg", "surface", "border"):
             if isinstance(el, Container):
-                out.append(Style(line=name))
+                out.append(fast_style(line=name))
             elif isinstance(el, Shape):
-                out.append(Style(fill=name))
+                out.append(fast_style(fill=name))
             else:
-                out.append(Style(color=ctx.theme.legible(name)))  # `.primary` text: readable shade if needed
+                out.append(
+                    fast_style(color=ctx.theme.legible(name))
+                )  # `.primary` text: readable shade if needed
     return out
 
 
@@ -247,13 +264,13 @@ def _styled(ctx: _Ctx, el, st: Style, classes: bool = True) -> Style:
         ctx.css.inherited(el), *(_class_styles(ctx, el) if classes else ()), own, getattr(el, "style", None)
     )
     if own.line_width and not out.line:  # `border: 2px` without a color: the border color token
-        out = out.merged(Style(line="border"))
+        out = out.merged(fast_style(line="border"))
     return out
 
 
 def _cstyle(ctx: _Ctx, el) -> Style:
     """Classes + CSS + inline of ``el`` only (margin, gap, grid, rotation lookups)."""
-    return Style().merged(*_class_styles(ctx, el), ctx.css.own(el), getattr(el, "style", None))
+    return fast_style().merged(*_class_styles(ctx, el), ctx.css.own(el), getattr(el, "style", None))
 
 
 def _cgrid(ctx: _Ctx, c) -> str | None:
@@ -314,14 +331,14 @@ def _scale_pad(st: Style, k: float) -> Style:
             upd[f] = f"{round(to_emu(v) / EMU_PER_PT * k, 2)}pt"
         except ValueError:
             continue
-    return st.merged(Style(**upd)) if upd else st
+    return st.merged(fast_style(**upd)) if upd else st
 
 
 def _text_style(ctx: _Ctx, el: Text | Shape, inherit: Style) -> Style:
     role = el.role if isinstance(el, Text) else "shape"
     if role == "shape":
         t = ctx.theme
-        st = Style(
+        st = fast_style(
             font=t.fonts.body,
             font_ea=t.fonts.ea,
             font_size=t.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k,
@@ -337,7 +354,7 @@ def _text_style(ctx: _Ctx, el: Text | Shape, inherit: Style) -> Style:
         st = st.merged(_only_inheritable(inherit))
     st = _styled(ctx, el, st)
     if role == "shape" and st.color is None:
-        st = st.merged(Style(color=ctx.theme.ink_on(st.fill, "bg")))  # `bg` unless it fails on the fill
+        st = st.merged(fast_style(color=ctx.theme.ink_on(st.fill, "bg")))  # `bg` unless it fails on the fill
     if (
         isinstance(el, Text)
         and "callout" in el.classes
@@ -346,7 +363,7 @@ def _text_style(ctx: _Ctx, el: Text | Shape, inherit: Style) -> Style:
     ):
         kind = next((k for k in _CALLOUT_KINDS if k in el.classes), None)
         if kind and (tint := _tint(ctx.theme, st.line)):
-            st = st.merged(Style(fill=tint))
+            st = st.merged(fast_style(fill=tint))
     st = _tighten(ctx, st)
     if isinstance(el, Text) and "callout" in el.classes:
         st = _callout_floor(ctx, st)
@@ -374,12 +391,12 @@ def _callout_floor(ctx: _Ctx, st: Style) -> Style:
     small = ctx.theme.sizes.get("footnote", DEFAULT_SIZES["footnote"])
     if st.font_size is not None and st.font_size < small:
         upd["font_size"] = small
-    return st.merged(Style(**upd)) if upd else st
+    return st.merged(fast_style(**upd)) if upd else st
 
 
 def _only_inheritable(s: Style) -> Style:
-    d = s.model_dump()
-    return Style(**{k: v for k, v in d.items() if k in _INHERIT_FIELDS and v is not None})
+    d = s.__dict__
+    return fast_style(**{k: v for k, v in d.items() if k in _INHERIT_FIELDS and v is not None})
 
 
 def _pad(style: Style, default: float = 0.0) -> int:
@@ -494,7 +511,7 @@ def _grown(ctx: _Ctx, el, eff: float) -> float:
         and "callout" not in el.classes
         and (_has_box_text(ctx) or _has_kpi_row(ctx))
     ):  # slide-level text beside grown boxes: at most one step smaller than their body text
-        base = max(_text_style(ctx, el, Style()).font_size or 18, 1.0)
+        base = max(_text_style(ctx, el, fast_style()).font_size or 18, 1.0)
         box_pt = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
         peer = 1.0 if _has_kpi_row(ctx) and not _has_box_text(ctx) else ctx.lt.slide_peer_step
         f = min(max(box_pt / peer / base, 1.0), ctx.grow)
@@ -561,7 +578,7 @@ def _code_eff(ctx: _Ctx, st: Style) -> float:
 
 def _code_style(ctx: _Ctx, el: Code) -> Style:
     t = ctx.theme
-    st = Style(
+    st = fast_style(
         font=t.fonts.mono,
         font_ea=t.fonts.ea,
         font_size=t.sizes.get("code", DEFAULT_SIZES["code"]) * ctx.dense_k,
@@ -576,7 +593,7 @@ def _code_style(ctx: _Ctx, el: Code) -> Style:
 
 def _table_style(ctx: _Ctx, el: Table) -> Style:
     t = ctx.theme
-    st = Style(
+    st = fast_style(
         font=t.fonts.body,
         font_ea=t.fonts.ea,
         font_size=t.sizes.get("table", DEFAULT_SIZES["table"]) * ctx.dense_k,
@@ -805,7 +822,7 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         )
     elif isinstance(el, Chart):
         t = ctx.theme
-        st = Style(
+        st = fast_style(
             font=t.fonts.body,
             font_ea=t.fonts.ea,
             font_size=t.sizes.get("table", DEFAULT_SIZES["table"]),
@@ -813,10 +830,10 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         )
         ctx.emit(el, rect, _styled(ctx, el, st, classes=False))
     elif isinstance(el, (Image, Media)):
-        ctx.emit(el, rect, _styled(ctx, el, Style()))
+        ctx.emit(el, rect, _styled(ctx, el, fast_style()))
     elif isinstance(el, Raw):
         t = ctx.theme
-        st = Style(
+        st = fast_style(
             font=t.fonts.body,
             font_size=t.sizes.get("caption", DEFAULT_SIZES["caption"]),
             color="muted",
@@ -865,14 +882,14 @@ def _math_scale(ctx: _Ctx, el: Raw, rect: Rect) -> float:
 
 def _card_style(ctx: _Ctx, c: Container) -> Style:
     if "plain" in c.classes:
-        base = Style(padding="0pt")
+        base = fast_style(padding="0pt")
     else:
-        base = _scale_pad(ctx.theme.classes.get("card", Style(padding=ctx.lt.box_pad)), ctx.step)
+        base = _scale_pad(ctx.theme.classes.get("card", fast_style(padding=ctx.lt.box_pad)), ctx.step)
     others = _class_styles(ctx, c, skip=("plain", "kpi"))
     own = ctx.css.own(c)
-    st = Style().merged(ctx.css.inherited(c), base, *others, own, c.style)
+    st = fast_style().merged(ctx.css.inherited(c), base, *others, own, c.style)
     if own.line_width and not st.line:
-        st = st.merged(Style(line="border"))
+        st = st.merged(fast_style(line="border"))
     return _tighten(ctx, st)
 
 
@@ -889,15 +906,15 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
         return None
     band = None if kpi else ctx.theme.heading_band
     h_el = c.title if c.title.role == "heading" else c.title.model_copy(update={"role": "heading"})
-    hst = _text_style(ctx, h_el, Style())
+    hst = _text_style(ctx, h_el, fast_style())
     if kpi:
         body_size = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k
         hst = hst.merged(
-            Style(align="center", color="muted", bold=False, font_size=body_size), ctx.css.own(h_el)
+            fast_style(align="center", color="muted", bold=False, font_size=body_size), ctx.css.own(h_el)
         )  # `.kpi h2 {..}` still wins over the label defaults
     if band:
         hst = hst.merged(
-            Style(
+            fast_style(
                 fill=band,
                 color=ctx.theme.heading_band_color,
                 bold=True,
@@ -921,7 +938,7 @@ def _box_body_pt(ctx: _Ctx, c: Container) -> float:
     best = 0.0
     for ch in c.children:
         if isinstance(ch, Text) and ch.role == "body" and "callout" not in ch.classes:
-            st = _text_style(ctx, ch, Style())
+            st = _text_style(ctx, ch, fast_style())
             size = st.font_size or 18
             best = max(
                 best, size * measure.effective_scale(size, ctx.scale, ctx.theme.min_font_size) * ctx.grow
@@ -1034,7 +1051,9 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
         icon = _icon_name(c)
         if icon and kpi:  # icon centered above the label and the number
             ctx.emit(
-                _icon_item(icon), Rect(inner.x + (inner.w - isz) // 2, y, isz, isz), Style(fill="primary")
+                _icon_item(icon),
+                Rect(inner.x + (inner.w - isz) // 2, y, isz, isz),
+                fast_style(fill="primary"),
             )
             y += isz + round(pad * 0.4)
         if band:
@@ -1042,11 +1061,11 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
                 ctx.over.append(_label(c))
             band_rect = Rect(rect.x, rect.y, rect.w, min(hh, rect.h))
             if icon:  # the band is a plain shape behind the icon and the shifted heading text
-                ctx.emit(Shape(shape="rect"), band_rect, Style(fill=band))
+                ctx.emit(Shape(shape="rect"), band_rect, fast_style(fill=band))
                 ctx.emit(
                     _icon_item(icon),
                     Rect(rect.x + pad, rect.y + (band_rect.h - isz) // 2, isz, isz),
-                    Style(fill=hst.color),
+                    fast_style(fill=hst.color),
                 )
                 text_rect = Rect(rect.x + shift, rect.y, rect.w - shift, band_rect.h)
                 ctx.emit(h_el, text_rect, hst.model_copy(update={"fill": None}), eff)
@@ -1055,7 +1074,9 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
             y = band_rect.bottom + round(pad * 0.5)
         else:
             if icon and not kpi:
-                ctx.emit(_icon_item(icon), Rect(inner.x, y, isz, isz), Style(fill=hst.color or "primary"))
+                ctx.emit(
+                    _icon_item(icon), Rect(inner.x, y, isz, isz), fast_style(fill=hst.color or "primary")
+                )
             if hh > inner.h * _TOL:
                 ctx.over.append(_label(c))
             ctx.emit(h_el, Rect(inner.x + shift, y, inner.w - shift, min(hh, inner.h)), hst, eff)
@@ -1141,10 +1162,10 @@ def _kpi_children(ctx: _Ctx, children: list, width: int, box: Container | None =
     ch = children[i]
     th = ctx.theme
     big = th.classes.get("kpi") or _base_classes()["kpi"]
-    cap = Style(
+    cap = fast_style(
         font_size=th.sizes.get("caption", DEFAULT_SIZES["caption"]), color="muted", align="center", bold=False
     )
-    vcss, ccss = ctx.css.kpi_styles(box) if box is not None else (Style(), Style())
+    vcss, ccss = ctx.css.kpi_styles(box) if box is not None else (fast_style(), fast_style())
     big, cap = big.merged(vcss), cap.merged(ccss)
     paras: list[Paragraph] = []
     for j, p in enumerate(ch.paragraphs):
@@ -1154,12 +1175,12 @@ def _kpi_children(ctx: _Ctx, children: list, width: int, box: Container | None =
             em = _kpi_row_em(ctx, box, measure.text_em(p.plain, bold=True))  # one size per row
             avail = width / EMU_PER_PT * 0.72  # headroom: fallback fonts are wider than the estimate
             if em * size > avail:  # one line: shrink the number to the card width
-                st = st.merged(Style(font_size=max(round(avail / em, 1), 10)))
+                st = st.merged(fast_style(font_size=max(round(avail / em, 1), 10)))
         else:
             st = cap
         paras.append(p.model_copy(update={"style": st.merged(p.style)}))
     new = ch.model_copy(
-        update={"paragraphs": paras, "style": Style(align="center", valign="middle").merged(ch.style)}
+        update={"paragraphs": paras, "style": fast_style(align="center", valign="middle").merged(ch.style)}
     )
     return children[:i] + [new] + children[i + 1 :]
 
@@ -1531,7 +1552,7 @@ def _emit_links(ctx: _Ctx, links: list[Link], rects: dict[int, Rect]) -> None:
         ctx.emit(
             Shape(shape="line", attrs=attrs),
             rect,
-            Style(line="primary", line_width=ctx.theme.render.connector_width),
+            fast_style(line="primary", line_width=ctx.theme.render.connector_width),
         )
 
 
@@ -1841,7 +1862,7 @@ def _place_blocks(
             nominal = _chevron_nominal(ctx, flow, inherit)
             head_ok = head_cap is None or head_cap >= min(nominal, 1.0)
             roomy = all(
-                _chevron_text_w(r, Style(), None, _cadj(ctx)) >= ctx.lt.chevron_text_share * r.w
+                _chevron_text_w(r, fast_style(), None, _cadj(ctx)) >= ctx.lt.chevron_text_share * r.w
                 for r in cells
                 if r.w > 0
             )
@@ -1897,7 +1918,7 @@ def _place_blocks(
             aw = min(round(g * 0.8), round(0.35 * EMU_PER_INCH))
             ah = min(round(aw * 1.2), overlap_y)
             cy = max(a.y, b.y) + overlap_y // 2
-            st = Style(fill="muted", line=None)
+            st = fast_style(fill="muted", line=None)
             ctx.emit(Shape(shape="arrow-right"), Rect(a.right + (g - aw) // 2, cy - ah // 2, aw, ah), st)
     if extra and tail_area is not None:
         sub = _place_stack(ctx, [b for _, b in extra], tail_area, inherit, gap, owner)
@@ -1932,7 +1953,7 @@ def _text_mate(flow: list) -> bool:
 def _top_align(p: Placed) -> None:
     """A picture / video beside text sits at the top of its cell (the renderer honors ``valign``)."""
     if p.style.valign is None:
-        p.style = p.style.merged(Style(valign="top"))
+        p.style = p.style.merged(fast_style(valign="top"))
 
 
 def _hug_beside_visual(ctx: _Ctx, gs, flow: list, cells: list[Rect], inherit: Style) -> list[Rect]:
@@ -2048,7 +2069,7 @@ def _chevron_font(ctx: _Ctx, sh: Shape, st: Style) -> Style:
         t.sizes.get("body", DEFAULT_SIZES["body"]),
         t.sizes.get("table", DEFAULT_SIZES["table"]) * ctx.dense_k * ctx.lt.table_font_grow,
     )
-    return st.merged(Style(font_size=max(st.font_size or 18, floor)))
+    return st.merged(fast_style(font_size=max(st.font_size or 18, floor)))
 
 
 def _chevron_geom(
@@ -2059,7 +2080,7 @@ def _chevron_geom(
     if hcap is not None:
         rect = Rect(rect.x, rect.y, rect.w, min(rect.h, hcap))
     # the preset text rectangle already starts a point depth inside both ends: add only a small padding
-    st = st.merged(Style(padding=ctx.lt.chevron_pad, align="center", valign="middle"))
+    st = st.merged(fast_style(padding=ctx.lt.chevron_pad, align="center", valign="middle"))
     if icon := _icon_name(blk):  # the icon sits left of the text: reserve its room as a left inset
         side = min(round(ctx.lt.icon_head * (st.font_size or 18) * EMU_PER_PT), round(0.4 * rect.h))
         sh = sh.model_copy(
@@ -2276,7 +2297,7 @@ def _place_chevron(
         ctx.emit(
             _icon_item(sh.attrs["icon"]),
             Rect(left + off, rect.y + (rect.h - side) // 2, side, side),
-            Style(fill=st.color or "primary"),
+            fast_style(fill=st.color or "primary"),
         )
     # a chevron shape only carries text: place the other children (table, chart, ...) under it
     extra = (
@@ -2899,7 +2920,7 @@ def _layout_free(ctx: _Ctx, elements: list, body: Rect, slide: Slide, theme: The
         tight=ctx.tight,
         css=ctx.css,
     )
-    inherit = Style()
+    inherit = fast_style()
     for n in slide.classes:
         if n in theme.classes:
             inherit = inherit.merged(_only_inheritable(theme.classes[n]))
@@ -2993,13 +3014,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 head,
                 Shape(shape="rect", id="band"),
                 Rect(0, by, W, band_h),
-                Style(fill=theme.title_band, line=None),
+                fast_style(fill=theme.title_band, line=None),
             )
         if slide.title:
             st = _role_style(ctx, "title", cover=True)
-            st = st.merged(Style(valign="bottom"))
+            st = st.merged(fast_style(valign="bottom"))
             if theme.title_band:
-                st = st.merged(Style(color=theme.title_band_color))
+                st = st.merged(fast_style(color=theme.title_band_color))
             r = Rect(Mx, by, inner_w, round(band_h * 0.65))
             st = _styled(ctx, slide.title, st, classes=False)
             put(head, slide.title, r, st, fit_text(slide.title, r, st))
@@ -3007,9 +3028,9 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         if sub:
             st = _role_style(ctx, "subtitle", cover=True)
             if theme.title_band:
-                st = st.merged(Style(color=theme.title_band_color))
+                st = st.merged(fast_style(color=theme.title_band_color))
             r = Rect(Mx, by + round(band_h * 0.68), inner_w, round(band_h * 0.3))
-            st = _styled(ctx, sub, st.merged(Style(valign="top")), classes=False)
+            st = _styled(ctx, sub, st.merged(fast_style(valign="top")), classes=False)
             put(head, sub, r, st, fit_text(sub, r, st))
         body = Rect(Mx, by + band_h + sg, inner_w, H - (by + band_h + sg) - My) if slide.elements else None
         y_top = 0
@@ -3022,12 +3043,12 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             tr_h = to_emu(theme.title_height)
             st = _role_style(ctx, "title")
             if theme.title_band:
-                st = st.merged(Style(color=theme.title_band_color))
+                st = st.merged(fast_style(color=theme.title_band_color))
                 put(
                     head,
                     Shape(shape="rect", id="band"),
                     Rect(0, 0, W, tr_h + My // 2),
-                    Style(fill=theme.title_band, line=None),
+                    fast_style(fill=theme.title_band, line=None),
                 )
                 r = Rect(Mx, 0, inner_w, tr_h + My // 2)
                 y = tr_h + My // 2 + sg
@@ -3081,14 +3102,14 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 tail,
                 _text_el("caption", deck.footer, {"field": "footer"}),
                 Rect(Mx, fy, round(inner_w * 0.7), fh),
-                cst.merged(Style(valign="middle")),
+                cst.merged(fast_style(valign="middle")),
             )
         if deck.slide_number:
             put(
                 tail,
                 _text_el("caption", str(index + 1), {"field": "slide_number"}),
                 Rect(W - Mx - round(0.9 * EMU_PER_INCH), fy, round(0.9 * EMU_PER_INCH), fh),
-                cst.merged(Style(align="right", valign="middle")),
+                cst.merged(fast_style(align="right", valign="middle")),
             )
         bottom = fy - sg // 2
         if (ft := footer_top(theme)) is not None:  # template: its own footer zone replaces the built-in row
@@ -3161,13 +3182,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         for lab in dict.fromkeys(final_ctx.over):
             ctx.diag("overflow", f"{lab} overflows its box", "enlarge its {x= y= w= h=} or shorten the text")
     elif body is not None and elements and body.h > 0:
-        slide_inherit = Style()
+        slide_inherit = fast_style()
         for n in slide.classes:
             if n in theme.classes:
                 slide_inherit = slide_inherit.merged(_only_inheritable(theme.classes[n]))
         slide_inherit = slide_inherit.merged(_only_inheritable(ctx.css.own(slide)))
         if kind == "center":
-            slide_inherit = slide_inherit.merged(Style(align="center", valign="middle"))
+            slide_inherit = slide_inherit.merged(fast_style(align="center", valign="middle"))
         sgap = _gap(ctx, slide.attrs.get("gap") or ctx.css.own(slide).gap, body.w)
 
         body_pt = theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k
