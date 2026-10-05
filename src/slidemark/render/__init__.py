@@ -602,7 +602,7 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             if inset := el.attrs.get("icon_inset"):  # room for the icon the layout placed before the text
                 shp.text_frame.margin_left = Emu(shp.text_frame.margin_left + int(inset))
         if el.shape == "chevron":
-            shp.adjustments[0] = rc.theme.layout.chevron_adj
+            shp.adjustments[0] = float(el.attrs.get("adj", rc.theme.layout.chevron_adj))
     elif isinstance(el, Table):
         add_table(rc, s, pl, name)
     elif isinstance(el, Chart):

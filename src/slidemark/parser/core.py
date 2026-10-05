@@ -917,11 +917,12 @@ def _infer_cover(slide: Slide, index: int, ctx: Ctx | None = None) -> None:
             and slide.lead is None
             and slide.conclusion is None
             and slide.grid is None
-            and (not boxes or any(isinstance(e, Text) for e in els))  # a lone `## x` stays a card
+            # a lone `## x` with body text stays a card; bare `## x` lines (no body) are the subtitle
+            and (not boxes or any(isinstance(e, Text) for e in els) or not any(b.children for b in boxes))
         )
         if not short:
             return
-    if boxes and ctx is not None:
+    if boxes and ctx is not None and any(b.children for b in boxes):
         ctx.add(
             "info",
             "'## ' on a cover or section slide is a subtitle line, not a box",

@@ -52,6 +52,10 @@ class LayoutTokens(BaseModel):
     icon_kpi: float = 2.0  # icon side / kpi label font size
     icon_gap: float = 0.4  # gap between icon and text, in icon sides
     chevron_adj: float = 0.3  # chevron point depth / shorter side
+    chevron_adj_min: float = 0.16  # flattest point depth the layout may choose to widen the text area
+    chevron_text_share: float = 0.6  # text area >= this share of the chevron width
+    chevron_adj_step: float = 0.02  # step of that search
+    chevron_word_slack: float = 1.08  # a word must fit this much narrower (wider fonts)
     chevron_pad: Length = "4pt"
     chevron_min_h: Length = "0.7in"
     chevron_max_h: Length = "1.3in"
@@ -69,6 +73,10 @@ class LayoutTokens(BaseModel):
     table_font_grow: float = 1.2  # table text grows up to this factor
     table_alone_grow: float = 2.6  # a table alone on a normal slide: rows grow up to this factor ...
     table_alone_font_grow: float = 1.45  # ... and its text up to this factor
+    kpi_text_grow: bool = True  # free text under a KPI row grows with the sparse-slide growth (box-text size)
+    kpi_grow_max: float = 1.7  # a KPI card beside free text grows its text up to this factor (1 = never)
+    table_fill_width: bool = True  # a lone body table spans the full width
+    table_row_max_em: float = 3.6  # grown table rows <= this x the text size (0 = off)
     table_grow_roomy: float = 2.0  # table rows grow up to this factor when a quarter of the body stays empty
     tree_slack_roomy: float = 1.15  # org-tree boxes may be this much taller than their content (roomy slides)
     tree_slack: float = 1.15  # org-tree boxes are at most this much taller than their content

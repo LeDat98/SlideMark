@@ -103,6 +103,7 @@ class _Ctx:
     head_grow: bool = False  # very sparse boxes: box headings grow with ``grow`` (up to ``GROW_HEAD``)
     grew: bool = False  # set when ``grow`` actually scaled some text
     step: float = 1.0  # sparse step: padding, table / chevron text and paragraph gaps scale with it
+    chev_adj: float | None = None  # point depth / shorter side of the chevron row being placed (None = token)
     chev_grow: float = 1.0  # a chevron row alone on the slide: its text grows with ``grow``
     fill: float | None = None  # natural content height / grid height of the slide-level grid, if known
     expand: int = 0  # extra height (EMU) the capped rows of the slide-level grid may take
@@ -484,11 +485,12 @@ def _grown(ctx: _Ctx, el, eff: float) -> float:
         and isinstance(el, Text)
         and el.role == "body"
         and "callout" not in el.classes
-        and _has_box_text(ctx)
+        and (_has_box_text(ctx) or _has_kpi_row(ctx))
     ):  # slide-level text beside grown boxes: at most one step smaller than their body text
         base = max(_text_style(ctx, el, Style()).font_size or 18, 1.0)
         box_pt = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
-        f = min(max(box_pt / ctx.lt.slide_peer_step / base, 1.0), ctx.grow)
+        peer = 1.0 if _has_kpi_row(ctx) and not _has_box_text(ctx) else ctx.lt.slide_peer_step
+        f = min(max(box_pt / peer / base, 1.0), ctx.grow)
         if f > 1.0:
             ctx.grew = True
             return eff * f
@@ -600,6 +602,26 @@ def _has_box_text(ctx: _Ctx) -> bool:
     )
 
 
+def _kpi_grow(ctx: _Ctx, grow: float) -> float:
+    """Growth of the text inside a ``.kpi`` card: none, except next to free body text on a sparse slide."""
+    if ctx.lt.kpi_grow_max <= 1.0 or not _has_kpi_text(ctx):
+        return 1.0
+    return min(max(grow, 1.0), ctx.lt.kpi_grow_max)
+
+
+def _has_kpi_text(ctx: _Ctx) -> bool:
+    return _has_kpi_row(ctx) and any(
+        isinstance(e, Text) and e.role == "body" and "callout" not in e.classes for e in ctx.slide.elements
+    )
+
+
+def _has_kpi_row(ctx: _Ctx) -> bool:
+    """The slide holds a ``.kpi`` box: free text under it follows the sparse-slide growth (never smaller)."""
+    return ctx.lt.kpi_text_grow and any(
+        isinstance(e, Container) and "kpi" in e.classes for e in ctx.slide.elements
+    )
+
+
 def _slide_grid(ctx: _Ctx) -> str | None:
     if ctx.slide.grid:
         return ctx.slide.grid
@@ -699,6 +721,9 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
             ctx.over.append(_label(el))
         elif rect.h > total:  # spare room: rows grow up to ctx.lt.table_grow, cell text stays centered
             target = min(rect.h, round(total * _table_grow(ctx)))
+            if ctx.lt.table_row_max_em > 0:  # rows stretch, but a row is never more than N text heights
+                row_cap = round(ctx.lt.table_row_max_em * (st.font_size or 14) * eff * EMU_PER_PT)
+                target = min(target, sum(max(h, row_cap) for h in rh))
             rh = [round(h * target / total) for h in rh]
             rh[-1] += target - sum(rh)
             total = sum(rh)
@@ -977,7 +1002,7 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
     saved = (ctx.depth, ctx.grow)
     ctx.depth += 1
     if kpi:
-        ctx.grow = 1.0
+        ctx.grow = _kpi_grow(ctx, saved[1])
     try:
         if grid or any(n in ("flow", "chevron") for n in c.classes):
             _place_blocks(ctx, children, area, child_inherit, grid, c.classes, gap, c, c.links)
@@ -1028,7 +1053,7 @@ def _box_nat0(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None
     saved = (ctx.depth, ctx.grow)
     ctx.depth += 1
     if kpi:
-        ctx.grow = 1.0
+        ctx.grow = _kpi_grow(ctx, saved[1])
     try:
         child_inherit = inherit.merged(_only_inheritable(style))
         nat = [_natural_height(ctx, ch, inner_w, child_inherit) for ch in children]
@@ -1210,7 +1235,9 @@ def _place_stack(
     used -= gap
     _share_gaps(ctx, [ch for _, ch in flow])
     limit = (
-        ctx.lt.grow_box_fill if ctx.grow > 1.0 and ctx.depth > 0 else _TOL
+        ctx.lt.grow_box_fill
+        if ctx.grow > 1.0 and ctx.depth > 0 and not (isinstance(owner, Container) and "kpi" in owner.classes)
+        else _TOL
     )  # grown text keeps some headroom
     if used > area.h * limit:
         ctx.over.append(_label(owner) if owner is not None else "content")
@@ -1632,6 +1659,8 @@ def _place_blocks(
         ctx.depth == 0
     ):  # a table next to a full-width box row / chart / image keeps the full width (no ragged edge)
         ctx.cap_tables = not any(isinstance(b, (Container, Chart, Image, Media, Code)) for _, b in flow)
+        if ctx.lt.table_fill_width and len(flow) == 1 and isinstance(flow[0][1], Table):
+            ctx.cap_tables = False  # the only body block: aligns with the lead / conclusion bar
     # slide level: callouts are never grid cells, they close the slide body as full-width rows
     callouts: list[tuple[int, object]] = []
     if ctx.depth == 0 and len(flow) > 1:
@@ -1726,13 +1755,28 @@ def _place_blocks(
         elif ctx.step > 1.0 and ctx.scale >= 1.0:
             ctx.chev_grow = ctx.step
             ctx.grew = True
-        chev_h = _chevron_row_h(
-            ctx,
-            [b for _, b in flow],
-            min((r.w for r in cells), default=area.w),
-            inherit,
-            area.h if alone else None,
-        )
+        ctx.chev_adj = None
+        ladder = _chevron_ladder(ctx)
+        word_cap: float | None = None
+        for k, adj in enumerate(ladder):  # pointiest shape first; flatter points widen the text area
+            ctx.chev_adj = adj if adj != ctx.lt.chevron_adj else None
+            chev_h = _chevron_row_h(
+                ctx,
+                [b for _, b in flow],
+                min((r.w for r in cells), default=area.w),
+                inherit,
+                area.h if alone else None,
+            )
+            word_cap = _chevron_word_cap(ctx, flow, cells, chev_h, inherit, last=k == len(ladder) - 1)
+            roomy = all(
+                _chevron_text_w(r, Style(), None, _cadj(ctx)) >= ctx.lt.chevron_text_share * r.w
+                for r in cells
+                if r.w > 0
+            )
+            if (roomy and (word_cap is None or word_cap >= _chevron_nominal(ctx, flow, inherit))) or k == len(
+                ladder
+            ) - 1:
+                break
         chev_eff = min(
             (
                 _chevron_eff(ctx, blk, _apply_box(ctx, blk, r, False), inherit, chev_h)
@@ -1741,6 +1785,8 @@ def _place_blocks(
             ),
             default=None,
         )
+        if word_cap is not None:  # shrink the text (down to the deck minimum) before a word would break
+            chev_eff = word_cap if chev_eff is None else min(chev_eff, word_cap)
     for (i, blk), r in zip(flow, cells, strict=True):
         r = _css_width(ctx, blk, _apply_box(ctx, blk, r, False), inherit)
         rects[i] = r
@@ -1957,6 +2003,85 @@ def _chevron_geom(
     return sh, st, rect
 
 
+def _cadj(ctx: _Ctx) -> float:
+    """Point depth of the chevron row being placed (shorter side = 1)."""
+    return ctx.lt.chevron_adj if ctx.chev_adj is None else ctx.chev_adj
+
+
+def _chevron_ladder(ctx: _Ctx) -> list[float]:
+    """Point depths to try, pointiest first: ``chevron_adj`` down to ``chevron_adj_min``."""
+    top, low = ctx.lt.chevron_adj, min(ctx.lt.chevron_adj_min, ctx.lt.chevron_adj)
+    step = max(ctx.lt.chevron_adj_step, 0.005)
+    out = [top]
+    while out[-1] - step > low + 1e-9:
+        out.append(round(out[-1] - step, 4))
+    if out[-1] > low + 1e-9:
+        out.append(low)
+    return out
+
+
+_KATAKANA = re.compile(r"[\u30a0-\u30ff\u31f0-\u31ff\uff66-\uff9f]+")
+
+
+def _longest_word_em(paragraphs: list[Paragraph]) -> float:
+    """Width (em, bold) of the longest unbreakable word: a space-separated word or a katakana run."""
+    best = 0.0
+    for p in paragraphs:
+        for chunk in p.plain.split():
+            if measure.has_cjk(chunk):
+                best = max(best, *(measure.text_em(r, bold=True) for r in _KATAKANA.findall(chunk)), 0.0)
+            else:
+                best = max(best, measure.text_em(chunk, bold=True))
+    return best
+
+
+def _chevron_nominal(ctx: _Ctx, flow: list, inherit: Style) -> float:
+    """Text scale a chevron row would use without any word constraint (the smallest of its blocks)."""
+    effs = []
+    for _i, blk in flow:
+        if not isinstance(blk, (Text, Shape, Container)):
+            continue
+        sh = _chevron_shape(blk)
+        st = _chevron_font(ctx, sh, _text_style(ctx, sh, inherit))
+        effs.append(
+            measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size) * ctx.chev_grow
+        )
+    return min(effs, default=1.0)
+
+
+def _chevron_word_cap(
+    ctx: _Ctx, flow: list, cells: list[Rect], h: int, inherit: Style, last: bool = True
+) -> float | None:
+    """Largest text scale at which the longest word of every chevron fits one line (floor: deck minimum).
+
+    ``None`` when nothing constrains. Emits ``chevron-word-break`` (only when ``last``: the flattest point
+    depth was tried) when even the minimum size cannot fit.
+    """
+    cap: float | None = None
+    for (_i, blk), r in zip(flow, cells, strict=True):
+        if not isinstance(blk, (Text, Shape, Container)):
+            continue
+        sh, st, rect = _chevron_geom(ctx, blk, _apply_box(ctx, blk, r, False), inherit, h)
+        em = _longest_word_em(sh.paragraphs)
+        if em <= 0:
+            continue
+        size = max(st.font_size or 18, 1.0)
+        avail = _chevron_text_w(rect, st, sh, _cadj(ctx)) / EMU_PER_PT
+        fit = avail / (em * size * ctx.lt.chevron_word_slack)  # slack: fallback fonts run wider
+        floor = ctx.theme.min_font_size / size
+        if fit < floor:
+            if last:
+                ctx.diag(
+                    "chevron-word-break",
+                    f"a word in {_label(blk)} is wider than the chevron text area even at the minimum size",
+                    "use `flow` boxes or shorter step labels",
+                    line=getattr(blk, "line", None),
+                )
+            fit = floor
+        cap = fit if cap is None else min(cap, fit)
+    return cap
+
+
 def _chevron_text_w(rect: Rect, st: Style, sh: Shape | None = None, adj: float | None = None) -> int:
     """Width of a chevron's text area: the shape minus both point depths, the padding and the icon."""
     inset = sh.attrs.get("icon_inset", 0) if sh is not None else 0
@@ -1998,9 +2123,7 @@ def _chevron_row_h(ctx: _Ctx, blocks: list, width: int, inherit: Style, alone_h:
             )
             need = max(
                 need,
-                measure.paragraphs_height(
-                    sh.paragraphs, _chevron_text_w(rect, st, sh, ctx.lt.chevron_adj), st, eff
-                ),
+                measure.paragraphs_height(sh.paragraphs, _chevron_text_w(rect, st, sh, _cadj(ctx)), st, eff),
             )
         h = min(max(round(need / 0.8), round(need + 2 * _emu(ctx.lt.chevron_vpad)), lo), hi)
     return h
@@ -2013,7 +2136,7 @@ def _chevron_eff(ctx: _Ctx, blk, rect: Rect, inherit: Style, hcap: int | None = 
     "KPI モニタリン / グ"): shrink until the line count no longer changes in a 12% narrower area (>= 80%).
     """
     sh, st, rect = _chevron_geom(ctx, blk, rect, inherit, hcap)
-    width = _chevron_text_w(rect, st, sh, ctx.lt.chevron_adj)
+    width = _chevron_text_w(rect, st, sh, _cadj(ctx))
     base = st.font_size or 18
     first = measure.effective_scale(base, ctx.scale, ctx.theme.min_font_size) * ctx.chev_grow
     for m in (1.0, 0.95, 0.9, 0.85, 0.8):
@@ -2034,16 +2157,16 @@ def _place_chevron(
     if eff_cap is not None:
         eff = min(eff, eff_cap)
     # centered text may use the middle 80% of the height
-    need = measure.paragraphs_height(
-        sh.paragraphs, _chevron_text_w(rect, st, sh, ctx.lt.chevron_adj), st, eff
-    )
+    need = measure.paragraphs_height(sh.paragraphs, _chevron_text_w(rect, st, sh, _cadj(ctx)), st, eff)
     if need > rect.h * 0.8:
         ctx.over.append(_label(blk))
+    if ctx.chev_adj is not None:  # the renderer draws this point depth (default: the token)
+        sh = sh.model_copy(update={"attrs": {**sh.attrs, "adj": ctx.chev_adj}})
     ctx.emit(sh, rect, st, eff)
     if "icon_side" in sh.attrs:  # icon just before the (centered) text block, vertically centered
         side = sh.attrs["icon_side"]
-        left = rect.x + round(ctx.lt.chevron_adj * min(rect.w, rect.h)) + _pad(st)
-        avail = _chevron_text_w(rect, st, sh, ctx.lt.chevron_adj)
+        left = rect.x + round(_cadj(ctx) * min(rect.w, rect.h)) + _pad(st)
+        avail = _chevron_text_w(rect, st, sh, _cadj(ctx))
         size = (st.font_size or 18) * eff
         line = max(
             (measure.text_em(p.plain, bold=True) * size * EMU_PER_PT for p in sh.paragraphs), default=0
