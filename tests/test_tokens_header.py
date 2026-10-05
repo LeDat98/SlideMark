@@ -147,3 +147,11 @@ def test_end_to_end_tokens_render(tmp_path):
         except (AttributeError, TypeError):
             pass
     assert "7C5CFF" in fills
+
+
+def test_font_list_keeps_first_family_with_info():
+    from slidemark.parser import parse
+
+    deck = parse('theme: none\nfonts: heading="Didot, Georgia"\n\n# T\n- a\n- b\n')
+    assert deck.tokens["fonts.heading"] == "Didot"
+    assert [d.rule for d in deck.diagnostics] == ["font-list"]

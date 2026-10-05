@@ -70,6 +70,16 @@ def set_token(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int)
     except TokenValueError as e:
         ctx.warn(f"token {key}={value}: {e}"[:140], line, "bad-token", e.hint)
         return
+    if path.startswith("fonts.") and "," in value:  # PowerPoint stores one typeface per role, no fallback list
+        first = value.split(",")[0].strip().strip("\"'")
+        ctx.add(
+            "info",
+            f"font list '{value}': PowerPoint keeps one family per role, using '{first}'",
+            line,
+            "font-list",
+            f"write {key}=\"{first}\" (viewers without it substitute a similar font)",
+        )
+        value = first
     deck.tokens[path] = value
     deck.attrs.setdefault("_token_src", {})[path] = (line, key, value)
 
