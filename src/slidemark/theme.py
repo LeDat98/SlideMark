@@ -17,6 +17,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from .contrast import best_ink, nearest_passing, ratio
 from .ir import Diagnostic, Length, Style
 
 PRESET_DIR = Path(__file__).parent / "presets"
@@ -200,6 +201,18 @@ class RenderTokens(BaseModel):
     code_style: str = "default"  # pygments style for code blocks
     shadow: str = "0 2 6 #00000040"  # `shadow: true`: CSS-like "x y blur [spread] color" (pt)
     slide_bg: str = "#FFFFFF"  # slide background when neither the slide nor the theme has `bg`
+    ink_auto: bool = True  # derive readable text colors the deck did not set (`style: ink.auto=off` disables)
+    contrast_min: float = 4.5  # contrast ratio auto ink aims for (normal text)
+    contrast_large: float = 3.0  # ... for large text (>= `large_pt`, e.g. KPI numbers)
+    large_pt: float = 24  # text at least this size counts as large
+
+
+_BASE_COLORS = ("bg", "fg", "surface", "border", "muted")  # never moved by auto ink (muted has its own rule)
+
+
+@cache
+def _shade(color: str, backs: tuple[str, ...], need: float) -> str:
+    return nearest_passing(color, list(backs), need)
 
 
 NEUTRAL_COLORS = {
@@ -298,6 +311,89 @@ class Theme(BaseModel):
             return None
         return self.colors.get(value, value)
 
+    def hexval(self, value: str | None) -> str | None:
+        """``#RRGGBB`` (upper case) of a theme color name or 3/6-digit hex; None for anything else."""
+        v = self.colors.get(value, value) if isinstance(value, str) else None
+        if not isinstance(v, str) or not re.fullmatch(r"#?([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})", v.strip()):
+            return None
+        h = v.strip().lstrip("#")
+        h = "".join(ch * 2 for ch in h) if len(h) == 3 else h
+        return "#" + h.upper()
+
+    def need_for(self, size_pt: float | None) -> float:
+        """Contrast ratio text of this size should reach (3:1 for large text, else 4.5:1)."""
+        rt = self.render
+        big = size_pt is not None and size_pt >= rt.large_pt
+        return rt.contrast_large if big else rt.contrast_min
+
+    def surface_backs(self) -> list[str]:
+        """Colors text may sit on without a fill of its own: the slide background and card surface."""
+        return [h for h in (self.hexval("bg"), self.hexval("surface")) if h]
+
+    def legible(self, value: str | None, size_pt: float | None = None, backs: list[str] | None = None):
+        """A theme color *name* made readable on ``backs`` (default bg + surface) by moving its lightness.
+
+        Hex values (set by the deck) and names of the base colors pass through unchanged, and so does
+        everything when ``render.ink_auto`` is off. The name is returned when it already passes.
+        """
+        if not self.render.ink_auto or not isinstance(value, str) or value not in self.colors:
+            return value
+        if value in _BASE_COLORS:
+            return value
+        hx = self.hexval(value)
+        use = backs or self.surface_backs()
+        if not hx or not use:
+            return value
+        got = _shade(hx, tuple(use), self.need_for(size_pt))
+        return value if got == hx else got
+
+    def ink_candidates(self) -> list[str]:
+        rt = self.render
+        raw = ["fg", "bg", rt.ink_light, rt.ink_dark, "#000000", "#FFFFFF"]
+        return [h for h in dict.fromkeys(self.hexval(c) for c in raw) if h]
+
+    def ink_on(self, fill: str | None, prefer: str | None = None, need: float | None = None) -> str:
+        """Ink on ``fill``: ``prefer`` when it reaches 4.5:1, else the best of fg/bg/white/black.
+
+        Returns ``prefer`` untouched when ``render.ink_auto`` is off or the fill is not a plain color.
+        """
+        fh = self.hexval(fill)
+        if not self.render.ink_auto or fh is None:
+            return prefer or "fg"
+        need = need or self.render.contrast_min
+        ph = self.hexval(prefer)
+        cands = ([ph] if ph else []) + self.ink_candidates()
+        if ph and ratio(ph, fh) >= need:
+            return prefer  # type: ignore[return-value]
+        return best_ink(fh, cands, need)
+
+    def badge_ink(self, highlight: str | None) -> str:
+        """Ink of a run on a badge highlight (the badge class color when it is the same fill)."""
+        hh = self.hexval(highlight) or self.hexval(self.render.highlight) or "#FFFF00"
+        badge = self.classes.get("badge")
+        if badge and badge.color and self.hexval(badge.fill) == hh:
+            return badge.color
+        r, g, b = (int(hh[i : i + 2], 16) for i in (1, 3, 5))
+        rt = self.render
+        prefer = rt.ink_dark if 0.299 * r + 0.587 * g + 0.114 * b > 160 else rt.ink_light
+        return self.ink_on(hh, prefer)
+
+    def run_color(
+        self,
+        run_color: str | None,
+        highlight: str | None,
+        style_color: str | None,
+        size_pt: float | None = None,
+        fill: str | None = None,
+    ) -> str | None:
+        """The color a run is drawn in (renderer and lint share this)."""
+        if highlight and run_color in (None, "bg"):  # the parser gives badges `bg`: the ink is chosen here
+            return self.badge_ink(highlight)
+        if run_color:
+            fh = self.hexval(fill)
+            return self.legible(run_color, size_pt, [fh] if fh else None)
+        return style_color
+
 
 # --------------------------------------------------------------------------- presets (YAML data)
 
@@ -371,6 +467,7 @@ STYLE_ALIASES = {
     "bg": "colors.bg",
     "fg": "colors.fg",
     "margin": "margin_x",
+    "ink.auto": "render.ink_auto",
 }
 _STYLE_FIELDS = tuple(Style.model_fields)
 _NUM = re.compile(r"^-?\d+(?:\.\d+)?$")
@@ -504,6 +601,7 @@ def apply_tokens(theme: Theme, tokens: dict[str, str]) -> tuple[Theme, list[Diag
             continue
         data = trial
     _derive_muted(data, tokens)
+    _derive_surface(data, tokens)
     return Theme.model_validate(data), diags
 
 
@@ -535,6 +633,103 @@ def _derive_muted(data: dict, tokens: dict[str, str]) -> None:
         return
     mix = [f + (b - f) * 0.35 for f, b in zip(fg, bg, strict=True)]
     cols["muted"] = "#" + "".join(f"{round(x * 255):02X}" for x in mix)
+
+
+def _mix_hex(a: tuple[float, ...], b: tuple[float, ...], t: float) -> str:
+    return "#" + "".join(f"{round((x + (y - x) * t) * 255):02X}" for x, y in zip(a, b, strict=True))
+
+
+def _derive_surface(data: dict, tokens: dict[str, str]) -> None:
+    """A deck that sets its own bg/fg but no ``surface`` / ``border`` gets cards that stand out from the bg.
+
+    The preset's light grey surface would be a white card on a dark brand bg (white text on it is unreadable)
+    and its border would vanish. A preset value is kept while it still works (fg reads on the surface at 4.5:1
+    and the surface differs from bg); otherwise surface = bg mixed toward fg until the two differ (>= 1.1:1,
+    6% to start), border = bg mixed 25% toward fg.
+    """
+    if not ({"colors.bg", "colors.fg"} & set(tokens)):
+        return
+    cols = data.get("colors") or {}
+    bg, fg = _hex_rgb(cols.get("bg")), _hex_rgb(cols.get("fg"))
+    if not (bg and fg):
+        return
+
+    def rat(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+        lo, hi = sorted((_rel_lum(a), _rel_lum(b)))
+        return (hi + 0.05) / (lo + 0.05)
+
+    surface = _hex_rgb(cols.get("surface"))
+    if "colors.surface" not in tokens and not (
+        surface and rat(fg, surface) >= 4.5 and rat(bg, surface) >= 1.03
+    ):
+        t = 0.06
+        while t < 0.3 and rat(bg, tuple(b + (f - b) * t for b, f in zip(bg, fg, strict=True))) < 1.1:
+            t += 0.02
+        cols["surface"] = _mix_hex(bg, fg, t)
+    border = _hex_rgb(cols.get("border"))
+    if "colors.border" not in tokens and not (border and rat(bg, border) >= 1.2):
+        cols["border"] = _mix_hex(bg, fg, 0.25)
+
+
+def derive_ink(theme: Theme, explicit: set[str] | frozenset[str] = frozenset()) -> Theme:
+    """Make the theme's default text colors readable (``render.ink_auto``), never touching the deck's own.
+
+    ``explicit`` holds the canonical token paths the deck set (``Deck.tokens`` keys): those fields are kept
+    and left for lint to report. Text drawn on a theme fill (conclusion bar, title / heading band, table
+    header, badge, any class with a fill and a color) keeps its color while it reaches
+    ``render.contrast_min``,
+    else becomes the best of fg / bg / white / black. Text in a theme color on the bg / card surface (KPI
+    numbers, heading and lead colors, color-only classes) keeps it while it reaches 4.5:1 (3:1 at
+    ``render.large_pt`` and above), else becomes the nearest passing shade of the same hue. Fills never
+    change.
+    Presets that already read are returned unchanged.
+    """
+    if not theme.render.ink_auto:
+        return theme
+    upd: dict[str, Any] = {}
+    classes = {k: v.model_copy() for k, v in theme.classes.items()}
+
+    def on_fill(path: str, color: str | None, fill: str | None) -> str | None:
+        if path in explicit or not color or not fill or theme.hexval(fill) is None:
+            return None
+        ink = theme.ink_on(fill, color)
+        return None if ink == color else ink
+
+    for field, fill in (
+        ("conclusion_color", theme.conclusion_fill),
+        ("title_band_color", theme.title_band),
+        ("heading_band_color", theme.heading_band),
+        ("table_header_color", theme.table_header_fill),
+    ):
+        if (new := on_fill(field, getattr(theme, field), fill)) is not None:
+            upd[field] = new
+
+    def in_color(path: str, color: str | None, size: float | None, backs: list[str]) -> str | None:
+        hx = theme.hexval(color)
+        if path in explicit or not hx or color in _BASE_COLORS or not backs:
+            return None
+        got = _shade(hx, tuple(backs), theme.need_for(size))
+        return None if got == hx else got
+
+    cards = theme.surface_backs()
+    plain = [b for b in (theme.hexval("bg"),) if b]
+    for field, backs in (("heading_color", cards), ("lead_color", plain)):
+        if (
+            new := in_color(field, getattr(theme, field), theme.sizes.get(field.split("_")[0]), backs)
+        ) is not None:
+            upd[field] = new
+    for name, st in theme.classes.items():
+        path = f"classes.{name}.color"
+        if st.fill:
+            new = on_fill(path, st.color, st.fill)
+        else:
+            size = st.font_size or theme.sizes.get(name) or theme.sizes.get("body")
+            new = in_color(path, st.color, size, cards)
+        if new is not None:
+            classes[name] = st.model_copy(update={"color": new})
+    if not upd and all(classes[k] == v for k, v in theme.classes.items()):
+        return theme
+    return theme.model_copy(update={**upd, "classes": classes})
 
 
 def _bad_token(path: str, raw: Any, why: str, hint: str) -> Diagnostic:
@@ -739,6 +934,13 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
         if path == "render.shadow" and not isinstance(val, str):
             raise TokenValueError("render.shadow needs x y blur color", _HINT_SHADOW)
         return [(path, val)]
+    if path == "render.ink_auto":
+        flag = _unquote(raw).lower()
+        if flag in ("on", "true", "yes", "1"):
+            return [(path, True)]
+        if flag in ("off", "false", "no", "0", "none"):
+            return [(path, False)]
+        raise TokenValueError("ink.auto is on or off", "write 'style: ink.auto=off' (or on)")
     if path == "palette":
         items = [p.strip() for p in _unquote(raw).split(",") if p.strip()]
         return [(path, [_color_value(p, names) for p in items])]

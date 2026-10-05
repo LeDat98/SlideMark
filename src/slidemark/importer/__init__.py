@@ -197,6 +197,18 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
     return best[1], diags
 
 
+def _drawn_accent(theme, tokens: dict, accent: str) -> str:
+    """RRGGBB a ``==mark==`` run is drawn in: the accent made legible on bg / surface (``Theme.legible``)."""
+    try:
+        from ..theme import apply_tokens
+
+        th, _ = apply_tokens(theme, {k: str(v) for k, v in tokens.items()})
+        got = th.hexval(th.legible("accent"))
+        return got.lstrip("#").upper() if got else accent
+    except Exception:  # never raise on a foreign deck: fall back to the plain accent
+        return accent
+
+
 def _import_with(
     prs, out_dir, diags: list[Diagnostic], src_name: str, own_tokens: dict[str, str]
 ) -> tuple[str, list[Diagnostic]]:
@@ -229,7 +241,7 @@ def _import_with(
     deck = DeckInfo(
         width=W,
         height=H,
-        accent=accent,
+        accent=_drawn_accent(theme, {**(design.get("tokens") or {}), **own_tokens}, accent),
         colors=colors,
         footers=footers,
         sections=read_sections(prs),

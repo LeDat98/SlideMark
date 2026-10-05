@@ -231,7 +231,7 @@ def _class_styles(ctx: _Ctx, el, skip: tuple[str, ...] = ()) -> list[Style]:
             elif isinstance(el, Shape):
                 out.append(Style(fill=name))
             else:
-                out.append(Style(color=name))
+                out.append(Style(color=ctx.theme.legible(name)))  # `.primary` text: readable shade if needed
     return out
 
 
@@ -320,7 +320,7 @@ def _text_style(ctx: _Ctx, el: Text | Shape, inherit: Style) -> Style:
             font=t.fonts.body,
             font_ea=t.fonts.ea,
             font_size=t.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k,
-            color="bg",
+            color=None,  # auto ink on the fill below, unless the deck sets a color
             fill="primary",
             align="center",
             valign="middle",
@@ -331,6 +331,8 @@ def _text_style(ctx: _Ctx, el: Text | Shape, inherit: Style) -> Style:
     if role in _INHERIT_ROLES or role == "shape":
         st = st.merged(_only_inheritable(inherit))
     st = _styled(ctx, el, st)
+    if role == "shape" and st.color is None:
+        st = st.merged(Style(color=ctx.theme.ink_on(st.fill, "bg")))  # `bg` unless it fails on the fill
     if (
         isinstance(el, Text)
         and "callout" in el.classes

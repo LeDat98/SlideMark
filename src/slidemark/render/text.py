@@ -12,7 +12,6 @@ from pptx.util import Emu, Pt
 from ..ir import Paragraph, Run, Style
 from ..layout import measure
 from ..layout.css import insets, transform_text
-from ..theme import Theme
 from .util import RenderCtx, hex6, rgb
 
 _RPR_ORDER = [
@@ -92,13 +91,6 @@ def _lang_for(text: str, deck_lang: str | None) -> str:
     return "en-US"
 
 
-def _contrast(hex_color: str, theme: Theme | None = None) -> str:
-    """``render.ink_dark`` or ``render.ink_light``, whichever reads better on ``hex_color`` ('RRGGBB')."""
-    tok = (theme or Theme(name="none")).render
-    r, g, b = (int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
-    return tok.ink_dark if 0.299 * r + 0.587 * g + 0.114 * b > 160 else tok.ink_light
-
-
 def _format_run(
     rc: RenderCtx, r, run: Run, style: Style, size_pt: float, text: str, scale: float = 1.0
 ) -> None:
@@ -111,9 +103,7 @@ def _format_run(
     f.italic = True if italic else None
     if run.underline or style.underline:
         f.underline = True
-    color = run.color or style.color
-    if run.highlight and not run.color:  # badge: readable text on the highlight
-        color = _contrast(hex6(theme, run.highlight, theme.render.highlight), theme)
+    color = theme.run_color(run.color, run.highlight, style.color, size_pt, style.fill)  # shared with lint
     f.color.rgb = rgb(theme, color, "fg")
     rpr = r._r.get_or_add_rPr()
     if style.opacity is not None and 0 <= style.opacity < 1 and not style.fill:

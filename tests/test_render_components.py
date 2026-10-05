@@ -9,6 +9,7 @@ from pptx.enum.text import PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Pt
 
+from slidemark.contrast import ratio
 from slidemark.ir import Cell, Container, Deck, Link, Paragraph, Run, Slide, Table, Text
 from slidemark.layout import layout_slide
 from slidemark.preview import pptx_to_pngs
@@ -120,7 +121,9 @@ def test_badge_run_is_highlighted_bold_with_theme_color(tmp_path):
     rpr = r_ok._r.rPr
     hl = rpr.find("{http://schemas.openxmlformats.org/drawingml/2006/main}highlight")
     assert hl is not None and hl[0].get("val") == th.color("success").lstrip("#")
-    assert r_ok.font.bold and str(r_ok.font.color.rgb) == th.color("bg").lstrip("#")
+    assert r_ok.font.bold
+    # badge ink: `bg` while it reads on the fill (success green does not: 3.3:1), else the best ink
+    assert ratio("#" + str(r_ok.font.color.rgb), th.color("success")) >= 4.5
     # schema order: solidFill, highlight, latin, ea
     names = [c.tag.split("}")[1] for c in rpr]
     assert names.index("solidFill") < names.index("highlight") < names.index("latin") < names.index("ea")
