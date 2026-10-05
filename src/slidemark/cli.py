@@ -251,6 +251,53 @@ def _facts(deck: Deck, out: Path) -> str:
     return f"wrote {out}: " + ", ".join(bits)
 
 
+def _look_line(deck: Deck) -> str | None:
+    """Brand facts of the resolved theme (what agents open slide images to check); None for a plain deck."""
+    if not (
+        deck.tokens or deck.theme != "default" or deck.css or any(s.html is not None for s in deck.slides)
+    ):
+        return None
+    try:
+        from .template import apply_tokens, deck_theme, resolve_theme
+
+        base = deck.attrs.get("base_dir")
+        theme, _ = deck_theme(deck, base)
+        col = {k: theme.hexval(k) for k in ("bg", "fg", "primary", "accent")}
+        f = theme.fonts
+        fonts = f"fonts {f.heading} (headings)" + ("" if f.body == f.heading else f", {f.body} (body)")
+        if f.body == f.heading:
+            fonts = f"fonts {f.heading} (headings, body)"
+        if (deck.lang or "").lower()[:2] in ("ja", "zh", "ko"):
+            fonts += f", {f.ea} (ea)"
+        band = (
+            f"title band {theme.hexval(theme.title_band) or theme.title_band}"
+            if theme.title_band
+            else "title band off"
+        )
+        line = (
+            f"look: theme {theme.name}, bg {col['bg']}, text {col['fg']}, "
+            f"primary {col['primary']}, accent {col['accent']}; {fonts}; {band}"
+        )
+        # text shades the contrast derivation moved (fills never change): compare against the underived theme
+        raw, _ = resolve_theme(deck.theme, base)
+        if deck.tokens:
+            raw, _ = apply_tokens(raw, deck.tokens)
+        moved: dict[str, str] = {}
+        pairs = [(raw.heading_color, theme.heading_color), (raw.lead_color, theme.lead_color)]
+        pairs += [(st.color, theme.classes[k].color) for k, st in raw.classes.items() if k in theme.classes]
+        for a, b in pairs:
+            ha, hb = raw.hexval(a), theme.hexval(b)
+            if a and ha and hb and ha != hb and a not in ("bg", "fg", "surface", "border", "muted"):
+                moved.setdefault(a if a in raw.colors else ha, f"{ha} -> {hb}")
+        if moved:
+            line += "; text shades adjusted for contrast: " + ", ".join(
+                f"{k} {v}" for k, v in list(moved.items())[:3]
+            )
+        return line
+    except Exception:  # a brand summary must never break a build
+        return None
+
+
 def _grouped(diags: list[Diagnostic]) -> list[str]:
     """Errors, warnings, infos; the same finding on several slides prints once with its slide list."""
     lines: list[str] = []
@@ -329,6 +376,8 @@ def cmd_build(args: argparse.Namespace) -> int:
         _say(line)
     if args.png:
         _contact_png(out, Path(args.png))
+    if look := _look_line(deck):
+        _say(look)
     _say(_facts(deck, out))
     return 1 if _has_errors(deck) else 0
 
@@ -537,7 +586,9 @@ def make_parser() -> argparse.ArgumentParser:
         help="build a .pptx from a Markdown or JSON deck: fixes, diagnostics and a facts line in one call",
         description="Build a .pptx. INPUT '-' reads the deck from stdin (output defaults to ./deck.pptx), "
         "e.g. slidemark build - -o deck.pptx --save deck.md <<'EOF'. Mechanical fixes are applied first "
-        "(like check --fix) and written back to the input file. The last output line is a facts line.",
+        "(like check --fix) and written back to the input file. The last output line is a facts line; "
+        "decks with colors/fonts/theme/CSS/@html get a 'look:' line before it (resolved theme, bg/text/"
+        "primary/accent, fonts, title band), so brand checks need no slide images.",
     )
     b.add_argument("input", help="deck .md/.json file, or '-' for stdin")
     b.add_argument("-o", "--output", help="output .pptx (default: next to the input; ./deck.pptx for stdin)")
