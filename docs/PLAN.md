@@ -23,6 +23,11 @@ keeps climbing L4 → L7, picking the unchecked gates with the best value.
 | **6** | `html`, `mermaid` fences | HTML → native (Playwright measurement), image fallback | Agent eval harness v0 |
 | **7** | Slide links, `hidden`, sections | Transitions, build animations, hyperlinks, sections | Packaging (PyPI-ready), release notes, AGENT_TIPS review |
 
+## Current direction: design freedom (owner, 2026-10-05)
+Until the DF gates in `docs/TARGETS.md` are done, **every run's goal is the DF gates** (spec: `docs/DESIGN_FREEDOM.md`),
+leftovers that conflict with it are dropped, and other L3–L7 work waits. Suggested order: DF1 + DF2 (tokens, presets
+as data, remove hard-coded looks) → DF3 (CSS fence) → DF4 + DF5 (HTML fidelity, whole-deck HTML) → DF6 (eval).
+
 ## Run routine (02:45 JST daily, or fired manually)
 1. Note the start time (`date -u`). Read `CLAUDE.md`, `docs/LESSONS.md`, this plan, `docs/TARGETS.md`,
    `docs/SYNTAX.md`, the end of `docs/DAILY_LOG.md`.

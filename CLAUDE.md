@@ -35,6 +35,9 @@ break the visual → bench has no token regression. Mark progress in `docs/FEATU
   (lane A front, lane B back), in waves; see "Run routine" in `docs/PLAN.md`.
 
 ## Rules
+- **Design freedom first (`docs/DESIGN_FREEDOM.md`).** Never hard-code a visual decision: colors, fonts, sizes,
+  spacing, bands, card looks and layout constants are tokens an agent can override from the deck (tokens, CSS or
+  HTML). Built-in themes are YAML presets in the public token schema, with no theme-specific code paths.
 - Token cost is the main product metric. New syntax must be the shortest unambiguous form; measure it.
 - Never raise on bad user input: append a `Diagnostic` with a one-line, actionable `hint`.
 - Dense Japanese business slides (many boxes, 10–12pt text, tables, arrows, footnotes) are a first-class
