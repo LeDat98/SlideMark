@@ -25,36 +25,36 @@ deck.pptx`. (No heredoc in your shell? Write `deck.md`, then build it, in the sa
 ## Pattern 1: business deck (default look)
 
 ````markdown
-title: Quarterly Business Review
+title: Hiring Plan 2027
 
-# Quarterly Business Review
-## Q3 2026 results and outlook
+# Hiring Plan 2027
+## Engineering leadership offsite
 
-# Revenue grew 18% year over year
-> Growth came from the enterprise segment
-```table {align=lrrr}
-Segment,Q3 2025,Q3 2026,Change
-Enterprise,4.2,5.6,+33%
-SMB,3.1,3.2,+3%
+# Attrition fell to 9%
+> Retention programs paid off in every team
+```table {align=lrr}
+Team,2025,2026
+Platform,14%,8%
+Mobile,11%,10%
 ```
-> Enterprise now drives two thirds of growth
+> Keep the mentoring budget in 2027
 
-# Three options
-## Hire
-- Add 6 agents
-- Ready in 4 months
-## Outsource
-- Partner covers nights
-## Automate
-- AI answers top 30 questions
-> We recommend Automate plus 2 hires
+# Where we hire
+## Backend
+- 6 senior engineers
+- Remote first
+## Data
+- 3 analysts
+## Design
+- 2 product designers
+> Start with backend in Q1
 
-# Pipeline doubled since Q1
-```column {title="Pipeline ($M)" labels=on legend=none}
-,Q1,Q2,Q3
-Pipeline,12,17,24
+# Offer acceptance is rising
+```line {title="Acceptance (%)" labels=on legend=bottom}
+,Jan,Apr,Jul,Oct
+2026,61,66,70,74
 ```
-??? Pipeline counts qualified opportunities only.
+??? Mention the new referral bonus.
 ````
 
 ## Pattern 2: dense Japanese business slides
@@ -65,44 +65,44 @@ lang: ja
 footer: ACME株式会社
 num: on
 
-# 中期経営計画 2027–2029
-## 取締役会 説明資料
+# 営業DXの進捗報告
+## 営業企画部 定例会議
 
-# 2029年の目標
-> 売上と利益率を同時に高める
-## 売上高 {.kpi}
-1,500億円
-2026年比 +30%
-## 営業利益率 {.kpi}
-12%
-+4pt
-## ROE {.kpi}
-10%
-+3pt
+# 主要指標
+> 商談化率が目標を上回った
+## 商談数 {.kpi}
+420件
+前月比 +12%
+## 商談化率 {.kpi}
+31%
+目標 28%
+## 受注額 {.kpi}
+3.8億円
+前月比 +5%
 @end
-- 既存事業は収益性を重視
-- 新規事業に3年で200億円を投資
+- インサイドセールスの架電数が倍増
+- 失注理由の記録率は60%に留まる
 
-# 4つの重点施策
-> 価格・海外・DX・人材の4本柱で実行する
-## 価格改定
-- 主力製品を平均5%改定
-## 海外展開
-- ベトナム工場の稼働
-## DX推進
-- 需要予測のAI化
-## 人材
-- 技術職を300名採用
-※ 出所: 社内資料（2026年9月）
+# 課題と対策
+> 入力負荷を下げ、記録率を90%に高める
+## 入力負荷
+- 1件あたり8分
+## 項目過多
+- 必須項目が24個
+## 定着
+- 研修は年1回のみ
+## 対策
+- 音声入力で自動記録
+※ 出所: 営業部アンケート（2026年9月）
 
-# 実行ロードマップ
+# 導入ステップ
 @chevron
-## 2027年 上期
-- 体制構築
-## 2027年 下期
-- 価格改定
-## 2028年
-- 海外拠点稼働
+## 10月
+- 試験導入
+## 11月
+- 全課展開
+## 12月
+- 効果測定
 ````
 
 Japanese: half-width digits, units in Japanese (`12.4億円`), one-line bullets (≈ 25 full-width chars per
@@ -112,25 +112,25 @@ column of a 3-column slide), `▲3` = −3 in tables, `density: dense` (deck) or
 
 ````markdown
 theme: none
-colors: bg=#0B1F3A fg=#FFFFFF primary=#FF6B57 accent=#FFB4A8 surface=#132B4F border=#24406B
-fonts: heading="Montserrat" body="Open Sans"
+colors: bg=#101820 fg=#F2F2F2 primary=#FEE715 accent=#7FDBFF surface=#1B2733 border=#2E3F50
+fonts: heading="Poppins" body="Source Sans 3"
 lang: en
 
-# Northwind Mobility
-## Series B investor update
+# Solar Roofs for Every Home
+## Partner briefing
 
-# Traction at a glance
-## Riders {.kpi}
-1.2M
-+64% YoY
-## Cities {.kpi}
-14
-+5 this year
+# Installs this year
+## Homes {.kpi}
+8,400
++40% YoY
+## Saved per home {.kpi}
+$1,150
+per year
 
-# Revenue by year ($M)
-```column {labels=on legend=none}
-,2024,2025,2026
-Revenue,7.8,15.2,26.0
+# Installs per quarter
+```bar {labels=on legend=none}
+,Q1,Q2,Q3
+Installs,1600,2100,2600
 ```
 ````
 
