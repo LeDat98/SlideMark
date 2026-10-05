@@ -6,6 +6,7 @@ import math
 import re
 from dataclasses import dataclass, field
 
+from .. import icons
 from ..ir import (
     Box,
     Chart,
@@ -56,6 +57,9 @@ _INHERIT_FIELDS = (
 )
 _VISUALS = (Image, Chart, Table, Code)
 _TOL = 1.01
+ICON_HEAD = 1.2  # icon side / heading font size (icon left of the heading text)
+ICON_KPI = 2.0  # icon side / label font size (icon above a kpi number)
+ICON_GAP = 0.4  # gap between icon and text, in icon sides
 CHEVRON_ADJ = 0.3  # chevron point depth / shorter side; the renderer sets the same adjustment
 CHEVRON_PAD_PT = 4  # text padding inside a chevron (the preset's text rectangle already clears the points)
 CHEVRON_H = 0.45  # chevron height / width (room for 3 lines of text between the point paddings)
@@ -521,6 +525,23 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
     return h_el, hst, eff, band
 
 
+def _icon_name(el) -> str | None:
+    """The valid icon name of ``icon=name`` on a box / chevron (unknown names are ignored here)."""
+    name = getattr(el, "attrs", {}).get("icon")
+    name = str(name).strip().lower() if name else ""
+    return name if name and icons.path(name) else None
+
+
+def _icon_item(name: str) -> Shape:
+    return Shape(shape="icon", attrs={"icon": name})
+
+
+def _icon_side(hst: Style, eff: float, kpi: bool) -> tuple[int, int]:
+    """(icon side, space the icon takes left of the heading text) in EMU."""
+    side = round((ICON_KPI if kpi else ICON_HEAD) * (hst.font_size or 18) * eff * EMU_PER_PT)
+    return side, side + round(ICON_GAP * side)
+
+
 def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> None:
     style = _card_style(ctx, c)
     pad = _pad(style, 10 * EMU_PER_PT * ctx.tight)
@@ -536,18 +557,44 @@ def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> Non
     kpi = "kpi" in c.classes
     if parts := _heading_parts(ctx, c, pad, kpi):
         h_el, hst, eff, band = parts
+        icon = _icon_name(c)
+        isz, shift = _icon_side(hst, eff, kpi) if icon else (0, 0)
+        if icon and kpi:  # icon centered above the label and the number
+            isz = min(isz, inner.w)
+            ctx.emit(
+                _icon_item(icon), Rect(inner.x + (inner.w - isz) // 2, y, isz, isz), Style(fill="primary")
+            )
+            y += isz + round(pad * 0.4)
+            shift = 0
+        if icon and band:
+            shift = pad + isz  # the text's own padding supplies the gap after the icon
         if band:
-            hh = round(_text_need(ctx, h_el, hst, rect.w, eff))
+            hh = round(_text_need(ctx, h_el, hst, rect.w - shift, eff))
+            if icon:
+                hh = max(hh, isz + 2 * pad)
             if hh > rect.h * _TOL:
                 ctx.over.append(_label(c))
             band_rect = Rect(rect.x, rect.y, rect.w, min(hh, rect.h))
-            ctx.emit(h_el, band_rect, hst, eff)
+            if icon:  # the band is a plain shape behind the icon and the shifted heading text
+                ctx.emit(Shape(shape="rect"), band_rect, Style(fill=band))
+                ctx.emit(
+                    _icon_item(icon),
+                    Rect(rect.x + pad, rect.y + (band_rect.h - isz) // 2, isz, isz),
+                    Style(fill=hst.color),
+                )
+                text_rect = Rect(rect.x + shift, rect.y, rect.w - shift, band_rect.h)
+                ctx.emit(h_el, text_rect, hst.model_copy(update={"fill": None}), eff)
+            else:
+                ctx.emit(h_el, band_rect, hst, eff)
             y = band_rect.bottom + round(pad * 0.5)
         else:
-            hh = round(_text_need(ctx, h_el, hst, inner.w, eff))
+            hh = round(_text_need(ctx, h_el, hst, inner.w - shift, eff))
+            if icon and not kpi:
+                hh = max(hh, isz)
+                ctx.emit(_icon_item(icon), Rect(inner.x, y, isz, isz), Style(fill=hst.color or "primary"))
             if hh > inner.h * _TOL:
                 ctx.over.append(_label(c))
-            ctx.emit(h_el, Rect(inner.x, y, inner.w, min(hh, inner.h)), hst, eff)
+            ctx.emit(h_el, Rect(inner.x + shift, y, inner.w - shift, min(hh, inner.h)), hst, eff)
             y += hh + round(pad * 0.5)
     area = Rect(inner.x, y, inner.w, max(inner.bottom - y, 0))
     if not c.children:
@@ -582,10 +629,20 @@ def _box_nat(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None:
     total = 2 * pad if c.children or c.title else 0
     if parts := _heading_parts(ctx, c, pad, kpi):
         h_el, hst, eff, band = parts
+        icon = _icon_name(c)
+        isz, shift = _icon_side(hst, eff, kpi) if icon else (0, 0)
+        if icon and kpi:
+            isz = min(isz, max(width - 2 * pad, 1))
+            total += isz + round(pad * 0.4)
+            shift = 0
+        if icon and band:
+            shift = pad + isz
         if band:
-            total = round(_text_need(ctx, h_el, hst, width, eff)) + round(pad * 0.5) + pad
+            hh = round(_text_need(ctx, h_el, hst, width - shift, eff))
+            total = (max(hh, isz + 2 * pad) if icon else hh) + round(pad * 0.5) + pad
         else:
-            total += round(_text_need(ctx, h_el, hst, width - 2 * pad, eff)) + round(pad * 0.5)
+            hh = round(_text_need(ctx, h_el, hst, width - 2 * pad - shift, eff))
+            total += (max(hh, isz) if icon and not kpi else hh) + round(pad * 0.5)
     children = c.children
     if not children:
         return total
@@ -1152,12 +1209,25 @@ def _chevron_geom(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> tuple[Shape, St
     )
     # the preset text rectangle already starts a point depth inside both ends: add only a small padding
     st = st.merged(Style(padding=f"{CHEVRON_PAD_PT}pt", align="center", valign="middle"))
+    if icon := _icon_name(blk):  # the icon sits left of the text: reserve its room as a left inset
+        side = min(round(ICON_HEAD * (st.font_size or 18) * EMU_PER_PT), round(0.4 * rect.h))
+        sh = sh.model_copy(
+            update={
+                "attrs": {
+                    **sh.attrs,
+                    "icon": icon,
+                    "icon_side": side,
+                    "icon_inset": side + round(ICON_GAP * side),
+                }
+            }
+        )
     return sh, st, rect
 
 
-def _chevron_text_w(rect: Rect, st: Style) -> int:
-    """Width of a chevron's text area: the shape minus both point depths minus the padding."""
-    return rect.w - 2 * round(CHEVRON_ADJ * min(rect.w, rect.h)) - 2 * _pad(st)
+def _chevron_text_w(rect: Rect, st: Style, sh: Shape | None = None) -> int:
+    """Width of a chevron's text area: the shape minus both point depths, the padding and the icon."""
+    inset = sh.attrs.get("icon_inset", 0) if sh is not None else 0
+    return rect.w - 2 * round(CHEVRON_ADJ * min(rect.w, rect.h)) - 2 * _pad(st) - inset
 
 
 def _chevron_eff(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> float:
@@ -1167,7 +1237,7 @@ def _chevron_eff(ctx: _Ctx, blk, rect: Rect, inherit: Style) -> float:
     "KPI モニタリン / グ"): shrink until the line count no longer changes in a 12% narrower area (>= 80%).
     """
     sh, st, rect = _chevron_geom(ctx, blk, rect, inherit)
-    width = _chevron_text_w(rect, st)
+    width = _chevron_text_w(rect, st, sh)
     base = st.font_size or 18
     first = measure.effective_scale(base, ctx.scale, ctx.theme.min_font_size)
     for m in (1.0, 0.95, 0.9, 0.85, 0.8):
@@ -1186,10 +1256,24 @@ def _place_chevron(ctx: _Ctx, blk, rect: Rect, inherit: Style, eff_cap: float | 
     if eff_cap is not None:
         eff = min(eff, eff_cap)
     # centered text may use the middle 80% of the height
-    need = measure.paragraphs_height(sh.paragraphs, _chevron_text_w(rect, st), st, eff)
+    need = measure.paragraphs_height(sh.paragraphs, _chevron_text_w(rect, st, sh), st, eff)
     if need > rect.h * 0.8:
         ctx.over.append(_label(blk))
     ctx.emit(sh, rect, st, eff)
+    if "icon_side" in sh.attrs:  # icon just before the (centered) text block, vertically centered
+        side = sh.attrs["icon_side"]
+        left = rect.x + round(CHEVRON_ADJ * min(rect.w, rect.h)) + _pad(st)
+        avail = _chevron_text_w(rect, st, sh)
+        size = (st.font_size or 18) * eff
+        line = max(
+            (measure.text_em(p.plain, bold=True) * size * EMU_PER_PT for p in sh.paragraphs), default=0
+        )
+        off = max(round((avail - min(line, avail)) / 2), 0)
+        ctx.emit(
+            _icon_item(sh.attrs["icon"]),
+            Rect(left + off, rect.y + (rect.h - side) // 2, side, side),
+            Style(fill=st.color or "primary"),
+        )
     # a chevron shape only carries text: place the other children (table, chart, ...) under it
     extra = (
         [ch for ch in blk.children if not isinstance(ch, (Text, Shape))] if isinstance(blk, Container) else []
