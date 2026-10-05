@@ -241,7 +241,17 @@ def add_html_native(rc: RenderCtx, pl: Placed, draw) -> bool:
     renderer = getattr(rc, "html_renderer", None)
     if renderer is None:
         renderer = rc.html_renderer = HtmlRenderer()  # type: ignore[attr-defined]
-    res = html_to_placed(el.source, pl.x, pl.y, pl.w, pl.h, rc.theme, rc.base_dir, renderer=renderer)
+    zoom: float | str = "auto"
+    raw = str(el.attrs.get("zoom", "")).strip()
+    if raw:
+        try:
+            zoom = float(raw)
+        except ValueError:
+            pass
+    zmax = float(getattr(getattr(rc.theme, "layout", None), "html_zoom_max", 1.0) or 1.0)
+    res = html_to_placed(
+        el.source, pl.x, pl.y, pl.w, pl.h, rc.theme, rc.base_dir, renderer=renderer, zoom=zoom, zoom_max=zmax
+    )
     if res is None:
         return False
     items, diags = res
