@@ -517,3 +517,9 @@ def test_image_line_right_under_a_list_is_its_own_block():
 def test_text_right_under_an_image_line_is_not_swallowed():
     deck = parse("# T\n- a\n![x](a.png)\ntext after\n")
     assert [e.type for e in deck.slides[0].elements] == ["text", "image", "text"]
+
+
+def test_column_count_with_matching_ratios_is_accepted():
+    deck = parse("# T\n@2 1:2\n## a\n- x\n## b\n- y\n")
+    assert deck.slides[0].grid == "1:2"
+    assert not [d for d in deck.diagnostics if d.rule == "bad-grid"]

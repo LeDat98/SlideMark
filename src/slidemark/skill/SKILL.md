@@ -6,8 +6,8 @@ description: Write PowerPoint decks as compact SlideMark text and build native, 
 # SlideMark
 
 ```bash
-slidemark check deck.md     # "warning slide 2 L14 rule: message -> hint"; fix only what it names
-slidemark review deck.md    # design critique + score; hints are source edits
+slidemark check deck.md     # "warning slide 2 L14 rule: message -> hint"
+slidemark review deck.md    # design critique + score
 slidemark build deck.md -o deck.pptx
 ```
 
@@ -30,21 +30,20 @@ num: on
 ※ 出所: 社内調査（2026年9月）
 ```
 
-- Header (optional): `theme` (`default` `midnight` `jp-business` or a .pptx path), `lang`, `footer`, `num: on`.
-- `# Title` = slide. First slide with title + 1–2 short lines = cover; later ones = section dividers.
+- Header: `theme` (`default` `midnight` `jp-business` or a .pptx path), `lang`, `footer`, `num: on`.
+- `# Title` = slide; title + ≤ 2 short lines = cover (first slide) or section divider.
 - `## Heading` = box; boxes arrange themselves. `>` after the title = key message, `>` last = conclusion
   bar, `※` = footnote, `??? ` = speaker notes. Each line is its own line.
-- `@end` closes the last box: a following table/chart/callout goes full width below the boxes.
+- `@end` closes the last box; what follows (table, chart) goes full width below.
 
-`@` line, only when the automatic layout is wrong: `@3` columns, `@2x2`, `@1:2` ratios, `@aab/aac` areas
-(big left box + two stacked), `chevron` steps, `flow` arrows, `a>b` connectors (letters = blocks in order),
-`@section`, `@dense`, `@build` (click to reveal), `@t=fade`. An `@` line after `@end` starts a new row of boxes.
+`@` line, only if the auto layout is wrong: `@3` columns, `@2x2`, `@1:2` ratios, `@aab/aac` areas
+(big left + 2 stacked), `chevron` steps, `flow` arrows, `a>b` connectors (letters = blocks in order),
+`@section`, `@dense`, `@build` (click to reveal), `@t=fade`. `@` after `@end` = new row of boxes.
 
 Content:
-- `**b**` `*i*` `==accent==` `[x]{.danger}` `[済]{.badge .success}` `[link](url)`; lists `-` / `1.`.
-- `## 売上 {.kpi icon=yen}` + `12.4億円` + caption line = KPI card. `icon=` on any box heading: check x warning
-  info user users building factory chart money yen target rocket lightbulb gear clock calendar document mail
-  phone globe lock shield cloud database search star heart truck cart leaf arrow-up arrow-down arrow-right.
+- `**b**` `*i*` `==accent==` `[x]{.danger}` `[済]{.badge .success}` `[link](url)`.
+- `## 売上 {.kpi icon=yen}` + `12.4億円` + caption line = KPI card;
+  `icon=` works on any box heading (`slidemark docs icons`).
 - `> [!warn] text` callout (`note` `tip` `warn` `caution`).
 - GFM table; a lone `<` merges left, `^` merges up; `{align=lrr}` on the line before.
 - Chart fence (`column bar line pie doughnut area scatter radar stacked-column stacked-bar`), CSV: first row =
@@ -57,8 +56,10 @@ Content:
 ```
 ````
 
-- Branches/loops: ` ```mermaid ` `graph TD` / `A[申請] --> B{承認?}` / `B -->|yes| C` → native shapes.
-- ` ```math ` LaTeX → native equation. `![alt](a.png)` images (always alt). Other fences = code.
+- Flowcharts: ` ```mermaid ` `graph TD` / `A[申請] --> B{承認?}` / `B -->|yes| C`.
+- ` ```math ` LaTeX → native equation. `![alt](a.png)` images (always alt); `![alt](demo.mp4)` video/audio.
+  Other fences = code. `[go](#5)` jumps to slide 5; `@hidden` hides a slide.
+- Given HTML/CSS: rewrite it as `#`/`##`/tables, or keep it in a ` ```html {render=native} ` fence.
 
 Rules: no positions or font sizes; table emphasis = `**bold**`/`==x==` in cells; one message per slide (the
-`>` lead); ≤ 4 boxes × 6 bullets, tables ≤ 8 rows, else split; `check` until zero warnings.
+`>` lead); ≤ 4 boxes × 6 bullets, tables ≤ 8 rows, else split; `check` to zero warnings.

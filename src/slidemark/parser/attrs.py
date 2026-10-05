@@ -321,7 +321,10 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
                     "bad-grid",
                     "every row of an areas grid needs the same number of letters, e.g. aab/aac",
                 )
-            if spec.grid is not None:
+            n_ratio = _consistent_n_ratio(spec.grid, tok)
+            if n_ratio:  # `@2 1:2`: the column count agrees with the ratios, keep the ratios silently
+                spec.grid = n_ratio
+            elif spec.grid is not None:
                 ctx.warn(f"second grid '{tok}' ignored", line, "bad-grid", "use one grid token per @ line")
             else:
                 spec.grid = tok
@@ -338,3 +341,13 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
                     "grids look like 3, 2x2, 1:2 or aab/aac (lowercase letters, same row length)",
                 )
     return spec
+
+
+def _consistent_n_ratio(first: str | None, second: str) -> str | None:
+    """`2` + `1:2` (either order) with matching column counts -> the ratio token, else None."""
+    if first is None:
+        return None
+    for n, ratio in ((first, second), (second, first)):
+        if n.isdigit() and _RATIO.match(ratio) and len(ratio.split(":")) == int(n):
+            return ratio
+    return None
