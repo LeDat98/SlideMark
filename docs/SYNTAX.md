@@ -204,6 +204,12 @@ Lists use `-` and `1.`, nested with two spaces.
 
 `![alt](path-or-url)`. Always write the alt text: it is used for accessibility and by `check`.
 
+### Video and audio
+
+The same syntax with a media file embeds native, playable media: `![demo](demo.mp4)`. Video: `.mp4 .m4v .mov
+.wmv .avi .webm`; audio: `.mp3 .m4a .wav .aac .wma`. Attributes: `{poster=frame.png autoplay loop}`. Without a
+poster a neutral frame with a play icon is shown. A missing file becomes a placeholder and a diagnostic.
+
 ## Tables
 
 Write a GFM table. To merge cells, put a lone `<` in a cell to merge it into the cell on its left, or a lone `^`

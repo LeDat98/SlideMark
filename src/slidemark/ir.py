@@ -122,6 +122,18 @@ class Image(ElementBase):
     fit: Literal["contain", "cover", "stretch"] = "contain"
 
 
+class Media(ElementBase):
+    """Embedded video or audio. Written as an image whose path has a media extension: `![demo](a.mp4)`."""
+
+    type: Literal["media"] = "media"
+    kind: Literal["video", "audio"] = "video"
+    src: str
+    alt: str = ""
+    poster: str | None = None  # image shown before playback; None = a generated placeholder frame
+    autoplay: bool = False
+    loop: bool = False
+
+
 class Cell(Model):
     paragraphs: list[Paragraph] = Field(default_factory=list)
     colspan: int = 1
@@ -214,7 +226,7 @@ class Container(ElementBase):
 
 
 Element = Annotated[
-    Text | Image | Table | Code | Chart | Shape | Raw | Container,
+    Text | Image | Media | Table | Code | Chart | Shape | Raw | Container,
     Field(discriminator="type"),
 ]
 Container.model_rebuild()
