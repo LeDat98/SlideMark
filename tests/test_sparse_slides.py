@@ -128,7 +128,7 @@ def test_dense_kpi_cards_taller_than_before():
     after, _, _ = lay(JA, 2)
     h0 = max(c.h for c in cards(before) if "kpi" in c.element.classes)
     h1 = max(c.h for c in cards(after) if "kpi" in c.element.classes)
-    assert h1 >= 1.15 * h0
+    assert h1 >= 1.1 * h0
 
 
 def test_kpi_cards_alone_grow():
@@ -136,20 +136,46 @@ def test_kpi_cards_alone_grow():
     after, _, _ = lay(VI, 2)
     h0 = max(c.h for c in cards(before))
     h1 = max(c.h for c in cards(after))
-    assert h1 >= LayoutTokens().sparse_kpi_air * h0 * 0.99 and h1 >= 1.15 * h0
-    # value text grows too (within tokens); labels stay
-    v0 = max(
-        p.style.font_size * p.font_scale
-        for p in before
-        if isinstance(p.element, Text) and p.element.role == "body"
-    )
-    v1 = max(
-        p.style.font_size * p.font_scale
-        for p in after
-        if isinstance(p.element, Text) and p.element.role == "body"
-    )
-    assert v1 >= 1.3 * v0
-    assert v1 <= LayoutTokens().sparse_text_max_pt * 2.2  # KPI numbers are display text, but bounded
+    assert h1 >= 1.15 * h0 * 0.99
+
+
+def kpi_values(items: list[Placed]) -> list[tuple[float, float, str]]:
+    """(rendered size pt, text width pt, text) of the big number of every KPI card."""
+    out = []
+    kpis = [c for c in cards(items) if "kpi" in c.element.classes]
+    for c in kpis:
+        t = next(
+            p
+            for p in items
+            if isinstance(p.element, Text)
+            and p.element.paragraphs
+            and p.x >= c.x - 2
+            and p.y >= c.y - 2
+            and p.x + p.w <= c.x + c.w + 2
+            and p.y + p.h <= c.y + c.h + 2
+            and p.element.role == "body"
+        )
+        para = t.element.paragraphs[0]
+        size = (para.style.font_size or t.style.font_size) * t.font_scale
+        out.append((size, t.w / 12700, para.plain))
+    return out
+
+
+@pytest.mark.parametrize(("name", "number"), [(JA, 2), (VI, 2)])
+def test_kpi_values_share_one_size_and_never_wrap(name, number):
+    items, _, _ = lay(name, number)
+    vals = kpi_values(items)
+    assert len(vals) == 4
+    assert max(v[0] for v in vals) - min(v[0] for v in vals) < 0.2, vals  # one size per row
+    for size, width, text in vals:
+        em = measure.text_em(text, bold=True)
+        assert em * size * 1.15 <= width, (text, size, width)  # one line, with a safety margin
+
+
+def test_kpi_value_grows_within_its_width():
+    items, _, _ = lay(JA, 2)
+    before, _, _ = lay(JA, 2, sparse_left_max=0.0)
+    assert min(v[0] for v in kpi_values(items)) >= min(v[0] for v in kpi_values(before)) - 1e-6
 
 
 @pytest.mark.parametrize("number", [8, 9])

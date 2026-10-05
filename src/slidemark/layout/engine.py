@@ -613,29 +613,40 @@ def _has_box_text(ctx: _Ctx) -> bool:
 def _kpi_grow(ctx: _Ctx, grow: float, box: Container | None = None, width: int | None = None) -> float:
     """Growth of the text inside a ``.kpi`` card: none, except next to free body text on a sparse slide.
 
-    The sparse completion (``ctx.air``) also grows a KPI row that stands alone, as long as the number still
-    fits one line, unless the author set the size (``{size=}`` on the card, a CSS rule on ``.kpi``)."""
+    The sparse completion (``ctx.air``) also grows a KPI row that stands alone, unless the author set the
+    size (``{size=}`` on the card, a CSS rule on ``.kpi``). Growth never makes a number wrap: it is capped
+    so the widest number of the row still fits one line with a safety margin."""
     if ctx.lt.kpi_grow_max <= 1.0:
         return 1.0
     g = min(max(grow, 1.0), ctx.lt.kpi_grow_max)
-    if _has_kpi_text(ctx):
-        return g
-    if ctx.air <= 0 or _kpi_explicit(ctx, box):
+    if not _has_kpi_text(ctx) and (ctx.air <= 0 or _kpi_explicit(ctx, box)):
         return 1.0
     return max(min(g, _kpi_fit(ctx, box, width)), 1.0) if width else g
 
 
+def _kpi_row_em(ctx: _Ctx, box: Container | None, own: float) -> float:
+    """Em width of the widest number among the KPI cards of the slide (one size per row)."""
+    best = own
+    for e in ctx.slide.elements:
+        if isinstance(e, Container) and "kpi" in e.classes:
+            t = next((c for c in e.children if isinstance(c, Text) and c.paragraphs), None)
+            if t is not None:
+                best = max(best, measure.text_em(t.paragraphs[0].plain, bold=True))
+    return best
+
+
 def _kpi_fit(ctx: _Ctx, box: Container | None, width: int) -> float:
-    """How many times larger the number of ``box`` may get and still fit one line of ``width``."""
+    """How many times larger the numbers of the row may get and still fit one line of ``width``."""
     if box is None:
         return 1.0
     text = next((c for c in box.children if isinstance(c, Text) and c.paragraphs), None)
     if text is None:
         return 1.0
     big = (ctx.theme.classes.get("kpi") or _base_classes()["kpi"]).merged(ctx.css.kpi_styles(box)[0])
-    size = big.font_size or 36
-    em = measure.text_em(text.paragraphs[0].plain, bold=True)
-    return width / EMU_PER_PT * 0.72 / max(em * size, 1e-6)
+    em = _kpi_row_em(ctx, box, measure.text_em(text.paragraphs[0].plain, bold=True))
+    avail = width / EMU_PER_PT * 0.72
+    size = min(big.font_size or 36, avail / max(em, 1e-6))  # the size the number has after its own shrink
+    return avail * ctx.lt.kpi_fit_margin / max(em * size, 1e-6)
 
 
 def _kpi_explicit(ctx: _Ctx, box: Container | None) -> bool:
@@ -1119,7 +1130,7 @@ def _kpi_children(ctx: _Ctx, children: list, width: int, box: Container | None =
         if j == 0:
             st = big
             size = big.font_size or 36
-            em = measure.text_em(p.plain, bold=True)
+            em = _kpi_row_em(ctx, box, measure.text_em(p.plain, bold=True))  # one size per row
             avail = width / EMU_PER_PT * 0.72  # headroom: fallback fonts are wider than the estimate
             if em * size > avail:  # one line: shrink the number to the card width
                 st = st.merged(Style(font_size=max(round(avail / em, 1), 10)))
