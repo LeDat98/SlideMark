@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 TOUCH = 45720  # 0.05 in: an end this close to a box edge touches it
 NEAR = 274320  # 0.3 in: last-resort tolerance for ends that touch nothing
 JOIN = 30000  # two free ends this close belong to the same polyline
-LABEL_NEAR = 228600  # 0.25 in: an unfilled text this close to a connector is its label
+LABEL_NEAR = 365760  # 0.4 in: an unfilled text this close to a connector is its label (matched closest first)
 NODE_PRST = ("roundRect", "rect", "diamond", "flowChartDecision", "ellipse", "flowChartTerminator")
 ROUND_PT = 8.5  # corner radius above which a node is written ``(text)``
 
@@ -362,17 +362,27 @@ def recover_diagram(blocks: list[Block], conns: list[ConnT], items: list[Item]) 
     # edge labels: unfilled short texts lying next to a connector
     labels: dict[int, str] = {}
     consumed: list[Block] = []
-    for b in blocks:
-        it = b.item
-        if b.kind != "text" or it is None or it.fill or it.line or b in nodes or not it.text:
+    pairs = []  # (distance, label index, edge index): matched greedily, closest first, one label per edge
+    cands = [
+        b
+        for b in blocks
+        if b.kind == "text"
+        and b.item is not None
+        and not (b.item.fill or b.item.line)
+        and b not in nodes
+        and b.item.text
+        and len(b.item.paras) == 1
+        and len(b.item.text) <= 40
+    ]
+    for n, b in enumerate(cands):
+        pairs += [(d, n, k) for k, e in enumerate(edges) if (d := _poly_rect(e.pts, _box(b))) <= LABEL_NEAR]
+    taken: set[int] = set()
+    for _, n, k in sorted(pairs):
+        if n in taken or k in labels:
             continue
-        if len(it.paras) != 1 or len(it.text) > 40:
-            continue
-        near = [(_poly_rect(e.pts, _box(b)), k) for k, e in enumerate(edges)]
-        d, k = min(near)
-        if d <= LABEL_NEAR and k not in labels:
-            labels[k] = it.text.replace("|", "/")
-            consumed.append(b)
+        labels[k] = cands[n].item.text.replace("|", "/")
+        consumed.append(cands[n])
+        taken.add(n)
     ends = [(nodes[e.s], nodes[e.e]) for e in edges if e.s is not None and e.e is not None]
     sx = sum(b.x + b.w / 2 - a.x - a.w / 2 for a, b in ends)
     sy = sum(b.y + b.h / 2 - a.y - a.h / 2 for a, b in ends)
