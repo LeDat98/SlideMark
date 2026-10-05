@@ -332,3 +332,11 @@ HTML corpus, L7 token research). Design freedom stays the rule: fixes are mechan
   balanced band, not inside cards. New knobs are `layout.*` tokens.
 - **Orchestrator:** consulting-grade dense JP set (examples/16, ≥ 8 slides) reviewed slide by slide; L7 token
   floor research (content-only floor of q3 vs python-pptx); harder brand briefs (`bench/tasks/121-140`).
+- **Wave 1 status:** A zoom (`html_zoom_max`, `{zoom=}`) + corpus 45 (native 0.999) merged; B cards hug content,
+  dense type cap, box beside a visual aligns, zero labels hidden merged. Orchestrator: examples/16 (10 slides),
+  token floor research, brand briefs 121–140 + eval run-8 (16/20 first pass), import box classes, html 100% height,
+  derived muted.
+- **Wave 2 A: eval gaps** (`parser/`, `layout/css.py`, `icons/`): `.kpi` CSS styles the number, element tokens take
+  every CSS property + alias hints, ~20 more icons + `icon=file.svg`.
+- **Wave 2 B: sparse fill v4** (`layout/`, `render/`, `bench/whitespace.py`): card-tail metric; no card tail > 25%;
+  leftover as one bottom band; deck-consistent type.
