@@ -59,3 +59,5 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [import] `_shorten` must keep link tokens in its trial `@` lines: links change the auto-arrangement. `[x]` and `(x)` mermaid nodes differ only by roundRect `adj`.
 - [xsd] python-pptx chart templates write negative `c:axId` (xs:unsignedInt in ECMA-376); core properties > 255 chars raise in python-pptx → truncate.
 - [layout] Row expansion is for multi-row grids only: a lone sparse row stays near natural height. The body top is `head_bottom + TOP_GAP` on every slide kind. `_row_heights` returning None skipped stacked-box weighting.
+- [render] python-pptx `add_movie` rebuilds `p:timing` (clashes with build animations) → drop its node and rewrite timing in `finish_timing`; `_Relationship.reltype` is a lazyproperty (pop it from `__dict__` before retyping to audio).
+- [parser] Shared helpers (`media_kind`) live in attrs.py: blocks.py ↔ html.py imports are circular.
