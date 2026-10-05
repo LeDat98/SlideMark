@@ -279,7 +279,7 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
 
 ## Leftovers for the next run
 - [ ] L3 consulting-grade: examples/11 slides 8–9 fuller (cards 49–72% filled) but slide 9 leaves a ~35% band below the cards
-- [ ] Chromium HTML imports as boxes, not back to an html fence (xfail in test_import); math shows LibreOffice fallback
+- [x] Chromium HTML imports back to an html fence (design part; xfail removed run 4); math shows LibreOffice fallback
 - [ ] Owner: open media/SVG/animation/morph decks in real PowerPoint (repair check); PyPI token
 - [ ] L7 tokens ≤ 20% of python-pptx (now 30%): needs a syntax design pass
 
