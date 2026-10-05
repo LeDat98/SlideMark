@@ -1426,7 +1426,10 @@ def _row_heights(
                 )  # fill stays >= ~50%
             if ctx.lone_air > 0 and nr == 1 and (tail_text or not has_tail):
                 floor = max(floor, min(ctx.lt.balance_row * ref_h, ctx.lone_air * n) / body.h)
-            caps.append(max(round(n * ctx.lt.row_slack), round(floor * body.h)))
+            if _consulting(ctx) and not has_tail:
+                floor = min(floor, ctx.lt.row_min_hug)  # consulting cards hug their text instead
+            slack = ctx.lt.row_slack_hug if ctx.lt.hug_shift > 0 and _consulting(ctx) else ctx.lt.row_slack
+            caps.append(max(round(n * min(slack, ctx.lt.row_slack)), round(floor * body.h)))
     extra_h = 0  # natural height that spanning blocks need beyond their rows
     for r0, r1, n in spans:
         rows = range(r0, r1 + 1)
@@ -1461,7 +1464,9 @@ def _row_heights(
     ):  # sparse slide: spread extra height over the capped rows (not kpi / table)
         rows = [r for r in range(nr) if caps[r] is not None and "other" in kinds[r]]
         tot = sum(caps[r] or 0 for r in rows)
-        airy = ctx.roomy and ctx.grow > ctx.grow_base  # grown text: rows keep a card fill of about 50%
+        airy = (ctx.roomy and ctx.grow > ctx.grow_base) or (
+            ctx.lt.hug_shift > 0 and _consulting(ctx)
+        )  # grown text / consulting cards: rows keep a card fill of about 50-70%
         for r in rows:
             grown = (caps[r] or 0) + round(ctx.expand * (caps[r] or 0) / max(tot, 1))
             if airy and nat[r]:
@@ -1713,6 +1718,11 @@ def _hug_beside_visual(ctx: _Ctx, gs, flow: list, cells: list[Rect], inherit: St
             continue
         floor = round(ctx.lt.beside_min * r.h)
         h = round(n * ctx.lt.beside_slack)
+        if (
+            h >= ctx.lt.beside_align * r.h
+        ):  # content fills enough of the visual's height: share top and bottom
+            out[k] = r
+            continue
         if h < floor:
             h = round(h + ctx.lt.beside_fill * (floor - h))
         out[k] = Rect(r.x, r.y, r.w, min(h, r.h))
@@ -2099,15 +2109,26 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
                 fin = c
                 left = body.bottom - _bottom(fin)
     top = min((p.y for p in fin.out), default=body.y)
-    if _bottom(fin) - top < ctx.lt.very_sparse_fill * body.h:
-        dy = round(
-            left
-            * (
-                ctx.lt.left_shift
-                if any(isinstance(e, Container) for e in elements)
-                else ctx.lt.left_shift_table
-            )
+    cards = (
+        (fin.dense_k < 1.0 or small_theme)
+        and any(isinstance(e, Container) for e in elements)
+        and all(
+            isinstance(e, Text) or (isinstance(e, Container) and not {"kpi", "diagram"} & set(e.classes))
+            for e in elements
+        )  # only card blocks: tables, charts and chevron rows keep their top anchor
+        and "chevron" not in (_slide_grid(ctx) or "")
+        and "chevron" not in ctx.slide.classes
+    )
+    # consulting cards hug their text: the leftover stays ONE band. It sits below the block (top-anchored,
+    # same title gap on every slide) unless ``hug_shift`` moves part of it above.
+    hug = cards and ctx.lt.hug_shift > 0 and left > keep
+    if hug or (not cards and _bottom(fin) - top < ctx.lt.very_sparse_fill * body.h):
+        share = (
+            ctx.lt.left_shift if any(isinstance(e, Container) for e in elements) else ctx.lt.left_shift_table
         )
+        dy = round(left * share)
+        if hug:
+            dy = max(dy, round((left - keep) * ctx.lt.hug_shift))
         if dy > 0:
             c = run(
                 Rect(body.x, body.y + dy, body.w, body.h - dy),

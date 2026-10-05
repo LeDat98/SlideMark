@@ -44,7 +44,7 @@ def test_two_by_two_with_conclusion_has_no_big_empty_band():
     cs = cards(placed)
     bar = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "conclusion")
     band = bar.y - max(c.y + c.h for c in cs)
-    assert band < 0.12 * H
+    assert band < 0.3 * H  # cards hug their text: the leftover is one band
     assert min(c.y for c in cs) - (_title(placed).y + _title(placed).h) < 0.12 * H
 
 
@@ -265,7 +265,9 @@ def _pt(p):
 def test_multirow_grid_grows_text_before_expanding_rows():
     placed, deck = _lay_md(_RISKS)
     bodies = [p for p in of(placed, Text) if p.element.role == "body" and p.h > 0]
-    assert min(_pt(p) for p in bodies) >= 1.5 * 9.9 - 0.1  # dense jp-business body 9.9 pt x (1.39 x 1.2)
+    assert (
+        min(_pt(p) for p in bodies) >= 1.35 * 9.9 - 0.1
+    )  # dense jp-business body 9.9 pt, one deck-wide band
     assert not [d for d in deck.diagnostics if d.rule == "overflow"]
     cs = cards(placed)
     for c in cs:
@@ -333,7 +335,7 @@ density: dense
     cs = cards(placed)
     top = cs[0].y
     body_h = (H - round(0.3 * 914400)) - top
-    assert 0.55 * body_h <= cs[0].h <= 0.9 * body_h
+    assert 0.3 * body_h <= cs[0].h <= 0.9 * body_h  # cards hug their text
     assert len({c.h for c in cs}) == 1
 
 
@@ -381,3 +383,30 @@ def test_sparse_dense_two_card_slide_fills_its_cards():
         )
         assert used / c.h >= 0.5
         assert all(p.y + p.h <= c.y + c.h + 2 for p in inner)
+
+
+def test_box_beside_a_chart_shares_its_top_and_bottom():
+    from slidemark.ir import Chart, Series
+
+    ch = Chart(kind="bar", categories=["a", "b"], series=[Series(name="s", values=[1, 2])])
+    s = Slide(
+        title=T("t", "title"),
+        grid="3:2",
+        elements=[ch, box("Notes", *[f"point number {i} " + "word " * 6 for i in range(8)])],
+    )
+    placed, _ = lay(s, "jp-business")
+    c = cards(placed)[0]
+    vis = next(p for p in placed if isinstance(p.element, Chart))
+    assert abs((c.y + c.h) - (vis.y + vis.h)) <= 2 and c.y == vis.y
+
+
+def test_dense_cards_hug_their_text_and_stay_top_anchored():
+    placed, _ = _lay_md(
+        "theme: jp-business\ndensity: dense\n\n# t\n> lead\n@2\n## A\n- one\n- two\n- three\n"
+        "## B\n- one\n- two\n"
+    )
+    cs = cards(placed)
+    body_h = (H - round(0.3 * 914400)) - cs[0].y
+    assert cs[0].h <= 0.6 * body_h  # no stretching over the body: one empty band below
+    gap = cs[0].y - (_title(placed).y + _title(placed).h)
+    assert gap < 0.3 * 914400 * 2

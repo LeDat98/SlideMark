@@ -481,9 +481,11 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     sdl.font.size = Pt(size * theme.render.chart_label_scale)
                     sdl.font.color.rgb = RGBColor.from_string(label_color_on(color, theme))
                     sdl.position = XL_LABEL_POSITION.CENTER
-                    if nf:
-                        sdl.number_format = nf
-                        sdl.number_format_is_linked = False
+                    # a zero-width segment gets no (clipped) label: the zero section of the format is empty
+                    sdl.number_format = (
+                        f"{nf};-{nf};;" if nf and ";" not in nf else (nf or "General;-General;;")
+                    )
+                    sdl.number_format_is_linked = False
     if kind == "doughnut":
         hole = chart.plots[0]._element.find(qn("c:holeSize"))
         if hole is not None:
