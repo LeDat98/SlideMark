@@ -56,6 +56,8 @@ def main() -> int:
         brief = set(re.findall(r"#[0-9A-Fa-f]{6}", task.read_text(encoding="utf-8")) if task.exists() else [])
         brief = {c.upper() for c in brief}
         used = {v for k, v in cols.items() if k != "theme"}
+        css = "\n".join(re.findall(r"```css\n(.*?)```", md.read_text(encoding="utf-8"), re.S))
+        used |= {c.upper() for c in re.findall(r"#[0-9A-Fa-f]{6}", css)}  # a CSS fence carries the look too
         follows = not brief or bool(brief & used)
         row = {"task": md.stem, "clean": not bad, "follows": follows, "palette": cols, "problems": bad[:3]}
         rows.append(row)
