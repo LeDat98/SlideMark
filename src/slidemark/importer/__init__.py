@@ -37,6 +37,18 @@ def detect_theme(prs) -> Theme:
     return DEFAULT
 
 
+def _custom_theme(prs) -> bool:
+    """True when the slide master's color scheme is not the stock Office one (a template-based deck)."""
+    try:
+        from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+
+        blob = prs.slide_masters[0].part.part_related_by(RT.THEME).blob.decode("utf-8", "ignore")
+        got = re.findall(r'<a:(accent[123])>\s*<a:srgbClr val="(\w+)"', blob)
+        return bool(got) and dict(got) != {"accent1": "4F81BD", "accent2": "C0504D", "accent3": "9BBB59"}
+    except Exception:
+        return False
+
+
 def _size_token(w: int, h: int) -> str | None:
     r = w / h if h else 16 / 9
     if abs(r - 16 / 9) < 0.01:
@@ -111,7 +123,7 @@ def import_pptx(path: str | Path, out_dir: str | Path | None = None) -> tuple[st
         )
         return "", diags
     try:
-        return _import(prs, out_dir, diags)
+        return _import(prs, out_dir, diags, Path(path).name)
     except Exception as e:  # last-resort guard
         diags.append(
             Diagnostic(
@@ -124,7 +136,7 @@ def import_pptx(path: str | Path, out_dir: str | Path | None = None) -> tuple[st
         return "", diags
 
 
-def _import(prs, out_dir, diags: list[Diagnostic]) -> tuple[str, list[Diagnostic]]:
+def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[str, list[Diagnostic]]:
     W, H = int(prs.slide_width), int(prs.slide_height)
     theme = detect_theme(prs)
     accent = theme.colors["accent"].lstrip("#").upper()
@@ -192,6 +204,16 @@ def _import(prs, out_dir, diags: list[Diagnostic]) -> tuple[str, list[Diagnostic
     header: list[str] = []
     if theme is not DEFAULT:
         header.append(f"theme: {theme.name}")
+    elif src_name and _custom_theme(prs):
+        header.append(f"theme: {src_name}")  # its own masters and colors: the source deck is the template
+        diags.append(
+            Diagnostic(
+                level="info",
+                message=f"the deck has its own theme; 'theme: {src_name}' reuses it as a template",
+                rule="import-template",
+                hint="keep the .pptx next to the .md (or change the theme: path)",
+            )
+        )
     size = _size_token(W, H)
     if size:
         header.append(f"size: {size}")

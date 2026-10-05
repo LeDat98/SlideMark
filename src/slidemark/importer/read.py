@@ -39,6 +39,7 @@ class ParaT:
     size: float | None = None
     marl: int | None = None
     lvl_attr: int | None = None
+    align: str | None = None  # a:pPr algn: l | ctr | r | just
 
     @property
     def plain(self) -> str:
@@ -90,6 +91,7 @@ class Item:
     sid: int = 0  # shape id in the slide (what ``a:stCxn``/``a:endCxn`` point at)
     col_w: list[int] = field(default_factory=list)  # table: column widths (EMU)
     row_h: list[int] = field(default_factory=list)  # table: row heights (EMU)
+    cropped: bool = False  # image: a:srcRect crop (``fit=cover``)
     latex: str | None = None  # math: the equation as LaTeX (``` math fence)
     missing: tuple[str, str] | None = None  # image: a "[image: label]" placeholder of a file that was absent
 
@@ -263,7 +265,8 @@ def read_paras(
             end = p.find(qn("a:endParaRPr"))
             if end is not None and end.get("sz", "").isdigit():
                 size = int(end.get("sz")) / 100
-        out.append(ParaT(runs=runs, marker=marker, size=size, marl=marl, lvl_attr=lvl_attr))
+        algn = ppr.get("algn") if ppr is not None else None
+        out.append(ParaT(runs=runs, marker=marker, size=size, marl=marl, lvl_attr=lvl_attr, align=algn))
     _levels(out)
     return out, slidenum
 
@@ -719,6 +722,8 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
             return
         img = sh.image
         it = _new(ctx, "image", box, sid=sh.shape_id, name=name, img=(img.blob, img.ext), alt=_alt(el, name))
+        src = el.find(qn("p:blipFill") + "/" + qn("a:srcRect"))
+        it.cropped = src is not None and any(int(src.get(k) or 0) != 0 for k in ("l", "t", "r", "b"))
         data.items.append(it)
     elif tag == "graphicFrame":
         if sh.has_table:

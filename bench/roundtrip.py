@@ -38,11 +38,27 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-def _run_fmt(rpr) -> tuple:
+def _link(rpr, part, slides) -> str | None:
+    """Target of a run's hyperlink: the URL, or ``#n`` for a jump to slide n."""
+    from pptx.oxml.ns import qn
+
+    h = rpr.find(qn("a:hlinkClick")) if rpr is not None else None
+    if h is None:
+        return None
+    try:
+        rel = part.rels[h.get(qn("r:id"))]
+        if rel.is_external:
+            return rel.target_ref
+        return f"#{slides.get(rel.target_part, '?')}"
+    except Exception:
+        return "?"
+
+
+def _run_fmt(rpr, part=None, slides=None) -> tuple:
     from pptx.oxml.ns import qn
 
     if rpr is None:
-        return (False, False, None, None)
+        return (False, False, None, None, None)
     fill = rpr.find(qn("a:solidFill"))
     col = None
     if fill is not None:
@@ -53,10 +69,10 @@ def _run_fmt(rpr) -> tuple:
     if hl is not None:
         c = hl.find(qn("a:srgbClr"))
         hlc = c.get("val").upper() if c is not None and c.get("val") else "x"
-    return (rpr.get("b") in ("1", "true"), rpr.get("i") in ("1", "true"), col, hlc)
+    return (rpr.get("b") in ("1", "true"), rpr.get("i") in ("1", "true"), col, hlc, _link(rpr, part, slides or {}))
 
 
-def _paras(txbody) -> list[dict]:
+def _paras(txbody, part=None, slides=None) -> list[dict]:
     """[{text, marker, lvl, runs: [(text, fmt)], size}] for a txBody (empty paragraphs kept out)."""
     from lxml import etree
     from pptx.oxml.ns import qn
@@ -71,9 +87,9 @@ def _paras(txbody) -> list[dict]:
             if tag in ("r", "fld"):
                 t = ch.find(qn("a:t"))
                 text = (t.text or "") if t is not None else ""
-                fmt = _run_fmt(ch.find(qn("a:rPr")))
+                fmt = _run_fmt(ch.find(qn("a:rPr")), part, slides)
             elif tag == "br":
-                text, fmt = "\n", (False, False, None, None)
+                text, fmt = "\n", (False, False, None, None, None)
             else:
                 continue
             if fmt[3]:
@@ -100,7 +116,10 @@ def _paras(txbody) -> list[dict]:
             if r.get("sz", "").isdigit():
                 size = int(r.get("sz")) / 100
                 break
-        out.append({"text": text, "marker": marker, "lvl": lvl, "runs": _merge_style(runs), "size": size})
+        algn = ppr.get("algn") if ppr is not None else None
+        out.append(
+            {"text": text, "marker": marker, "lvl": lvl, "runs": _merge_style(runs), "size": size, "algn": algn}
+        )
     return out
 
 
@@ -115,6 +134,14 @@ def _merge_style(runs: list) -> list:
         else:
             sig.append((text, fmt))
     return [(t.strip(), f) for t, f in sig]
+
+
+def _cell_fill(tc) -> str | None:
+    from pptx.oxml.ns import qn
+
+    pr = tc.find(qn("a:tcPr"))
+    c = pr.find(qn("a:solidFill") + "/" + qn("a:srgbClr")) if pr is not None else None
+    return c.get("val").upper() if c is not None else None
 
 
 def slide_facts(slide, ctx_slide_index: dict) -> dict:
@@ -170,7 +197,8 @@ def slide_facts(slide, ctx_slide_index: dict) -> dict:
                                 tc.get("vMerge") in ("1", "true"),
                                 tc.get("gridSpan"),
                                 tc.get("rowSpan"),
-                                _paras(tc.find(qn("a:txBody"))),
+                                _paras(tc.find(qn("a:txBody")), slide.part, ctx_slide_index),
+                                _cell_fill(tc),
                             )
                             for tc in tr.tc_lst
                         ]
@@ -206,7 +234,7 @@ def slide_facts(slide, ctx_slide_index: dict) -> dict:
             eq = el.xpath(".//*[local-name()='oMathPara']")
             items.append({"kind": "math", "key": _canon(eq[0]) if eq else "?", "box": box})
         elif tag == "sp":
-            paras = _paras(el.find(qn("p:txBody")))
+            paras = _paras(el.find(qn("p:txBody")), slide.part, ctx_slide_index)
             g = el.find(qn("p:spPr") + "/" + qn("a:prstGeom"))
             prst = g.get("prst") if g is not None else ("custom" if el.find(qn("p:spPr") + "/" + qn("a:custGeom")) is not None else "?")
             sp = el.find(qn("p:spPr"))
@@ -355,6 +383,10 @@ def compare_facts(fa: dict, fb: dict) -> list[tuple[str, str]]:
     return diffs
 
 
+def _size_differs(a, b) -> bool:
+    return a is not None and b is not None and abs(a - b) > 0.6
+
+
 def _compare_pair(n, x, y, diffs) -> None:
     k = x["kind"]
     if k == "text":
@@ -365,6 +397,10 @@ def _compare_pair(n, x, y, diffs) -> None:
                 diffs.append(("marker", f"s{n}: {pa['text'][:30]!r} {pa['marker']}/{pa['lvl']} vs {pb['marker']}/{pb['lvl']}"))
             elif pa["runs"] != pb["runs"]:
                 diffs.append(("style", f"s{n}: runs of {pa['text'][:30]!r}: {pa['runs']} vs {pb['runs']}"))
+            elif (pa["algn"] or "l") != (pb["algn"] or "l"):
+                diffs.append(("style", f"s{n}: align of {pa['text'][:30]!r}: {pa['algn']} vs {pb['algn']}"))
+            elif _size_differs(pa["size"], pb["size"]):
+                diffs.append(("size", f"s{n}: size of {pa['text'][:30]!r}: {pa['size']} vs {pb['size']}"))
     elif k == "table":
         if len(x["rows"]) != len(y["rows"]) or any(len(r) != len(s) for r, s in zip(x["rows"], y["rows"], strict=False)):
             diffs.append(("table", f"s{n}: table shape differs"))
@@ -374,9 +410,18 @@ def _compare_pair(n, x, y, diffs) -> None:
                 if c[:4] != d[:4]:
                     diffs.append(("table", f"s{n}: merge/span differs"))
                     return
+                if c[5] != d[5]:
+                    diffs.append(("style", f"s{n}: cell fill {c[5]} vs {d[5]}"))
+                    return
                 for pa, pb in zip(c[4], d[4], strict=False):
                     if pa["runs"] != pb["runs"] or pa["marker"] != pb["marker"]:
                         diffs.append(("style", f"s{n}: cell {pa['text'][:30]!r} runs differ"))
+                        return
+                    if (pa["algn"] or "l") != (pb["algn"] or "l"):
+                        diffs.append(("style", f"s{n}: cell {pa['text'][:30]!r} align {pa['algn']} vs {pb['algn']}"))
+                        return
+                    if _size_differs(pa["size"], pb["size"]):
+                        diffs.append(("size", f"s{n}: cell {pa['text'][:30]!r} size {pa['size']} vs {pb['size']}"))
                         return
         if x["cols"] != y["cols"] and any(abs(p - q) > 1 for p, q in zip(x["cols"], y["cols"], strict=False)):
             diffs.append(("table", f"s{n}: column widths {x['cols']} vs {y['cols']}"))

@@ -752,6 +752,51 @@ def _head(paras: list[ParaT], out: Out) -> str:
     return txt[:-1] + "\\}" if txt.endswith("}") else txt
 
 
+def _table_align(rows) -> str | None:
+    """``lrrl`` when the body columns are aligned differently from the automatic rule (figures right)."""
+    from ..layout.tables import NUMERIC_SHARE, is_numeric
+
+    ncols = max((len(r) for r in rows), default=0)
+    if ncols < 2 or len(rows) < 2:
+        return None
+    letters, differs = [], False
+    for c in range(ncols):
+        body = [
+            row[c]
+            for row in rows[1:]
+            if c < len(row) and not row[c].hmerge and not row[c].vmerge and any(p.plain.strip() for p in row[c].paras)
+        ]
+        if not body:
+            letters.append("l")
+            continue
+        algs = [(cell.paras[0].align or "l") for cell in body]
+        mode = max(set(algs), key=algs.count)
+        let = {"l": "l", "ctr": "c", "r": "r"}.get(mode, "l")
+        texts = ["".join(p.plain for p in cell.paras).strip() for cell in body]
+        auto = "r" if sum(is_numeric(t) for t in texts) >= NUMERIC_SHARE * len(texts) else "l"
+        letters.append(let)
+        differs = differs or let != auto
+    return "".join(letters) if differs else None
+
+
+def _fit_attr(it: Item) -> str:
+    """``{fit=cover}`` for a cropped picture, ``{fit=stretch}`` when its box has another aspect than the image."""
+    if it.cropped:
+        return "{fit=cover}"
+    try:
+        import io
+
+        from PIL import Image as PILImage
+
+        with PILImage.open(io.BytesIO(it.img[0])) as im:
+            iw, ih = im.size
+        if iw and ih and it.w and it.h and abs((it.w / it.h) / (iw / ih) - 1) > 0.04:
+            return "{fit=stretch}"
+    except Exception:
+        pass
+    return ""
+
+
 def _narrow_cols(b: Block, out: Out) -> int | None:
     """One block narrower than its box: the box's own ``@N`` line made N columns and it took the first."""
     if len(b.children) != 1 or b.children[0].kind == "box":
@@ -795,6 +840,9 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
                     hint="< and ^ cannot be combined in one cell; check the table",
                 )
             )
+        align = _table_align(b.item.rows)
+        if align and lines:
+            lines = ["{align=" + align + "}", *lines]
         return [("table", lines)] if lines else []
     if b.kind == "chart":
         return [("fence", chart_lines(b.item.chart))]
@@ -814,7 +862,7 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
         blob, ext = b.item.img
         ref = out.save_image(out.slide_no, out.img_n, blob, ext)
         alt = (b.item.alt or b.item.name or "image").replace("[", "(").replace("]", ")").replace("\n", " ")
-        return [("image", [f"![{alt}]({ref})"])]
+        return [("image", [f"![{alt}]({ref})" + _fit_attr(b.item)])]
     # box
     mark = "###" if b.sub else "##"
     chunks: list[tuple[str, list[str]]] = []
