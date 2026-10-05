@@ -163,6 +163,55 @@ def _merge(edges: list[Edge]) -> list[Edge]:
             return edges
 
 
+def network_edges(conns: list[ConnT], rects: list[Rect]) -> tuple[list[Edge], list[ConnT]]:
+    """Tree networks (a bus line with branches, as in an org chart): one edge from the topmost rect the
+    network touches to each other rect it touches. Returns the edges and the connectors left for the rest."""
+    n = len(conns)
+    segs = [((c.x0, c.y0), (c.x1, c.y1)) for c in conns]
+    parent = list(range(n))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    tee = [False] * n
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                continue
+            for p in segs[i]:
+                if _seg_point(segs[j][0], segs[j][1], p) <= 3 * JOIN:
+                    parent[find(i)] = find(j)
+                    if min(math.hypot(p[0] - q[0], p[1] - q[1]) for q in segs[j]) > 6 * JOIN:
+                        tee[j] = True  # an end lands in the middle of j: a branching bus
+    groups: dict[int, list[int]] = {}
+    for i in range(n):
+        groups.setdefault(find(i), []).append(i)
+    edges: list[Edge] = []
+    used: set[int] = set()
+    for members in groups.values():
+        if len(members) < 3 or not any(tee[i] for i in members):
+            continue
+        touched = sorted(
+            {k for k, r in enumerate(rects) for i in members if _seg_rect(*segs[i], r) <= TOUCH * 2}
+        )
+        if len(touched) < 3:
+            continue
+        root = min(touched, key=lambda k: (rects[k][1] + rects[k][3] / 2, rects[k][0]))
+        arrow = any(conns[i].arrow_end or conns[i].arrow_start for i in members)
+        cs = [conns[i] for i in members]
+        order = min(c.order for c in cs)
+        for k in touched:
+            if k != root:
+                edges.append(
+                    Edge([segs[members[0]][0], segs[members[0]][1]], root, k, False, arrow, order, cs)
+                )
+        used.update(members)
+    return edges, [c for i, c in enumerate(conns) if i not in used]
+
+
 def build_edges(conns: list[ConnT], rects: list[Rect], sid: dict[int, int]) -> list[Edge]:
     """Edges with both ends on a rect (start and end may be the same rect), in drawing order."""
     edges: list[Edge] = []
@@ -207,7 +256,8 @@ def find_links(
         return [], {}, len(conns)
     kept: set[int] = set()
     rects = [_box(b) for b in blocks]
-    edges = build_edges(conns, rects, _sid_map(items, rects))
+    net, rest = network_edges(conns, rects)
+    edges = sorted([*build_edges(rest, rects, _sid_map(items, rects)), *net], key=lambda x: x.order)
     top: list[tuple[Block, Block, bool]] = []
     inner_conns: dict[int, list[ConnT]] = {}
     seen: set[tuple] = set()

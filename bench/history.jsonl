@@ -25,3 +25,4 @@
 {"date": "2026-10-05T03:18:30+00:00", "commit": "3b005c7", "metric": "syntax_tokens", "deck": "q3-review", "format": "python-pptx", "tokens_proxy": 518, "tokens_claude": null, "tokenizer": "o200k_base"}
 {"date": "2026-10-05T03:18:30+00:00", "commit": "3b005c7", "metric": "syntax_tokens", "deck": "q3-review", "format": "slidemark", "tokens_proxy": 155, "tokens_claude": null, "tokenizer": "o200k_base"}
 {"date": "2026-10-05T03:18:35+00:00", "commit": "3b005c7", "metric": "layout_inferred", "value": 1.0, "slides": 28}
+{"date": "2026-10-05T04:52:04+00:00", "commit": "945817b", "metric": "import_fidelity", "import_fidelity": 0.977, "value": 0.977, "decks": 19, "worst": [["05-org", 0.854], ["09-process", 0.952], ["15-timeline", 0.969]]}
