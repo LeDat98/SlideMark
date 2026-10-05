@@ -212,3 +212,17 @@ each, o200k proxy), shipped as package data; written by the orchestrator.
 - Slide links forming a tree from one root → tree layout like mermaid (`.a./bcd`) automatically.
 - Math blocks scale up (≈ 1.6× body) and center; code blocks grow like text when the slide is sparse.
 - Goal: `bench/layout_inference.py` ≥ 90% with the `@` grid tokens removed from examples where redundant.
+
+## Day 7 work packages
+Contract (SYNTAX.md, committed by orchestrator): `@build` (or `{.build}` on a block) = bullets/blocks appear one
+by one on click; `t=` transitions `fade push wipe split cover zoom morph` (+ `t=fade:0.5` duration s);
+PowerPoint sections from `@section` slides (the section is named after the slide title) — `sections: off` in
+the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
+- **A+B combined (no layout changes)**: parser for `@build`/`.build`, transition durations, header
+  `sections:`; renderer: `p:timing` build animations (appear per paragraph for text, per shape for blocks),
+  more transitions with duration, `p14:sectionLst` sections, slide-jump hyperlinks by id and number, hidden.
+- **Orchestrator**: packaging (wheel build check, sdist excludes), `CHANGELOG.md`, release notes, AGENT_TIPS review.
+
+## Day 7 status
+- [ ] A+B: build animations, transitions, sections, jumps
+- [ ] Orchestrator: packaging, changelog

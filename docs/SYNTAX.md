@@ -44,6 +44,7 @@ num: on
 | `footer` | text | none |
 | `num` | `on` / `off`: slide numbers | `off` |
 | `density` | `normal` / `dense` (smaller default type for packed slides) | `normal` |
+| `sections` | `on` / `off`: section slides start PowerPoint sections named after their title | `on` |
 
 A YAML front-matter block between `---` lines is accepted as well.
 
@@ -110,9 +111,10 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `flow` | arrows between blocks in reading order (process diagrams) | `@4 flow` |
 | `chevron` | blocks drawn as chevrons (steps) | `@4 chevron` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
-| `key=value` | `bg=` color or image, `t=` transition (`fade`, `push`, ...), `id=`, `gap=` | `@bg=#0F172A t=fade` |
+| `key=value` | `bg=` color or image, `t=` transition (`fade`, `push`, `wipe`, `split`, `cover`, `zoom`, `morph`; `t=fade:0.5` sets seconds), `id=`, `gap=` | `@bg=#0F172A t=fade` |
 | `a>b` `a-b` | **connector** from block `a` to block `b` (arrow / plain line). Letters count blocks in source order (`a` = 1st), digits work too (`1>3`) | `@3 a>b a>c` |
 | `hidden` | hide the slide in the show | |
+| `build` | bullets and blocks appear one by one on click (`{.build}` on one block does it for that block only) | `@build` |
 | any other word | class applied to the slide (`dense`, `dark`, ...) | `@3 dense` |
 
 Inside a box, an `@` line lays out that box's `###` sub-boxes in the same way.
