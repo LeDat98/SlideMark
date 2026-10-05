@@ -133,3 +133,6 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [import] A derived accent shade broke `==x==` detection on import → `_drawn_accent` maps it back.
 - [process] `tail -2 log && git push` pushed a red suite (tail succeeds) → check for "failed" explicitly: `grep -q ' failed' log || git push`. Fixed within minutes (run 5).
 - [import] Legible accent shades depend on text size (3:1 large, 4.5:1 normal) → the importer accepts every variant (`A|B` in `emit.inline`).
+- [render] Pie/doughnut labels need per-point `c:dLbl` ink (fills differ per point; a label may sit inside or outside its slice → ink must read on both). Contact-sheet review found dark labels on a dark teal slice in a zero-warning deck.
+- [layout] A chevron heading's spaces are break points, so a longest-word cap misses "Tháng 11" wrapping → cap the whole heading line (`chevron_head_*` tokens).
+- [eval] A blind reviewer judging contact-sheet tiles reports "tiny text" for 21pt text on short slides → verify each finding against the .pptx before counting it (run 5: 6 raw, 2 real on 54 slides).
