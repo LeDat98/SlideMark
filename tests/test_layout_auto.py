@@ -5,11 +5,18 @@ from __future__ import annotations
 import pytest
 
 from slidemark.ir import Chart, Code, Container, Raw, Shape, Table, Text
-from slidemark.layout import layout_slide, measure
+from slidemark.layout import engine, layout_slide, measure
 from slidemark.layout.grid import strip_grid_tokens, tree_areas
 from slidemark.parser import parse
 from slidemark.theme import get_theme
 from slidemark.units import EMU_PER_INCH as IN
+
+
+@pytest.fixture(autouse=True)
+def _rules_only(monkeypatch):
+    """These tests pin the rule-based arrangement; the layout search (test_layout_search.py) is off here."""
+    monkeypatch.setattr(engine, "MAX_CANDIDATES", 1)
+
 
 CHART = '```column {title="T"}\n,Q1,Q2\nA,1,2\n```\n'
 
