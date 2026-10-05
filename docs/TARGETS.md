@@ -53,7 +53,7 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 ## L6: Production grade
 - [ ] 0 "repair" prompts: XSD-valid on 10k fuzzed decks + spot-checked in real PowerPoint each release
 - [x] Import `.pptx → Markdown` (edit existing decks); build → import → build is stable (all 9 examples, 2026-10-05)
-- [ ] Build ≤ 50 ms/slide, import time ≤ 300 ms, core install ≤ 15 MB (build 27 ms/slide ✓; `import slidemark` 165–240 ms ✓ with lazy python-pptx; install size not measured)
+- [ ] Build ≤ 50 ms/slide, import time ≤ 300 ms, core install ≤ 15 MB (build 27 ms/slide ✓; `import slidemark` 165–240 ms ✓ with lazy python-pptx; install 50 MB ✗: python-pptx alone pulls lxml + Pillow ≈ 31 MB, slidemark wheel ≈ 0.2 MB)
 - [ ] Published on PyPI with semver, changelog, CI on 3 Python versions, coverage ≥ 90%
 
 ## L7: Breakthrough
