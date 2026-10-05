@@ -47,7 +47,7 @@ slidemark skill install      # cài skill cho Claude Code
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-05 · commit `8f22261` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-05 · commit `9016af2` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -126,6 +126,20 @@ Nguồn: [`examples/10-template.md`](examples/10-template.md)
 ![10-template slide 1](docs/gallery/10-template/slide-01.png)
 ![10-template slide 2](docs/gallery/10-template/slide-02.png)
 ![10-template slide 3](docs/gallery/10-template/slide-03.png)
+
+### Tiếng Nhật: bộ 9 slide tư vấn dày đặc (tóm tắt, KPI, tổ chức, lộ trình, rủi ro)
+
+Nguồn: [`examples/11-jp-consulting.md`](examples/11-jp-consulting.md)
+
+![11-jp-consulting slide 1](docs/gallery/11-jp-consulting/slide-01.png)
+![11-jp-consulting slide 2](docs/gallery/11-jp-consulting/slide-02.png)
+![11-jp-consulting slide 3](docs/gallery/11-jp-consulting/slide-03.png)
+![11-jp-consulting slide 4](docs/gallery/11-jp-consulting/slide-04.png)
+![11-jp-consulting slide 5](docs/gallery/11-jp-consulting/slide-05.png)
+![11-jp-consulting slide 6](docs/gallery/11-jp-consulting/slide-06.png)
+![11-jp-consulting slide 7](docs/gallery/11-jp-consulting/slide-07.png)
+![11-jp-consulting slide 8](docs/gallery/11-jp-consulting/slide-08.png)
+![11-jp-consulting slide 9](docs/gallery/11-jp-consulting/slide-09.png)
 <!-- gallery:end -->
 
 ## Tài liệu
