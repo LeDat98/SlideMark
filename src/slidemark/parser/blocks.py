@@ -50,8 +50,21 @@ def _close_index(tokens: list[Token], i: int) -> int:
     return len(tokens) - 1
 
 
-def paragraphs_from_tokens(tokens: list[Token]) -> list[Paragraph]:
-    """Paragraphs (with list markers/levels) from a flat token slice."""
+def split_soft(children: list[Token] | None) -> list[list[Token]]:
+    """Inline children cut at soft breaks: one line of source text per part."""
+    parts: list[list[Token]] = [[]]
+    for t in children or []:
+        if t.type == "softbreak":
+            parts.append([])
+        else:
+            parts[-1].append(t)
+    return parts
+
+
+def paragraphs_from_tokens(tokens: list[Token], lines: bool = False) -> list[Paragraph]:
+    """Paragraphs (with list markers/levels) from a flat token slice.
+
+    ``lines``: a soft break outside a list item starts a new paragraph (one source line each)."""
     out: list[Paragraph] = []
     stack: list[str] = []
     first_in_item = False
@@ -72,6 +85,12 @@ def paragraphs_from_tokens(tokens: list[Token]) -> list[Paragraph]:
         elif ty == "list_item_open":
             first_in_item = True
         elif ty == "inline":
+            if lines and not stack and not in_heading:
+                for part in split_soft(tok.children):
+                    pr = [r for r in inline_items(part) if isinstance(r, Run)]
+                    if pr:
+                        out.append(Paragraph(runs=pr))
+                continue
             runs = [r for r in inline_items(tok.children) if isinstance(r, Run)]
             if in_heading:
                 for r in runs:
@@ -283,17 +302,18 @@ class _Builder:
 
     def paragraph(self, tokens: list[Token], i: int, line: int) -> None:
         inline = tokens[i + 1]
-        runs: list[Run] = []
-        for item in inline_items(inline.children, allow_images=True):
-            if isinstance(item, Run):
-                runs.append(item)
-                continue
+        for part in split_soft(inline.children):
+            runs: list[Run] = []
+            for item in inline_items(part, allow_images=True):
+                if isinstance(item, Run):
+                    runs.append(item)
+                    continue
+                if any(r.text.strip() for r in runs):
+                    self.add_paragraph(Paragraph(runs=runs), line)
+                runs = []
+                self.add_image(item, line)
             if any(r.text.strip() for r in runs):
                 self.add_paragraph(Paragraph(runs=runs), line)
-            runs = []
-            self.add_image(item, line)
-        if any(r.text.strip() for r in runs):
-            self.add_paragraph(Paragraph(runs=runs), line)
 
     def marp_image(self, ref: ImageRef) -> tuple[str, Attrs | None]:
         """Marp sizing in the alt text (``![w:200 h:100 text](a.png)``) -> ``{w=200 h=100}``. Pure."""
@@ -382,7 +402,7 @@ class _Builder:
                 q = self.take(Text(role="body" if kind else "quote"), line)
                 if kind:
                     q.classes += [c for c in ("callout", kind) if c not in q.classes]
-                q.paragraphs = paragraphs_from_tokens(inner)
+                q.paragraphs = paragraphs_from_tokens(inner, lines=bool(kind))
                 if kind:
                     q.paragraphs = [p for p in q.paragraphs if p.runs]
                 self.out.append(q)
