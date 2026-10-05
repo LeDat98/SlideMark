@@ -101,6 +101,7 @@ class _Ctx:
     text_only: bool = False  # the slide body is plain text only: its body text grows like box text
     head_grow: bool = False  # very sparse boxes: box headings grow with ``grow`` (up to ``GROW_HEAD``)
     grew: bool = False  # set when ``grow`` actually scaled some text
+    step: float = 1.0  # sparse step: padding, table / chevron text and paragraph gaps scale with it
     chev_grow: float = 1.0  # a chevron row alone on the slide: its text grows with ``grow``
     fill: float | None = None  # natural content height / grid height of the slide-level grid, if known
     expand: int = 0  # extra height (EMU) the capped rows of the slide-level grid may take
@@ -290,7 +291,12 @@ def _tint(theme: Theme, color: str | None, amount: float = 0.12) -> str | None:
 
 def _tighten(ctx: _Ctx, st: Style) -> Style:
     """Dense slides shrink paddings as well as fonts."""
-    if ctx.tight >= 1.0:
+    return _scale_pad(st, ctx.tight)
+
+
+def _scale_pad(st: Style, k: float) -> Style:
+    """``st`` with every padding multiplied by ``k``."""
+    if k == 1.0:
         return st
     upd = {}
     for f in ("padding", "padding_top", "padding_right", "padding_bottom", "padding_left"):
@@ -298,7 +304,7 @@ def _tighten(ctx: _Ctx, st: Style) -> Style:
         if v is None:
             continue
         try:
-            upd[f] = f"{round(to_emu(v) / EMU_PER_PT * ctx.tight, 2)}pt"
+            upd[f] = f"{round(to_emu(v) / EMU_PER_PT * k, 2)}pt"
         except ValueError:
             continue
     return st.merged(Style(**upd)) if upd else st
@@ -461,9 +467,22 @@ def _grown(ctx: _Ctx, el, eff: float) -> float:
     return eff
 
 
+def _base_gap(ctx: _Ctx) -> float:
+    """Paragraph gap (em) of a card paragraph before any spreading: wider at the sparse step."""
+    return max(measure.para_gap(), ctx.lt.sparse_para_gap) if ctx.step > 1.0 else measure.para_gap()
+
+
+def _para_gap(ctx: _Ctx, el) -> float | None:
+    """The paragraph gap (em) chosen for ``el`` (spread or sparse step), ``None`` = the default gap."""
+    g = ctx.gaps.get(id(el))
+    if g is None and ctx.step > 1.0 and ctx.depth > 0 and ctx.scale >= 1.0 and _spreadable(el):
+        return _base_gap(ctx)
+    return g
+
+
 def _text_need(ctx: _Ctx, el: Text | Shape, style: Style, width: int, scale: float) -> float:
     ph, pv = css.inset_hv(style)
-    gap = ctx.gaps.get(id(el))
+    gap = _para_gap(ctx, el)
     return measure.paragraphs_height(el.paragraphs, width - ph, style, scale, gap=gap) + pv
 
 
@@ -566,7 +585,10 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
     if (
         ctx.grow > 1.0 and ctx.scale >= 1.0 and not (ctx.css.active and ctx.css.own(el).font_size is not None)
     ):  # sparse slide: table text grows too (less than box text)
-        t = min(ctx.grow, ctx.lt.table_alone_font_grow if _tables_alone(ctx) else ctx.lt.table_font_grow)
+        t = min(
+            ctx.grow,
+            (ctx.lt.table_alone_font_grow if _tables_alone(ctx) else ctx.lt.table_font_grow) * ctx.step,
+        )
         if _has_box_text(ctx):  # ... but stays within one step of the box text on the same slide
             body = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
             want = body / ctx.lt.peer_step / max(st.font_size or 14, 1) / max(eff, 1e-6)
@@ -617,7 +639,7 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         if isinstance(el, Text) and "callout" in el.classes:
             rect = Rect(rect.x, rect.y, rect.w, min(rect.h, round(need)))  # callouts never stretch
         orig = id(el)
-        if (pg := ctx.gaps.get(orig)) is not None:  # spread paragraphs: the renderer writes spcBef
+        if (pg := _para_gap(ctx, el)) is not None:  # spread paragraphs: the renderer writes spcBef
             el = el.model_copy(update={"attrs": {**el.attrs, "para_gap": pg}})
         ctx.emit(el, rect, st, eff)
         ctx.text_out[orig] = len(ctx.out) - 1
@@ -713,7 +735,7 @@ def _card_style(ctx: _Ctx, c: Container) -> Style:
     if "plain" in c.classes:
         base = Style(padding="0pt")
     else:
-        base = ctx.theme.classes.get("card", Style(padding=ctx.lt.box_pad))
+        base = _scale_pad(ctx.theme.classes.get("card", Style(padding=ctx.lt.box_pad)), ctx.step)
     others = _class_styles(ctx, c, skip=("plain", "kpi"))
     own = ctx.css.own(c)
     st = Style().merged(ctx.css.inherited(c), base, *others, own, c.style)
@@ -725,7 +747,7 @@ def _card_style(ctx: _Ctx, c: Container) -> Style:
 def _cpads(ctx: _Ctx, c: Container) -> tuple[Style, int, tuple[int, int, int, int]]:
     """(card style, scalar padding, (left, top, right, bottom) insets) of a box."""
     style = _card_style(ctx, c)
-    dflt = _emu(ctx.lt.box_pad) * ctx.tight
+    dflt = _emu(ctx.lt.box_pad) * ctx.tight * ctx.step
     return style, _pad(style, dflt), css.insets(style, dflt)
 
 
@@ -1034,18 +1056,20 @@ def _share_gaps(ctx: _Ctx, boxes: list) -> None:
     members = [ids for b in boxes if isinstance(b, Container) and (ids := ctx.boxes.get(id(b)))]
     if len(members) < 2:
         return
-    floor = min(ctx.gaps.get(i, measure.para_gap()) for ids in members for i in ids)
+    floor = min(ctx.gaps.get(i, _base_gap(ctx)) for ids in members for i in ids)
     for ids in members:
         for i in ids:
-            if ctx.gaps.get(i, measure.para_gap()) <= floor + 1e-9:
+            if ctx.gaps.get(i, _base_gap(ctx)) <= floor + 1e-9:
                 continue
             p = ctx.out[ctx.text_out[i]]
             attrs = {k: v for k, v in p.element.attrs.items() if k != "para_gap"}
-            if floor > measure.para_gap() + 1e-9:
+            if floor > _base_gap(ctx) + 1e-9:
                 attrs["para_gap"] = floor
                 ctx.gaps[i] = floor
             else:
                 ctx.gaps.pop(i, None)
+                if ctx.step > 1.0:
+                    attrs["para_gap"] = _base_gap(ctx)
             p.element = p.element.model_copy(update={"attrs": attrs})
 
 
@@ -1085,12 +1109,13 @@ def _roomy_paragraphs(ctx: _Ctx, flow: list, nat: list, area: Rect, inherit: Sty
                 ctx, ch, measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
             )
             cands.append((k, ch, size * (len(ch.paragraphs) - 1)))
+    base = _base_gap(ctx)
     slots = sum(c[2] for c in cands)
     if not slots:
         return
     gmax = ctx.lt.room_gap_max_dense if _consulting(ctx) else ctx.lt.room_gap_max
-    g = min(gmax, measure.para_gap() + free * ctx.lt.room_use / EMU_PER_PT / slots)
-    while g > measure.para_gap() + 0.02:
+    g = min(gmax, base + free * ctx.lt.room_use / EMU_PER_PT / slots)
+    while g > base + 0.02:
         for k, ch, _ in cands:
             ctx.gaps[id(ch)] = g
             nat[k] = round(_natural_height(ctx, ch, area.w, inherit) or 0)
@@ -1660,6 +1685,9 @@ def _place_blocks(
         if alone and ctx.grow > 1.0 and ctx.scale >= 1.0:
             ctx.chev_grow = ctx.grow
             ctx.grew = True
+        elif ctx.step > 1.0 and ctx.scale >= 1.0:
+            ctx.chev_grow = ctx.step
+            ctx.grew = True
         chev_h = _chevron_row_h(
             ctx,
             [b for _, b in flow],
@@ -2100,11 +2128,11 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
             1.05,
             1.0,
         ):  # tables / trees take more height, text grows a little
-            if f > 1.0 and not ctx.lt.grow:  # growth is off: text keeps its nominal size
+            if f > 1.0 and (not ctx.lt.grow or fin.step > 1.0):  # growth off / sparse step is the last step
                 continue
             g = round(fin.grow * f, 2)
             if (
-                fin.dense_k < 1.0 and g * fin.dense_k > ctx.lt.dense_roomy_body
+                fin.dense_k < 1.0 and g * fin.dense_k > ctx.lt.dense_roomy_body * fin.step
             ):  # consulting body text stays below ~1.6x the theme size
                 continue
             if expanded:  # text first: grow it, then spread what is left over the rows
@@ -2202,6 +2230,47 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
             if not c.over and c.out:
                 fin = c
     return fin
+
+
+def _sparse_step(ctx: _Ctx, fc: _Ctx, run, body: Rect, stepped: list[float]) -> _Ctx:
+    """A slide whose content fills less than ``sparse_fill_soft`` of the body is laid out one step up.
+
+    Text, paddings, paragraph gaps, chevron and table text scale by ``sparse_step`` (else ``sparse_step_min``)
+    on top of the growth already chosen. A step is refused when something overflows, a wrapped line is
+    added (CJK guard of the roomy pass), nothing gets bigger, or the body text would pass ``sparse_max_pt``.
+    Explicit font sizes never change (``_explicit_size``). The first accepted step wins.
+    """
+    fill = (_bottom(fc) - body.y) / max(body.h, 1)
+    if fill >= ctx.lt.sparse_fill_soft:
+        return fc
+    # a marginal slide only tries the full step; a really sparse one may fall back to the smaller one
+    steps = (
+        (ctx.lt.sparse_step, ctx.lt.sparse_step_min) if fill < ctx.lt.sparse_fill else (ctx.lt.sparse_step,)
+    )
+    for st in steps:
+        if st <= 1.0:
+            continue
+        g = round(fc.grow * st, 2)
+        c = run(body, grow=g, step=st, roomy=True, grow_base=fc.grow, expand=fc.expand)
+        if c.over or not c.out or _bottom(c) <= _bottom(fc):
+            continue
+        big = max(
+            (
+                (p.style.font_size or 0) * p.font_scale
+                for p in c.out
+                if isinstance(p.element, Text)
+                and p.element.role == "body"
+                and not _explicit_size(c, p.element)
+            ),
+            default=0,
+        )
+        if big > ctx.lt.sparse_max_pt + 1e-6:  # body text of a stepped slide stays below ``sparse_max_pt``
+            continue
+        if c.fill is not None and c.fill > ctx.lt.grow_fill:
+            continue
+        stepped[0], stepped[1] = st, fc.grow
+        return c
+    return fc
 
 
 def _search(first: _Ctx, solve, theme: Theme, body: Rect) -> tuple[_Ctx, str | None]:
@@ -2529,7 +2598,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         )
 
         def solve(arrange: str | None = None) -> _Ctx:
+            stepped: list[float] = [1.0, 1.0]  # sparse step, growth before it
+
             def run(area: Rect, **kw) -> _Ctx:
+                if stepped[0] > 1.0:  # every later run keeps the slide's sparse step
+                    kw.setdefault("step", stepped[0])
+                    kw.setdefault("roomy", True)
+                    kw.setdefault("grow_base", stepped[1])
                 c = _Ctx(
                     deck,
                     theme,
@@ -2569,6 +2644,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     if c3.grew and not c3.over and (c3.fill is None or c3.fill <= ctx.lt.grow_fill):
                         fc = c3
                         break
+            if fc.scale >= 1.0 and not fc.over and ctx.lt.grow and ctx.lt.sparse_step > 1.0:
+                fc = _sparse_step(ctx, fc, run, body, stepped)
             if fc.scale >= 1.0 and not fc.over:
                 fc = _spread(ctx, fc, run, body, elements)
             return fc

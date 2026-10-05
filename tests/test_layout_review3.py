@@ -9,7 +9,7 @@ from slidemark.ir import Chart, Container, Deck, Image, Link, Media, Series, Sli
 from slidemark.layout import layout_slide
 from slidemark.layout.engine import TABLE_GROW_ROOMY
 from slidemark.parser import parse
-from slidemark.theme import get_theme
+from slidemark.theme import LayoutTokens, get_theme
 from slidemark.units import EMU_PER_INCH, slide_size, to_emu
 
 from .test_layout_policies import T, box, bullets, cell, of
@@ -105,7 +105,7 @@ def test_roomy_table_rows_grow_up_to_2x_and_text_up_to_1_2x():
     s = Slide(title=T("t", "title"), elements=[_plain_table()])
     placed, deck = lay(s)
     (tp,) = of(placed, Table)
-    assert tp.font_scale <= 1.2 + 1e-9
+    assert tp.font_scale <= 1.2 * LayoutTokens().sparse_step + 1e-9  # the sparse step comes on top
     nat = 1.2 * tp.style.font_size * tp.font_scale * 12700 + 2 * 45720
     assert max(tp.element.attrs["_row_h"]) <= TABLE_GROW_ROOMY * nat * 1.15
     assert sum(tp.element.attrs["_row_h"]) == tp.h

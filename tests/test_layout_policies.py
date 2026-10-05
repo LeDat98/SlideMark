@@ -5,7 +5,7 @@ from __future__ import annotations
 from slidemark.ir import Cell, Container, Deck, Link, Paragraph, Run, Shape, Slide, Style, Table, Text
 from slidemark.layout import layout_slide
 from slidemark.layout.tables import column_widths, is_numeric, table_grid
-from slidemark.theme import get_theme
+from slidemark.theme import LayoutTokens, get_theme
 from slidemark.units import EMU_PER_INCH, slide_size
 
 W, H = slide_size("16:9")
@@ -115,7 +115,7 @@ def test_table_text_and_rows_grow_within_limits():
     s = Slide(title=T("t", "title"), elements=[Table(rows=rows)])
     placed, _ = lay(s, "jp-business")
     (tp,) = of(placed, Table)
-    assert 1.0 < tp.font_scale <= 1.2 + 1e-9
+    assert 1.0 < tp.font_scale <= 1.2 * LayoutTokens().sparse_step + 1e-9  # + the sparse step
     line = 11 * 1.2 * 12700 * tp.font_scale
     assert max(tp.element.attrs["_row_h"]) <= 2.0 * (1.8 * line + 2 * 45720) + 1  # at most 2x (roomy)
 
@@ -179,7 +179,7 @@ def test_table_rows_grow_but_not_beyond_1_6x():
     (tp,) = of(placed, Table)
     rh = tp.element.attrs["_row_h"]
     assert sum(rh) == tp.h
-    nat = 14 * 1.2 * 12700 * 1.03 + 2 * 45720  # one 14pt row, roughly
+    nat = 14 * 1.2 * 12700 * 1.03 * tp.font_scale + 2 * 45720  # one row at the grown size, roughly
     assert min(rh) > 1.2 * nat * 0.9  # grew
     assert max(rh) <= 1.6 * nat * 1.3  # but capped
 
