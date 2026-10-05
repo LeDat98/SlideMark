@@ -41,7 +41,7 @@ def test_sparse_slide_takes_the_step_and_does_not_overflow():
     (s0,) = body_sizes(placed0)
     (s1,) = body_sizes(placed1)
     assert s1 > s0 * 1.1
-    assert s1 <= LayoutTokens().sparse_max_pt + 1e-9
+    assert s1 <= LayoutTokens().sparse_low_max_pt + 1e-9  # a floating block may grow to the larger cap
     assert not [d for d in deck.diagnostics if d.rule == "overflow"]
 
 

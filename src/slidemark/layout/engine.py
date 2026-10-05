@@ -2288,6 +2288,29 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
     return fin
 
 
+def _panel_fill(out: list[Placed]) -> float:
+    """Lowest content share of a text panel (card) that sits beside a chart / image; 1.0 without one."""
+    if not any(isinstance(p.element, (Chart, Image, Media)) for p in out):
+        return 1.0
+    worst = 1.0
+    for c in out:
+        if not isinstance(c.element, Container) or c.h <= 0:
+            continue
+        inner = [
+            p
+            for p in out
+            if p is not c
+            and isinstance(p.element, Text)
+            and p.x >= c.x - 2
+            and p.y >= c.y - 2
+            and p.x + p.w <= c.x + c.w + 2
+            and p.y + p.h <= c.y + c.h + 2
+        ]
+        if inner:
+            worst = min(worst, (max(p.y + p.h for p in inner) - c.y) / c.h)
+    return worst
+
+
 def _sparse_step(ctx: _Ctx, fc: _Ctx, run, body: Rect, stepped: list[float]) -> _Ctx:
     """A slide whose content fills less than ``sparse_fill_soft`` of the body is laid out one step up.
 
@@ -2297,12 +2320,28 @@ def _sparse_step(ctx: _Ctx, fc: _Ctx, run, body: Rect, stepped: list[float]) -> 
     Explicit font sizes never change (``_explicit_size``). The first accepted step wins.
     """
     fill = (_bottom(fc) - body.y) / max(body.h, 1)
-    if fill >= ctx.lt.sparse_fill_soft:
+    panel = _panel_fill(fc.out)
+    if fill >= ctx.lt.sparse_fill_soft and panel >= ctx.lt.center_min_fill:
         return fc
+    if (
+        fill >= ctx.lt.sparse_fill_soft
+    ):  # full-height block, but a text panel beside a chart stays mostly empty
+        return _panel_step(ctx, fc, run, body, stepped, panel)
     # a marginal slide only tries the full step; a really sparse one may fall back to the smaller one
     steps = (
         (ctx.lt.sparse_step, ctx.lt.sparse_step_min) if fill < ctx.lt.sparse_fill else (ctx.lt.sparse_step,)
     )
+    max_pt = ctx.lt.sparse_max_pt
+    if (
+        fill < ctx.lt.center_min_fill
+        and ctx.lt.sparse_step_max > ctx.lt.sparse_step
+        and not any(isinstance(p.element, Table) for p in fc.out)  # table text keeps the regular step
+    ):
+        # a block that would float: try bigger steps first (largest that fits), then the usual ones
+        top = ctx.lt.sparse_step_max
+        n = round((top - ctx.lt.sparse_step) / 0.05)
+        steps = tuple(round(top - 0.05 * i, 2) for i in range(n)) + steps
+        max_pt = max(max_pt, ctx.lt.sparse_low_max_pt)
     for st in steps:
         if st <= 1.0:
             continue
@@ -2320,9 +2359,35 @@ def _sparse_step(ctx: _Ctx, fc: _Ctx, run, body: Rect, stepped: list[float]) -> 
             ),
             default=0,
         )
-        if big > ctx.lt.sparse_max_pt + 1e-6:  # body text of a stepped slide stays below ``sparse_max_pt``
+        if big > max_pt + 1e-6:  # body text of a stepped slide stays below ``sparse_max_pt``
             continue
         if c.fill is not None and c.fill > ctx.lt.grow_fill:
+            continue
+        stepped[0], stepped[1] = st, fc.grow
+        return c
+    return fc
+
+
+def _panel_step(ctx: _Ctx, fc: _Ctx, run, body: Rect, stepped: list[float], panel: float) -> _Ctx:
+    """Text of a panel beside a chart / image grows (largest step that fits) to use the panel height."""
+    top = ctx.lt.sparse_step_max
+    n = round((top - ctx.lt.sparse_step_min) / 0.05)
+    for i in range(n + 1):
+        st = round(top - 0.05 * i, 2)
+        c = run(body, grow=round(fc.grow * st, 2), step=st, roomy=True, grow_base=fc.grow, expand=fc.expand)
+        if c.over or not c.out or _panel_fill(c.out) <= panel + 0.02:
+            continue
+        big = max(
+            (
+                (p.style.font_size or 0) * p.font_scale
+                for p in c.out
+                if isinstance(p.element, Text)
+                and p.element.role == "body"
+                and not _explicit_size(c, p.element)
+            ),
+            default=0,
+        )
+        if big > ctx.lt.sparse_low_max_pt + 1e-6:
             continue
         stepped[0], stepped[1] = st, fc.grow
         return c
@@ -2738,6 +2803,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 ctx.lt.body_valign,
                 ctx.lt.body_spread_max,
                 _emu(ctx.lt.top_gap) if (slide.conclusion or slide.footnotes) else 0,
+                ctx.lt.center_min_fill,
+                ctx.lt.card_pad_share,
+                ctx.lt.card_stretch,
+                ctx.lt.card_stretch_share,
             )
         ctx.diags += final_ctx.diags
         seen: set[str] = set()
