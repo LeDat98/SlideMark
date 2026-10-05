@@ -36,6 +36,8 @@ class GridSpec:
     areas: dict[int, tuple[int, int, int, int]] | None = None  # block index -> (r0, c0, r1, c1) inclusive
     flags: set[str] = field(default_factory=set)
     errors: list[str] = field(default_factory=list)
+    snap: bool = False  # ratio / area grids: column edges snap to the theme's track grid
+    capacity: int | None = None  # number of blocks the grid holds; ``None`` = rows grow as needed
 
 
 _N = re.compile(r"^\d+$")
@@ -82,15 +84,16 @@ def parse_spec(spec: str | None, n_blocks: int, classes: list[str] | None = None
         if _N.match(main):
             c = max(int(main), 1)
             gs.cols, gs.rows = [1.0] * c, [1.0] * max(math.ceil(n_blocks / c), 1)
+            if flags & FLAGS:
+                gs.rows, gs.capacity = [1.0], c  # a flow / chevron row is a single row
         elif m := _CXR.match(main):
             c, r = max(int(m.group(1)), 1), max(int(m.group(2)), 1)
-            if c * r < n_blocks:
-                errors.append(f"grid {main} has {c * r} cells for {n_blocks} blocks; added rows")
-                r = math.ceil(n_blocks / c)
             gs.cols, gs.rows = [1.0] * c, [1.0] * r
+            gs.capacity = c * r
         elif _RATIO.match(main):
             gs.cols = [float(p) for p in main.split(":")]
             gs.rows = [1.0] * max(math.ceil(n_blocks / len(gs.cols)), 1)
+            gs.snap = True
         else:
             rows = main.split("/")
             width = max(len(r) for r in rows)
@@ -105,9 +108,9 @@ def parse_spec(spec: str | None, n_blocks: int, classes: list[str] | None = None
                     a = areas.setdefault(idx, [ri, ci, ri, ci])
                     a[0], a[1] = min(a[0], ri), min(a[1], ci)
                     a[2], a[3] = max(a[2], ri), max(a[3], ci)
-            if len(areas) < n_blocks:
-                raise ValueError(f"areas {main!r} define {len(areas)} blocks but the slide has {n_blocks}")
             gs.cols, gs.rows = [1.0] * width, [1.0] * len(rows)
+            gs.snap = True
+            gs.capacity = len(areas)
             gs.areas = {k: (a[0], a[1], a[2], a[3]) for k, a in areas.items()}
     except ValueError as e:
         errors.append(str(e))
@@ -136,17 +139,47 @@ def auto_spec(n: int, *, text_visual: bool = False, short: bool = False) -> Grid
     return GridSpec([1.0] * cols, [1.0] * math.ceil(n / cols))
 
 
-def cell_rects(spec: GridSpec, n: int, area: Rect, gap: int) -> list[Rect]:
-    """Rect for each of ``n`` blocks in source order (areas map letters, otherwise row-major)."""
+def track_counts(weights: list[float], columns: int) -> list[int] | None:
+    """Split ``columns`` tracks over ``weights`` (largest remainder, min 1 each); ``None`` = do not snap."""
+    n = len(weights)
+    if n < 2 or n > columns or len(set(weights)) == 1:
+        return None  # equal columns already line up (or do not divide the tracks evenly)
+    total = sum(weights)
+    raw = [w * columns / total for w in weights]
+    out = [max(int(r), 1) for r in raw]
+    while sum(out) < columns:
+        i = max(range(n), key=lambda k: raw[k] - out[k])
+        out[i] += 1
+    while sum(out) > columns:
+        i = max((k for k in range(n) if out[k] > 1), key=lambda k: out[k] - raw[k])
+        out[i] -= 1
+    return out
+
+
+def cell_rects(spec: GridSpec, n: int, area: Rect, gap: int, columns: int = 12) -> list[Rect]:
+    """Rect for each of ``n`` blocks in source order (areas map letters, otherwise row-major).
+
+    Ratio and area grids snap their column edges to ``columns`` tracks so edges line up across rows and boxes.
+    """
     nc, nr = len(spec.cols), len(spec.rows)
     avail_w = max(area.w - gap * (nc - 1), nc)
     avail_h = max(area.h - gap * (nr - 1), nr)
     xs, ys = [], []
-    x = area.x
-    for wgt in spec.cols:
-        w = round(avail_w * wgt / sum(spec.cols))
-        xs.append((x, w))
-        x += w + gap
+    tracks = track_counts(spec.cols, columns) if spec.snap else None
+    if tracks is not None:
+        tw = (area.w - gap * (columns - 1)) / columns
+        t0 = 0
+        for k in tracks:
+            x0 = area.x + round(t0 * (tw + gap))
+            x1 = area.x + round((t0 + k) * (tw + gap) - gap)
+            xs.append((x0, x1 - x0))
+            t0 += k
+    else:
+        x = area.x
+        for wgt in spec.cols:
+            w = round(avail_w * wgt / sum(spec.cols))
+            xs.append((x, w))
+            x += w + gap
     y = area.y
     for wgt in spec.rows:
         h = round(avail_h * wgt / sum(spec.rows))

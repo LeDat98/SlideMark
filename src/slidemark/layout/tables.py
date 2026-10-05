@@ -32,8 +32,9 @@ def table_grid(t: Table) -> tuple[int, int, list[tuple[int, int, Cell]]]:
                 for dc in range(cs):
                     occupied.add((r + dr, c + dc))
             anchors.append((r, c, cell))
-            c += cs
-            ncols = max(ncols, c)
+            ncols = max(ncols, c + cs)
+            # rectangular input: covered positions follow as placeholders and are skipped above
+            c += 1 if rect else cs
     return nrows, max(ncols, 1), anchors
 
 
