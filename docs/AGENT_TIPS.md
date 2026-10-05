@@ -22,3 +22,6 @@ Practical patterns that cut tokens and retries. Budget: keep this file under ~1,
     becomes native rounded rects + text (verified 2026-10-05, XSD-valid); canvas/SVG/gradients fall back to an image.
 13. ✅ **Video costs one line:** `![what it shows](demo.mp4)` embeds a playable native video with a poster frame.
 14. ✅ **`@2 1:2` is fine** (column count + matching ratios); eval run 5 (80 tasks) passed 79/80 first time from SKILL.md alone.
+- Own brand in 3–4 header lines (`theme: none` + `colors:` + `fonts:` + `style:`): verified on 20 brand briefs (run-6-brand, Sonnet, design.md only): 19/20 check-clean first pass, 20 distinct palettes.
+- With a dark `bg`, set `surface` and `border` too, or cards keep the light neutral defaults (seen in eval decks).
+- Gradient cards need a text color that passes on every stop: lint checks each stop (`hero.fill` teal end failed 2.6:1 in examples/13).
