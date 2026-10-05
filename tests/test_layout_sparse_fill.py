@@ -25,7 +25,14 @@ def _slide(name: str, number: int) -> tuple[list[Placed], int]:
 
 def test_flow_row_with_callout_fills_the_body():  # 05-jp-process slide 2
     items, band = _slide("05-jp-process", 2)
-    assert band <= 22
+    assert band <= 55  # cards hug their text (fill >= 65%); the leftover is one band at the bottom
+    import sys
+
+    sys.path.insert(0, str(ROOT / "bench"))
+    from whitespace import card_fills
+
+    fills = [f for _t, f in card_fills(items)]
+    assert sum(fills) / len(fills) >= 0.65
     callout = next(p for p in items if "callout" in getattr(p.element, "classes", []))
     cards = [p for p in items if type(p.element).__name__ == "Container"]
     assert all(c.y + c.h <= callout.y for c in cards)  # the callout still closes the slide

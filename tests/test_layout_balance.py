@@ -55,11 +55,18 @@ def test_html_mixed_card_row_has_no_big_band():  # 15-html-mixed slide 2
     assert _band(items, h) <= 0.2
 
 
-def test_dense_two_box_slide_loses_most_of_its_band():  # 11-jp-consulting slide 9
+def test_dense_two_box_slide_hugs_its_text():  # 11-jp-consulting slide 9
     items, h = _slide("11-jp-consulting", 9)
     cards = _cards(items)
     assert len(cards) == 2 and len({c.y for c in cards}) == 1
-    assert _band(items, h) <= 0.15  # was ~35% of the body
+    import sys
+
+    sys.path.insert(0, str(ROOT / "bench"))
+    from whitespace import card_fills
+
+    fills = [f for _t, f in card_fills(items)]
+    assert sum(fills) / len(fills) >= 0.6  # cards hug their text; the leftover is one band under them
+    assert _band(items, h) <= 0.62
 
 
 def test_text_grows_before_cards_stretch():  # 13-brand-aurora slide 2: cards were ~3x their text

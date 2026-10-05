@@ -54,3 +54,10 @@ def test_axis_ids_are_positive_and_consistent(tmp_path):
             if a.tag in (qn("c:catAx"), qn("c:valAx"), qn("c:dateAx"), qn("c:serAx"))
         }
         assert set(cross) <= defined, kind
+
+
+def test_stacked_labels_hide_zero_segments(tmp_path):
+    chart = build_chart(tmp_path, "stacked-bar", labels="on")
+    for ser in chart.plots[0].series:
+        fmt = ser._element.find(qn("c:dLbls")).find(qn("c:numFmt")).get("formatCode")
+        assert fmt.split(";")[2] == "", fmt  # empty zero section: no clipped "0" in a zero-width segment
