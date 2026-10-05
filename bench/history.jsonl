@@ -75,3 +75,17 @@
 {"date": "2026-10-05T13:30:08+00:00", "metric": "markup_tokens", "deck": "q3-review", "content": 131, "slidemark_markup": 24, "html_markup": 190, "ratio": 0.126, "tokenizer": "o200k_base"}
 {"date": "2026-10-05T13:30:14+00:00", "commit": "acbdab1", "metric": "design_tokens", "css": 139, "html": 362, "tokens": 128, "value": 0.354}
 {"date": "2026-10-05T13:31:56+00:00", "commit": "acbdab1", "metric": "html_fidelity", "slides": 45, "native": 0.999, "native_90": 45, "diff": 0.0112, "diff_native": 0.0112, "value": 0.999, "worst": [["40-text-image-placeholder", 0.941], ["01-gradient-hero", 1.0], ["02-kpi-dashboard", 1.0], ["03-timeline", 1.0], ["04-jp-dense", 1.0]]}
+{"date": "2026-10-05T20:33:21+00:00", "commit": "98f6ce2", "metric": "syntax_tokens", "deck": "design", "format": "css", "tokens_proxy": 139, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:21+00:00", "commit": "98f6ce2", "metric": "syntax_tokens", "deck": "design", "format": "html", "tokens_proxy": 362, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:21+00:00", "commit": "98f6ce2", "metric": "syntax_tokens", "deck": "design", "format": "tokens", "tokens_proxy": 128, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:21+00:00", "commit": "98f6ce2", "metric": "syntax_tokens", "deck": "jp-dense", "format": "html", "tokens_proxy": 828, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:21+00:00", "commit": "98f6ce2", "metric": "syntax_tokens", "deck": "jp-dense", "format": "slidemark", "tokens_proxy": 482, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:21+00:00", "commit": "98f6ce2", "metric": "syntax_tokens", "deck": "jp-kpi", "format": "html", "tokens_proxy": 914, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:21+00:00", "commit": "98f6ce2", "metric": "syntax_tokens", "deck": "jp-kpi", "format": "slidemark", "tokens_proxy": 551, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:21+00:00", "commit": "98f6ce2", "metric": "syntax_tokens", "deck": "q3-review", "format": "html", "tokens_proxy": 321, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:21+00:00", "commit": "98f6ce2", "metric": "syntax_tokens", "deck": "q3-review", "format": "python-pptx", "tokens_proxy": 518, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:21+00:00", "commit": "98f6ce2", "metric": "syntax_tokens", "deck": "q3-review", "format": "slidemark", "tokens_proxy": 155, "tokens_claude": null, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:22+00:00", "metric": "markup_tokens", "deck": "jp-dense", "content": 382, "slidemark_markup": 100, "html_markup": 446, "ratio": 0.224, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:22+00:00", "metric": "markup_tokens", "deck": "jp-kpi", "content": 417, "slidemark_markup": 134, "html_markup": 497, "ratio": 0.27, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:22+00:00", "metric": "markup_tokens", "deck": "q3-review", "content": 131, "slidemark_markup": 24, "html_markup": 190, "ratio": 0.126, "tokenizer": "o200k_base"}
+{"date": "2026-10-05T20:33:22+00:00", "commit": "98f6ce2", "metric": "design_tokens", "css": 139, "html": 362, "tokens": 128, "value": 0.354}
