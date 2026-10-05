@@ -60,6 +60,6 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 - [ ] Blind review: agent-made decks preferred or tied against professional human decks in ≥ 50% of pairs
 - [ ] Vision self-review loop: `preview` + automatic design critique fixes layout issues without human input
 - [ ] Tokens near the floor: syntax ≤ 20% of python-pptx; ≥ 95% of tasks need only SKILL.md (no reference reads)
-- [ ] Agent eval first-pass success ≥ 98% across ≥ 100 tasks, including dense JP and HTML-heavy decks
+- [x] Agent eval first-pass success ≥ 98% across ≥ 100 tasks, including dense JP and HTML-heavy decks (100 tasks: run-4 01–20 20/20 + run-5 21–100 79/80 = 99%; jp 34/34, html 17/17, hard 10/10; Sonnet, SKILL.md only, 2026-10-05)
 - [ ] Lossless round-trip of any deck the library produced; real-world `.pptx` import ≥ 95% fidelity (`bench/import_fidelity.py` on 19 agent-written python-pptx decks: 0.977, lenient metric; true real-world decks still needed)
 - [ ] Every presentation feature of PowerPoint reachable from text; nothing requires opening PowerPoint to fix

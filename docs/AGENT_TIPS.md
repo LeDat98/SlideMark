@@ -21,3 +21,4 @@ Practical patterns that cut tokens and retries. Budget: keep this file under ~1,
 12. ✅ **Free-form HTML still gives editable slides:** a ```` ```html {render=native} ```` fence with CSS grid/flex cards
     becomes native rounded rects + text (verified 2026-10-05, XSD-valid); canvas/SVG/gradients fall back to an image.
 13. ✅ **Video costs one line:** `![what it shows](demo.mp4)` embeds a playable native video with a poster frame.
+14. ✅ **`@2 1:2` is fine** (column count + matching ratios); eval run 5 (80 tasks) passed 79/80 first time from SKILL.md alone.
