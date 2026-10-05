@@ -357,7 +357,10 @@ SVG); only what PowerPoint cannot draw becomes a picture, with a diagnostic nami
 ````
 
 `slidemark build deck.html` builds a whole HTML deck: one `<section>` per slide, a shared `<style>` in
-`<head>`. Theme tokens are CSS custom properties in every HTML slide (`var(--primary)`, `var(--font-body)`,
+`<head>`. A section made of headings, lists, tables, cards and grid/flex tracks becomes normal SlideMark
+elements; a section with an `<svg>`, or background/border/padding/shadow/transform/position styles (inline or
+from `<style>`), is laid out by Chromium as a whole-slide HTML slide. `data-render="html"` on a section or
+`<html data-slidemark="native">` forces that for one slide or all. Theme tokens are CSS custom properties in every HTML slide (`var(--primary)`, `var(--font-body)`,
 `var(--size-body)`), so HTML slides and SlideMark slides of one deck share one design.
 
 ## Other fences

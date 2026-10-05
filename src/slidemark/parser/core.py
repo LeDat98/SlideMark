@@ -325,6 +325,46 @@ def _scan_body(lines: list[str], inside: list[bool], c: Chunk, ctx: Ctx) -> tupl
     return items, notes
 
 
+AT_HTML = re.compile(r"(?:^|\s)html(?:\s|$)")
+HTML_FENCE = re.compile(r"^[ \t]*(`{3,}|~{3,})[ \t]*html\b")
+
+
+def _take_html_fence(items: list[Item], ctx: Ctx) -> tuple[list[Item], str | None]:
+    """For an ``@html`` slide: cut the first ```html fence out of the body items and return its text."""
+    line = next(it.line for it in items if it.kind == "at" and AT_HTML.search(it.text))
+    for n, it in enumerate(items):
+        if it.kind != "md":
+            continue
+        for i, text in enumerate(it.lines):
+            m = HTML_FENCE.match(text)
+            if not m:
+                continue
+            fence = m.group(1)
+            close = next(
+                (
+                    j
+                    for j in range(i + 1, len(it.lines))
+                    if re.match(rf"^[ \t]*{fence[0]}{{{len(fence)},}}[ \t]*$", it.lines[j])
+                ),
+                len(it.lines),
+            )
+            body = "\n".join(it.lines[i + 1 : close])
+            rest = it.lines[:i] + it.lines[close + 1 :]
+            new = list(items)
+            if any(t.strip() for t in rest):
+                new[n] = replace(it, lines=rest)
+            else:
+                del new[n]
+            return new, body
+    ctx.warn(
+        "'@html' slide has no ```html fence",
+        line,
+        "html-slide-empty",
+        "write the slide's HTML in one ```html fence under the title",
+    )
+    return items, None
+
+
 def _heading_text(text: str, line: int, ctx: Ctx) -> tuple[Text, Attrs | None]:
     body, attrs = split_trailing_attrs(text)
     t = Text(role="heading", paragraphs=[Paragraph(runs=inline_runs(body.strip()))], line=line)
@@ -491,6 +531,9 @@ def parse_slide(
             lead_ats.append(Item("at", r.idx + 1, text=r.value))
     items, notes = _scan_body(lines, inside, chunk, ctx)
     items = lead_ats + items
+    html_src: str | None = None
+    if any(it.kind == "at" and AT_HTML.search(it.text) for it in items):
+        items, html_src = _take_html_fence(items, ctx)
     slide.notes = "\n".join([*extra_notes, *([notes] if notes else [])]) or None
 
     slide_links: list[RawLink] = []
@@ -664,6 +707,21 @@ def parse_slide(
         else:
             slide.attrs.update(kv)
 
+    if "html" in slide.classes:
+        slide.classes.remove("html")
+    if html_src is not None:
+        if slide.elements or slide.lead or slide.conclusion or slide.footnotes:
+            ctx.add(
+                "warning",
+                "'@html' slide ignores its other blocks",
+                slide.line,
+                "dropped-content",
+                "put everything inside the ```html fence, or remove '@html'",
+            )
+        slide.elements, slide.lead, slide.conclusion, slide.footnotes = [], None, None, []
+        slide.grid, slide_links = None, []
+        slide.layout = slide.layout or "blank"
+        slide.html = html_src
     _infer_cover(slide, index)
     slide.links = _resolve_links(slide_links, len(slide.elements), "slide", ctx, slide, slide.elements)
     for box, raw in ctx.box_links:

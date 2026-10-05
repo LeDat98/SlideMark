@@ -39,13 +39,35 @@ _ALIASES = {
 }
 
 
-def _family(theme: Theme) -> str:
+def _stack(*fonts: str) -> str:
+    """A CSS font-family list: each name, its metric-compatible stand-in, then ``sans-serif``."""
     names: list[str] = []
-    for f in (theme.fonts.body, theme.fonts.ea):
+    for f in fonts:
         f = re.sub(r"[^\w .-]", "", f or "").strip()
         if f:
             names += [f, _ALIASES.get(f.lower(), "")]
     return ", ".join(f"'{n}'" for n in names if n) + ", sans-serif"
+
+
+def _family(theme: Theme) -> str:
+    return _stack(theme.fonts.body, theme.fonts.ea)
+
+
+def _tokens(theme: Theme) -> str:
+    """``:root`` custom properties: ``--<color>`` per theme color, ``--font-*``, ``--size-<role>`` (px)."""
+    parts = []
+    for name, value in theme.colors.items():
+        key = re.sub(r"[^\w-]", "-", str(name)).strip("-")
+        if key:
+            parts.append(f"--{key}:#{hex6(theme, value)}")
+    parts.append(f"--font-heading:{_stack(theme.fonts.heading, theme.fonts.ea)}")
+    parts.append(f"--font-body:{_family(theme)}")
+    parts.append(f"--font-mono:{_stack(theme.fonts.mono)}".replace(", sans-serif", ", monospace"))
+    for role, pt in theme.sizes.items():
+        key = re.sub(r"[^\w-]", "-", str(role)).strip("-")
+        if key:
+            parts.append(f"--size-{key}:{pt * 96 / 72:.1f}px")
+    return ":root{" + ";".join(parts) + "}"
 
 
 def _page(source: str, theme: Theme) -> str:
@@ -53,7 +75,8 @@ def _page(source: str, theme: Theme) -> str:
     size = theme.sizes.get("body", DEFAULT_SIZES["body"]) * 96 / 72
     return (
         '<!doctype html><html><head><meta charset="utf-8">'
-        f"<style>*{{box-sizing:border-box}}html,body{{margin:0;padding:0;background:#{bg};}}"
+        f"<style>{_tokens(theme)}"
+        f"*{{box-sizing:border-box}}html,body{{margin:0;padding:0;background:#{bg};}}"
         f"body{{font-family:{_family(theme)};font-size:{size:.1f}px;color:#{fg};overflow:hidden}}"
         f"</style></head><body>{source}</body></html>"
     )

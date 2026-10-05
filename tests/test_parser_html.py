@@ -167,9 +167,9 @@ def test_chart_and_bad_chart_data():
 
 
 def test_unknown_element_falls_back_with_one_info():
-    deck = parse_html('<section class="slide"><h1>T</h1><svg><rect/></svg><p>after</p></section>')
+    deck = parse_html('<section class="slide"><h1>T</h1><canvas></canvas><p>after</p></section>')
     raws = [e for e in deck.slides[0].elements if isinstance(e, Raw)]
-    assert len(raws) == 1 and raws[0].kind == "html" and "<svg" in raws[0].source
+    assert len(raws) == 1 and raws[0].kind == "html" and "<canvas" in raws[0].source
     d = [x for x in deck.diagnostics if x.rule == "html-fallback"]
     assert len(d) == 1 and d[0].level == "info" and d[0].hint
 

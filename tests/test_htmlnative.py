@@ -67,15 +67,16 @@ def _deck(body: str, attr: str = "{render=native}") -> str:
 def test_convertible_rules():
     assert convertible(CARD)
     assert convertible(GRID)
-    for bad in (
-        "<canvas></canvas>",
+    for bad in ("<canvas></canvas>", "<video src=x></video>", "<iframe></iframe>"):
+        assert not convertible(bad), bad
+    # handled per element now: gradients, transforms, svg, text-transform
+    for ok in (
         '<svg width="5"></svg>',
-        "<video src=x></video>",
         '<div style="background:linear-gradient(red,blue)">x</div>',
         '<div style="transform:rotate(3deg)">x</div>',
-        "<iframe></iframe>",
+        '<p style="text-transform:uppercase">x</p>',
     ):
-        assert not convertible(bad), bad
+        assert convertible(ok), ok
 
 
 def test_card_becomes_rounded_rect_and_text(renderer):
