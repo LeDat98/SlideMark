@@ -239,6 +239,9 @@ class LayoutTokens(BaseModel):
     l3_gap_extra_short: float = 3.0  # ... lists of at most l3_short_items items may spread this much (em) ...
     l3_wrap_margin: float = 0.12  # ... grown text must also fit this much narrower (renderers wrap earlier)
     l3_text_max_pt: float = 20  # ... card / panel body text of such a slide may grow up to this size (pt)
+    chart_plot_top_em: float = (
+        3.5  # ... a chart with a title: its plot area starts this many title sizes below the chart top
+    )
     l3_gap_cap: float = 0.8  # ... paragraph gaps never exceed this extra (em): one even rhythm, no stretching
     l3_head_pad: float = 0.35  # ... air (em) between a card heading band and its first item
     l3_panel_shrink: float = (

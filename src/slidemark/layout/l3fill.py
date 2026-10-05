@@ -18,7 +18,7 @@ unchanged.
 
 from __future__ import annotations
 
-from ..ir import Chart, Container, Image, Media, Placed, Shape, Text
+from ..ir import Chart, Container, Image, Media, Placed, Shape, Table, Text
 from ..theme import LayoutTokens
 from ..units import EMU_PER_PT, to_emu
 from . import measure
@@ -40,12 +40,20 @@ def _is_note(p: Placed) -> bool:
 def _explicit(p: Placed) -> bool:
     if p.element.box is not None:
         return True
+    if getattr(p.element, "role", None) == "heading":
+        return False  # a heading band centres its text by design (its box never moves relative to the card)
     return p.style.valign not in (None, "top") and not _is_note(p)
 
 
-def _inner_texts(card: Placed, out: list[Placed]) -> list[Placed] | None:
-    """The placed texts inside ``card``; ``None`` when it holds anything else (nested cards, tables ...)."""
+def _inner_texts(card: Placed, out: list[Placed], deco: bool = False) -> list[Placed] | None:
+    """The placed texts inside ``card``; ``None`` when it holds anything else (nested cards, tables ...).
+
+    ``deco``: header bars and icons (shapes in the top band of the card) stay put and are skipped."""
     inner = [p for p in out if p is not card and _contains(card, p)]
+    if deco:
+        inner = [
+            p for p in inner if not (isinstance(p.element, Shape) and p.y + p.h <= card.y + (card.h // 3) + 2)
+        ]
     if not inner or any(not isinstance(p.element, Text) for p in inner):
         return None
     return inner
@@ -203,10 +211,16 @@ def _body_items(out: list[Placed], body: Rect) -> list[Placed]:
     ]
 
 
-def fill_row(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool = True) -> list[Placed]:
-    """A sparse slide of one row of text cards: top-anchored, equal tall cards, spread paragraphs."""
+def fill_row(
+    out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool = True, sparse: bool = True
+) -> list[Placed]:
+    """A sparse slide of one row of text cards: top-anchored, equal tall cards, spread paragraphs.
+
+    A row followed by a table keeps its top and its height at most (``bounded``): the text grows first,
+    then the cards shrink to their content and the table follows them up (the free band ends up at the
+    bottom of the body). ``sparse=False`` only accepts that bounded case."""
     try:
-        return _fill_row(out, body, lt, consulting)
+        return _fill_row(out, body, lt, consulting, sparse)
     except Exception:  # never raise on bad input
         return out
 
@@ -222,14 +236,16 @@ def _row_extras(items: list[Placed], cards: list[Placed], covered: set[int]):
             continue
         if isinstance(p.element, Shape) and p.h <= to_emu("0.05in") and top <= p.y <= bottom:
             arrows.append(p)  # a flow arrow: stays centred between the cards
-        elif isinstance(p.element, Text) and p.y >= bottom - 2:
+        elif isinstance(p.element, (Text, Table)) and p.y >= bottom - 2:
             tails.append(p)  # a callout / conclusion bar under the row: follows the cards
         else:
             return None
     return arrows, tails
 
 
-def _fill_row(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool) -> list[Placed]:
+def _fill_row(
+    out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool, sparse: bool = True
+) -> list[Placed]:
     if not lt.l3_fill or lt.body_valign == "top" or body.h <= 0:
         return out
     items = _body_items(out, body)
@@ -238,13 +254,18 @@ def _fill_row(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool)
         return out
     if not consulting and not all("kpi" in c.element.classes for c in cards):
         return out  # normal-density themes keep their hugging cards (only KPI rows are top-anchored)
+    bounded = any(isinstance(p.element, Table) for p in items)  # a table below: keep top, shrink only
+    if not sparse and not bounded:
+        return out
     plan: dict[int, list[Placed]] = {}
     for c in cards:
-        inner = _inner_texts(c, items)
+        inner = _inner_texts(c, items, deco=bounded)
         if inner is None:
             return out
         plan[id(c)] = inner
     covered = {id(p) for ps in plan.values() for p in ps} | set(plan)
+    if bounded:  # decoration inside the cards (header bars, icons) is covered too
+        covered |= {id(p) for p in items if any(_contains(c, p) for c in cards)}
     extras = _row_extras(items, cards, covered)
     if extras is None:  # free text / tables / shapes next to the cards
         return out
@@ -252,9 +273,16 @@ def _fill_row(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool)
     if min(c.y + c.h for c in cards) <= max(c.y for c in cards):  # not one row
         return out
     old_bottom = max(c.y + c.h for c in cards)
-    top = body.y
-    tail_h = max((p.y + p.h for p in tails), default=old_bottom) - old_bottom
-    bottom = body.bottom - round(lt.sparse_row_bottom_band * body.h) - tail_h
+    bounded = bounded and any(isinstance(p.element, Table) for p in tails)
+    if not sparse and not bounded:
+        return out
+    if bounded:  # a table fills the rest: the row keeps its top and never grows taller
+        top = min(c.y for c in cards)
+        bottom = old_bottom
+    else:
+        top = body.y
+        tail_h = max((p.y + p.h for p in tails), default=old_bottom) - old_bottom
+        bottom = body.bottom - round(lt.sparse_row_bottom_band * body.h) - tail_h
     if bottom - top < max(c.h for c in cards) or any(c.y < top for c in cards):
         return out
     kpi = all("kpi" in c.element.classes for c in cards)
@@ -320,11 +348,13 @@ def _fill_share(card: Placed, inner: list[Placed]) -> float:
     return (max(p.y + _text_h(p) for p in inner) - card.y) / max(card.h, 1)
 
 
-def fill_panels(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool = False) -> list[Placed]:
+def fill_panels(
+    out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool = False, title_scale: float = 1.2
+) -> list[Placed]:
     """Text panels beside a chart / image: text grows, gaps stay even and capped, the panel shrinks to its
     content (a trailing note follows the text)."""
     try:
-        return _fill_panels(out, body, lt, consulting)
+        return _fill_panels(out, body, lt, consulting, title_scale)
     except Exception:  # never raise on bad input
         return out
 
@@ -367,21 +397,60 @@ def _fill_panel(c: Placed, inner: list[Placed], lt: LayoutTokens, consulting: bo
     return res
 
 
-def _fill_panels(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool) -> list[Placed]:
+def _align_plot(
+    c: Placed,
+    r: dict[int, Placed],
+    items: list[Placed],
+    visuals: list[Placed],
+    lt: LayoutTokens,
+    scale: float,
+) -> dict[int, Placed]:
+    """A panel that now ends after its content moves down so its top meets the plot area of the titled chart
+    beside it (never the chart title); it stays inside the chart's height."""
+    new = r[id(c)]
+    if new.h >= c.h or lt.chart_plot_top_em <= 0:
+        return r
+    side = [
+        v
+        for v in visuals
+        if isinstance(v.element, Chart)
+        and v.element.title
+        and (v.x + v.w <= c.x + 2 or c.x + c.w <= v.x + 2)
+        and v.y <= c.y + 2
+        and v.y + v.h >= c.y + c.h - 2
+    ]
+    if not side:
+        return r
+    v = side[0]
+    title_pt = (v.style.font_size or 10.5) * v.font_scale * scale
+    dy = round(v.y + lt.chart_plot_top_em * title_pt * EMU_PER_PT) - c.y
+    if dy <= 0 or new.y + dy + new.h > v.y + v.h:
+        return r
+    out = {k: q.model_copy(update={"y": q.y + dy}) for k, q in r.items()}
+    for q in items:  # decoration inside the panel (header bar, icon) follows it
+        if q is not c and id(q) not in r and _contains(c, q):
+            out[id(q)] = q.model_copy(update={"y": q.y + dy})
+    return out
+
+
+def _fill_panels(
+    out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool, title_scale: float = 1.2
+) -> list[Placed]:
     if not lt.l3_fill or lt.body_valign == "top" or body.h <= 0:
         return out
     items = _body_items(out, body)
     if not any(isinstance(p.element, (Chart, Image, Media)) for p in items):
         return out
     res: dict[int, Placed] = {}
-    visual_h = max(p.h for p in items if isinstance(p.element, (Chart, Image, Media)))
+    visuals = [p for p in items if isinstance(p.element, (Chart, Image, Media))]
+    visual_h = max(p.h for p in visuals)
     for c in (p for p in items if isinstance(p.element, Container)):
         inner = _inner_texts(c, items)
         if inner is None or c.h < visual_h * 0.9 or _fill_share(c, inner) >= lt.panel_fill_min:
             continue
         r = _fill_panel(c, inner, lt, consulting)
         if r is not None:
-            res.update(r)
+            res.update(_align_plot(c, r, items, visuals, lt, title_scale) if consulting else r)
     return _apply(out, res) if res else out
 
 

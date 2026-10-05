@@ -3437,14 +3437,22 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             linked_sparse = bool(slide.links) and (
                 body.bottom - _content_bottom(final_ctx.out) > round(ctx.lt.sparse_left_max * body.h)
             )  # a flow row: the sparse completion skips linked slides, the row fill does not
-            if final_ctx.completed or linked_sparse:  # a sparse row of text cards: top-anchored, tall, spread
-                small = theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
-                final_ctx.out = fill_row(
-                    final_ctx.out, body, ctx.lt, consulting=final_ctx.dense_k < 1.0 or small
-                )
+            # a sparse row of text cards: top-anchored, tall, spread; above a table it only shrinks to content
+            small = theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
+            final_ctx.out = fill_row(
+                final_ctx.out,
+                body,
+                ctx.lt,
+                consulting=final_ctx.dense_k < 1.0 or small,
+                sparse=bool(final_ctx.completed or linked_sparse),
+            )
             small_body = theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
             final_ctx.out = fill_panels(
-                final_ctx.out, body, ctx.lt, consulting=final_ctx.dense_k < 1.0 or small_body
+                final_ctx.out,
+                body,
+                ctx.lt,
+                consulting=final_ctx.dense_k < 1.0 or small_body,
+                title_scale=theme.render.chart_title_scale,
             )
             final_ctx.out = fill_chevron_row(final_ctx.out, body, ctx.lt)
         if (
