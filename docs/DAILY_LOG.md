@@ -2,6 +2,15 @@
 
 Newest at the bottom. ≤ 10 lines per day: done · metrics · problems · next.
 
+## 2026-10-05 (run 6, chained manual, agent cost + L3, 21:03 UTC)
+Run goal:
+- [ ] AC full matrix on fresh brief set 2: 9 briefs × 3 runs × skill-only + skill-open, python-pptx baseline for set 2
+- [ ] AC4 toward ≤ 35%: cut per-call overhead (SKILL.md first screen, quiet build output), measure on set 2
+- [ ] 5-step chevrons: headings wrap to two lines at word boundaries instead of shrinking text
+- [ ] Re-land sparse lead/footnote growth (c1d65ec) within the 50 ms/slide gate, with perf margin
+- [ ] Contrast lint for table cells and chart labels
+- [ ] L3 consulting-grade: two-card decision slides and text panels beside charts no longer half empty
+
 ## 2026-10-04 (day 0, manual session)
 - Done: proposal, 7-day plan, targets L1–L7, IR contract, theme/units, syntax v0, bench v0, project notes.
 - Metrics: syntax tokens compact 158 / python-pptx 528 (30%), o200k proxy.

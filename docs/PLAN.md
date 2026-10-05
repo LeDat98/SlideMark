@@ -400,3 +400,13 @@ Goal: `docs/AGENT_COST.md` work packages 1–6 in order; design freedom stays a 
 - [ ] Perf: layout back under the 50 ms/slide gate with margin; then re-apply lead/footnote growth on sparse slides (c1d65ec)
 - [ ] Tables are not contrast-linted; chart label contrast is not linted
 - [ ] Owner: real PowerPoint check (gradients, shadows, customXml, media, per-point dLbl); PyPI token; L7 token gate decision
+
+## Run 2026-10-05 (run 6, chained, 21:03 UTC) work packages
+Goal: run-5 leftovers (AC matrix, AC4, chevrons, sparse lead growth + perf, table/chart contrast lint, L3 fill).
+- **Wave 1 B (layout):** perf margin (best-of-3 build ≤ 35 ms/slide on the gate deck), re-land c1d65ec lead/footnote
+  growth on sparse slides, 5-step chevron headings may wrap to two lines at spaces (never inside a word) before text shrinks.
+- **Wave 1 A (lint):** contrast lint for table cells (header + body + banding) and chart data labels / axis text;
+  one-edit hints (token + nearest passing shade), shared colour resolver with render.
+- **Orchestrator:** brief set 2 (`bench/briefs2/`, fresh content), eval runner dirs `/opt/smeval`, python-pptx
+  baseline for set 2, then the AC matrix (2 eval agents at a time); SKILL.md first-screen cut.
+- **Wave 2 B (layout):** L3 two-card decision slides and chart + text panel slides fill their space.
