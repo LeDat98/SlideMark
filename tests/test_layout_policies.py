@@ -289,7 +289,7 @@ def _body_scales(slide, theme="default"):
     return body, head, placed
 
 
-def test_very_sparse_boxes_of_a_large_theme_grow_up_to_1_4_and_headings_up_to_1_25():
+def test_very_sparse_boxes_of_a_large_theme_grow_up_to_1_4_and_headings_follow_the_body():
     s = Slide(
         title=T("t", "title"),
         grid="3",
@@ -299,8 +299,10 @@ def test_very_sparse_boxes_of_a_large_theme_grow_up_to_1_4_and_headings_up_to_1_
     assert len(body) == 1 and len(head) == 1  # siblings share one scale
     bs, hs = body.pop(), head.pop()
     assert 1.15 < bs <= 1.4 + 1e-9
-    assert 1.0 < hs <= 1.25 + 1e-9
-    assert get_theme("default").sizes["body"] * bs <= 26 + 1e-6
+    th = get_theme("default")
+    assert 1.0 < hs
+    assert th.sizes["heading"] * hs >= th.sizes["body"] * bs * 0.98  # heading never smaller than its body
+    assert th.sizes["body"] * bs <= 26 + 1e-6
 
 
 def test_normal_boxes_of_a_large_theme_keep_the_small_growth():
@@ -311,7 +313,8 @@ def test_normal_boxes_of_a_large_theme_keep_the_small_growth():
     )
     body, head, _ = _body_scales(s)
     assert max(body) <= 1.15 + 1e-9
-    assert head == {1.0}
+    th = get_theme("default")
+    assert th.sizes["heading"] * min(head) >= th.sizes["body"] * max(body) * 0.98
 
 
 def test_text_above_code_has_no_gap():
@@ -327,3 +330,113 @@ def test_text_above_code_has_no_gap():
     body = next(p for p in text if p.element.role == "body")
     code = of(placed, Code)[0]
     assert 0 <= code.y - (body.y + body.h) <= 0.35 * EMU_PER_INCH  # the code follows the text directly
+
+
+# --------------------------------------------------------------------------- heading bands, paragraph room
+
+
+def _pt(p):
+    return (p.style.font_size or 0) * p.font_scale
+
+
+def _role(placed, role):
+    return [p for p in of(placed, Text) if p.element.role == role]
+
+
+def test_box_heading_is_never_smaller_than_the_grown_body_text():
+    for theme in ("jp-business", "default", "midnight"):
+        s = Slide(title=T("t", "title"), grid="2", elements=[box("a", "x", "y"), box("b", "x", "y")])
+        placed, _ = lay(s, theme)
+        body = max(_pt(p) for p in _role(placed, "body"))
+        heads = {round(_pt(p), 2) for p in _role(placed, "heading")}
+        assert len(heads) == 1  # siblings share one heading size
+        assert min(heads) >= body * 0.98, (theme, heads, body)
+        assert min(heads) <= body * 1.2  # ... of the same order as the body text
+
+
+LONG_HEAD = "とても長い見出しとても長い見出しとても長い見出しとても長い見出し"  # wraps in a quarter-width box
+
+
+def test_heading_band_height_follows_the_heading_text_and_is_equal_in_a_row():
+    s = Slide(
+        title=T("t", "title"),
+        grid="4",
+        elements=[
+            box("短い", "x", "y"),
+            box(LONG_HEAD, "x", "y"),
+            box("見出し", "x", "y"),
+            box("見出し", "x", "y"),
+        ],
+    )
+    placed, _ = lay(s)
+    heads = _role(placed, "heading")
+    assert len(heads) == 4 and len({p.h for p in heads}) == 1  # one band height for the row
+    assert len({p.y for p in heads}) == 1
+    solo, _ = lay(
+        Slide(
+            title=T("t", "title"),
+            grid="4",
+            elements=[box("a", "x"), box("b", "x"), box("c", "x"), box("d", "x")],
+        )
+    )
+    assert heads[0].h > _role(solo, "heading")[0].h * 1.5  # the shared band is taller than a one-line band
+    assert len({p.y for p in _role(placed, "body")}) == 1  # bodies start at the same height
+
+
+def test_band_height_is_per_row():
+    s = Slide(
+        title=T("t", "title"),
+        grid="2x2",
+        elements=[box("短い", "x"), box(LONG_HEAD, "x"), box("c", "x"), box("d", "x")],
+    )
+    placed, _ = lay(s)
+    h = _role(placed, "heading")
+    assert h[0].h == h[1].h and h[2].h == h[3].h and h[0].h > h[2].h
+
+
+def test_roomy_card_spreads_its_paragraphs_and_the_measure_matches():
+    from slidemark.layout import measure
+
+    s = Slide(title=T("t", "title"), grid="2", elements=[box("a", "x", "y", "z"), box("b", "x", "y", "z")])
+    placed, _ = lay(s, "default")
+    for b in _role(placed, "body"):
+        gap = b.element.attrs.get("para_gap")
+        assert gap is not None and measure.PARA_GAP < gap <= 0.6 + 1e-9
+        plain = measure.paragraphs_height(b.element.paragraphs, b.w, b.style, b.font_scale)
+        spread = measure.paragraphs_height(b.element.paragraphs, b.w, b.style, b.font_scale, gap=gap)
+        assert spread > plain
+        assert spread <= b.h * 1.01  # the text with its spacing fits the box it was given
+
+
+def test_full_or_single_paragraph_cards_get_no_extra_spacing():
+    many = tuple(f"line number {i} of a very full card" for i in range(9))
+    shrunk = tuple(f"line {i} with some more words to wrap around the card width" for i in range(30))
+    for items in (("x",), many, shrunk):
+        s = Slide(title=T("t", "title"), grid="2", elements=[box("a", *items), box("b", *items)])
+        placed, _ = lay(s, "default")
+        assert all("para_gap" not in b.element.attrs for b in _role(placed, "body"))
+
+
+def test_slide_text_beside_grown_boxes_is_at_most_one_step_smaller():
+    s = Slide(
+        title=T("t", "title"),
+        elements=[bullets("日時: 10月2日", "場所: 会議室A", "出席者: 5名"), box("決定事項", "a", "b", "c")],
+    )
+    placed, _ = lay(s)
+    text, in_box = _role(placed, "body")
+    assert text.element.paragraphs[0].plain.startswith("日時")
+    assert _pt(in_box) > get_theme("jp-business").sizes["body"]  # the box text did grow
+    assert _pt(text) > get_theme("jp-business").sizes["body"]  # ... and the slide text follows it
+    assert _pt(in_box) / 1.12 - 0.05 <= _pt(text) <= _pt(in_box) + 1e-6
+
+
+def test_badge_is_never_split_across_lines_in_the_measure():
+    from slidemark.layout import measure
+
+    p = Paragraph(runs=[Run(text="画面設計 "), Run(text="進行中", highlight="primary")])
+    segs = measure.para_segments(p)
+    assert measure.count_lines(segs, 8 * 10, 10) == 2  # 4em + badge 5em (padded) > 8em: the badge moves down
+    assert measure.count_lines([s[:3] for s in segs], 8 * 10, 10) == 1  # plain text of the same width fits
+    assert measure.count_lines(segs, 12 * 10, 10) == 1
+    latin = Paragraph(runs=[Run(text="status "), Run(text="in progress", highlight="primary")])
+    assert measure.count_lines(measure.para_segments(latin), 7 * 10, 10) == 2  # a Latin badge keeps its space

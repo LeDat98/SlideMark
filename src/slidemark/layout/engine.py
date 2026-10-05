@@ -103,6 +103,14 @@ GROW_VERY_SPARSE = (
 GROW_VERY_SPARSE_PT = 16
 GROW_VERY_SPARSE_MAX_PT = 26  # ... grow up to this factor, but never beyond this body size
 GROW_HEAD = 1.25  # box headings grow along with the body text, up to this factor
+HEAD_BODY = 1.05  # a box heading is at least this much x the (grown) body text of the same box ...
+HEAD_TOL = (
+    0.98  # ... but only when it would be more than this much smaller (a 1% gap is not worth a taller band)
+)
+ROOM_FREE = 0.35  # a card with more than this share of its inner height free spreads its paragraphs ...
+ROOM_USE = 0.6  # ... using this share of the free height ...
+ROOM_GAP_MAX = 0.6  # ... up to this space-before (em, about half a line) per paragraph
+SLIDE_PEER_STEP = 1.12  # slide-level text is at most this much smaller than the box body text beside it
 SPARSE_LINES = 2
 SPARSE_LINE_EM = 22  # a "short" line
 GROW_FILL = 0.85  # growth stops when the content would fill more than this share of the grid
@@ -149,6 +157,10 @@ class _Ctx:
     grow_base: float = (
         1.0  # roomy pass: the growth before it; text that would wrap more at ``grow`` is refused
     )
+    band_h: dict[tuple[int, int], int] = field(
+        default_factory=dict
+    )  # (box id, box width) -> heading height shared by the boxes of one row
+    gaps: dict[int, float] = field(default_factory=dict)  # text id -> paragraph gap (em) of a roomy card
     out: list[Placed] = field(default_factory=list)
     over: list[str] = field(default_factory=list)
     diags: list[Diagnostic] = field(default_factory=list)
@@ -384,12 +396,28 @@ def _grown(ctx: _Ctx, el, eff: float) -> float:
         if el.role == "body" and "callout" not in el.classes:
             ctx.grew = True
             return eff * ctx.grow
+    elif (
+        ctx.grow > 1.0
+        and ctx.depth == 0
+        and ctx.scale >= 1.0
+        and isinstance(el, Text)
+        and el.role == "body"
+        and "callout" not in el.classes
+        and _has_box_text(ctx)
+    ):  # slide-level text beside grown boxes: at most one step smaller than their body text
+        base = max(_text_style(ctx, el, Style()).font_size or 18, 1.0)
+        box_pt = ctx.theme.sizes.get("body", 18) * ctx.dense_k * ctx.grow
+        f = min(max(box_pt / SLIDE_PEER_STEP / base, 1.0), ctx.grow)
+        if f > 1.0:
+            ctx.grew = True
+            return eff * f
     return eff
 
 
 def _text_need(ctx: _Ctx, el: Text | Shape, style: Style, width: int, scale: float) -> float:
     pad = _pad(style)
-    return measure.paragraphs_height(el.paragraphs, width - 2 * pad, style, scale) + 2 * pad
+    gap = ctx.gaps.get(id(el))
+    return measure.paragraphs_height(el.paragraphs, width - 2 * pad, style, scale, gap=gap) + 2 * pad
 
 
 def _natural_height(ctx: _Ctx, el, width: int, inherit: Style) -> int | None:
@@ -506,6 +534,8 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
                 ctx.over.append(_label(el))
         if isinstance(el, Text) and "callout" in el.classes:
             rect = Rect(rect.x, rect.y, rect.w, min(rect.h, round(need)))  # callouts never stretch
+        if (pg := ctx.gaps.get(id(el))) is not None:  # spread paragraphs: the renderer writes spcBef
+            el = el.model_copy(update={"attrs": {**el.attrs, "para_gap": pg}})
         ctx.emit(el, rect, st, eff)
     elif isinstance(el, Code):
         st = _code_style(ctx, el)
@@ -610,7 +640,69 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
     eff = measure.effective_scale(hst.font_size or 18, ctx.scale, ctx.theme.min_font_size)
     if ctx.head_grow and ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi:
         eff *= min(ctx.grow, GROW_HEAD)
+    if ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi and (body := _box_body_pt(ctx, c)):
+        size = max(hst.font_size or 18, 1.0)
+        if size * eff < body * HEAD_TOL:  # never smaller than its own body
+            eff = body * HEAD_BODY / size
     return h_el, hst, eff, band
+
+
+def _box_body_pt(ctx: _Ctx, c: Container) -> float:
+    """Largest body text size (pt) inside box ``c`` after the sparse-slide growth; 0 without body text."""
+    best = 0.0
+    for ch in c.children:
+        if isinstance(ch, Text) and ch.role == "body" and "callout" not in ch.classes:
+            st = _text_style(ctx, ch, Style())
+            size = st.font_size or 18
+            best = max(
+                best, size * measure.effective_scale(size, ctx.scale, ctx.theme.min_font_size) * ctx.grow
+            )
+    return best
+
+
+def _head_metrics(ctx: _Ctx, c: Container, rect_w: int, pad: int, kpi: bool, row: bool = True):
+    """(parts, icon side, text shift, heading height) of a box ``rect_w`` wide, or ``None`` without heading.
+
+    The height is the heading band (or the plain heading text); with ``row`` it is raised to the tallest
+    heading among the boxes of the same row (``ctx.band_h``) so that bands and bodies line up.
+    """
+    parts = _heading_parts(ctx, c, pad, kpi)
+    if parts is None:
+        return None
+    h_el, hst, eff, band = parts
+    icon = _icon_name(c)
+    isz, shift = _icon_side(hst, eff, kpi) if icon else (0, 0)
+    if icon and kpi:
+        isz = min(isz, max(rect_w - 2 * pad, 1))
+        shift = 0
+    if icon and band:
+        shift = pad + isz  # the text's own padding supplies the gap after the icon
+    if band:
+        hh = round(_text_need(ctx, h_el, hst, rect_w - shift, eff))
+        if icon:
+            hh = max(hh, isz + 2 * pad)
+    else:
+        hh = round(_text_need(ctx, h_el, hst, rect_w - 2 * pad - shift, eff))
+        if icon and not kpi:
+            hh = max(hh, isz)
+    if row:
+        hh = max(hh, ctx.band_h.get((id(c), rect_w), 0))
+    return parts, isz, shift, hh
+
+
+def _equalize_heads(ctx: _Ctx, boxes: list[tuple[Container, int, int]]) -> None:
+    """Boxes of one row share the tallest heading height: ``boxes`` are (box, width, row key)."""
+    rows: dict[int, list[tuple[Container, int, int]]] = {}
+    for c, w, key in boxes:
+        if isinstance(c, Container) and "kpi" not in c.classes and c.title is not None:
+            pad = _pad(_card_style(ctx, c), 10 * EMU_PER_PT * ctx.tight)
+            m = _head_metrics(ctx, c, w, pad, False, row=False)
+            if m is not None:
+                rows.setdefault(key, []).append((c, w, m[3]))
+    for items in rows.values():
+        top = max(h for _, _, h in items)
+        for c, w, _ in items:
+            ctx.band_h[(id(c), w)] = top
 
 
 def _icon_name(el) -> str | None:
@@ -643,23 +735,15 @@ def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> Non
     y = inner.y
     child_inherit = inherit.merged(_only_inheritable(style))
     kpi = "kpi" in c.classes
-    if parts := _heading_parts(ctx, c, pad, kpi):
-        h_el, hst, eff, band = parts
+    if metrics := _head_metrics(ctx, c, rect.w, pad, kpi):
+        (h_el, hst, eff, band), isz, shift, hh = metrics
         icon = _icon_name(c)
-        isz, shift = _icon_side(hst, eff, kpi) if icon else (0, 0)
         if icon and kpi:  # icon centered above the label and the number
-            isz = min(isz, inner.w)
             ctx.emit(
                 _icon_item(icon), Rect(inner.x + (inner.w - isz) // 2, y, isz, isz), Style(fill="primary")
             )
             y += isz + round(pad * 0.4)
-            shift = 0
-        if icon and band:
-            shift = pad + isz  # the text's own padding supplies the gap after the icon
         if band:
-            hh = round(_text_need(ctx, h_el, hst, rect.w - shift, eff))
-            if icon:
-                hh = max(hh, isz + 2 * pad)
             if hh > rect.h * _TOL:
                 ctx.over.append(_label(c))
             band_rect = Rect(rect.x, rect.y, rect.w, min(hh, rect.h))
@@ -676,9 +760,7 @@ def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> Non
                 ctx.emit(h_el, band_rect, hst, eff)
             y = band_rect.bottom + round(pad * 0.5)
         else:
-            hh = round(_text_need(ctx, h_el, hst, inner.w - shift, eff))
             if icon and not kpi:
-                hh = max(hh, isz)
                 ctx.emit(_icon_item(icon), Rect(inner.x, y, isz, isz), Style(fill=hst.color or "primary"))
             if hh > inner.h * _TOL:
                 ctx.over.append(_label(c))
@@ -715,22 +797,14 @@ def _box_nat(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None:
     pad = _pad(style, 10 * EMU_PER_PT * ctx.tight)
     kpi = "kpi" in c.classes
     total = 2 * pad if c.children or c.title else 0
-    if parts := _heading_parts(ctx, c, pad, kpi):
-        h_el, hst, eff, band = parts
-        icon = _icon_name(c)
-        isz, shift = _icon_side(hst, eff, kpi) if icon else (0, 0)
-        if icon and kpi:
-            isz = min(isz, max(width - 2 * pad, 1))
+    if metrics := _head_metrics(ctx, c, width, pad, kpi):
+        (_h_el, _hst, _eff, band), isz, _shift, hh = metrics
+        if kpi and _icon_name(c):
             total += isz + round(pad * 0.4)
-            shift = 0
-        if icon and band:
-            shift = pad + isz
         if band:
-            hh = round(_text_need(ctx, h_el, hst, width - shift, eff))
-            total = (max(hh, isz + 2 * pad) if icon else hh) + round(pad * 0.5) + pad
+            total = hh + round(pad * 0.5) + pad
         else:
-            hh = round(_text_need(ctx, h_el, hst, width - 2 * pad - shift, eff))
-            total += (max(hh, isz) if icon and not kpi else hh) + round(pad * 0.5)
+            total += hh + round(pad * 0.5)
     children = c.children
     if not children:
         return total
@@ -789,6 +863,48 @@ def _gap(ctx: _Ctx, value, ref: int, small: bool = False) -> int:
     return round(g * 0.5) if small else round(g)
 
 
+def _roomy_paragraphs(ctx: _Ctx, flow: list, nat: list, area: Rect, inherit: Style, owner, gap: int) -> None:
+    """A card with plenty of free height spreads its paragraphs (space-before up to about half a line).
+
+    Only inside boxes, not on shrunk (dense full) slides, and only when more than ``ROOM_FREE`` of the inner
+    height stays free. Sets ``ctx.gaps`` (read by ``_text_need`` and written by the renderer as ``spcBef``)
+    and updates the natural heights in ``nat``.
+    """
+    if ctx.depth == 0 or ctx.scale < 1.0 or not isinstance(owner, Container) or "kpi" in owner.classes:
+        return
+    fixed = sum(n or 0 for n in nat) + gap * (len(flow) - 1)
+    free = area.h - fixed
+    if area.h <= 0 or free <= ROOM_FREE * area.h:
+        return
+    cands: list[tuple[int, Text, float]] = []  # (index, text, sum of font sizes over its paragraph gaps)
+    for k, (_i, ch) in enumerate(flow):
+        if (
+            isinstance(ch, Text)
+            and ch.role == "body"
+            and "callout" not in ch.classes
+            and len(ch.paragraphs) > 1
+        ):
+            st = _text_style(ctx, ch, inherit)
+            size = (st.font_size or 18) * _grown(
+                ctx, ch, measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
+            )
+            cands.append((k, ch, size * (len(ch.paragraphs) - 1)))
+    slots = sum(c[2] for c in cands)
+    if not slots:
+        return
+    g = min(ROOM_GAP_MAX, measure.PARA_GAP + free * ROOM_USE / EMU_PER_PT / slots)
+    while g > measure.PARA_GAP + 0.02:
+        for k, ch, _ in cands:
+            ctx.gaps[id(ch)] = g
+            nat[k] = round(_natural_height(ctx, ch, area.w, inherit) or 0)
+        if sum(n or 0 for n in nat) + gap * (len(flow) - 1) <= area.h * (1 - ROOM_FREE * 0.5):
+            return
+        g -= 0.05
+    for k, ch, _ in cands:  # no room for more than the default gap after all
+        ctx.gaps.pop(id(ch), None)
+        nat[k] = round(_natural_height(ctx, ch, area.w, inherit) or 0)
+
+
 def _place_stack(
     ctx: _Ctx, children: list, area: Rect, inherit: Style, gap: int, owner, *, center: bool = False
 ) -> dict[int, Rect]:
@@ -816,6 +932,8 @@ def _place_stack(
             share = spare / len(tabs)
             for k in tabs:
                 nat[k] = round((nat[k] or 0) + min(share, (nat[k] or 0) * (_table_grow(ctx) - 1)))
+        elif not tabs:
+            _roomy_paragraphs(ctx, flow, nat, area, inherit, owner, gap)
     y = area.y
     used = 0
     for (i, ch), n in zip(flow, nat, strict=True):
@@ -1057,6 +1175,7 @@ def _group_nat(ctx: _Ctx, g: Container, width: int, inherit: Style) -> tuple[int
         return None, "other"
     gap = _gap(ctx, g.gap, width, small=True)
     w = max((width - gap * (len(kids) - 1)) // len(kids), 1)
+    _equalize_heads(ctx, [(k, w, 0) for k in kids])
     nats = [_box_nat(ctx, k, w, inherit) for k in kids]
     if any(n is None for n in nats):
         return None, "other"
@@ -1270,6 +1389,8 @@ def _place_blocks(
     if extra:
         grid_area, tail_area = _split_grid_tail(ctx, area, gap, gs, flow, extra, inherit, flags)
     cells = cell_rects(gs, len(flow), grid_area, gap, ctx.theme.columns)
+    if "chevron" not in flags:  # boxes of one row share the tallest heading (band) height
+        _equalize_heads(ctx, [(blk, r.w, r.y) for (_i, blk), r in zip(flow, cells, strict=True)])
     if "chevron" not in flags and ctx.depth == 0:
         tree = bool(links) and gs.areas is not None and len(gs.rows) >= 2
         row_h = _row_heights(ctx, gs, flow, cells, grid_area, area, gap, inherit, tail_area is not None, tree)

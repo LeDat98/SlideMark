@@ -440,7 +440,16 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
             shp = s.shapes.add_textbox(Emu(pl.x), Emu(pl.y), Emu(pl.w), Emu(pl.h))
             shp.name = name
             tf = shp.text_frame
-        fill_text(rc, tf, el.paragraphs, st, pl.font_scale, field=field)
+        gap = el.attrs.get("para_gap")
+        fill_text(
+            rc,
+            tf,
+            el.paragraphs,
+            st,
+            pl.font_scale,
+            field=field,
+            gap_em=float(gap) if isinstance(gap, (int, float)) else None,
+        )
         if "callout" in el.classes and st.line and not use_placeholder:
             _accent_bar(rc, s, pl, name)
     elif isinstance(el, Shape) and el.shape == "line":
