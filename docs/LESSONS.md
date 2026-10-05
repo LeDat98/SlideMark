@@ -70,3 +70,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [critique] Layout autofits sibling boxes to one scale (font-spread rules rarely fire); judge title length at nominal size because titles shrink instead of wrapping.
 - [parser] `![x](a.mp4)` right under a list item was swallowed as lazy continuation (alt text appended to the bullet, media dropped silently; found by the eval reference answers) → the line scanner flushes before and after a standalone image line.
 - [eval] Missing-asset diagnostics appear only at render time → eval.py renders into an empty temp dir and tolerates only asset-missing rules.
+- [layout] Layout search must score full pipeline results per candidate (grow/spread included); keep the empty-band weight small and add a width-fill term, or stacking sparse boxes into wide bars wins. Rule-level tests pin `engine.MAX_CANDIDATES = 1`.
