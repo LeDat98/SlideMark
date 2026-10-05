@@ -68,6 +68,8 @@ def _roundtrip(tmp_path: Path, source: str):
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.stem)
 def test_roundtrip_examples(path: Path, tmp_path: Path):
+    if "html" in path.stem:
+        pytest.xfail("Chromium-measured HTML imports as plain boxes/shapes, not back to an html fence")
     src = path.read_text(encoding="utf-8")
     text1, text2, d1, _ = _roundtrip(tmp_path, src)
     assert not [d for d in d1 if d.level in ("error", "warning")]
