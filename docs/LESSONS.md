@@ -86,3 +86,9 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] Layout tokens reach `measure` through a process-wide `measure.set_tokens(theme.layout)`: lint, critique and render must call it too, or they measure with another deck's tokens.
 - [render] `spPr` children are fill → `ln` → `effectLst`; `shape.shadow.inherit=False` already writes an empty `effectLst`, replace it instead of appending a second one.
 - [css] Python `round()` is half-to-even: `rgba(0,0,0,.3)` gives alpha `4C`, not `4D`. CSS fences are blanked in place (not deleted) so line numbers stay valid.
+- [layout] Unknown font families (Inter …) were measured with Arial metrics but LibreOffice/PowerPoint substitute wider fonts → headings wrapped over body text; unknown families now measure as "wide" (Arial × 1.13).
+- [layout] Stretching sparse cards alone leaves empty card interiors; shifting the block down leaves a gap under the lead. Balance tokens (`layout.balance_*`) only for normal density.
+- [render] U+3000 badge padding is for CJK text only; Latin badges in CJK decks use NBSP (else tiny unreadable highlights in LibreOffice).
+- [tokens] `_value("none")` means inherit → `fill=none`/`shadow=none` must be intercepted as transparent / off first; color-name checks wait for the whole header (names can be declared later).
+- [html] `\btransform:` also matched `text-transform:`. SVG paths default to a black fill (ignore zero-area ones). Measure with transforms neutralised, then map centres through ancestor matrices.
+- [eval] Lint must use the deck's real design (`deck_theme`, tokens applied): tests that used `resolve_theme` saw neutral colors and missed/raised contrast falsely.
