@@ -7,7 +7,7 @@ from pathlib import Path
 
 from lxml import etree
 from pptx import Presentation
-from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
+from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE, MSO_SHAPE_TYPE
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
@@ -320,16 +320,25 @@ def _accent_bar(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
 
 
 def _connector(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
-    """A straight connector from one corner of the box to the opposite one (flips pick the diagonal)."""
+    """A connector: straight (corner to opposite corner, flips pick the diagonal) or an elbow.
+
+    Elbows are ``bentConnector3``: horizontal-vertical-horizontal for ``route="h"``; for ``route="v"`` the
+    shape is rotated by 90 degrees (vertical-horizontal-vertical). ``adj`` places the middle segment.
+    """
     el = pl.element
     fh, fv = bool(el.attrs.get("flip_h")), bool(el.attrs.get("flip_v"))
     x0, x1 = (pl.x + pl.w, pl.x) if fh else (pl.x, pl.x + pl.w)
     y0, y1 = (pl.y + pl.h, pl.y) if fv else (pl.y, pl.y + pl.h)
-    cx = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Emu(x0), Emu(y0), Emu(x1), Emu(y1))
+    elbow = bool(el.attrs.get("elbow"))
+    kind = MSO_CONNECTOR.ELBOW if elbow else MSO_CONNECTOR.STRAIGHT
+    cx = slide.shapes.add_connector(kind, Emu(x0), Emu(y0), Emu(x1), Emu(y1))
     cx.name = name
     style_el = cx._element.find(qn("p:style"))
     if style_el is not None:
         cx._element.remove(style_el)
+    if elbow:
+        _elbow_geometry(cx, el.attrs, pl, fh, fv)
+    _glue(slide, cx, el.attrs, fh, fv)
     st = pl.style
     cx.line.color.rgb = rgb(rc.theme, st.line or "primary")
     cx.line.width = Pt(st.line_width if st.line_width is not None else 1.5)
@@ -339,6 +348,69 @@ def _connector(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         tail.set("type", "triangle")
         tail.set("w", "med")
         tail.set("len", "med")
+
+
+def _find_box(slide, box) -> object | None:
+    """The first plain rectangle / rounded rectangle on ``slide`` with exactly this (x, y, w, h)."""
+    if not box:
+        return None
+    for shp in slide.shapes:
+        if shp.shape_type != MSO_SHAPE_TYPE.AUTO_SHAPE:
+            continue
+        if (shp.left, shp.top, shp.width, shp.height) == tuple(box):
+            if shp.auto_shape_type in (MSO_SHAPE.RECTANGLE, MSO_SHAPE.ROUNDED_RECTANGLE):
+                return shp
+    return None
+
+
+def _glue(slide, cx, attrs: dict, fh: bool, fv: bool) -> None:
+    """Attach both ends to the connected boxes (connection sites 0 top, 1 left, 2 bottom, 3 right).
+
+    Glued connectors follow their boxes when the slide is edited, and LibreOffice routes them by the sides.
+    """
+    route = attrs.get("route")
+    src, dst = _find_box(slide, attrs.get("src_box")), _find_box(slide, attrs.get("dst_box"))
+    if route not in ("v", "h") or src is None or dst is None:
+        return
+    if route == "v":
+        s_idx, e_idx = (0, 2) if fv else (2, 0)
+    else:
+        s_idx, e_idx = (1, 3) if fh else (3, 1)
+    c_nv = cx._element.find(qn("p:nvCxnSpPr")).find(qn("p:cNvCxnSpPr"))
+    for tag, shp, idx in (("a:stCxn", src, s_idx), ("a:endCxn", dst, e_idx)):
+        el = etree.SubElement(c_nv, qn(tag))
+        el.set("id", str(shp.shape_id))
+        el.set("idx", str(idx))
+
+
+def _elbow_geometry(cx, attrs: dict, pl: Placed, fh: bool, fv: bool) -> None:
+    """Set the bend position and, for vertical routes, the 90 degree rotation of a ``bentConnector3``."""
+    adj = attrs.get("adj")
+    geom = cx._element.spPr.find(qn("a:prstGeom"))
+    if adj is not None and geom is not None and abs(adj - 0.5) > 1e-4:
+        av = geom.find(qn("a:avLst"))
+        if av is None:
+            av = etree.SubElement(geom, qn("a:avLst"))
+        gd = etree.SubElement(av, qn("a:gd"))
+        gd.set("name", "adj1")
+        gd.set("fmla", f"val {round(adj * 100000)}")
+    if attrs.get("route") != "v":
+        return
+    # vertical route: rotate the unrotated (w=|dy|, h=|dx|) box by 90 degrees around the bounding box center.
+    # With rot=90 the path starts top-right; flipV moves the start to the left, flipH to the bottom.
+    xfrm = cx._element.spPr.find(qn("a:xfrm"))
+    mx, my = pl.x + pl.w // 2, pl.y + pl.h // 2
+    xfrm.set("rot", "5400000")
+    for k in ("flipH", "flipV"):
+        xfrm.attrib.pop(k, None)
+    if fv:
+        xfrm.set("flipH", "1")
+    if not fh:
+        xfrm.set("flipV", "1")
+    xfrm.find(qn("a:off")).set("x", str(mx - pl.h // 2))
+    xfrm.find(qn("a:off")).set("y", str(my - pl.w // 2))
+    xfrm.find(qn("a:ext")).set("cx", str(pl.h))
+    xfrm.find(qn("a:ext")).set("cy", str(pl.w))
 
 
 def _placeholder(rc: RenderCtx, s, pl: Placed, name: str, label: str) -> None:

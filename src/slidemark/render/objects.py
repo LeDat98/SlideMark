@@ -8,6 +8,7 @@ from lxml import etree
 from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.dml.color import RGBColor
 from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION
+from pptx.enum.text import MSO_ANCHOR
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 from pygments import lex
@@ -130,6 +131,7 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             pl.font_scale,
             inset=0,
         )
+        cell.vertical_anchor = MSO_ANCHOR.MIDDLE
         cell.margin_left = cell.margin_right = Emu(measure.CELL_PAD_X)
         cell.margin_top = cell.margin_bottom = Emu(measure.CELL_PAD_Y)
 

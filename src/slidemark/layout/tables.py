@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
+
 from ..ir import Cell, Style, Table
-from ..units import to_emu
+from ..units import EMU_PER_PT, to_emu
 from . import measure
 
 
@@ -38,8 +40,21 @@ def table_grid(t: Table) -> tuple[int, int, list[tuple[int, int, Cell]]]:
     return nrows, max(ncols, 1), anchors
 
 
-def column_widths(t: Table, ncols: int, anchors: list[tuple[int, int, Cell]], total: int) -> list[int]:
-    """Column widths in EMU summing to ``total``."""
+def _min_em(text: str) -> float:
+    """Width in em below which ``text`` would wrap awkwardly: short CJK strings stay on one line."""
+    if measure.has_cjk(text):
+        return min(measure.text_em(text), 8.0)
+    return min(max((measure.text_em(w) for w in text.split()), default=0.0), 12.0)
+
+
+def column_widths(
+    t: Table, ncols: int, anchors: list[tuple[int, int, Cell]], total: int, size_pt: float = 14.0
+) -> list[int]:
+    """Column widths in EMU summing to ``total``.
+
+    Without explicit ``col_widths`` the widths follow the measured longest cell text of each column (header
+    included), and no column drops below the width of its shortest sensible line (``_min_em``).
+    """
     weights: list[float] = []
     if t.col_widths:
         for v in t.col_widths[:ncols]:
@@ -51,18 +66,102 @@ def column_widths(t: Table, ncols: int, anchors: list[tuple[int, int, Cell]], to
                 )
             except (ValueError, TypeError):
                 weights.append(1.0)
-    if len(weights) != ncols or any(w <= 0 for w in weights):
-        weights = [4.0] * ncols
-        for _r, c, cell in anchors:
-            if cell.colspan == 1:
-                n = sum(measure.text_em(p.plain) for p in cell.paragraphs[:1])
-                text = max((p.plain for p in cell.paragraphs), key=len, default="")
-                n = max(n, measure.text_em(text))
-                weights[c] = max(weights[c], min(n, 30.0))
-    s = sum(weights)
-    widths = [round(total * w / s) for w in weights]
+    if len(weights) == ncols and all(w > 0 for w in weights):
+        s = sum(weights)
+        widths = [round(total * w / s) for w in weights]
+        widths[-1] += total - sum(widths)
+        return widths
+    weights = [3.0] * ncols
+    mins = [2.0] * ncols
+    for r, c, cell in anchors:
+        if cell.colspan != 1:
+            continue
+        bold = r < t.header_rows or c < t.header_cols
+        n = max((measure.text_em(p.plain, bold=bold) for p in cell.paragraphs), default=0.0)
+        weights[c] = max(weights[c], min(n, 30.0))
+        mins[c] = max(mins[c], *(_min_em(p.plain) for p in cell.paragraphs), 0.0)
+    pad_em = 2 * measure.CELL_PAD_X / EMU_PER_PT / max(size_pt, 1.0)
+    weights = [w + pad_em for w in weights]
+    min_w = [(m + pad_em) * 1.08 for m in mins]  # a little headroom: fallback fonts run wider
+    # water-filling: columns below their minimum are pinned to it, the rest share what is left by weight
+    em_total = total / EMU_PER_PT / max(size_pt, 1.0)
+    pinned: dict[int, float] = {}
+    for _ in range(ncols):
+        rest = em_total - sum(pinned.values())
+        free = [i for i in range(ncols) if i not in pinned]
+        wsum = sum(weights[i] for i in free) or 1.0
+        bad = [i for i in free if rest * weights[i] / wsum < min_w[i]]
+        if not bad:
+            break
+        for i in bad:
+            pinned[i] = min_w[i]
+    rest = max(em_total - sum(pinned.values()), 0.0)
+    free = [i for i in range(ncols) if i not in pinned]
+    wsum = sum(weights[i] for i in free) or 1.0
+    ems = [pinned[i] if i in pinned else rest * weights[i] / wsum for i in range(ncols)]
+    s = sum(ems) or 1.0
+    widths = [round(total * e / s) for e in ems]
     widths[-1] += total - sum(widths)
     return widths
+
+
+_NUM = re.compile(
+    r"^[\s+\-\u2212\uff0b\uff0d\u25b2\u25b3\u25bc\u25bd\u00a5\uffe5$\u20ac\u00b1(]*"
+    r"[\d][\d.,\uff0c\s]*"
+    r"(?:%|\uff05|\u5104\u5186|\u4e07\u5186|\u5343\u5186|\u5146\u5186|\u5186|\u5104|\u4e07|\u5343|"
+    r"\u793e|\u4ef6|\u540d|\u4eba|\u500d|\u30f6\u6708|\u304b\u6708|\u30ab\u6708|\u30dd\u30a4\u30f3\u30c8|"
+    r"pt|pts|x|k|m|b|bn|M|K|B)?[\s)]*[\u301c~]?$"
+)
+
+
+_DASHES = {"-", "\u2013", "\u2014", "\uff0d", "\u2212", "\u2015"}  # "no value" placeholders
+
+
+def is_numeric(text: str) -> bool:
+    """True for figures such as ``38.2``, ``+14%``, ``▲8.0``, ``62.4億円``, ``5万円〜``."""
+    t = text.strip()
+    return bool(t) and (bool(_NUM.match(t)) or t in _DASHES)
+
+
+def right_align_numbers(t: Table) -> Table:
+    """Copy of ``t`` where numeric body cells (and the header of all-numeric columns) are right-aligned.
+
+    Cells with an explicit alignment (cell or paragraph style) are left alone.
+    """
+    _, ncols, anchors = table_grid(t)
+    col_of = {id(cell): c for _r, c, cell in anchors}
+
+    def text(cell: Cell) -> str:
+        return "".join(p.plain for p in cell.paragraphs).strip()
+
+    body: dict[int, list[str]] = {c: [] for c in range(ncols)}
+    for r, c, cell in anchors:
+        if r >= t.header_rows and c >= t.header_cols and cell.colspan == 1 and text(cell):
+            body[c].append(text(cell))
+    num_cols = {c for c, items in body.items() if items and all(is_numeric(x) for x in items)}
+    rows = [list(row) for row in t.rows]
+    changed = False
+    for ri, row in enumerate(t.rows):
+        for ci, cell in enumerate(row):
+            col = col_of.get(id(cell))
+            if col is None or cell.colspan != 1 or not text(cell):
+                continue
+            if (cell.style and cell.style.align) or any(p.style and p.style.align for p in cell.paragraphs):
+                continue
+            if (
+                (col in num_cols)
+                if ri < t.header_rows
+                else (
+                    col >= t.header_cols
+                    and is_numeric(text(cell))
+                    and (col in num_cols or text(cell) not in _DASHES)
+                )
+            ):
+                rows[ri][ci] = cell.model_copy(
+                    update={"style": (cell.style or Style()).merged(Style(align="right"))}
+                )
+                changed = True
+    return t.model_copy(update={"rows": rows}) if changed else t
 
 
 def row_heights(

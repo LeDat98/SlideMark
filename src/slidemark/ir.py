@@ -290,6 +290,8 @@ class Placed(Model):
       resolve them with ``Theme.color``. ``font_scale`` multiplies every font size of the element.
     - Connectors (``Link``) are ``Shape(shape="line")`` with ``attrs={"head": "arrow"|"none",
       "flip_h": bool, "flip_v": bool}``: a straight line from one corner of the box to the opposite one.
+      Elbow connectors add ``"elbow": True, "route": "v"|"h", "adj": 0..1`` (bend position) and
+      ``"src_box"``/``"dst_box"`` ``(x, y, w, h)`` so the renderer can glue both ends to the block shapes.
     - ``.kpi`` boxes: the first paragraph is the big number (role style ``kpi``), the rest is caption text.
     - Callouts (``> [!note]``) are ``Text`` with classes ``["callout", "<kind>"]``; badges are runs with
       ``highlight`` set (theme color name) and ``color`` for the text.
