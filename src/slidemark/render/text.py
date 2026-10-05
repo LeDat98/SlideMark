@@ -164,8 +164,14 @@ def fill_text(
     para_gap: bool = True,
     field: str | None = None,
     inset: int | None = None,
+    gap_em: float | None = None,
 ) -> None:
-    """Write ``paragraphs`` into text frame ``tf`` using the (already merged) ``style``."""
+    """Write ``paragraphs`` into text frame ``tf`` using the (already merged) ``style``.
+
+    ``gap_em`` is the space before every paragraph but the first, x font size (default ``measure.PARA_GAP``;
+    the layout passes a larger value for roomy cards, as ``attrs["para_gap"]`` of the text).
+    """
+    gap = measure.PARA_GAP if gap_em is None else gap_em
     tf.word_wrap = True
     tf.auto_size = MSO_AUTO_SIZE.NONE
     pad = inset if inset is not None else emu(style.padding, default=0) if style.padding is not None else 0
@@ -179,7 +185,7 @@ def fill_text(
         para.alignment = _ALIGN.get(pst.align or "left", PP_ALIGN.LEFT)
         if pst.line_spacing:
             para.line_spacing = pst.line_spacing
-        para.space_before = Pt(size * measure.PARA_GAP) if (i > 0 and para_gap) else Pt(0)
+        para.space_before = Pt(size * gap) if (i > 0 and para_gap) else Pt(0)
         para.space_after = Pt(0)
         _set_bullet(para, p, size)
         first_text = ""

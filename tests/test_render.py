@@ -322,3 +322,36 @@ def test_opens_in_libreoffice(tmp_path):
     assert (tmp_path / "lo.pdf").exists(), r.stderr
     assert (tmp_path / "lo.pdf").stat().st_size > 1000
     assert Emu(1)  # keep import used
+
+
+def _space_before_pts(tmp_path, items, theme="default"):
+    boxes = [Container(title=T(h, "heading"), children=[bullets(*items)]) for h in ("a", "b")]
+    d = Deck(slides=[Slide(title=T("t", "title"), grid="2", elements=boxes)])
+    prs = build(d, tmp_path, theme)
+    out = []
+    for shp in prs.slides[0].shapes:
+        if shp.has_text_frame and shp.text_frame.text.startswith(items[0]):
+            for para in shp.text_frame.paragraphs:
+                sb = para._p.pPr.find("{http://schemas.openxmlformats.org/drawingml/2006/main}spcBef")
+                pts = sb[0].get("val")
+                out.append((int(pts), para.runs[0].font.size.pt))
+            break
+    return out
+
+
+def test_roomy_card_paragraphs_get_a_larger_spc_bef(tmp_path):
+    from slidemark.layout import measure
+
+    rows = _space_before_pts(tmp_path, ("one", "two", "three"))
+    assert rows[0][0] == 0
+    for val, size in rows[1:]:
+        assert val / 100 > size * measure.PARA_GAP + 0.5  # spread: more than the default gap
+        assert val / 100 <= size * 0.6 + 0.02  # ... up to about half a line
+
+
+def test_full_card_paragraphs_keep_the_default_spc_bef(tmp_path):
+    from slidemark.layout import measure
+
+    rows = _space_before_pts(tmp_path, tuple(f"line number {i} of a very full card" for i in range(9)))
+    for val, size in rows[1:]:
+        assert abs(val / 100 - size * measure.PARA_GAP) < 0.02

@@ -122,10 +122,15 @@ def list_indent(size_pt: float, level: int) -> tuple[int, int]:
     return hang * (level + 1), -hang
 
 
-def _units(
-    segments: list[tuple[str, bool, bool]], font: str | None = None
-) -> list[tuple[float, float, str, bool, str]]:
-    """Split styled text into wrap units: (width_em, trailing_space_em, first_char, hard_break, last_char)."""
+Segment = tuple[str, bool, bool] | tuple[str, bool, bool, bool]  # (text, bold, mono[, badge])
+
+
+def _units(segments: list[Segment], font: str | None = None) -> list[tuple[float, float, str, bool, str]]:
+    """Split styled text into wrap units: (width_em, trailing_space_em, first_char, hard_break, last_char).
+
+    A badge segment (4th item true) is one unbreakable unit: its text plus the full-width padding the
+    renderer adds around CJK badge text.
+    """
     units: list[tuple[float, float, str, bool, str]] = []
     key = font_key(font)
     st = {"word": "", "w": 0.0, "sp": 0.0}
@@ -135,8 +140,14 @@ def _units(
             units.append((st["w"], st["sp"], st["word"][:1], False, st["word"][-1:]))
         st["word"], st["w"], st["sp"] = "", 0.0, 0.0
 
-    for text, bold, mono in segments:
+    for seg in segments:
+        text, bold, mono = seg[0], seg[1], seg[2]
         kind = "mono" if mono else ("bold" if bold else "regular")
+        if len(seg) > 3 and seg[3] and text.strip() and "\n" not in text and "\v" not in text:
+            flush()
+            w = sum(_char_em(c, kind, key) for c in text) + (2.0 if has_cjk(text) else 0.0)
+            units.append((w, 0.0, "", False, ""))
+            continue
         for ch in text:
             if ch in "\n\v":
                 flush()
@@ -161,9 +172,7 @@ def _units(
     return units
 
 
-def count_lines(
-    segments: list[tuple[str, bool, bool]], width_pt: float, size_pt: float, font: str | None = None
-) -> int:
+def count_lines(segments: list[Segment], width_pt: float, size_pt: float, font: str | None = None) -> int:
     """Number of lines the styled text needs in ``width_pt`` at ``size_pt`` (with kinsoku)."""
     width = max(width_pt / max(size_pt, 1.0), 1.0)  # in em
     lines, cur = 1, 0.0
@@ -198,8 +207,8 @@ def count_lines(
     return lines
 
 
-def para_segments(p: Paragraph, bold: bool = False, mono: bool = False) -> list[tuple[str, bool, bool]]:
-    return [(r.text, bold or r.bold, mono or r.code) for r in p.runs]
+def para_segments(p: Paragraph, bold: bool = False, mono: bool = False) -> list[Segment]:
+    return [(r.text, bold or r.bold or bool(r.highlight), mono or r.code, bool(r.highlight)) for r in p.runs]
 
 
 def paragraphs_height(
@@ -210,8 +219,13 @@ def paragraphs_height(
     *,
     default_size: float = 18,
     mono: bool = False,
+    gap: float | None = None,
 ) -> float:
-    """Estimated height in EMU of ``paragraphs`` wrapped into ``width_emu`` (insets already removed)."""
+    """Estimated height in EMU of ``paragraphs`` wrapped into ``width_emu`` (insets already removed).
+
+    ``gap`` is the space before every paragraph but the first, x font size (default ``PARA_GAP``).
+    """
+    gap = PARA_GAP if gap is None else gap
     base = style.font_size or default_size
     font = style.font
     total_pt = 0.0
@@ -223,7 +237,7 @@ def paragraphs_height(
         lines = count_lines(para_segments(p, bold, mono), wpt, size, font)
         ls = (p.style.line_spacing if p.style and p.style.line_spacing else style.line_spacing) or 1.0
         lh = size * (LINE_CJK if has_cjk(p.plain) else LINE_LATIN) * ls
-        total_pt += lines * lh + (size * PARA_GAP if i > 0 else 0)
+        total_pt += lines * lh + (size * gap if i > 0 else 0)
     return total_pt * EMU_PER_PT * SAFETY
 
 
