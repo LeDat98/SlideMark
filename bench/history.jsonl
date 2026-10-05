@@ -40,3 +40,4 @@
 {"date": "2026-10-05T08:47:11+00:00", "commit": "2fd77ea", "metric": "html_fidelity", "slides": 30, "native": 1.0, "native_90": 30, "diff": 0.0116, "diff_native": 0.0116, "value": 1.0, "worst": [["01-gradient-hero", 1.0], ["02-kpi-dashboard", 1.0], ["03-timeline", 1.0], ["04-jp-dense", 1.0], ["05-svg-diagram", 1.0]]}
 {"date": "2026-10-05T08:57:11+00:00", "commit": "37c4198", "metric": "design_tokens", "css": 139, "html": 362, "tokens": 128, "value": 0.354}
 {"date": "2026-10-05T08:57:18+00:00", "commit": "96063ce", "metric": "design_tokens", "css": 139, "html": 362, "tokens": 128, "value": 0.354}
+{"date": "2026-10-05T09:17:16+00:00", "commit": "475158b", "metric": "roundtrip", "roundtrip": 0.957, "value": 0.957, "decks": 115, "lossless": 110, "token_ratio": 0.966, "design_decks": 3, "design_ok": 3, "failures": {"style": 4, "geometry": 3, "size": 2, "shape": 1, "objects": 1, "text-order": 1}}

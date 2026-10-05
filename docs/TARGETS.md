@@ -23,7 +23,7 @@ Never limit the agent's design ability: mechanisms, not looks. These gates come 
 - [x] DF2 Inline tokens: every `Theme` field settable from header lines (`colors:`, `fonts:`, `sizes:`, `style:`), a theme file, or preset + overrides; `slidemark tokens`; in SKILL.md within budget (SKILL.md 942 tokens, `slidemark docs design`)
 - [x] DF3 CSS fence: selectors for every SlideMark element + custom classes/ids; ≥ 30 CSS properties mapped natively (gradients, shadows, per-side borders, letter-spacing, line-height, rotation…); unmapped → diagnostic (2026-10-05 run 3: 34 properties, `layout/css.py` selector matching, 165 tests)
 - [x] DF4 HTML fidelity: ≥ 30 agent-designed HTML slides; ≥ 90% of visible elements native + editable; gradients/shadows/rotation/inline SVG native; mean Chromium-vs-pptx perceptual diff recorded and only goes down (`bench/html_fidelity.py`: 30 slides, native 0.633 → 1.00, 30/30 ≥ 0.9, diff 0.0116 in BASELINE.json)
-- [ ] DF5 Whole-deck HTML (`build deck.html`, `@html` slides) and mixed decks sharing tokens; import round trip (all ✓ except the import round trip: tokens/CSS/HTML source are lost on import)
+- [x] DF5 Whole-deck HTML (`build deck.html`, `@html` slides) and mixed decks sharing tokens; import round trip (2026-10-05 run 3: design source in a customXml part, `bench/roundtrip.py` design round trip 3/3 stable)
 - [x] DF6 Design-freedom eval: 20 brand-brief tasks, ≥ 90% first-pass clean, each deck follows its own brief (no shared palette unless asked), images reviewed (run-6-brand: 19/20 = 95% first pass, 0 shared palettes, all 20 decks reviewed by the orchestrator)
 
 ## L1: Works (target: day 2)
