@@ -304,3 +304,17 @@ open to new names), presets as YAML (`src/slidemark/presets/*.yaml`), `theme: no
   ellipses, pill badges, simple inline SVG native) on `bench/html_corpus` (baseline native 0.633, 19/30 ≥ 0.9).
 - **Wave 4 (DF6):** 20 brand-brief eval tasks (`bench/tasks/101-120`, Sonnet, SKILL.md only) → `bench/brand_eval.py`.
 - Open defect (gallery): sparse box slides on non-dense decks leave a 35–40% empty band (13-brand-aurora slide 2).
+
+## Run 2026-10-05 (run 3) status
+- [x] Contracts: token schema, YAML presets, `Deck.tokens`, `CssRule`/`Deck.css`/`Slide.css`, Style CSS fields, `Slide.html`
+- [x] W1 A tokens header + `slidemark tokens`/`themes`; B constants → tokens, gradients/shadows, DF1 scanner
+- [x] W2 A CSS parser (34 properties); W3 B CSS matching + native render; W3 A `@html`, deck.html, htmlnative fidelity 0.63 → 1.00
+- [x] W4 A token value validation + shorthands; B unknown-font metrics, radial position, Latin badges, sparse balance
+- [x] W5 A design round trip (customXml part); B sparse slides (bar penalty, text + card growth); W6 A round-trip fixes
+- [ ] W6 B `@free` slides + text-first fill; W7 A html fence source on import (running at wrap-up time: see the log)
+
+## Leftovers for the next run
+- [ ] Sparse cards: emptiness moved inside cards on some slides (13 s2, 11 s9): grow text first (W6 B if not merged)
+- [ ] Round trip: 48-jp-meeting-minutes text-order, 73-vi-launch-mermaid geometry (pre-existing)
+- [ ] Owner: open a design deck (gradients, shadows, customXml design part) in real PowerPoint: repair check
+- [ ] L3 consulting-grade judgement; L7 tokens ≤ 20% of python-pptx (syntax design pass)

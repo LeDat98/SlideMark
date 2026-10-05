@@ -52,7 +52,8 @@ Run goal:
 
 ## 2026-10-05 (run 3, manual, design freedom, 07:40 UTC–)
 Run goal:
-- [ ] DF1 no hard-coded design: layout/render constants → `theme.layout`/`theme.render` tokens, presets as YAML, `theme: none`, literal-scanner test
-- [ ] DF2 inline tokens: `colors:`/`fonts:`/`sizes:`/`style:` header lines → `Deck.tokens`, `slidemark tokens`, SKILL.md
-- [ ] DF3 CSS fence (if time): selectors + native mappings (gradients, shadows, per-side borders, letter-spacing …)
-- [ ] Examples with agent-designed looks (brand colors, gradients, dark/light) next to dense JP; gallery reviewed
+- [x] DF1 no hard-coded design: layout/render constants → `theme.layout`/`theme.render` tokens, presets as YAML, `theme: none`, literal-scanner test
+- [x] DF2 inline tokens: `colors:`/`fonts:`/`sizes:`/`style:` header lines → `Deck.tokens`, `slidemark tokens`, SKILL.md
+- [x] DF3 CSS fence: 34 properties native, selector matching, diagnostics
+- [x] Extended: DF4 HTML fidelity (30-slide corpus), DF5 `@html`/deck.html + design round trip, DF6 brand eval (20 tasks)
+- [x] Examples with agent-designed looks (13 dark brand, 14 terracotta, 15 HTML + tokens) next to dense JP; gallery reviewed

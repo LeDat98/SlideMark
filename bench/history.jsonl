@@ -41,3 +41,4 @@
 {"date": "2026-10-05T08:57:11+00:00", "commit": "37c4198", "metric": "design_tokens", "css": 139, "html": 362, "tokens": 128, "value": 0.354}
 {"date": "2026-10-05T08:57:18+00:00", "commit": "96063ce", "metric": "design_tokens", "css": 139, "html": 362, "tokens": 128, "value": 0.354}
 {"date": "2026-10-05T09:17:16+00:00", "commit": "475158b", "metric": "roundtrip", "roundtrip": 0.957, "value": 0.957, "decks": 115, "lossless": 110, "token_ratio": 0.966, "design_decks": 3, "design_ok": 3, "failures": {"style": 4, "geometry": 3, "size": 2, "shape": 1, "objects": 1, "text-order": 1}}
+{"date": "2026-10-05T09:33:45+00:00", "commit": "61d32fe", "metric": "roundtrip", "roundtrip": 0.974, "value": 0.974, "decks": 115, "lossless": 112, "token_ratio": 0.966, "design_decks": 3, "design_ok": 3, "failures": {"geometry": 2, "size": 2, "style": 2, "shape": 1, "objects": 1, "text-order": 1}}
