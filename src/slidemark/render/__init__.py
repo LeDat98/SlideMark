@@ -12,8 +12,23 @@ from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 
-from ..ir import Chart, Code, Container, Deck, Image, Placed, Raw, Shape, Slide, Style, Table, Text
+from ..ir import (
+    Chart,
+    Code,
+    Container,
+    Deck,
+    Diagnostic,
+    Image,
+    Placed,
+    Raw,
+    Shape,
+    Slide,
+    Style,
+    Table,
+    Text,
+)
 from ..layout.engine import CHEVRON_ADJ
+from ..template import clone_footer, open_template, pick_layout
 from ..theme import Theme
 from ..units import slide_size
 from .math import add_math
@@ -60,19 +75,36 @@ _NS_P = "http://schemas.openxmlformats.org/presentationml/2006/main"
 def render(deck: Deck, placed: list[list[Placed]], theme: Theme, out: str | Path) -> Path:
     """Write ``deck`` to ``out``. ``placed[i]`` is the layout result for ``deck.slides[i]``."""
     out = Path(out)
-    prs = Presentation()
-    try:
-        prs.slide_width, prs.slide_height = (Emu(v) for v in slide_size(deck.size))
-    except ValueError:
-        prs.slide_width, prs.slide_height = (Emu(v) for v in slide_size("16:9"))
+    prs = None
     rc = RenderCtx(deck=deck, theme=theme, base_dir=str(deck.attrs.get("base_dir", ".")))
+    if theme.template:
+        try:
+            prs = open_template(theme.template)
+            rc.template = True  # the template's own slide size wins
+        except Exception as e:
+            deck.diagnostics.append(
+                Diagnostic(
+                    level="warning",
+                    message=f"template {theme.template!r} could not be opened: {type(e).__name__}",
+                    rule="bad-theme",
+                    hint="re-save the template as .pptx; the default design was used",
+                )
+            )
+    if prs is None:
+        prs = Presentation()
+        try:
+            prs.slide_width, prs.slide_height = (Emu(v) for v in slide_size(deck.size))
+        except ValueError:
+            prs.slide_width, prs.slide_height = (Emu(v) for v in slide_size("16:9"))
     for i, slide in enumerate(deck.slides):
         rc.slide_index = i
         items = placed[i] if i < len(placed) else []
         try:
             rc.slides.append(_render_slide(rc, prs, slide, items))
         except Exception as e:  # never raise on bad input: keep an empty slide and say why
-            rc.slides.append(prs.slides.add_slide(prs.slide_layouts[6]))
+            rc.slides.append(
+                prs.slides.add_slide(pick_layout(prs, "blank") if rc.template else prs.slide_layouts[6])
+            )
             rc.diag(
                 "render-error",
                 f"slide failed to render: {type(e).__name__}: {e}",
@@ -91,7 +123,13 @@ def render(deck: Deck, placed: list[list[Placed]], theme: Theme, out: str | Path
 
 def _render_slide(rc: RenderCtx, prs, slide: Slide, items: list[Placed]):
     has_title = any(isinstance(p.element, Text) and p.element.role == "title" for p in items)
-    s = prs.slides.add_slide(prs.slide_layouts[5 if has_title else 6])
+    if rc.template:
+        kind = _slide_kind(slide, rc.slide_index)
+        if kind == "content":
+            kind = "title" if has_title else "blank"
+        s = prs.slides.add_slide(pick_layout(prs, kind))
+    else:
+        s = prs.slides.add_slide(prs.slide_layouts[5 if has_title else 6])
     _background(rc, prs, s, slide)
     counters: dict[str, int] = {}
     used_title = False
@@ -101,6 +139,8 @@ def _render_slide(rc: RenderCtx, prs, slide: Slide, items: list[Placed]):
                 has_title and not used_title and isinstance(pl.element, Text) and pl.element.role == "title"
             )
             used_title = used_title or use_ph
+            if rc.template and _native_footer(rc, s, pl):
+                continue
             _render_item(rc, s, pl, counters, use_ph)
         except Exception as e:
             rc.diag(
@@ -111,6 +151,11 @@ def _render_slide(rc: RenderCtx, prs, slide: Slide, items: list[Placed]):
             )
     if has_title and not used_title and s.shapes.title is not None:
         s.shapes.title._element.getparent().remove(s.shapes.title._element)
+    if rc.template:  # drop unused template placeholders (empty "Click to add ..." prompts)
+        keep = s.shapes.title._element if used_title and s.shapes.title is not None else None
+        for shp in list(s.placeholders):
+            if shp._element is not keep and not shp._element.xpath(".//p:ph[@type='ftr' or @type='sldNum']"):
+                shp._element.getparent().remove(shp._element)
     if slide.notes:
         s.notes_slide.notes_text_frame.text = slide.notes
     if slide.hidden:
@@ -119,8 +164,30 @@ def _render_slide(rc: RenderCtx, prs, slide: Slide, items: list[Placed]):
     return s
 
 
+def _slide_kind(slide: Slide, index: int) -> str:
+    """Same inference as the layout engine: cover | section | blank | content."""
+    if slide.layout in ("cover", "section", "blank"):
+        return slide.layout
+    if slide.layout is None and slide.title and not slide.elements and not slide.conclusion:
+        return "cover" if index == 0 else "section"
+    return "content"
+
+
+def _native_footer(rc: RenderCtx, s, pl: Placed) -> bool:
+    """With a template, footer / slide number become the layout's native placeholders (fields)."""
+    el = pl.element
+    field = el.attrs.get("field") if isinstance(el, Text) else None
+    if field == "footer":
+        return clone_footer(s, "ftr", "".join(p.plain for p in el.paragraphs))
+    if field == "slide_number":
+        return clone_footer(s, "sldNum", str(rc.slide_index + 1))
+    return False
+
+
 def _background(rc: RenderCtx, prs, s, slide: Slide) -> None:
     bg = slide.background
+    if rc.template and not bg:
+        return  # keep the template's own background
     theme = rc.theme
     fill = s.background.fill
     if bg and bg.lower().startswith("linear-gradient"):

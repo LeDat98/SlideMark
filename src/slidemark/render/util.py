@@ -62,6 +62,7 @@ class RenderCtx:
     # (run element, rPr element, link target, source slide index) for the second pass
     links: list[tuple[object, object, str, int]] = field(default_factory=list)
     slides: list = field(default_factory=list)
+    template: bool = False  # the base presentation comes from a user template
 
     def diag(self, rule: str, message: str, hint: str, level: str = "warning", line: int | None = None):
         self.deck.diagnostics.append(
