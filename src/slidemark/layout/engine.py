@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+import re
 from dataclasses import dataclass, field
 
 from ..ir import (
@@ -25,7 +27,7 @@ from ..ir import (
 from ..theme import Theme
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import measure
-from .grid import Rect, auto_spec, cell_rects, parse_spec
+from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
 from .tables import column_widths, right_align_numbers, row_heights, table_grid
 
@@ -57,6 +59,7 @@ _TOL = 1.01
 CHEVRON_ADJ = 0.3  # chevron point depth / shorter side; the renderer sets the same adjustment
 CHEVRON_PAD_PT = 4  # text padding inside a chevron (the preset's text rectangle already clears the points)
 CHEVRON_H = 0.45  # chevron height / width (room for 3 lines of text between the point paddings)
+CODE_GROW = 1.25  # code text grows with the sparse-slide growth, up to this factor
 TABLE_GROW = 2.2  # rows of a table with spare room grow up to this factor
 TABLE_FONT_GROW = 1.2  # table text grows with the sparse-slide growth, up to this factor
 ROW_SLACK = 1.35  # a grid row is at most this much taller than its tallest content ...
@@ -70,7 +73,9 @@ GROW_FILL = 0.85  # growth stops when the content would fill more than this shar
 GROW_BOX_FILL = 0.92  # ... or more than this share of a box
 LEFT_KEEP = 0.2  # rows of a sparse slide expand until at most this share of the body is left over ...
 LEFT_ABOVE = 1 / 3  # ... and that leftover is split: this share above the block, the rest below
+MATH_GROW = 1.6  # an equation alone in its cell is this much larger than body text
 KPI_MIN_H = 1.1  # inches
+SHORT_EM = 30  # boxes with at most this much text (in em) are "short": four of them stay in one row
 DENSE_TIGHT = 0.7  # gap / padding factor on dense slides
 _SCALES = [round(1.0 - 0.05 * i, 2) for i in range(15)]  # 1.0 .. 0.3
 
@@ -342,13 +347,22 @@ def _natural_height(ctx: _Ctx, el, width: int, inherit: Style) -> int | None:
         return round(_text_need(ctx, el, st, width, eff))
     if isinstance(el, Code):
         st = _code_style(ctx, el)
-        eff = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
+        eff = _code_eff(ctx, st)
         pad = _pad(st)
         return round(measure.code_height(el.text, width - 2 * pad, (st.font_size or 14) * eff) + 2 * pad)
     if isinstance(el, Table):
         _, _, _, _, rh = _table_geom(ctx, el, width)
         return sum(rh)
     return None
+
+
+def _code_eff(ctx: _Ctx, st: Style) -> float:
+    """Code font scale: the autofit scale, times the sparse-slide growth (at most ``CODE_GROW``)."""
+    eff = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
+    if ctx.grow > 1.0 and ctx.scale >= 1.0:
+        ctx.grew = True
+        eff *= min(ctx.grow, CODE_GROW)
+    return eff
 
 
 def _code_style(ctx: _Ctx, el: Code) -> Style:
@@ -405,7 +419,7 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         ctx.emit(el, rect, st, eff)
     elif isinstance(el, Code):
         st = _code_style(ctx, el)
-        eff = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
+        eff = _code_eff(ctx, st)
         pad = _pad(st)
         need = measure.code_height(el.text, rect.w - 2 * pad, (st.font_size or 14) * eff) + 2 * pad
         if need > rect.h * _TOL:
@@ -413,6 +427,8 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         ctx.emit(el, Rect(rect.x, rect.y, rect.w, min(round(need), rect.h)), st, eff)
     elif isinstance(el, Table):
         st, eff, _anchors, cw, rh = _table_geom(ctx, el, rect.w)
+        if not rh or not cw:  # an empty table places nothing
+            return
         total = sum(rh)
         if total > rect.h * _TOL:
             ctx.over.append(_label(el))
@@ -447,9 +463,27 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
             align="center",
             valign="middle",
         ).merged(el.style)
-        ctx.emit(el, rect, st)
+        fs = 1.0
+        if el.kind == "math" and ctx.depth == 0:
+            fs = _math_scale(
+                ctx, el, rect
+            )  # alone in its cell: the equation grows (the renderer scales the body size)
+        ctx.emit(el, rect, st, fs)
     elif isinstance(el, Container):
         _place_container(ctx, el, rect, inherit)
+
+
+def _math_scale(ctx: _Ctx, el: Raw, rect: Rect) -> float:
+    """Font scale of an equation alone in a cell: ``MATH_GROW`` x body, less when it would not fit."""
+    body = ctx.theme.sizes.get("body", 18) * ctx.dense_k
+    size = body * MATH_GROW * ctx.scale
+    flat = re.sub(r"\\[A-Za-z]+|[{}\s]", "", el.source)
+    lines = max(el.source.count("\\\\") + 1, 1)
+    width = max(len(flat) / lines, 1) * 0.6  # em, rough
+    size = min(size, rect.w / EMU_PER_PT * 0.9 / width, rect.h / EMU_PER_PT * 0.8 / (1.6 * lines))
+    return max(size, body * ctx.scale * 0.6) / ctx.theme.sizes.get(
+        "body", 18
+    )  # the renderer divides by the theme body
 
 
 def _card_style(ctx: _Ctx, c: Container) -> Style:
@@ -676,6 +710,60 @@ def _chevron_shape(blk) -> Shape:
     )
 
 
+def _weight(b) -> int:
+    """Text length of a block (visuals count as huge)."""
+    if isinstance(b, Text):
+        return len(_plain(b.paragraphs))
+    if isinstance(b, Container):
+        return sum(_weight(c) for c in b.children) + (len(_plain(b.title.paragraphs)) if b.title else 0)
+    return 10_000
+
+
+def _has_visual(b) -> bool:
+    if isinstance(b, (Chart, Table, Image)):
+        return True
+    return isinstance(b, Container) and any(_has_visual(c) for c in b.children)
+
+
+def _auto_plan(flow: list, gs: GridSpec | None, classes: list[str], links: list[Link]):
+    """Arrangement without a grid token (docs/SYNTAX.md): returns (spec or None, flow, tail blocks).
+
+    1. a run of >= 2 boxes followed only by non-box blocks = the boxes in one row (<= 5, else two rows) and
+       the rest full width below (``tail``); ``flow`` / ``chevron`` take one column per box;
+    2. slide links forming a tree = layered areas; 3. three boxes, the first with a visual or >= 2x the text
+       of each other box = ``aab/aac``.
+    """
+    flags = set(gs.flags) if gs else set()
+    errors = list(gs.errors) if gs else []
+    k = 0
+    while k < len(flow) and isinstance(flow[k][1], Container):
+        k += 1
+    tail: list[tuple[int, object]] = []
+    if k >= 2 and k < len(flow) and all(not isinstance(b, Container) for _, b in flow[k:]):
+        tail, flow = flow[k:], flow[:k]
+    n = len(flow)
+
+    def spec(cols: int, rows: int, cap: int | None) -> GridSpec:
+        return GridSpec([1.0] * cols, [1.0] * rows, flags=flags, errors=errors, capacity=cap)
+
+    if flags:
+        if n < 2:
+            return gs, flow, tail
+        cols = n if n <= 6 else math.ceil(n / 2)
+        return spec(cols, math.ceil(n / cols), n), flow, tail
+    if n == 3 and all(isinstance(b, Container) and "kpi" not in b.classes for _, b in flow):
+        w = [_weight(b) for _, b in flow]
+        if _has_visual(flow[0][1]) or w[0] >= 2 * max(w[1], w[2]):
+            return parse_spec("aab/aac", n, classes), flow, tail
+    ids = [i for i, _ in flow]
+    if links and (areas := tree_areas(ids, [(ln.src, ln.dst) for ln in links])):
+        return parse_spec(areas, n, classes), flow, tail
+    if tail:
+        cols = n if n <= 5 else math.ceil(n / 2)
+        return spec(cols, math.ceil(n / cols), n), flow, tail
+    return gs, flow, tail
+
+
 def _block_kind_hint(blocks: list) -> tuple[bool, bool]:
     """(text_visual, short) hints for the automatic arrangement."""
     text_visual = (
@@ -684,14 +772,16 @@ def _block_kind_hint(blocks: list) -> tuple[bool, bool]:
         and sum(isinstance(b, _VISUALS) for b in blocks) == 1
     )
 
-    def size(b) -> int:
+    def size(b) -> float:
         if isinstance(b, Text):
-            return len(_plain(b.paragraphs))
+            return measure.text_em(_plain(b.paragraphs))
         if isinstance(b, Container):
-            return sum(size(c) for c in b.children) + (len(_plain(b.title.paragraphs)) if b.title else 0)
+            return sum(size(c) for c in b.children) + (
+                measure.text_em(_plain(b.title.paragraphs)) if b.title else 0
+            )
         return 10_000
 
-    return text_visual, all(size(b) <= 80 for b in blocks)
+    return text_visual, all(size(b) <= SHORT_EM for b in blocks)
 
 
 def _cx(r: Rect) -> int:
@@ -914,15 +1004,15 @@ def _place_blocks(
             callouts = []
         flow = [(i, b) for i, b in flow if (i, b) not in callouts]
     gs = parse_spec(grid, len(flow), classes)
-    # tables closing a row of boxes (a `.kpi` row, then a table) are not grid cells either
     tables: list[tuple[int, object]] = []
-    if (gs is None or (gs.capacity is None and gs.areas is None and not gs.flags)) and len(flow) > 2:
-        k = len(flow)
+    if gs is None or not gs.cols:  # no explicit grid token: infer the arrangement from the blocks
+        gs, flow, tables = _auto_plan(flow, gs, classes, links or [])
+    elif gs.capacity is None and gs.areas is None and not gs.flags and len(flow) > 2:
+        k = len(flow)  # `@4` / `@1:2`: tables closing a row of boxes (a `.kpi` row) are not grid cells
         while k > 0 and isinstance(flow[k - 1][1], Table):
             k -= 1
         if k >= 2 and all(isinstance(b, Container) for _, b in flow[:k]):
-            tables = flow[k:]
-            flow = flow[:k]
+            tables, flow = flow[k:], flow[:k]
             gs = parse_spec(grid, len(flow), classes)
     flags: set[str] = set()
     if gs is not None:
@@ -933,7 +1023,8 @@ def _place_blocks(
         text_visual, short = _block_kind_hint([b for _, b in flow])
         if text_visual and not isinstance(flow[0][1], Text):
             flow = [flow[1], flow[0]]
-        gs = auto_spec(len(flow), text_visual=text_visual, short=short)
+        wide = any(isinstance(b, Code) and max(map(len, b.text.split("\n")), default=0) > 45 for _, b in flow)
+        gs = auto_spec(len(flow), text_visual=text_visual, short=short, wide_visual=wide)
     # blocks beyond the grid's cells are stacked full width below it
     extra: list[tuple[int, object]] = []
     if gs.capacity is not None and len(flow) > gs.capacity:
@@ -960,6 +1051,7 @@ def _place_blocks(
                 tgap = tail_area.y - grid_area.bottom
                 ty = grid_area.y + used + tgap
                 tail_area = Rect(area.x, ty, area.w, max(area.bottom - ty, 0))
+    start = len(ctx.out)
     chev_eff: float | None = None  # one text size for the whole chevron row
     if "chevron" in flags:
         chev_eff = min(
@@ -993,7 +1085,36 @@ def _place_blocks(
         for k, (i, _b) in enumerate(extra):
             if k in sub:
                 rects[i] = sub[k]
+    if ctx.depth == 0 and extra and len(flow) == 1 and _is_diagram(flow[0][1]):
+        _hug_tail(ctx, start, area, gap)
     _emit_links(ctx, links or [], rects)
+
+
+def _is_diagram(b) -> bool:
+    return isinstance(b, Container) and "diagram" in b.classes and b.title is None
+
+
+def _hug_tail(ctx: _Ctx, start: int, area: Rect, gap: int) -> None:
+    """A lone diagram followed by blocks (a callout): the blocks sit right below it, the pair is centered."""
+    items = ctx.out[start:]
+    if len(items) < 2:
+        return
+    diag = items[0]  # the diagram card is emitted first and spans the diagram
+    inside = [p for p in items if p.y < diag.y + diag.h and p.y + p.h > diag.y and p is not diag]
+    members = [diag, *inside]
+    rest = [p for p in items if all(p is not m for m in members)]
+    if not rest:
+        return
+    top = min(p.y for p in members)
+    dbot = max(p.y + p.h for p in members)
+    rtop = min(p.y for p in rest)
+    rbot = max(p.y + p.h for p in rest)
+    pair = (dbot - top) + gap + (rbot - rtop)
+    new_top = area.y + max(area.h - pair, 0) // 2
+    for p in members:
+        p.y += new_top - top
+    for p in rest:
+        p.y += new_top + (dbot - top) + gap - rtop
 
 
 def _split_grid_tail(
