@@ -34,7 +34,7 @@ from ..template import clone_footer, open_template, pick_layout
 from ..theme import Theme
 from ..units import slide_size
 from .anim import build_timing
-from .htmlimg import add_html_image, close_html
+from .htmlimg import add_html_image, add_html_native, close_html
 from .icons import add_icon
 from .math import add_math
 from .media import add_media, finish_timing
@@ -478,6 +478,12 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
         shp = _autoshape(rc, s, pl, MSO_SHAPE.RECTANGLE, name)
         fill_text(rc, shp.text_frame, code_paragraphs(el), st, pl.font_scale, para_gap=False)
     elif isinstance(el, Raw) and el.kind == "math" and add_math(rc, s, pl, name):
+        pass
+    elif (
+        isinstance(el, Raw)
+        and el.kind == "html"
+        and add_html_native(rc, pl, lambda p: _render_item(rc, s, p, counters, False))
+    ):
         pass
     elif isinstance(el, Raw) and el.kind == "html" and add_html_image(rc, s, pl):
         pass

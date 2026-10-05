@@ -101,7 +101,7 @@ def _float(v: str) -> float | None:
 VALID_KEYS = (
     *("x", "y", "w", "h", "size", "color", "fill", "line", "font", "align", "valign", "bold", "italic"),
     *("radius", "opacity", "pad", "fit", "bg", "t", "hidden", "gap", "id", "icon"),
-    *("poster", "autoplay", "loop"),
+    *("poster", "autoplay", "loop", "render"),
 )
 # keep in sync with slidemark.icons (tests/test_icons.py checks it)
 ICON_NAMES = (
@@ -206,7 +206,7 @@ def apply_attrs(
         else:
             sink[k] = v
             near = closest(k, VALID_KEYS, 0.7) if sink is el.attrs else None
-            if near:
+            if near and near != k:
                 ctx.warn(f"unknown attribute '{k}'", line, "unknown-attr", f"did you mean '{near}='?")
     if box:
         merged = el.box.model_dump() if el.box else {}

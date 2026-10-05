@@ -274,4 +274,4 @@ Numeric columns are right-aligned automatically.
 | ` ```python ` or any other language | code with native syntax highlighting |
 | ` ```mermaid ` | diagram |
 | ` ```math ` | native, editable equation (LaTeX subset: `\frac`, `^`, `_`, `\sqrt`, `\sum`, `\int`, Greek, `\times`, ...) |
-| ` ```html ` | HTML/CSS rendered to native shapes, falling back to an image |
+| ` ```html ` | HTML/CSS: structural subset, else laid out by Chromium into native shapes/text (CSS grid, flex, cards), else an image; `{render=native\|image}` forces one (canvas, svg, gradients, transforms stay images) |
