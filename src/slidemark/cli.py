@@ -1,4 +1,4 @@
-"""Command line: ``slidemark build|check|import|preview|docs|schema|skill|version``."""
+"""Command line: ``slidemark build|check|review|import|preview|docs|schema|skill|version``."""
 
 from __future__ import annotations
 
@@ -90,6 +90,86 @@ def cmd_check(args: argparse.Namespace) -> int:
     else:
         print(f"ok: {len(deck.slides)} slides")
     return 1 if _has_errors(deck) else 0
+
+
+def cmd_review(args: argparse.Namespace) -> int:
+    """Parse, lay out, lint and critique a deck; print diagnostics and a score. Never fails a build."""
+    from .parser import parse
+
+    text = _read(args.input)
+    if text is None:
+        return 2
+    if _is_json(args.input):
+        from .jsonio import load_deck
+
+        deck = load_deck(text)
+    else:
+        deck = parse(text)
+    diags = list(deck.diagnostics)
+    if not _has_errors(deck):
+        try:
+            from .critique import critique
+            from .layout import layout_slide
+            from .lint import lint
+            from .template import resolve_theme, template_size
+
+            deck.attrs.setdefault("base_dir", str(Path(args.input).resolve().parent))
+            theme, tdiags = resolve_theme(deck.theme, deck.attrs["base_dir"])
+            diags.extend(tdiags)
+            if size := template_size(theme):
+                deck.size = size
+            placed = [layout_slide(s, deck, theme, i) for i, s in enumerate(deck.slides)]
+            seen = {(d.rule, d.slide) for d in diags}
+            diags.extend(d for d in lint(deck, placed, theme) if (d.rule, d.slide) not in seen)
+            diags.extend(critique(deck, placed, theme))
+        except NotImplementedError:
+            pass
+        except Exception as e:
+            diags.append(
+                Diagnostic(
+                    level="warning",
+                    message=f"review failed: {type(e).__name__}: {e}",
+                    rule="check-layout",
+                    hint="report this deck as a bug; the diagnostics above are still valid",
+                )
+            )
+    from .critique import review_score
+
+    score = review_score(diags, len(deck.slides))
+    if args.format == "json":
+        _say(json.dumps({"score": score, "diagnostics": [d.model_dump() for d in diags]}, ensure_ascii=False))
+    else:
+        for d in diags:
+            _say(str(d))
+        print(f"score: {score}/100")
+    if args.png and not _has_errors(deck):
+        _review_png(args)
+    return 0
+
+
+def _review_png(args: argparse.Namespace) -> None:
+    try:
+        import tempfile
+
+        from .build import build
+        from .preview import have_soffice, pptx_to_pngs
+
+        if not have_soffice():
+            print("note: --png skipped: LibreOffice (soffice) not found", file=sys.stderr)
+            return
+        src = Path(args.input)
+        with tempfile.TemporaryDirectory(prefix="slidemark-") as tmp:
+            pptx = Path(tmp) / (src.stem + ".pptx")
+            if _is_json(args.input):
+                from .jsonio import build_deck, load_deck
+
+                build_deck(load_deck(src), pptx, src.resolve().parent)
+            else:
+                build(src, pptx)
+            for p in pptx_to_pngs(pptx, Path(args.png)):
+                print(p, file=sys.stderr)
+    except Exception as e:
+        print(f"note: --png failed: {type(e).__name__}: {e}", file=sys.stderr)
 
 
 def cmd_build(args: argparse.Namespace) -> int:
@@ -260,6 +340,12 @@ def make_parser() -> argparse.ArgumentParser:
     c.add_argument("input")
     c.add_argument("--format", choices=["text", "json"], default="text")
     c.set_defaults(func=cmd_check)
+
+    r = sub.add_parser("review", help="design critique: check + layout/design rules + score (never fails)")
+    r.add_argument("input")
+    r.add_argument("--format", choices=["text", "json"], default="text")
+    r.add_argument("--png", metavar="DIR", help="also write slide-NN.png previews here (needs LibreOffice)")
+    r.set_defaults(func=cmd_review)
 
     im = sub.add_parser("import", help="convert a .pptx to SlideMark text (stdout, or -o file + images/)")
     im.add_argument("input")
