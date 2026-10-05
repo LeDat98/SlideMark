@@ -103,3 +103,69 @@ def test_check_runs_layout_lint_and_reports_alt_in_json(tmp_path, capsys):
     data = json.loads(capsys.readouterr().out)
     assert {"image-alt", "alt"} <= {d["rule"] for d in data}
     assert all(set(d) == {"level", "message", "line", "slide", "rule", "hint"} for d in data)
+
+
+def test_docs_default_and_topic(capsys):
+    assert main(["docs"]) == 0
+    assert "# SlideMark" in capsys.readouterr().out
+    assert main(["docs", "syntax"]) == 0
+    assert capsys.readouterr().out.strip()
+
+
+def test_docs_unknown_topic(capsys):
+    assert main(["docs", "sintax"]) == 2
+    err = capsys.readouterr().err
+    assert "unknown topic 'sintax'; topics:" in err and "syntax" in err
+
+
+def test_schema(capsys):
+    assert main(["schema"]) == 0
+    assert "properties" in json.loads(capsys.readouterr().out)
+    assert main(["schema", "--indent", "2"]) == 0
+    assert "\n  " in capsys.readouterr().out
+
+
+def test_json_roundtrip_build_and_check(tmp_path):
+    from pptx import Presentation
+
+    from slidemark.parser import parse
+
+    deck = parse("# A\n- x\n---\n# B\n- y\n")
+    j = tmp_path / "d.json"
+    j.write_text(deck.model_dump_json(), encoding="utf-8")
+    out = tmp_path / "o.pptx"
+    assert main(["build", str(j), "-o", str(out)]) == 0
+    assert len(Presentation(str(out)).slides) == 2
+    assert main(["check", str(j)]) == 0
+
+
+def test_bad_json_exit_1(tmp_path, capsys):
+    j = tmp_path / "bad.json"
+    j.write_text('{"slides": 3}', encoding="utf-8")
+    assert main(["check", str(j)]) == 1
+    assert "bad-json" in capsys.readouterr().out
+    assert main(["build", str(j), "-o", str(tmp_path / "x.pptx")]) == 1
+    captured = capsys.readouterr()
+    assert "bad-json" in captured.err
+    j.write_text("not json", encoding="utf-8")
+    assert main(["check", str(j)]) == 1
+
+
+def test_skill_install(tmp_path, capsys):
+    d = tmp_path / "sk"
+    assert main(["skill", "install", "--dir", str(d)]) == 0
+    assert str(d) in capsys.readouterr().out
+    assert (d / "SKILL.md").exists() and any((d / "reference").glob("*.md"))
+    assert main(["skill", "install", "--dir", str(d)]) == 0  # idempotent
+
+
+def test_skill_install_print(tmp_path, capsys):
+    d = tmp_path / "sk2"
+    assert main(["skill", "install", "--dir", str(d), "--print"]) == 0
+    assert "SKILL.md" in capsys.readouterr().out and not d.exists()
+
+
+def test_help_lists_new_commands(capsys):
+    main(["--help"])
+    out = capsys.readouterr().out
+    assert all(c in out for c in ("docs", "schema", "skill"))

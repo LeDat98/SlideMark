@@ -1,4 +1,4 @@
-"""Command line: ``slidemark build|check|preview|version``."""
+"""Command line: ``slidemark build|check|preview|docs|schema|skill|version``."""
 
 from __future__ import annotations
 
@@ -26,13 +26,17 @@ def _say(text: str, file=None) -> None:
         print(text.encode("ascii", "backslashreplace").decode("ascii"), file=file or sys.stdout)
 
 
-def _print_diagnostics(deck: Deck, file=sys.stderr) -> None:
+def _print_diagnostics(deck: Deck, file=None) -> None:
     for d in deck.diagnostics:
-        _say(str(d), file)
+        _say(str(d), file or sys.stderr)
 
 
 def _has_errors(deck: Deck) -> bool:
     return any(d.level == "error" for d in deck.diagnostics)
+
+
+def _is_json(path: str) -> bool:
+    return Path(path).suffix.lower() == ".json"
 
 
 def _add_layout_diagnostics(deck: Deck, input_path: str) -> None:
@@ -66,8 +70,15 @@ def cmd_check(args: argparse.Namespace) -> int:
     text = _read(args.input)
     if text is None:
         return 2
-    deck = parse(text)
-    _add_layout_diagnostics(deck, args.input)
+    if _is_json(args.input):
+        from .jsonio import load_deck
+
+        deck = load_deck(text)
+        if not _has_errors(deck):
+            _add_layout_diagnostics(deck, args.input)
+    else:
+        deck = parse(text)
+        _add_layout_diagnostics(deck, args.input)
     if args.format == "json":
         _say(json.dumps([d.model_dump() for d in deck.diagnostics], ensure_ascii=False))
     elif deck.diagnostics:
@@ -86,7 +97,16 @@ def cmd_build(args: argparse.Namespace) -> int:
         return 2
     out = Path(args.output) if args.output else src.with_suffix(".pptx")
     try:
-        deck = build(src, out)
+        if _is_json(args.input):
+            from .jsonio import build_deck, load_deck
+
+            deck = load_deck(src)
+            if _has_errors(deck):
+                _print_diagnostics(deck)
+                return 1
+            deck = build_deck(deck, out, src.resolve().parent)
+        else:
+            deck = build(src, out)
     except NotImplementedError:
         print("error: layout/render are not available in this build yet", file=sys.stderr)
         return 2
@@ -129,6 +149,60 @@ def cmd_preview(args: argparse.Namespace) -> int:
     return 1 if _has_errors(deck) else 0
 
 
+def _skill_files() -> list[tuple[str, str]]:
+    """(relative path, text) of SKILL.md and reference/*.md, read from package data."""
+    from importlib.resources import files
+
+    root = files("slidemark").joinpath("skill")
+    out = [("SKILL.md", root.joinpath("SKILL.md").read_text(encoding="utf-8"))]
+    for f in sorted(root.joinpath("reference").iterdir(), key=lambda x: x.name):
+        if f.name.endswith(".md"):
+            out.append((f"reference/{f.name}", f.read_text(encoding="utf-8")))
+    return out
+
+
+def cmd_docs(args: argparse.Namespace) -> int:
+    docs = dict(_skill_files())
+    if not args.topic:
+        _say(docs["SKILL.md"].rstrip("\n"))
+        return 0
+    topics = sorted(k[len("reference/") : -3] for k in docs if k.startswith("reference/"))
+    key = f"reference/{args.topic}.md"
+    if key not in docs:
+        import difflib
+
+        near = difflib.get_close_matches(args.topic, topics, n=1)
+        dym = f" (did you mean '{near[0]}'?)" if near else ""
+        print(f"error: unknown topic '{args.topic}'; topics: {', '.join(topics)}{dym}", file=sys.stderr)
+        return 2
+    _say(docs[key].rstrip("\n"))
+    return 0
+
+
+def cmd_schema(args: argparse.Namespace) -> int:
+    seps = (",", ":") if args.indent is None else None
+    _say(json.dumps(Deck.model_json_schema(), ensure_ascii=False, indent=args.indent, separators=seps))
+    return 0
+
+
+def cmd_skill_install(args: argparse.Namespace) -> int:
+    dest = Path(args.dir).expanduser() if args.dir else Path.home() / ".claude" / "skills" / "slidemark"
+    for rel, text in _skill_files():
+        target = dest / rel
+        if args.print:
+            _say(str(target))
+            continue
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
+        except OSError as e:
+            print(f"error: cannot write {target}: {e}", file=sys.stderr)
+            return 2
+    if not args.print:
+        _say(str(dest))
+    return 0
+
+
 def cmd_version(args: argparse.Namespace) -> int:
     from . import __version__
 
@@ -140,12 +214,12 @@ def make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="slidemark", description="Markdown to native, editable .pptx")
     sub = p.add_subparsers(dest="command", required=True)
 
-    b = sub.add_parser("build", help="build a .pptx from a Markdown file")
+    b = sub.add_parser("build", help="build a .pptx from a Markdown or JSON deck file")
     b.add_argument("input")
     b.add_argument("-o", "--output", help="output .pptx (default: next to the input)")
     b.set_defaults(func=cmd_build)
 
-    c = sub.add_parser("check", help="parse and print diagnostics, one per line")
+    c = sub.add_parser("check", help="print diagnostics for a .md or .json deck, one per line")
     c.add_argument("input")
     c.add_argument("--format", choices=["text", "json"], default="text")
     c.set_defaults(func=cmd_check)
@@ -154,6 +228,21 @@ def make_parser() -> argparse.ArgumentParser:
     v.add_argument("input")
     v.add_argument("-o", "--output", help="output directory for slide-NN.png")
     v.set_defaults(func=cmd_preview)
+
+    d = sub.add_parser("docs", help="print the agent guide (SKILL.md) or a reference topic")
+    d.add_argument("topic", nargs="?", help="reference topic, e.g. syntax")
+    d.set_defaults(func=cmd_docs)
+
+    sc = sub.add_parser("schema", help="print the JSON schema of a Deck")
+    sc.add_argument("--indent", type=int, help="pretty-print with this indent (default: compact)")
+    sc.set_defaults(func=cmd_schema)
+
+    sk = sub.add_parser("skill", help="manage the Claude skill files")
+    sksub = sk.add_subparsers(dest="skill_command", required=True)
+    si = sksub.add_parser("install", help="copy SKILL.md and reference/ to ~/.claude/skills/slidemark")
+    si.add_argument("--dir", help="target directory (default: ~/.claude/skills/slidemark)")
+    si.add_argument("--print", action="store_true", help="list the files it would write, write nothing")
+    si.set_defaults(func=cmd_skill_install)
 
     sub.add_parser("version", help="print the version").set_defaults(func=cmd_version)
     return p
