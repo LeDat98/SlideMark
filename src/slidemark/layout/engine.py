@@ -494,7 +494,14 @@ def _table_style(ctx: _Ctx, el: Table) -> Style:
     return _styled(ctx, el, st)
 
 
+def _tables_alone(ctx: _Ctx) -> bool:
+    """Roomy pass of a normal-density slide that holds nothing but tables: they may grow more."""
+    return ctx.roomy and not _consulting(ctx) and all(isinstance(e, Table) for e in ctx.slide.elements)
+
+
 def _table_grow(ctx: _Ctx) -> float:
+    if _tables_alone(ctx):
+        return ctx.lt.table_alone_grow
     return ctx.lt.table_grow_roomy if ctx.roomy else ctx.lt.table_grow
 
 
@@ -524,7 +531,7 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
     if (
         ctx.grow > 1.0 and ctx.scale >= 1.0 and not (ctx.css.active and ctx.css.own(el).font_size is not None)
     ):  # sparse slide: table text grows too (less than box text)
-        t = min(ctx.grow, ctx.lt.table_font_grow)
+        t = min(ctx.grow, ctx.lt.table_alone_font_grow if _tables_alone(ctx) else ctx.lt.table_font_grow)
         if _has_box_text(ctx):  # ... but stays within one step of the box text on the same slide
             body = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
             want = body / ctx.lt.peer_step / max(st.font_size or 14, 1) / max(eff, 1e-6)
@@ -635,9 +642,23 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
             fs = _math_scale(
                 ctx, el, rect
             )  # alone in its cell: the equation grows (the renderer scales the body size)
+        if (
+            el.kind == "html"
+            and ctx.depth == 0
+            and ctx.lt.html_fit
+            and len(ctx.slide.elements) == 1
+            and str(el.attrs.get("fit", "")).lower() != "off"
+        ):  # alone on the slide: Chromium lays it out at the full box height (stretch, else center)
+            el = el.model_copy(update={"source": HTML_FIT_OPEN + el.source + "</div>"})
         ctx.emit(el, rect, st, fs)
     elif isinstance(el, Container):
         _place_container(ctx, el, rect, inherit)
+
+
+HTML_FIT_OPEN = (
+    "<style>.sm-fit{display:flex;flex-direction:column;justify-content:center;height:100vh}"
+    '.sm-fit>:only-child{flex:1 1 auto}</style><div class="sm-fit">'
+)  # a lone single-root HTML block stretches over the box; several roots / fixed content center vertically
 
 
 def _math_scale(ctx: _Ctx, el: Raw, rect: Rect) -> float:
@@ -985,6 +1006,11 @@ def _share_gaps(ctx: _Ctx, boxes: list) -> None:
             p.element = p.element.model_copy(update={"attrs": attrs})
 
 
+def _consulting(ctx: _Ctx) -> bool:
+    """Dense slide or small-body (consulting) theme: sparse cards may take more air than normal themes."""
+    return ctx.dense_k < 1.0 or ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
+
+
 def _roomy_paragraphs(ctx: _Ctx, flow: list, nat: list, area: Rect, inherit: Style, owner, gap: int) -> None:
     """A card with plenty of free height spreads its paragraphs (space-before up to about half a line).
 
@@ -1014,7 +1040,7 @@ def _roomy_paragraphs(ctx: _Ctx, flow: list, nat: list, area: Rect, inherit: Sty
     slots = sum(c[2] for c in cands)
     if not slots:
         return
-    gmax = ctx.lt.room_gap_max_dense if ctx.dense_k < 1.0 else ctx.lt.room_gap_max
+    gmax = ctx.lt.room_gap_max_dense if _consulting(ctx) else ctx.lt.room_gap_max
     g = min(gmax, measure.para_gap() + free * ctx.lt.room_use / EMU_PER_PT / slots)
     while g > measure.para_gap() + 0.02:
         for k, ch, _ in cands:
@@ -1339,6 +1365,7 @@ def _row_heights(
     inherit: Style,
     has_tail: bool = False,
     tree: bool = False,
+    tail_text: bool = False,
 ) -> list[int] | None:
     """Row heights of a slide-level grid: sparse rows do not stretch over the whole body.
 
@@ -1371,6 +1398,7 @@ def _row_heights(
             rowtext[r0] = False
         nat[r0] = None if n is None or nat[r0] is None else max(nat[r0] or 0, n)
     caps: list[int | None] = []
+    ref_h = grid_area.h if has_tail else body.h  # a tail (callout, table) below keeps its own room
     for row in range(nr):
         n = nat[row]
         if not covered[row] or n is None or n <= 0:
@@ -1387,17 +1415,17 @@ def _row_heights(
         else:
             lone = nr == 1 and not has_tail and ctx.dense_k < 1.0
             floor = ctx.lt.row_min_tail if has_tail else (ctx.lt.row_min_dense if lone else ctx.lt.row_min)
-            if ctx.roomy and nr == 1 and not has_tail and ctx.grow > ctx.grow_base:
+            if ctx.roomy and nr == 1 and (tail_text or not has_tail) and ctx.grow > ctx.grow_base:
                 floor = max(
                     floor,
                     min(
-                        ctx.lt.roomy_row * body.h,
-                        (ctx.lt.roomy_row_air_dense if ctx.dense_k < 1.0 else ctx.lt.roomy_row_air) * n,
+                        ctx.lt.roomy_row * ref_h,
+                        (ctx.lt.roomy_row_air_dense if _consulting(ctx) else ctx.lt.roomy_row_air) * n,
                     )
                     / body.h,
                 )  # fill stays >= ~50%
-            if ctx.lone_air > 0 and nr == 1 and not has_tail:
-                floor = max(floor, min(ctx.lt.balance_row * body.h, ctx.lone_air * n) / body.h)
+            if ctx.lone_air > 0 and nr == 1 and (tail_text or not has_tail):
+                floor = max(floor, min(ctx.lt.balance_row * ref_h, ctx.lone_air * n) / body.h)
             caps.append(max(round(n * ctx.lt.row_slack), round(floor * body.h)))
     extra_h = 0  # natural height that spanning blocks need beyond their rows
     for r0, r1, n in spans:
@@ -1442,7 +1470,7 @@ def _row_heights(
                     max(
                         caps[r] or 0,
                         round(
-                            (ctx.lt.roomy_row_air_dense if ctx.dense_k < 1.0 else ctx.lt.roomy_row_air)
+                            (ctx.lt.roomy_row_air_dense if _consulting(ctx) else ctx.lt.roomy_row_air)
                             * (nat[r] or 0)
                         ),
                     ),
@@ -1542,7 +1570,12 @@ def _place_blocks(
         _equalize_heads(ctx, [(blk, r.w, r.y) for (_i, blk), r in zip(flow, cells, strict=True)])
     if "chevron" not in flags and ctx.depth == 0:
         tree = bool(links) and gs.areas is not None and len(gs.rows) >= 2
-        row_h = _row_heights(ctx, gs, flow, cells, grid_area, area, gap, inherit, tail_area is not None, tree)
+        tail_text = all(
+            isinstance(b, Text) for _, b in extra
+        )  # a callout / lead below keeps only its own line
+        row_h = _row_heights(
+            ctx, gs, flow, cells, grid_area, area, gap, inherit, tail_area is not None, tree, tail_text
+        )
         if row_h is not None:
             cells = cell_rects(gs, len(flow), grid_area, gap, ctx.theme.columns, row_h)
             used = sum(row_h) + gap * (len(row_h) - 1)
@@ -1970,6 +2003,17 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
     small_theme = (
         ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
     )  # consulting themes (jp-business: 11pt)
+    if (
+        all(isinstance(e, Table) for e in elements)
+        and left >= ctx.lt.roomy_left * body.h
+        and not (fin.dense_k < 1.0 or small_theme)
+    ):  # tables alone: rows grow up to ``table_grow_roomy`` x (text a little more), then the usual shift
+        for g in (ctx.lt.table_alone_font_grow, fin.grow):
+            c = run(body, grow=round(g, 2), expand=fin.expand, roomy=True, grow_base=fin.grow)
+            if not c.over and c.out and _bottom(c) > _bottom(fin):
+                fin = c
+                left = body.bottom - _bottom(fin)
+                break
     if max(left, left0) >= ctx.lt.roomy_left * body.h and (
         fin.dense_k < 1.0 or small_theme
     ):  # a quarter of the body stays empty (before the rows expanded)
