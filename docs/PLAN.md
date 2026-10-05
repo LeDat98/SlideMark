@@ -261,3 +261,5 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
   are laid out in headless Chromium and converted to native rects/text/images; `{render=image}` opts out;
   canvas/complex SVG keep the image fallback.
 - **Wave 3 B: fixes from the wave 2 gallery review.**
+- **Wave 3 A (done): import fidelity** on 19 agent-written python-pptx decks (`bench/import_fidelity.py`, 0.955 → 0.977).
+- **Wave 4 A: `slidemark review`** (`critique.py`): design critic with source-level hints and a 0–100 score.
