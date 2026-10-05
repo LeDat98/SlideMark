@@ -227,12 +227,28 @@ def _units(
     return units
 
 
+_LINES_CACHE: dict = {}
+
+
 def count_lines(
     segments: list[Segment], width_pt: float, size_pt: float, font: str | None = None, spacing_pt: float = 0.0
 ) -> int:
     """Number of lines the styled text needs in ``width_pt`` at ``size_pt`` (with kinsoku).
 
-    ``spacing_pt`` is the CSS letter spacing added after every character."""
+    ``spacing_pt`` is the CSS letter spacing added after every character. Results are memoised
+    per (segments, width, size, font, spacing): layout re-measures the same text in many trials."""
+    key = (tuple(segments), width_pt, size_pt, font, spacing_pt, _default_font)
+    hit = _LINES_CACHE.get(key)
+    if hit is None:
+        if len(_LINES_CACHE) > 200_000:
+            _LINES_CACHE.clear()
+        hit = _LINES_CACHE[key] = _count_lines(segments, width_pt, size_pt, font, spacing_pt)
+    return hit
+
+
+def _count_lines(
+    segments: list[Segment], width_pt: float, size_pt: float, font: str | None, spacing_pt: float
+) -> int:
     width = max(width_pt / max(size_pt, 1.0), 1.0)  # in em
     lines, cur = 1, 0.0
     line: list[tuple[float, float, str, bool, str]] = []  # units on the current line

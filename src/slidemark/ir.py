@@ -71,14 +71,20 @@ class Style(Model):
 
     def merged(self, *others: Style | None) -> Style:
         """Return a copy where later non-None fields override earlier ones."""
-        data = self.model_dump()
+        data = dict(self.__dict__)
         for other in others:
             if other is None:
                 continue
-            for k, v in other.model_dump().items():
+            for k, v in other.__dict__.items():
                 if v is not None:
                     data[k] = v
-        return Style(**data)
+        # values come from validated Styles: build the instance directly (model_construct is slow)
+        out = object.__new__(Style)
+        object.__setattr__(out, "__dict__", data)
+        object.__setattr__(out, "__pydantic_fields_set__", set(data))
+        object.__setattr__(out, "__pydantic_extra__", None)
+        object.__setattr__(out, "__pydantic_private__", None)
+        return out
 
 
 class CssRule(Model):
