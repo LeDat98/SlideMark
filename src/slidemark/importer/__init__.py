@@ -240,7 +240,7 @@ def _shorten(lines, info, sd, deck, classes, header) -> list[str]:
         from ..build import build
 
         for var in _variants(tokens):
-            new = [*var, *hidden]
+            new = [*var, *info.get("links", []), *hidden]
             trial = [*lines[:at], *(["@" + " ".join(new)] if new else []), *lines[at + 1 :]]
             text = ("\n".join(header) + "\n\n" if header else "") + "\n".join(trial) + "\n"
             with tempfile.TemporaryDirectory() as tmp:

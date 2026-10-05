@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -83,6 +84,8 @@ class Item:
     has_slidenum: bool = False
     role: str | None = None  # set by structure: title/lead/conclusion/footnote/footer/decor/callout:<kind>
     uid: int = 0
+    radius: float | None = None  # corner radius in pt of a rounded rectangle
+    sid: int = 0  # shape id in the slide (what ``a:stCxn``/``a:endCxn`` point at)
 
     @property
     def cx(self) -> float:
@@ -107,8 +110,24 @@ class Item:
 
 
 @dataclass
+class ConnT:
+    """A connector: start/end point in slide EMU, the shape ids it is glued to and its arrowheads."""
+
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    st: int | None = None  # a:stCxn id
+    en: int | None = None  # a:endCxn id
+    arrow_end: bool = False  # a:tailEnd (the end of the line; what the renderer draws for ``a>b``)
+    arrow_start: bool = False  # a:headEnd
+    order: int = 0
+
+
+@dataclass
 class SlideData:
     items: list[Item] = field(default_factory=list)
+    conns: list[ConnT] = field(default_factory=list)
     notes: str | None = None
     hidden: bool = False
     connectors: int = 0
@@ -483,9 +502,70 @@ def _walk(shapes, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
             ctx.skip(f"shape {getattr(sh, 'name', '?')!r} ({type(e).__name__})")
 
 
-def _new(ctx: ReadCtx, kind: str, box, **kw) -> Item:
+def _new(ctx: ReadCtx, kind: str, box, sid: int = 0, **kw) -> Item:
     ctx.next_uid += 1
-    return Item(kind=kind, x=box[0], y=box[1], w=box[2], h=box[3], uid=ctx.next_uid, **kw)
+    return Item(kind=kind, x=box[0], y=box[1], w=box[2], h=box[3], uid=ctx.next_uid, sid=sid, **kw)
+
+
+def _radius(geom, box) -> float | None:
+    """Corner radius (pt) from the ``adj`` guide of a ``roundRect``; None when the guide is absent."""
+    for gd in geom.iter(qn("a:gd")):
+        m = (gd.get("fmla") or "").split()
+        if gd.get("name") == "adj" and len(m) == 2 and m[1].lstrip("-").isdigit():
+            return int(m[1]) / 100000 * min(box[2], box[3]) / 12700
+    return None
+
+
+def _int(v) -> int | None:
+    return int(v) if isinstance(v, str) and v.lstrip("-").isdigit() else None
+
+
+def _arrow(ln, tag: str) -> bool:
+    end = ln.find(qn(tag)) if ln is not None else None
+    return end is not None and (end.get("type") or "none") != "none"
+
+
+def _read_conn(el, tf: Tf, order: int) -> ConnT | None:
+    """Endpoints of a ``p:cxnSp`` (path start = top-left of its box, flips and rotation applied)."""
+    xf = el.find(qn("p:spPr") + "/" + qn("a:xfrm"))
+    if xf is None or xf.find(qn("a:off")) is None or xf.find(qn("a:ext")) is None:
+        return None
+    try:
+        x, y = int(xf.find(qn("a:off")).get("x")), int(xf.find(qn("a:off")).get("y"))
+        w, h = int(xf.find(qn("a:ext")).get("cx")), int(xf.find(qn("a:ext")).get("cy"))
+        rot = (int(xf.get("rot") or 0) / 60000) % 360
+    except (TypeError, ValueError):
+        return None
+    mx, my = x + w / 2, y + h / 2
+    pts = []
+    for px, py in ((x, y), (x + w, y + h)):
+        if xf.get("flipH") in ("1", "true"):
+            px = 2 * mx - px
+        if xf.get("flipV") in ("1", "true"):
+            py = 2 * my - py
+        if rot:
+            c, s = math.cos(math.radians(rot)), math.sin(math.radians(rot))
+            dx, dy = px - mx, py - my
+            px, py = mx + dx * c - dy * s, my + dx * s + dy * c
+        pts.append((tf.ax + tf.bx * px, tf.ay + tf.by * py))
+    cnv = el.find(qn("p:nvCxnSpPr") + "/" + qn("p:cNvCxnSpPr"))
+    st = en = None
+    if cnv is not None:
+        a, b = cnv.find(qn("a:stCxn")), cnv.find(qn("a:endCxn"))
+        st = _int(a.get("id")) if a is not None else None
+        en = _int(b.get("id")) if b is not None else None
+    ln = el.find(qn("p:spPr") + "/" + qn("a:ln"))
+    return ConnT(
+        pts[0][0],
+        pts[0][1],
+        pts[1][0],
+        pts[1][1],
+        st,
+        en,
+        _arrow(ln, "a:tailEnd"),
+        _arrow(ln, "a:headEnd"),
+        order,
+    )
 
 
 def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
@@ -497,6 +577,9 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
         return
     if tag == "cxnSp":
         data.connectors += 1
+        conn = _read_conn(el, tf, len(data.conns))
+        if conn is not None:
+            data.conns.append(conn)
         return
     try:
         box = tf.box(sh.left or 0, sh.top or 0, sh.width or 0, sh.height or 0)
@@ -511,6 +594,7 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
         fill, line = _fill_of(el)
         geom = el.find(qn("p:spPr") + "/" + qn("a:prstGeom"))
         prst = geom.get("prst") if geom is not None else None
+        radius = _radius(geom, box) if prst == "roundRect" else None
         default_bullets = ph_type in ("body", "obj")
         paras, num = read_paras(
             el.find(qn("p:txBody")), ctx, part, default_bullets, keep_empty=name.lower().startswith("code")
@@ -522,11 +606,13 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
             ctx,
             "text" if paras else "shape",
             box,
+            sid=sh.shape_id,
             name=name,
             ph=ph_type,
             fill=fill,
             line=line,
             prst=prst,
+            radius=radius,
             paras=paras,
             has_slidenum=num,
         )
@@ -536,7 +622,7 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
             ctx.skip(f"media {name!r}", "media cannot be imported")
             return
         img = sh.image
-        it = _new(ctx, "image", box, name=name, img=(img.blob, img.ext), alt=_alt(el, name))
+        it = _new(ctx, "image", box, sid=sh.shape_id, name=name, img=(img.blob, img.ext), alt=_alt(el, name))
         data.items.append(it)
     elif tag == "graphicFrame":
         if sh.has_table:
@@ -553,11 +639,11 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
                         )
                     )
                 rows.append(row)
-            data.items.append(_new(ctx, "table", box, name=name, rows=rows))
+            data.items.append(_new(ctx, "table", box, sid=sh.shape_id, name=name, rows=rows))
         elif sh.has_chart:
             ch = read_chart(sh, ctx)
             if ch is not None:
-                data.items.append(_new(ctx, "chart", box, name=name, chart=ch))
+                data.items.append(_new(ctx, "chart", box, sid=sh.shape_id, name=name, chart=ch))
         else:
             ctx.skip(f"object {name!r} (SmartArt, OLE or other)")
     else:
