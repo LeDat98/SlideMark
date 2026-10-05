@@ -287,3 +287,25 @@ Observed in Claude Code, October 2026; verify the paths and fields in the harnes
 - The last call has no successor: use `1.53 × visible`.
 - `subagent_tokens` in the completion notice is the final context size, not the total cost.
 - Count from tool inputs: `slidemark docs` attempts, builds, PNG reads, and any path outside the run folder.
+
+## Run 6 findings (2026-10-05, brief set 2, SlideMark 62493aa)
+
+Full matrix on fresh briefs (`bench/briefs2/`): python-pptx 9 runs, skill-only 27, skill-open 27; every SlideMark
+deck passed the acceptance script. Medians per run: 3 model calls (p90 4), 0 images, 0 docs lookups, output 21%
+of python-pptx, cost above common start 47% (≥ 5 slides 41%). AC2, AC3, AC5 and the image half of AC6 pass;
+AC4 does not.
+
+**Why AC4 stalls near 40–50%.** The python-pptx arm on set 2 is cheap: 4–6 calls, 26–89k units above start
+(median 45.7k). A 3-call SlideMark run costs, in units above start (so-c01-1, 17.4k):
+
+| Part | Units | Lever |
+|---|---|---|
+| Two later calls re-read the 32k start context at 0.1 | ≈ 6.4k | none: any 3-call path pays it |
+| SKILL.md (≈ 4.2k Claude tokens) written once at 1.25, read once at 0.1 | ≈ 5.7k | SKILL.md size |
+| Brief, build output, tool JSON | ≈ 2k | none |
+| Output (deck + reply) at 5 | ≈ 3k | deck syntax |
+
+So a 3-slide deck cannot go below ≈ 12k units (≈ 37% of the cheapest python-pptx run here) even with an empty
+SKILL.md, and halving SKILL.md moves the median ratio by only ≈ 6 points. The gate is reachable on 10-slide briefs
+(28–41%) but not on 3-slide ones (49–69%). Options for the owner: measure AC4 on briefs of ≥ 5 slides only, or
+state it against the python-pptx arm's cost excluding the shared per-call re-reads; or accept ≈ 40% as the floor.
