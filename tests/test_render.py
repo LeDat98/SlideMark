@@ -39,8 +39,9 @@ def bullets(*items, marker="bullet"):
     return Text(paragraphs=[Paragraph(runs=[Run(text=i)], marker=marker) for i in items])
 
 
-def build(deck: Deck, tmp_path: Path, theme="default") -> Presentation:
-    th = get_theme(theme)
+def build(deck: Deck, tmp_path: Path, theme="default", hug: bool = True) -> Presentation:
+    th = get_theme(theme).model_copy(deep=True)
+    th.layout.hug_cards = hug
     placed = [layout_slide(s, deck, th, i) for i, s in enumerate(deck.slides)]
     out = tmp_path / "out.pptx"
     render(deck, placed, th, out)
@@ -324,10 +325,12 @@ def test_opens_in_libreoffice(tmp_path):
     assert Emu(1)  # keep import used
 
 
-def _space_before_pts(tmp_path, items, theme="default"):
+def _space_before_pts(
+    tmp_path, items, theme="default"
+):  # cards keep spare height (hug off) so paragraphs spread
     boxes = [Container(title=T(h, "heading"), children=[bullets(*items)]) for h in ("a", "b")]
     d = Deck(slides=[Slide(title=T("t", "title"), grid="2", elements=boxes)])
-    prs = build(d, tmp_path, theme)
+    prs = build(d, tmp_path, theme, hug=False)
     out = []
     for shp in prs.slides[0].shapes:
         if shp.has_text_frame and shp.text_frame.text.startswith(items[0]):

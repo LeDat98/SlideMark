@@ -120,6 +120,9 @@ class _Ctx:
     gaps: dict[int, float] = field(default_factory=dict)  # text id -> paragraph gap (em) of a roomy card
     text_out: dict[int, int] = field(default_factory=dict)  # text id -> index of its Placed in ``out``
     boxes: dict[int, list[int]] = field(default_factory=dict)  # box id -> ids of its spreadable texts
+    centered: set[int] = field(
+        default_factory=set
+    )  # card ids whose content is centered (row pinned by a visual)
     out: list[Placed] = field(default_factory=list)
     over: list[str] = field(default_factory=list)
     diags: list[Diagnostic] = field(default_factory=list)
@@ -398,11 +401,18 @@ def _fit(ctx: _Ctx, need_fn, avail: int, base_size: float) -> float:
 # --------------------------------------------------------------------------- element placement
 
 
+def _explicit_size(ctx: _Ctx, el) -> bool:
+    """The author set the font size of ``el`` (CSS rule, ``{size=}``, element style): it never grows."""
+    if getattr(getattr(el, "style", None), "font_size", None) is not None:
+        return True
+    return bool(ctx.css.active and ctx.css.own(el).font_size is not None)
+
+
 def _grown(ctx: _Ctx, el, eff: float) -> float:
     """Autofit scale ``eff`` times the sparse-grid growth for body text inside boxes.
 
     A CSS ``font-size`` is explicit: it is never grown (autofit may still shrink it)."""
-    if ctx.css.active and ctx.css.own(el).font_size is not None:
+    if _explicit_size(ctx, el):
         return eff
     if ctx.grow > 1.0 and (ctx.depth > 0 or ctx.text_only) and ctx.scale >= 1.0 and isinstance(el, Text):
         if el.role == "body" and "callout" not in el.classes:
@@ -715,9 +725,10 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
             )
         )
     eff = measure.effective_scale(hst.font_size or 18, ctx.scale, ctx.theme.min_font_size)
-    if ctx.head_grow and ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi:
+    fixed = _explicit_size(ctx, h_el) or _explicit_size(ctx, c.title)
+    if ctx.head_grow and ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi and not fixed:
         eff *= min(ctx.grow, ctx.lt.grow_head)
-    if ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi and (body := _box_body_pt(ctx, c)):
+    if ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi and not fixed and (body := _box_body_pt(ctx, c)):
         size = max(hst.font_size or 18, 1.0)
         if size * eff < body * HEAD_TOL:  # never smaller than its own body
             eff = body * ctx.lt.head_body / size
@@ -1012,8 +1023,8 @@ def _consulting(ctx: _Ctx) -> bool:
 
 
 def _hugging(ctx: _Ctx) -> bool:
-    """Consulting cards are as tall as their content (``row_slack_hug``) instead of ``row_slack``."""
-    return ctx.lt.hug_cards and _consulting(ctx)
+    """Cards are as tall as their content (``row_slack_hug``) instead of ``row_slack``."""
+    return ctx.lt.hug_cards
 
 
 def _roomy_paragraphs(ctx: _Ctx, flow: list, nat: list, area: Rect, inherit: Style, owner, gap: int) -> None:
@@ -1089,6 +1100,10 @@ def _place_stack(
         elif not tabs:
             _roomy_paragraphs(ctx, flow, nat, area, inherit, owner, gap)
     y = area.y
+    if (
+        not nflex and owner is not None and id(owner) in ctx.centered
+    ):  # a card as tall as the visual beside it
+        y += max((area.h - sum(n or 0 for n in nat) - gap * (len(flow) - 1)) // 2, 0)
     used = 0
     for (i, ch), n in zip(flow, nat, strict=True):
         h = n if n is not None else flex_h
@@ -1385,6 +1400,8 @@ def _row_heights(
     onecol = len(gs.cols) == 1 and nr >= 2 and not tree
     rowtext = [True] * nr  # rows holding only text / code blocks (a vertical stack)
     spans: list[tuple[int, int, int | None]] = []  # blocks spanning several rows: (first, last, natural)
+    singles: list[tuple[int, object]] = []
+    rowtable = [False] * nr  # rows with a table inside a card: its rows grow, so the card keeps some slack
     stacked: set[int] = set()  # rows beside a flexible block that spans them (a column of stacked boxes)
     for k, ((_i, blk), r) in enumerate(zip(flow, cells, strict=True)):
         if gs.areas is not None:
@@ -1394,9 +1411,14 @@ def _row_heights(
         else:
             r0 = r1 = min(k // len(gs.cols), nr - 1)
         n, kind = _cell_nat(ctx, blk, r.w, inherit)
+        if isinstance(blk, Container) and any(isinstance(ch, Table) for ch in blk.children):
+            rowtable[r0] = True
         if r1 > r0:
             spans.append((r0, r1, n))
+            if isinstance(blk, Container) and ctx.lt.center_beside:
+                ctx.centered.add(id(blk))  # a card spanning several rows may be taller than its content
             continue
+        singles.append((r0, blk))
         covered[r0] = True
         kinds[r0].add(kind)
         if not isinstance(blk, (Text, Code)):
@@ -1433,7 +1455,7 @@ def _row_heights(
                 floor = max(floor, min(ctx.lt.balance_row * ref_h, ctx.lone_air * n) / body.h)
             if _consulting(ctx) and not has_tail:
                 floor = min(floor, ctx.lt.row_min_hug)  # consulting cards hug their text instead
-            slack = ctx.lt.row_slack_hug if _hugging(ctx) else ctx.lt.row_slack
+            slack = ctx.lt.row_slack_hug if _hugging(ctx) and not rowtable[row] else ctx.lt.row_slack
             caps.append(max(round(n * min(slack, ctx.lt.row_slack)), round(floor * body.h)))
     extra_h = 0  # natural height that spanning blocks need beyond their rows
     for r0, r1, n in spans:
@@ -1460,6 +1482,8 @@ def _row_heights(
         ctx.fill = total / max(grid_area.h, 1)
     if all(c is None for c in caps) and not stacked:
         return None
+    if stacked and ctx.lt.center_beside:
+        ctx.centered.update(id(b) for r0, b in singles if r0 in stacked and isinstance(b, Container))
     if stacked and all(n for n in nat):  # boxes stacked beside a tall block share its height by content
         tot = sum(nat)  # type: ignore[arg-type]
         w = [max(n or 0, ctx.lt.stack_min * tot) for n in nat]
@@ -1469,7 +1493,9 @@ def _row_heights(
     ):  # sparse slide: spread extra height over the capped rows (not kpi / table)
         rows = [r for r in range(nr) if caps[r] is not None and "other" in kinds[r]]
         tot = sum(caps[r] or 0 for r in rows)
-        airy = (ctx.roomy and ctx.grow > ctx.grow_base) or _hugging(ctx)  # grown text / consulting cards: rows keep a card fill of about 50-70%
+        airy = (ctx.roomy and ctx.grow > ctx.grow_base) or _hugging(
+            ctx
+        )  # grown text / consulting cards: rows keep a card fill of about 50-70%
         for r in rows:
             grown = (caps[r] or 0) + round(ctx.expand * (caps[r] or 0) / max(tot, 1))
             if airy and nat[r]:
@@ -1711,7 +1737,7 @@ def _hug_beside_visual(ctx: _Ctx, gs, flow: list, cells: list[Rect], inherit: St
             continue
         row = k // ncol
         if not any(
-            isinstance(o, (Chart, Image, Media))
+            isinstance(o, (Chart, Image, Media, Raw))
             for j, (_n, o) in enumerate(flow)
             if j // ncol == row and j != k
         ):
@@ -1725,6 +1751,8 @@ def _hug_beside_visual(ctx: _Ctx, gs, flow: list, cells: list[Rect], inherit: St
             h >= ctx.lt.beside_align * r.h
         ):  # content fills enough of the visual's height: share top and bottom
             out[k] = r
+            if ctx.lt.center_beside:
+                ctx.centered.add(id(blk))
             continue
         if h < floor:
             h = round(h + ctx.lt.beside_fill * (floor - h))
@@ -2082,7 +2110,7 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
         best_g = fin.grow
         for f in [1.0] + [round(1.0 + 0.05 * i, 2) for i in range(1, steps + 1)]:
             g = round(fin.grow * f, 2)
-            if g > fin.grow and g * body_pt0 > ctx.lt.balance_max_pt:
+            if g > fin.grow and (g * body_pt0 > ctx.lt.balance_max_pt or g > max(ctx.lt.grow_max, fin.grow)):
                 break
             c = run(body, grow=g, expand=fin.expand, lone_air=ctx.lt.balance_text_air, grow_base=fin.grow)
             if c.over or not c.out:
@@ -2501,6 +2529,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     top = max(top, ctx.lt.dense_grow_body / ctx.dense_k)
                 if very:
                     top = max(top, min(ctx.lt.grow_very_sparse, ctx.lt.grow_very_sparse_max_pt / body_pt))
+                if ctx.dense_k >= 1.0:
+                    top = min(top, max(ctx.lt.grow_max, 1.0))
                 n = round((top - 1.05) / 0.05)
                 for g in [round(top - 0.05 * i, 2) for i in range(n + 1)]:
                     c3 = run(body, grow=g)

@@ -36,6 +36,13 @@ def lay(slide, theme="jp-business"):
     return layout_slide(slide, deck, get_theme(theme), 0), deck
 
 
+def _lay_tall(slide, theme="default"):
+    """Layout with ``hug_cards`` off: cards keep spare height (the paragraph-spreading mechanism)."""
+    th = get_theme(theme).model_copy(deep=True)
+    th.layout.hug_cards = False
+    return layout_slide(slide, Deck(slides=[slide]), th, 0)
+
+
 def of(placed, cls):
     return [p for p in placed if isinstance(p.element, cls)]
 
@@ -71,10 +78,10 @@ def test_sparse_boxes_are_capped_and_top_aligned():
         cs = cards(placed)
         assert len({c.h for c in cs}) == 1 and len({c.y for c in cs}) == 1  # equal heights in a row
         assert cs[0].h < 0.9 * H  # not stretched over the whole body
-        assert cs[0].h > 0.2 * H  # but not tiny either
+        assert cs[0].h > 0.12 * H  # but not tiny either (cards hug their text)
         below, body_h = _gap_below(placed, theme)
         assert (
-            0.22 * body_h <= cs[0].h <= 0.9 * body_h
+            0.1 * body_h <= cs[0].h <= 0.9 * body_h
         )  # follows content; a lone sparse row reaches at most ~85% of the body
         title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
         above = cs[0].y - (title.y + title.h)
@@ -398,7 +405,7 @@ def test_roomy_card_spreads_its_paragraphs_and_the_measure_matches():
     from slidemark.layout import measure
 
     s = Slide(title=T("t", "title"), grid="2", elements=[box("a", "x", "y", "z"), box("b", "x", "y", "z")])
-    placed, _ = lay(s, "default")
+    placed = _lay_tall(s)  # spreading needs free card height: cards that hug their text have none
     for b in _role(placed, "body"):
         gap = b.element.attrs.get("para_gap")
         assert gap is not None and measure.PARA_GAP < gap <= 0.6 + 1e-9
@@ -464,7 +471,7 @@ def test_sibling_boxes_with_different_spread_end_up_equal():
 
 def test_single_paragraph_sibling_does_not_pull_the_gap_down():
     s = Slide(title=T("t", "title"), grid="2", elements=[box("a", "x", "y", "z"), box("b", "x")])
-    placed, _ = lay(s, "default")
+    placed = _lay_tall(s)
     assert _gaps(placed)[0] is not None
 
 
@@ -520,4 +527,8 @@ def test_normal_density_lone_row_gets_taller_cards():
     th = get_theme("default").model_copy(deep=True)
     th.layout.balance_air = 0.0
     off = layout_slide(s, Deck(slides=[s]), th, 0)
-    assert cards(placed)[0].h > cards(off)[0].h
+    assert cards(placed)[0].h >= cards(off)[0].h
+    th.layout.balance_air = 1.9  # the stretch is still available as a token
+    th.layout.hug_cards = False
+    tall = layout_slide(s, Deck(slides=[s]), th, 0)
+    assert cards(tall)[0].h > cards(off)[0].h
