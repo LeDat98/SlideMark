@@ -42,7 +42,7 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 - [x] `slidemark docs`, `schema`, `skill install`; SKILL.md ≤ 1,500 tokens, each reference file ≤ 800
 - [x] Lenient parser: Marp/Slidev/common-mistake variants accepted with warnings (fuzz: 0 crashes in 100k inputs; bench/fuzz_long.py seed 11, 2026-10-05)
 - [x] Agent eval (≥ 20 tasks): first-pass `check` success ≥ 90%, mean fix rounds ≤ 0.3 (run-2-sonnet: 20 tasks, 90%, 0.1 warnings/task, docs only; fix rounds proxied by warnings)
-- [ ] Total agent tokens per deck (docs + output + fixes) ≤ 40% of a python-pptx agent on the same tasks
+- [x] Total agent tokens per deck (docs + output + fixes) ≤ 40% of a python-pptx agent on the same tasks (run-4: (SKILL.md 909 + deck 152) / python-pptx 2,704 = 0.39, 20/20 first pass, no reference pages read)
 
 ## L5: Full PowerPoint
 - [ ] HTML → native shapes (Chromium measurement) with image fallback; Mermaid → native shapes

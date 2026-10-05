@@ -15,6 +15,6 @@ Practical patterns that cut tokens and retries. Budget: keep this file under ~1,
 8. ✅ **Close a row of boxes with `@end`** before a slide-level table/chart; otherwise it lands inside the last
    box. `check` flags it as `missing-end`. A closing `>` needs no `@end` (it is always the conclusion).
 9. ✅ **Org charts and approval flows need no shapes:** `@.a./bcd a>b a>c a>d` or `@3 a>b b>c` (connectors).
-10. ✅ **Skill docs are budgeted:** SKILL.md ≈ 1,160 tokens; each `slidemark docs <topic>` page ≤ 720.
+10. ✅ **SKILL.md alone is enough:** ≈ 910 tokens; eval run 4 wrote 20/20 clean decks without reading any reference page.
 11. ✅ **Agents get it right from SKILL.md alone:** eval run 2 (Sonnet, 20 tasks, docs only) = 90% first-pass clean,
     ~158 tokens per deck. The two misses: `align=` letter count ≠ columns; a second `@` grid (now row groups).
