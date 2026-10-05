@@ -221,7 +221,7 @@ def apply_attrs(
 LAYOUT_WORDS = ("cover", "section", "blank", "center")
 FLAGS = ("flow", "chevron")
 AT_KEYS = ("bg", "t", "id", "gap")
-KNOWN_WORDS = (*LAYOUT_WORDS, *FLAGS, "hidden", "build", "dense", "dark", "light", "plain")
+KNOWN_WORDS = (*LAYOUT_WORDS, *FLAGS, "html", "hidden", "build", "dense", "dark", "light", "plain")
 TRANSITIONS = ("fade", "push", "wipe", "split", "cover", "zoom", "morph")
 _N = re.compile(r"^\d+$")
 _CXR = re.compile(r"^\d+x\d+$")
@@ -303,6 +303,8 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
                 ctx.warn(f"unknown '@' key '{k}'", line, "unknown-token", hint)
         elif tok in LAYOUT_WORDS:
             spec.layout = tok
+        elif tok == "html":
+            spec.classes.append("html")
         elif tok == "hidden":
             spec.hidden = True
         elif tok in FLAGS:

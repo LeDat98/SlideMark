@@ -84,10 +84,12 @@ HINT = "kept as raw HTML (an image when rendering is available); use section.sli
 
 
 class Node:
-    __slots__ = ("tag", "attrs", "children", "line")
+    __slots__ = ("tag", "attrs", "children", "line", "start", "end")
 
     def __init__(self, tag: str, attrs: dict[str, str], line: int):
         self.tag, self.attrs, self.line = tag, attrs, line
+        self.start: int | None = None  # source offsets of the element (``outer_html``)
+        self.end: int | None = None
         self.children: list[Node | str] = []
 
     @property
@@ -112,6 +114,12 @@ class _Builder(HTMLParser):
         self.root = Node("#root", {}, 0)
         self.stack: list[Node] = [self.root]
         self.skip: str | None = None
+        self.src = ""
+        self.starts: list[int] = [0]
+
+    def _offset(self) -> int:
+        line, col = self.getpos()
+        return self.starts[min(line - 1, len(self.starts) - 1)] + col
 
     def _close_to(self, names: set[str], stop: set[str]) -> None:
         for i in range(len(self.stack) - 1, 0, -1):
@@ -140,6 +148,7 @@ class _Builder(HTMLParser):
         elif tag in P_CLOSERS and self.stack[-1].tag == "p":
             self.stack.pop()
         node = Node(tag, {k.lower(): (v or "") for k, v in attrs}, self.getpos()[0])
+        node.start = self._offset()
         self.stack[-1].children.append(node)
         if tag not in VOID and len(self.stack) < MAX_DEPTH:
             self.stack.append(node)
@@ -152,6 +161,8 @@ class _Builder(HTMLParser):
             return
         for i in range(len(self.stack) - 1, 0, -1):
             if self.stack[i].tag == tag:
+                close = self.src.find(">", self._offset())
+                self.stack[i].end = close + 1 if close >= 0 else None
                 del self.stack[i:]
                 return
 
@@ -167,6 +178,9 @@ class _Builder(HTMLParser):
 
 def build_tree(text: str) -> Node:
     b = _Builder()
+    b.src = text
+    for m in re.finditer("\n", text):
+        b.starts.append(m.end())
     try:
         b.feed(text)
         b.close()
@@ -895,6 +909,91 @@ def _slide(node: Node, ctx: Ctx, index: int) -> Slide:
     return slide
 
 
+# CSS properties the structural subset cannot express (it ignores them): a section that uses one is "styled"
+VISUAL_PROP = re.compile(
+    r"^(background|border|box-shadow|position|top|left|right|bottom|transform|opacity|filter|clip-path|"
+    r"padding|outline|text-shadow|z-index|backdrop-filter|mask)"
+)
+STYLE_BLOCK = re.compile(r"<style\b[^>]*>.*?</style>", re.I | re.S)
+CSS_RULE = re.compile(r"([^{}@]+)\{([^{}]*)\}")
+CSS_TOKEN = re.compile(r"[.#]?[A-Za-z_][\w-]*")
+
+
+def _has_visual(decls: str) -> bool:
+    return any(VISUAL_PROP.match(d.split(":", 1)[0].strip().lower()) for d in decls.split(";") if ":" in d)
+
+
+def _subtree_tokens(n: Node, out: set[str]) -> None:
+    out.add(n.tag)
+    out.update("." + c for c in n.classes)
+    if n.attrs.get("id"):
+        out.add("#" + n.attrs["id"].lower())
+    for c in n.elements():
+        _subtree_tokens(c, out)
+
+
+def _subtree_nodes(n: Node):
+    yield n
+    for c in n.elements():
+        yield from _subtree_nodes(c)
+
+
+def needs_html(node: Node, styles: list[str], forced: bool) -> bool:
+    """Is this ``<section>`` too styled for the structural subset (so it becomes ``Slide.html``)?
+
+    Rule: a section is converted structurally (headings, lists, tables, ``card`` boxes, grid/flex tracks)
+    unless it is *styled*, i.e. one of
+
+    - it (or ``<html data-slidemark="native">``) forces HTML: ``data-render="html"`` on the section;
+    - it contains an ``<svg>``;
+    - an inline ``style`` in it uses a visual property the subset ignores (background, gradient, border,
+      border-radius, box-shadow, padding, position/top/left..., transform, opacity, filter, clip-path,
+      outline, text-shadow, z-index, mask);
+    - a document ``<style>`` rule with such a property targets it (every simple selector token of the rule,
+      tag, ``.class`` or ``#id``, occurs in the section; ``html``, ``body``, ``*`` and ``:root`` rules are
+      deck-wide and ignored).
+
+    Plain text, headings, lists, tables and ``style="color;text-align;display:grid;gap;grid-*"`` stay
+    structural, so they remain editable SlideMark elements and cost the same tokens as Markdown.
+    """
+    if forced or node.attrs.get("data-render", "").lower() == "html":
+        return True
+    nodes = list(_subtree_nodes(node))
+    if any(n.tag == "svg" for n in nodes):
+        return True
+    if any(_has_visual(n.attrs.get("style", "")) for n in nodes):
+        return True
+    present: set[str] = set()
+    _subtree_tokens(node, present)
+    for sel, decls in styles:
+        if not _has_visual(decls):
+            continue
+        for part in sel.split(","):
+            toks = [t.lower() for t in CSS_TOKEN.findall(re.sub(r"\[[^\]]*\]|:[\w-]+(\([^)]*\))?", "", part))]
+            toks = [t for t in toks if t not in ("html", "body")]
+            if toks and all(t in present for t in toks):
+                return True
+    return False
+
+
+def outer_html(node: Node, text: str) -> str:
+    if node.start is not None and node.end is not None and node.end > node.start:
+        return text[node.start : node.end]
+    return to_html(node)
+
+
+def _html_slide(node: Node, text: str, style_blocks: list[str], line_of: int | None) -> Slide:
+    title = next((n for n in _subtree_nodes(node) if n.tag in ("h1", "h2")), None)
+    slide = Slide(line=line_of, layout="blank")
+    if title is not None and raw_text(title).strip():
+        slide.title = Text(
+            role="title", paragraphs=[Paragraph(runs=[Run(text=WS.sub(" ", raw_text(title)).strip())])]
+        )
+    slide.id = node.attrs.get("id") or None
+    slide.html = "".join(style_blocks) + outer_html(node, text)
+    return slide
+
+
 def parse_html(text: str) -> Deck:
     """Parse a whole HTML file into a Deck. Never raises: problems go to ``deck.diagnostics``."""
     deck = Deck()
@@ -916,20 +1015,37 @@ def parse_html(text: str) -> Deck:
 
 def _parse_html(text: str, deck: Deck) -> None:
     ctx = Ctx(deck.diagnostics)
-    root = build_tree(text.lstrip("﻿"))
+    text = text.lstrip("\ufeff")
+    root = build_tree(text)
     html = find_all(root, lambda n: n.tag == "html")
     if html and html[0].attrs.get("lang"):
         deck.lang = html[0].attrs["lang"].split("-")[0][:8] or None
     title = find_all(root, lambda n: n.tag == "title")
     if title and raw_text(title[0]).strip():
         deck.title = WS.sub(" ", raw_text(title[0])).strip()
-    slides = find_all(root, lambda n: n.tag == "section" and _is_slide(n)) or find_all(root, _is_slide)
+    slides = (
+        find_all(root, lambda n: n.tag == "section" and _is_slide(n))
+        or find_all(root, _is_slide)
+        or find_all(root, lambda n: n.tag == "section")
+    )
     if not slides:
         body = find_all(root, lambda n: n.tag == "body")
         slides = [body[0] if body else root]
+    style_blocks = STYLE_BLOCK.findall(text)
+    rules = [
+        (sel.strip(), decls)
+        for blk in style_blocks
+        for sel, decls in CSS_RULE.findall(
+            re.sub(r"/\*.*?\*/", "", re.sub(r"</?style[^>]*>", "", blk), flags=re.S)
+        )
+    ]
+    forced = bool(html and html[0].attrs.get("data-slidemark", "").lower() == "native")
     for i, node in enumerate(slides):
         ctx.slide = i + 1
         try:
+            if node.tag == "section" and needs_html(node, rules, forced):
+                deck.slides.append(_html_slide(node, text, style_blocks, node.line or None))
+                continue
             deck.slides.append(_slide(node, ctx, i))
         except Exception as e:
             ctx.error(
@@ -940,7 +1056,7 @@ def _parse_html(text: str, deck: Deck) -> None:
             )
             deck.slides.append(Slide(line=node.line or None))
     ctx.slide = None
-    if not any(s.title or s.elements for s in deck.slides):
+    if not any(s.title or s.elements or s.html for s in deck.slides):
         ctx.warn(
             "no slides found", None, "no-slides", 'wrap each slide in <section class="slide"> with an <h1>'
         )

@@ -1932,6 +1932,10 @@ def layout_slide(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Pla
     ``index`` is the 0-based slide index (used for footer / slide number items).
     Problems (overflow, unknown layout, ...) are appended to ``deck.diagnostics``.
     """
+    if slide.html is not None:  # whole-slide HTML: Chromium decides the layout
+        from .htmlslide import layout_html_slide
+
+        return layout_html_slide(slide, deck, theme, index)
     try:
         return _layout(slide, deck, theme, index)
     except Exception as e:  # never raise on bad input

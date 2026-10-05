@@ -9,7 +9,7 @@ from .html import parse_html
 
 def _looks_like_html(text: str) -> bool:
     head = text.lstrip("\ufeff \t\r\n")[:20].lower()
-    return head.startswith(("<!doctype html", "<html", "<section"))
+    return head.startswith(("<!doctype html", "<html", "<section", "<style", "<head", "<body"))
 
 
 def parse(text: str) -> Deck:

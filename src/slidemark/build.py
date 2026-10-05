@@ -38,7 +38,13 @@ def build_deck(deck: Deck, out: str | Path, base_dir: str | Path | None = None) 
     deck.diagnostics.extend(diags)
     if size := template_size(theme):
         deck.size = size  # the template's slide size wins
-    placed = [layout_slide(slide, deck, theme, i) for i, slide in enumerate(deck.slides)]
+    try:
+        placed = [layout_slide(slide, deck, theme, i) for i, slide in enumerate(deck.slides)]
+    finally:
+        if any(s.html is not None for s in deck.slides):
+            from .layout.htmlslide import close_shared
+
+            close_shared()  # one Playwright at a time: the renderer opens its own for pictures
     seen = {(d.rule, d.slide) for d in deck.diagnostics}
     deck.diagnostics.extend(d for d in lint(deck, placed, theme) if (d.rule, d.slide) not in seen)
     from .render import render  # python-pptx loads only when a file is written

@@ -19,7 +19,7 @@ SVG = '<svg width="200" height="100"><circle cx="50" cy="50" r="40" fill="red"/>
 
 
 def _deck(body: str) -> str:
-    return f"# Chart\n\n```html\n{body}\n```\n"
+    return f"# Chart\n\n```html{{render=image}}\n{body}\n```\n"
 
 
 def _pictures(path):
@@ -82,7 +82,7 @@ def test_external_request_is_blocked(tmp_path, chromium):
 
 
 def test_browser_is_reused_for_many_blocks(tmp_path, chromium):
-    md = "# A\n\n" + "".join(f"```html\n{SVG}\n```\n\n" for _ in range(3))
+    md = "# A\n\n" + "".join(f"```html{{render=image}}\n{SVG}\n```\n\n" for _ in range(3))
     out = tmp_path / "c.pptx"
     build(md, out)
     prs = Presentation(str(out))
