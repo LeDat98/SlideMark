@@ -8,7 +8,6 @@ from .ir import Deck
 from .layout import layout_slide
 from .lint import lint
 from .parser import parse
-from .render import render
 from .template import resolve_theme, template_size
 
 
@@ -42,5 +41,7 @@ def build_deck(deck: Deck, out: str | Path, base_dir: str | Path | None = None) 
     placed = [layout_slide(slide, deck, theme, i) for i, slide in enumerate(deck.slides)]
     seen = {(d.rule, d.slide) for d in deck.diagnostics}
     deck.diagnostics.extend(d for d in lint(deck, placed, theme) if (d.rule, d.slide) not in seen)
+    from .render import render  # python-pptx loads only when a file is written
+
     render(deck, placed, theme, out)
     return deck

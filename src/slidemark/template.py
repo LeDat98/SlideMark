@@ -13,8 +13,6 @@ import zipfile
 from pathlib import Path
 
 from lxml import etree
-from pptx import Presentation
-from pptx.oxml.ns import qn
 
 from .ir import Diagnostic
 from .theme import DEFAULT, Fonts, Theme, get_theme
@@ -30,6 +28,13 @@ _SECTION_EXT = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
 
 
 # --------------------------------------------------------------------------- theme resolution
+
+
+def qn(tag: str) -> str:
+    """``pptx.oxml.ns.qn``, imported lazily: python-pptx costs ~50 ms and only rendering needs it."""
+    from pptx.oxml.ns import qn as _qn
+
+    return _qn(tag)
 
 
 def _bad(path: str, why: str, hint: str) -> Diagnostic:
@@ -248,6 +253,8 @@ def open_template(path: str | Path):
                         data = ct.replace(_CT_TEMPLATE, _CT_PRESENTATION).encode("utf-8")
                     zout.writestr(item, data)
             raw = buf.getvalue()
+    from pptx import Presentation
+
     prs = Presentation(io.BytesIO(raw))
     _drop_slides(prs)
     return prs

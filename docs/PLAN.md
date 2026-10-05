@@ -237,4 +237,4 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
 - [ ] Very sparse box slides (01-basics slide 3) still ~70% empty boxes: rethink (center the row, or smaller cards)
 - [ ] L3 consulting-grade pass on JP slides (02 slide 1 right boxes sparse, 07 slide 2 empty band)
 - [ ] Video/audio; Chromium measurement for HTML; XSD validation of output; PowerPoint repair check (owner)
-- [ ] Importer: reconstruct connectors (`a>b`) and mermaid; `import slidemark` < 300 ms (lazy imports)
+- [ ] Importer: reconstruct connectors (`a>b`) and mermaid
