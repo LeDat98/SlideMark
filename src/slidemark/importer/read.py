@@ -722,8 +722,18 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
                 _new(ctx, "image", box, sid=sh.shape_id, name=name, img=(blob, ext), alt=_alt(el, name))
             )
             return
-        img = sh.image
-        it = _new(ctx, "image", box, sid=sh.shape_id, name=name, img=(img.blob, img.ext), alt=_alt(el, name))
+        blob_ext = None
+        svg_ids = el.xpath(".//*[local-name()='svgBlip']/@*[local-name()='embed']")
+        if svg_ids:  # Office SVG picture: keep the vector, not the PNG fallback
+            try:
+                part = sh.part.related_part(svg_ids[0])
+                blob_ext = (part.blob, "svg")
+            except Exception:
+                blob_ext = None
+        if blob_ext is None:
+            img = sh.image
+            blob_ext = (img.blob, img.ext)
+        it = _new(ctx, "image", box, sid=sh.shape_id, name=name, img=blob_ext, alt=_alt(el, name))
         src = el.find(qn("p:blipFill") + "/" + qn("a:srcRect"))
         it.cropped = src is not None and any(int(src.get(k) or 0) != 0 for k in ("l", "t", "r", "b"))
         data.items.append(it)

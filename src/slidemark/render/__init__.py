@@ -470,7 +470,7 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
         add_chart(rc, s, pl, name)
     elif isinstance(el, Image):
         if not add_image(rc, s, pl, name):
-            _placeholder(rc, s, pl, name, f"[image: {el.alt or el.src}]")
+            _placeholder(rc, s, pl, name, f"[image: {el.alt or el.src[:60]}]")
     elif isinstance(el, Media):
         if not add_media(rc, s, pl, name):
             _placeholder(rc, s, pl, name, f"[{el.kind}: {el.alt or el.src}]")

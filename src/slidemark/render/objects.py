@@ -413,6 +413,10 @@ def resolve_image(rc: RenderCtx, src: str) -> Path | None:
 def add_image(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
     """Add the picture; returns False when the image cannot be used (caller draws a placeholder)."""
     im: Image = pl.element  # type: ignore[assignment]
+    from .svg import add_svg, is_svg_src
+
+    if is_svg_src(im.src):
+        return add_svg(rc, slide, pl, name)
     path = resolve_image(rc, im.src)
     if path is None:
         hint = (

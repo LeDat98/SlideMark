@@ -36,5 +36,7 @@ before a block. Keys: `x y w h` (`%`, `in`, `cm`, `mm`, `pt`, `px`; bare = pt), 
 
 **Media.** `![alt](a.mp4){poster=p.png autoplay loop}` embeds video (.mp4 .mov .webm …) or audio (.mp3 .wav …).
 
+**SVG.** `![logo](logo.svg)` or a ` ```svg ` fence: native Office SVG with PNG fallback (scripts stripped).
+
 **Inline:** `**b**` `*i*` `~~s~~` `` `code` `` `==accent==` `[x]{.danger}` `[x]{.badge}` `H~2~O` `x^2^`
 `[t](url)` `[t](#5)`. Lists: `-` and `1.`, nest with two spaces.

@@ -205,6 +205,10 @@ Lists use `-` and `1.`, nested with two spaces.
 
 `![alt](path-or-url)`. Always write the alt text: it is used for accessibility and by `check`.
 
+SVG: `![logo](logo.svg)` or a ` ```svg ` fence with inline source (`{alt=...}` or `<title>` gives the alt text). It is
+embedded as a native Office SVG picture with a PNG fallback; scripts, `on*` attributes, `<foreignObject>` and
+external links are stripped.
+
 ### Video and audio
 
 The same syntax with a media file embeds native, playable media: `![demo](demo.mp4)`. Video: `.mp4 .m4v .mov
