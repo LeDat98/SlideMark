@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import yaml
 
 from ..ir import Chart, Container, Deck, Link, Paragraph, Run, Slide, Table, Text
 from .attrs import (
+    FLAGS,
     STANDALONE,
     AtSpec,
     Attrs,
@@ -454,20 +455,22 @@ def parse_slide(
     slide.notes = "\n".join([*extra_notes, *([notes] if notes else [])]) or None
 
     slide_links: list[RawLink] = []
-    top_ats: list[Item] = []
-    top: list[Item] = []
     boxes: list[tuple[Item, list[Item], list[Item]]] = []  # h2, content, at lines
-    order: list[Any] = []  # ("top", [items]) | ("box", idx) in source order
+    order: list[Any] = []  # ("top", [items], section) | ("box", idx, section) in source order
+    sec_ats: list[list[Item]] = [[]]  # slide-level `@` lines per row-group section
+    sec = 0
     in_box = False
+    pending_end = False  # an `@end` was seen since the last slide-level `@` line
     for it in items:
         if it.kind == "foot":
             ft = Text(role="footnote", paragraphs=[Paragraph(runs=inline_runs(it.text))], line=it.line)
             slide.footnotes.append(ft)
         elif it.kind == "h2":
             boxes.append((it, [], []))
-            order.append(("box", len(boxes) - 1))
+            order.append(("box", len(boxes) - 1, sec))
             in_box = True
         elif it.kind == "end":
+            pending_end = True
             if in_box:
                 in_box = False
             else:
@@ -479,29 +482,103 @@ def parse_slide(
                     "remove it, or put it after the '## ' box it closes",
                 )
         elif it.kind == "at":
-            (boxes[-1][2] if in_box else top_ats).append(it)
+            if in_box:
+                boxes[-1][2].append(it)
+            else:
+                if pending_end and sec_ats[sec]:
+                    sec += 1  # row group: a new `@` line after `@end` starts the next section
+                    sec_ats.append([])
+                pending_end = False
+                sec_ats[sec].append(it)
         else:
             if not in_box:
-                top.append(it)
-                if not order or order[-1][0] != "top":
-                    order.append(("top", []))
+                if not order or order[-1][0] != "top" or order[-1][2] != sec:
+                    order.append(("top", [], sec))
                 order[-1][1].append(it)
             else:
                 boxes[-1][1].append(it)
 
     # elements in source order: top-level runs and boxes interleave (items before the first box, only)
-    for kind, val in order:
+    sec_count = [0] * len(sec_ats)
+    sec_boxes: list[list[Container]] = [[] for _ in sec_ats]
+    sec_last_box = [False] * len(sec_ats)
+    for kind, val, sc in order:
         if kind == "top":
-            slide.elements.extend(_build_flat(val, ctx))
+            built = _build_flat(val, ctx)
+            slide.elements.extend(built)
+            sec_count[sc] += len(built)
+            sec_last_box[sc] = False
         else:
             h2, content, ats = boxes[val]
-            slide.elements.append(_build_box(h2, content, ats, ctx))
+            box = _build_box(h2, content, ats, ctx)
+            slide.elements.append(box)
+            sec_count[sc] += 1
+            sec_boxes[sc].append(box)
+            sec_last_box[sc] = True
 
-    _hint_missing_end(slide, boxes, order, ctx)
+    for sc in range(len(sec_ats)):
+        if sec_last_box[sc]:
+            _hint_missing_end(sec_boxes[sc], ctx)
 
-    # slide-level `@` line and heading attributes
-    if top_ats:
-        spec = _merge_specs([parse_at(a.text, ctx, a.line) for a in top_ats], ctx, [a.line for a in top_ats])
+    # slide-level `@` lines (one per row-group section) and heading attributes
+    specs = [
+        _merge_specs([parse_at(a.text, ctx, a.line) for a in ats], ctx, [a.line for a in ats])
+        for ats in sec_ats
+    ]
+    lead_popped, concl_popped = _lead_and_conclusion(slide)
+    if lead_popped:
+        sec_count[next((i for i, c in enumerate(sec_count) if c), 0)] -= 1
+    if concl_popped:
+        sec_count[max((i for i, c in enumerate(sec_count) if c), default=0)] -= 1
+    groups: list[tuple[AtSpec, list[Any]]] = []
+    pos = 0
+    for sc, spec in enumerate(specs):
+        groups.append((spec, slide.elements[pos : pos + sec_count[sc]]))
+        pos += sec_count[sc]
+    used = [g for g in groups if g[1]]
+    if len(specs) > 1 and len(used) > 1:
+        slide_spec = AtSpec()
+        slide_els: list[Any] = []
+        for spec, els in groups:
+            flags = [c for c in spec.classes if c in FLAGS]
+            slide_spec.layout = spec.layout or slide_spec.layout
+            slide_spec.classes += [c for c in spec.classes if c not in FLAGS and c not in slide_spec.classes]
+            slide_spec.attrs.update(spec.attrs)
+            slide_spec.id = spec.id or slide_spec.id
+            slide_spec.background = spec.background or slide_spec.background
+            slide_spec.transition = spec.transition or slide_spec.transition
+            slide_spec.hidden = slide_spec.hidden or spec.hidden
+            if not els:
+                continue
+            if len(els) == 1:
+                slide_els.extend(els)
+                continue
+            g = Container(
+                classes=["plain", "group", *flags], grid=spec.grid, line=getattr(els[0], "line", None)
+            )
+            if spec.gap is not None:
+                g.gap = spec.gap
+            g.children = els
+            g.links = _resolve_links(spec.links, len(els), "group", ctx, "flow" in flags)
+            slide_els.append(g)
+        slide.elements = slide_els
+        slide.grid = f"1x{len(slide_els)}"
+        spec = slide_spec
+        slide.layout = spec.layout
+        slide.classes += [c for c in spec.classes if c not in slide.classes]
+        slide.attrs.update(spec.attrs)
+        slide.id = spec.id or slide.id
+        slide.background = spec.background
+        slide.transition = spec.transition
+        slide.hidden = spec.hidden
+        slide_links = []
+    elif any(sa for sa in sec_ats):
+        keep = specs.index(used[0][0]) if used else 0
+        spec = _merge_specs(
+            [replace(s, grid=None) if i != keep else s for i, s in enumerate(specs)],
+            ctx,
+            [0] * len(specs),
+        )
         slide.grid = spec.grid
         slide.layout = spec.layout
         slide.classes += [c for c in spec.classes if c not in slide.classes]
@@ -530,7 +607,6 @@ def parse_slide(
         else:
             slide.attrs.update(kv)
 
-    _lead_and_conclusion(slide)
     _infer_cover(slide, index)
     slide.links = _resolve_links(slide_links, len(slide.elements), "slide", ctx, "flow" in slide.classes)
     for box, raw in ctx.box_links:
@@ -539,14 +615,11 @@ def parse_slide(
     return slide
 
 
-def _hint_missing_end(slide: Slide, boxes: list, order: list, ctx: Ctx) -> None:
+def _hint_missing_end(box_els: list[Container], ctx: Ctx) -> None:
     """Info when the last `##` box seems to swallow slide-level content (a forgotten `@end`).
 
-    A closing `>` needs no `@end`: it becomes the conclusion anyway (``_lead_and_conclusion``)."""
-    if len(boxes) < 2 or not order or order[-1][0] != "box":
-        return
-    box_els = [e for e in slide.elements if isinstance(e, Container)]
-    if len(box_els) != len(boxes):
+    Runs per row-group section. A closing `>` needs no `@end`: it becomes the conclusion anyway."""
+    if len(box_els) < 2:
         return
     *rest, last = box_els
 
@@ -602,13 +675,17 @@ def _resolve_links(raw: list[RawLink], n: int, owner: str, ctx: Ctx, flow: bool 
     return out
 
 
-def _lead_and_conclusion(slide: Slide) -> None:
+def _lead_and_conclusion(slide: Slide) -> tuple[bool, bool]:
+    """Take the lead and conclusion; returns whether each was removed from the flat element list."""
     els = slide.elements
+    lead = concl = False
     if els and _is_quote(els[0]):
         q = els.pop(0)
         slide.lead = _as_role(q, "lead")
+        lead = True
     if els and _is_quote(els[-1]):
         slide.conclusion = _as_role(els.pop(), "conclusion")
+        concl = True
     elif (
         els
         and isinstance(els[-1], Container)
@@ -616,6 +693,7 @@ def _lead_and_conclusion(slide: Slide) -> None:
         and _is_quote(els[-1].children[-1])
     ):
         slide.conclusion = _as_role(els[-1].children.pop(), "conclusion")
+    return lead, concl
 
 
 def _as_role(t: Text, role: str) -> Text:

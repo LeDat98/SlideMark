@@ -49,3 +49,5 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] Auto-arrangement v2 rules order: boxes + trailing visuals → one row; flow/chevron → one column per box; 3 boxes with a heavy first → aab/aac (before the link-tree rule); "short" boxes are measured in em so CJK is not short.
 - [import] Heading bands are text-less filled shapes on the card's top edge: ignore them for box detection, or they import as nested `###` boxes. Slide-number text lives in `a:fld`, which python-pptx runs skip.
 - [import] Emit an `@` token only if a trial layout without it differs: keeps imported text at 0.82–1.00× the original tokens.
+- [parser] Row groups: a second `@` line after `@end` = new section → `Container(plain, group)` per section, slide grid `1xN`; pop lead/conclusion before wrapping. Soft breaks in plain paragraphs are new Paragraphs (agents expect line = line).
+- [skill] SKILL.md 1,374 → 819 tokens (details moved to reference pages) to meet the agent token gate: (skill + deck) / python-pptx ≈ 0.36.

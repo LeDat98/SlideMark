@@ -80,6 +80,7 @@ def main() -> int:
     ap.add_argument("--answers", required=True, type=Path)
     ap.add_argument("--live", action="store_true")
     ap.add_argument("--record", action="store_true")
+    ap.add_argument("--baseline", type=Path, help="dir of python-pptx answers (<task>.py)")
     args = ap.parse_args()
     args.answers.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -107,6 +108,18 @@ def main() -> int:
         "mean_warnings": round(sum(r["warnings"] for r in rows) / len(rows), 3),
         "mean_tokens": round(sum(r["tokens"] for r in rows) / len(rows), 1),
     }
+    if args.baseline:
+        import tiktoken
+
+        enc = tiktoken.get_encoding("o200k_base")
+        skill = len(enc.encode(skill_text()))
+        base = [args.baseline / f"{r['task']}.py" for r in rows]
+        if all(b.exists() for b in base):
+            pptx = sum(len(enc.encode(b.read_text(encoding="utf-8"))) for b in base) / len(rows)
+            summary["skill_tokens"] = skill
+            summary["python_pptx_tokens"] = round(pptx, 1)
+            # one task = read SKILL.md once + write the deck (+ fixes, ~0 when first_pass is high)
+            summary["agent_token_ratio"] = round((skill + summary["mean_tokens"]) / pptx, 3)
     print(json.dumps(summary, ensure_ascii=False))
     if args.record:
         with HISTORY.open("a", encoding="utf-8") as f:
