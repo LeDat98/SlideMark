@@ -497,3 +497,11 @@ def test_flow_duplicate_links_dropped():
     s = deck.slides[0]
     assert [(link.src, link.dst) for link in s.links] == [(2, 0)]
     assert sum(d.rule == "duplicate-link" for d in deck.diagnostics) == 2
+
+
+def test_icon_attr():
+    deck = parse("# T\n## 売上 {.kpi icon=chart}\n12億円\n## B {icon=chrt}\n- b\n")
+    a, b = deck.slides[0].elements
+    assert a.attrs.get("icon") == "chart" and "icon" not in b.attrs
+    d = [d for d in deck.diagnostics if d.rule == "unknown-icon"]
+    assert d and "chart" in d[0].hint

@@ -87,7 +87,14 @@ def _float(v: str) -> float | None:
 
 VALID_KEYS = (
     *("x", "y", "w", "h", "size", "color", "fill", "line", "font", "align", "valign", "bold", "italic"),
-    *("radius", "opacity", "pad", "fit", "bg", "t", "hidden", "gap", "id"),
+    *("radius", "opacity", "pad", "fit", "bg", "t", "hidden", "gap", "id", "icon"),
+)
+# keep in sync with slidemark.icons (tests/test_icons.py checks it)
+ICON_NAMES = (
+    *("check", "x", "warning", "info", "user", "users", "building", "factory", "chart", "money", "yen"),
+    *("target", "rocket", "lightbulb", "gear", "clock", "calendar", "document", "mail", "phone", "globe"),
+    *("lock", "shield", "cloud", "database", "search", "star", "heart", "truck", "cart", "leaf"),
+    *("arrow-up", "arrow-down", "arrow-right"),
 )
 KNOWN_CLASSES = (
     "primary",
@@ -167,6 +174,13 @@ def apply_attrs(
                 el.fit = v  # type: ignore[assignment]
             else:
                 ctx.warn(f"bad fit '{v}'", line, "bad-attr", "use fit=contain|cover|stretch")
+        elif k == "icon":
+            if v in ICON_NAMES:
+                el.attrs["icon"] = v
+            else:
+                near = closest(v, ICON_NAMES, 0.5)
+                hint = f"did you mean '{near}'?" if near else "run 'slidemark docs icons' for the names"
+                ctx.warn(f"unknown icon '{v}'", line, "unknown-icon", hint)
         else:
             sink[k] = v
             near = closest(k, VALID_KEYS, 0.7) if sink is el.attrs else None
