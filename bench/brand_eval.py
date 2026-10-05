@@ -36,7 +36,8 @@ def palette(md: Path) -> tuple[dict, list[str]]:
         for d in deck.diagnostics
         if d.level in ("warning", "error") and d.rule not in ASSET_RULES and "file not found" not in d.message
     ]
-    cols = {k: (theme.color(k) or "").upper() for k in ("bg", "fg", "primary", "accent")}
+    keys = ("bg", "fg", "primary", "accent", "muted", "surface", "border")
+    cols = {k: (theme.color(k) or "").upper() for k in keys}
     cols["theme"] = deck.theme
     return cols, bad
 
@@ -54,7 +55,7 @@ def main() -> int:
         task = ROOT / "bench" / "tasks" / md.name
         brief = set(re.findall(r"#[0-9A-Fa-f]{6}", task.read_text(encoding="utf-8")) if task.exists() else [])
         brief = {c.upper() for c in brief}
-        used = {cols[k] for k in ("bg", "fg", "primary", "accent")}
+        used = {v for k, v in cols.items() if k != "theme"}
         follows = not brief or bool(brief & used)
         row = {"task": md.stem, "clean": not bad, "follows": follows, "palette": cols, "problems": bad[:3]}
         rows.append(row)
