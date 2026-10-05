@@ -8,6 +8,7 @@ from slidemark.ir import Deck, Image, Paragraph, Placed, Run, Slide, Style, Text
 from slidemark.layout import layout_slide
 from slidemark.lint import contrast_ratio, lint, lint_slide
 from slidemark.parser import parse
+from slidemark.template import resolve_theme
 from slidemark.theme import get_theme
 
 TH = get_theme("default")
@@ -80,7 +81,7 @@ def test_overflow_and_tiny_text():
 
 def test_explicit_boxes_collide_end_to_end():
     deck = parse("# T\n## A {x=10% y=20% w=50% h=40%}\n- one\n## B {x=30% y=30% w=50% h=40%}\n- two\n")
-    th = get_theme(deck.theme)
+    th = TH
     placed = [layout_slide(s, deck, th, i) for i, s in enumerate(deck.slides)]
     assert "overlap" in [d.rule for d in lint(deck, placed, th)]
 
@@ -88,7 +89,7 @@ def test_explicit_boxes_collide_end_to_end():
 def test_examples_are_clean():
     for md in sorted(EXAMPLES.glob("*.md")):
         deck = parse(md.read_text(encoding="utf-8"))
-        th = get_theme(deck.theme)
+        th, _ = resolve_theme(deck.theme, md.parent)
         placed = [layout_slide(s, deck, th, i) for i, s in enumerate(deck.slides)]
         bad = [
             str(d) for d in lint(deck, placed, th) if d.rule in ("off-slide", "overlap", "contrast", "alt")
@@ -98,7 +99,7 @@ def test_examples_are_clean():
 
 def test_connector_through_a_block():
     deck = parse("# T\n@3 a>c\n## A\n- a\n## B\n- b\n## C\n- c\n")
-    th = get_theme(deck.theme)
+    th = TH
     placed = [layout_slide(s, deck, th, i) for i, s in enumerate(deck.slides)]
     assert "connector-crosses" in [d.rule for d in lint(deck, placed, th)]
     ok = parse("# T\n@3 a>b\n## A\n- a\n## B\n- b\n## C\n- c\n")

@@ -18,7 +18,7 @@ from pathlib import Path
 from slidemark.layout import layout_slide
 from slidemark.layout.grid import strip_grid_tokens
 from slidemark.parser import parse
-from slidemark.theme import get_theme
+from slidemark.template import resolve_theme
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -34,7 +34,7 @@ def main() -> int:
     total = inferred = 0
     for md in sorted((ROOT / "examples").glob("*.md")):
         deck = parse(md.read_text(encoding="utf-8"))
-        theme = get_theme(deck.theme)
+        theme, _ = resolve_theme(deck.theme, md.parent)
         for i, s in enumerate(deck.slides):
             total += 1
             stripped = strip_grid_tokens(s.grid)
