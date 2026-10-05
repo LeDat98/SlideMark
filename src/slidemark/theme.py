@@ -73,6 +73,7 @@ class LayoutTokens(BaseModel):
     tree_slack_roomy: float = 1.3  # org-tree boxes may be this much taller than their content (roomy slides)
     tree_slack: float = 1.15  # org-tree boxes are at most this much taller than their content
     html_fit: bool = False  # True: a lone HTML block fills the body height (stretch, else center)
+    html_zoom_max: float = 1.5  # an HTML block much smaller than its box renders zoomed up to this factor (1 = off)
     roomy_left: float = 0.25  # share of the body left empty that triggers the roomy pass
     roomy_grow: float = 1.2  # the roomy pass grows box / tree text by up to this factor more
     roomy_grow_dense: float = 1.6  # dense slides: sparse cards may grow text this much more
