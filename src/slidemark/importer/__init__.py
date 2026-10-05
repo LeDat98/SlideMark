@@ -12,11 +12,13 @@ from ..ir import Diagnostic
 from ..render.design_part import read_design_part
 from ..theme import DEFAULT, JP_BUSINESS, MIDNIGHT, Theme
 from .design import (
+    claim_fences,
     css_fence,
     design_header,
     edited,
     edited_diag,
     html_slide_lines,
+    insert_fences,
     is_template_path,
     match_slide,
     tag_boxes,
@@ -267,6 +269,7 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
             continue  # restored from the stored HTML: no shapes to arrange
         try:
             sdc = copy.deepcopy(sd)
+            claim_fences(ent, sdc, n, [])
             info: dict = {}
             lines = build_slide(n, sdc, deck, [], lambda *a: "", classes, info)
             lines = tag_boxes(lines, ent)
@@ -285,8 +288,12 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
         try:
             sdiags: list[Diagnostic] = []
             info = {}
+            ent = match_slide(design, n, slide_ids[n - 1]) if design else None
+            won = [] if (ent and ent.get("html") is not None) else claim_fences(ent, sd, n, diags)
             lines = build_slide(n, sd, deck, sdiags, save_image, classes, info)
             diags.extend(sdiags)
+            if won:
+                info["title_only"] = False  # the html block is the body: not a section divider
             solo_titles = solo_titles or (n > 1 and bool(info.get("title_only")))
             ent = match_slide(design, n, slide_ids[n - 1]) if design else None
             lines = tag_boxes(lines, ent)
@@ -301,6 +308,7 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
                 if flags.get(n) and not deck_dense:
                     lines = _add_dense(lines, info)
                 lines = _shorten(lines, info, sd, deck, classes, _trial_head(header, css_head))
+                lines = insert_fences(_drop_section(lines) if won else lines, won, len(notes_lines(sd.notes)))
             if ent and ent.get("css"):
                 k = len(lines) - len(notes_lines(sd.notes))
                 lines = [*lines[:k], *css_fence(ent["css"]), *lines[k:]]
@@ -322,6 +330,19 @@ def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[
     top = [*header, *([""] if header and css_head else []), *css_head]
     text = ("\n".join(top) + "\n\n" if top else "") + body + "\n"
     return text, diags
+
+
+def _drop_section(lines: list[str]) -> list[str]:
+    """Remove the ``section`` / ``cover`` token (and an ``@`` line it leaves empty) after the heading."""
+    out: list[str] = []
+    for k, ln in enumerate(lines):
+        if k and ln.startswith("@") and {"section", "cover"} & set(ln[1:].split()):
+            rest = [t for t in ln[1:].split() if t not in ("section", "cover")]
+            if rest:
+                out.append("@" + " ".join(rest))
+            continue
+        out.append(ln)
+    return out
 
 
 def _trial_head(header: list[str], css_head: list[str]) -> list[str]:

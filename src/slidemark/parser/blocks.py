@@ -261,6 +261,8 @@ def build_fence(tok: Token, line: int, ctx: Ctx) -> Any:
         if els is not None:
             return els
         el = Raw(kind="html", source=body, line=line)
+        el.attrs["html_src"] = body  # the importer re-emits the fence from the design part
+        el.attrs["html_info"] = rest.strip()
     elif lang == "svg":  # inline source rides in a data: URI, so layout/lint treat it as any Image
         title = re.search(r"<title[^>]*>([^<]*)</title>", body)
         alt = str(attrs.kv.get("alt", "")) if attrs else ""
