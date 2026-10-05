@@ -20,6 +20,7 @@ TITLES = {
     "07-jp-org": "Tiếng Nhật: sơ đồ tổ chức, ma trận rủi ro",
     "08-jp-roadmap": "Tiếng Nhật: kế hoạch trung hạn, lộ trình",
     "09-midnight-tech": "Theme tối (midnight): KPI, biểu đồ, Mermaid, công thức, code",
+    "10-template": "Template .pptx của người dùng, ảnh (cover crop), biểu đồ, callout",
 }
 
 
