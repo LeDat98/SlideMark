@@ -85,6 +85,15 @@ skipped with a `bad-token` warning. A theme file is the same tokens as YAML (`co
 - Code fences are never parsed for structure, so a `#` comment inside code is safe.
 - **Cover and section slides are automatic.** A slide with a title and at most two short lines of text is a cover
   (when it is the first slide) or a section divider. Those lines become the subtitle.
+  On a cover or section slide (`@cover`, `@section`, or inferred) a `## line` is one more subtitle line, not a
+  box (info `cover-heading`); `##` boxes belong on content slides.
+- **Dark slides pick their own ink.** A slide `bg=` (color, token name or `linear-gradient(...)`, every stop
+  judged) that gives the theme `fg` less than 4.5:1 turns the text on the slide (title, lead, subtitle, footnote,
+  loose paragraphs) to `render.ink_light` or `render.ink_dark`, whichever contrasts more; lead, subtitle and
+  footnote get a softer mix. The class `dark` always means light ink and `light` dark ink on whatever bg (unless
+  the theme defines that class). Cards, tables and anything with its own fill keep their colors. Colors you
+  declare for the slide win: a slide ```css fence or `{color=}` on `slide` / `h1` / `p` / `.lead` ... (a
+  deck-wide `h1 { color }` yields to a slide's own `bg=`/`dark`). Example: `@cover bg=#2E7D32 dark`.
 - `??? ` starts speaker notes. Everything after it until the next slide is notes.
 
 ## Blocks and boxes
@@ -237,6 +246,9 @@ to slide 5. Additions:
 - `H~2~O` is subscript and `x^2^` is superscript.
 
 Lists use `-` and `1.`, nested with two spaces.
+
+Task lists: `- [ ] todo` and `- [x] done` start with a ☐ / ☑ glyph (U+2610 / U+2611) instead of a bullet.
+`[x]{.badge}` is still a badge.
 
 ## Images
 

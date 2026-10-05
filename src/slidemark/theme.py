@@ -758,3 +758,96 @@ def schema_table(theme: Theme | None = None) -> list[tuple[str, str]]:
         text = ",".join(node) if isinstance(node, list) else str(node)
         rows.append((path, "none" if node is None else text))
     return rows
+
+
+# --------------------------------------------------------------------------- slide ink (dark backgrounds)
+
+# Text that sits directly on the slide background (cards and tables keep their own colors).
+_INK_SELECTORS = ("h1", "slide > p", ".plain > p", ".plain > h2")
+_MUTED_SELECTORS = (".lead", ".subtitle", ".footnote")
+_INK_MARK = -1  # CssRule.line of the rules this module adds (so a second call replaces them)
+
+
+def _hex_str(rgb: tuple[float, ...]) -> str:
+    return "#" + "".join(f"{round(min(max(x, 0.0), 1.0) * 255):02X}" for x in rgb)
+
+
+def slide_ink(theme: Theme, bg: str | None, classes: list[str] | tuple[str, ...] = ()) -> dict[str, str]:
+    """Text colors a slide needs on its own background: ``{"color": ink, "muted": softer ink}`` or ``{}``.
+
+    ``dark`` always means light ink (``render.ink_light``), ``light`` dark ink (``render.ink_dark``), on
+    whatever background (unless the theme defines that class itself). Without a class, a slide ``bg``
+    (color, token name or gradient: every stop is judged) that gives the theme ``fg`` less than 4.5:1 switches
+    to whichever ink contrasts more. Pure: it only reads ``theme`` and the arguments.
+    """
+    from .lint import _backs, _hex, contrast_ratio  # lint imports this module: import lazily
+
+    rt = theme.render
+    backs = _backs(bg, theme, None) if bg else []
+    ref = backs or ([b] if (b := _hex("bg", theme)) else [])
+
+    def worst(ink: str) -> float:
+        c = _hex(ink, theme)
+        return min((contrast_ratio(c, b) for b in ref), default=0.0) if c and ref else 0.0
+
+    names = [c for c in classes if c in ("dark", "light") and c not in theme.classes]
+    if names:
+        ink = rt.ink_light if names[-1] == "dark" else rt.ink_dark
+    elif backs:
+        fg = worst("fg")
+        ink = max((rt.ink_light, rt.ink_dark), key=worst)
+        if fg >= 4.5 or worst(ink) <= fg:
+            return {}
+    else:
+        return {}
+    out = {"color": ink, "muted": ink}
+    rgb = _hex(ink, theme)
+    if rgb and ref:
+        mean = tuple(sum(b[k] for b in ref) / len(ref) for k in range(3))
+        soft = _hex_str(tuple(c + (m - c) * 0.22 for c, m in zip(rgb, mean, strict=True)))
+        if worst(soft) >= 4.5:
+            out["muted"] = soft
+    return out
+
+
+def apply_slide_ink(deck: Any, theme: Theme) -> None:
+    """Give every slide that needs it the CSS rules of :func:`slide_ink` (idempotent, never raises).
+
+    Colors declared for the slide win: a slide-scoped CSS rule (a fence inside the slide, or a deck rule
+    naming ``slide``) that sets ``color`` on ``slide`` skips the slide, one on ``h1`` / ``p`` / ``.lead`` ...
+    skips just that target; element ``{color=}`` attrs and ``@html`` slides are never touched.
+    """
+    from .ir import CssRule
+    from .layout.css import slide_style
+
+    try:
+        for i, slide in enumerate(deck.slides):
+            slide.css = [r for r in slide.css if r.line != _INK_MARK]
+            if slide.html:
+                continue
+            fill = slide.background or slide_style(deck, slide, i).fill
+            ink = slide_ink(theme, fill, slide.classes)
+            if not ink:
+                continue
+            declared: set[str] = set()
+            # Declarations for this slide always win. A deck-wide `h1 { color }` was chosen for the default
+            # background: it yields to a slide's own `bg=` / `dark` / `light`, but not to a deck-wide
+            # `slide { background }` (the deck painted both).
+            local = slide.background or any(r.style.fill for r in slide.css) or "dark" in slide.classes
+            local = local or "light" in slide.classes
+            for r in [*(r for r in deck.css if not local or "slide" in r.selector), *slide.css]:
+                if r.style.color is None:
+                    continue
+                last = re.split(r"\s*>\s*|\s+", r.selector.strip())[-1]
+                declared |= set(re.findall(r"[.#]?[\w-]+", last))
+            if "slide" in declared:
+                continue
+            rules = []
+            for sels, color in ((_INK_SELECTORS, ink["color"]), (_MUTED_SELECTORS, ink["muted"])):
+                for sel in sels:
+                    key = re.split(r"\s*>\s*", sel)[-1]
+                    if key not in declared:
+                        rules.append(CssRule(selector=sel, style=Style(color=color), line=_INK_MARK))
+            slide.css = [*rules, *slide.css]
+    except Exception:  # never raise on user input: the slide keeps the theme colors
+        return

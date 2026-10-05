@@ -15,7 +15,7 @@ from pathlib import Path
 from lxml import etree
 
 from .ir import Diagnostic
-from .theme import DEFAULT, Fonts, Theme, apply_tokens, get_theme, theme_from_data
+from .theme import DEFAULT, Fonts, Theme, apply_slide_ink, apply_tokens, get_theme, theme_from_data
 
 __all__ = [
     "deck_theme",
@@ -93,6 +93,7 @@ def deck_theme(deck, base_dir: str | Path | None = None) -> tuple[Theme, list[Di
     if deck.tokens:
         theme, more = apply_tokens(theme, deck.tokens)
         diags = diags + more
+    apply_slide_ink(deck, theme)  # dark/light slide classes and dark `bg=` flip the text color
     return theme, diags
 
 

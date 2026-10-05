@@ -61,6 +61,16 @@ def split_soft(children: list[Token] | None) -> list[list[Token]]:
     return parts
 
 
+def _task_box(runs: list[Run]) -> str | None:
+    """``\u2610`` / ``\u2611`` when a list item starts with ``[ ] `` / ``[x] `` (task list), else None."""
+    if not runs or runs[0].code or runs[0].link:
+        return None
+    head = runs[0].text[:4]
+    if head in ("[ ] ", "[x] ", "[X] "):
+        return "\u2610" if head[1] == " " else "\u2611"
+    return None
+
+
 def paragraphs_from_tokens(tokens: list[Token], lines: bool = False) -> list[Paragraph]:
     """Paragraphs (with list markers/levels) from a flat token slice.
 
@@ -96,6 +106,9 @@ def paragraphs_from_tokens(tokens: list[Token], lines: bool = False) -> list[Par
                 for r in runs:
                     r.bold = True
             marker = stack[-1] if stack and first_in_item else None
+            if marker and (box := _task_box(runs)):  # `- [ ] a` / `- [x] a`: the box glyph is the bullet
+                marker = None
+                runs[0].text = box + "\u2002" + runs[0].text[4:]
             out.append(Paragraph(runs=runs, marker=marker, level=max(len(stack) - 1, 0)))  # type: ignore[arg-type]
             first_in_item = False
         elif ty == "fence":
