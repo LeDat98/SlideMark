@@ -7,11 +7,11 @@ description: Write PowerPoint decks as compact SlideMark text and build native, 
 
 ```bash
 slidemark check deck.md     # warnings with hints; --fix repairs simple ones
-slidemark review deck.md    # design critique + score
+slidemark review deck.md    # design critique + score; --fix splits dense slides, fixes contrast/titles
 slidemark build deck.md -o deck.pptx
 ```
 
-More: `slidemark docs syntax|design|components|charts-tables|jp-dense|icons|diagnostics`.
+More: `slidemark docs syntax|design|components|charts-tables|jp-dense|icons|diagnostics|review`.
 
 ```markdown
 theme: jp-business
