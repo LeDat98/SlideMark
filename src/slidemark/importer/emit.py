@@ -62,8 +62,15 @@ def inline(
     classes: dict[str, str] | None = None,
     plain_bold: bool = False,
     cell: bool = False,
+    implied=None,
 ) -> str:
-    """Runs -> inline Markdown. ``plain_bold`` drops bold that the theme adds anyway (titles, headings)."""
+    """Runs -> inline Markdown. ``plain_bold`` drops bold that the theme adds anyway (titles, headings).
+
+    ``implied`` (a Style: color, bold, italic) is what a css rule already gives this text: no markup for it.
+    """
+    imp_color = getattr(implied, "color", None)
+    imp_bold = bool(getattr(implied, "bold", None))
+    imp_italic = bool(getattr(implied, "italic", None))
     parts: list[str] = []
     all_bold = bool(runs) and all(r.bold for r in runs if r.text.strip())
     for r in _merge(runs):
@@ -92,11 +99,13 @@ def inline(
                 body = f"~{body}~"
             if r.strike:
                 body = f"~~{body}~~"
-            if r.italic:
+            if r.italic and not imp_italic:
                 body = f"*{body}*"
-            if r.bold and not (plain_bold and all_bold) and not r.badge:
+            if r.bold and not imp_bold and not (plain_bold and all_bold) and not r.badge:
                 body = f"**{body}**"
-            if accent and r.color == accent and not r.badge:
+            if imp_color and r.color == imp_color:
+                pass
+            elif accent and r.color == accent and not r.badge:
                 body = f"=={body}=="
             elif r.color and not r.badge and (cname := (classes or {}).get(r.color)) in ("success", "danger"):
                 body = f"[{body}]{{.{cname}}}"

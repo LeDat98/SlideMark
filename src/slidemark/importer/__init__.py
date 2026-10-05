@@ -15,9 +15,12 @@ from .design import (
     claim_fences,
     css_fence,
     design_header,
+    design_rules,
     edited,
     edited_diag,
+    heading_sized,
     html_slide_lines,
+    implied_style,
     insert_fences,
     is_template_path,
     match_slide,
@@ -233,6 +236,9 @@ def _import_with(
         margin_x=to_emu(theme.margin_x),
         gap=to_emu(theme.gap),
     )
+    rules = design_rules(design)
+    deck.implied = {r: implied_style(rules, r, colors) for r in ("lead", "conclusion", "footnote")}
+    deck.css_heading = heading_sized(rules)
     classes = {}
     for cname in ("success", "danger", "muted", "accent"):
         classes.setdefault(colors[cname], cname)
@@ -358,6 +364,7 @@ def _import_with(
                 if flags.get(n) and not deck_dense:
                     lines = _add_dense(lines, info)
                 lines = _shorten(lines, info, sd, deck, classes, _trial_head(header, css_head))
+                lines = _table_widths(lines, sd, _trial_head(header, css_head))
                 lines = insert_fences(_drop_section(lines) if won else lines, won, len(notes_lines(sd.notes)))
             if ent and ent.get("css"):
                 k = len(lines) - len(notes_lines(sd.notes))
@@ -432,6 +439,57 @@ def _shorten(lines, info, sd, deck, classes, header) -> list[str]:
     return lines
 
 
+def _table_widths(lines: list[str], sd: SlideData, header: list[str]) -> list[str]:
+    """Add ``{widths=a:b:c}`` to the tables whose rebuilt column widths differ from the original's.
+
+    The automatic widths follow the text and hug numeric tables; explicit ``widths`` (or a CSS-free
+    hand-sized table) are not stored in the .pptx except as the finished column widths.
+    """
+    from .structure import _units
+
+    tables = sorted((i for i in sd.items if i.kind == "table" and len(i.col_w) > 1), key=lambda i: (i.y, i.x))
+    if not tables:
+        return lines
+    try:
+        head = ("\n".join(header) + "\n\n") if header else ""
+        trial = _read_trial(head + "\n".join(lines) + "\n", None)  # type: ignore[arg-type]
+        got = sorted(
+            (i for i in trial.items if i.kind == "table" and len(i.col_w) > 1), key=lambda i: (i.y, i.x)
+        )
+        if len(got) != len(tables):
+            return lines
+        bad = []
+        for k, (a, b) in enumerate(zip(tables, got, strict=True)):
+            if len(a.col_w) != len(b.col_w):
+                continue
+            ta, tb = sum(a.col_w), sum(b.col_w)
+            if abs(ta - tb) > 0.03 * ta or any(
+                abs(x / ta - y / tb) > 0.04 for x, y in zip(a.col_w, b.col_w, strict=True)
+            ):
+                bad.append(k)
+        if not bad:
+            return lines
+        out: list[str] = []
+        k = -1
+        in_fence = False
+        for ln in lines:
+            if ln.startswith(("```", "~~~")):
+                in_fence = not in_fence
+            starts = not in_fence and ln.startswith("|") and not (out and out[-1].startswith("|"))
+            if starts:
+                k += 1
+                if k in bad:
+                    w = "widths=" + ":".join(map(str, _units(list(tables[k].col_w))))
+                    if out and out[-1].startswith("{align="):
+                        out[-1] = out[-1][:-1] + " " + w + "}"
+                    else:
+                        out.append("{" + w + "}")
+            out.append(ln)
+        return out
+    except Exception:
+        return lines
+
+
 # --------------------------------------------------------------------------- density
 
 
@@ -447,7 +505,7 @@ def _drop_token(lines: list[str], tok: str) -> list[str]:
     return out
 
 
-def _read_trial(text: str, deck: DeckInfo) -> SlideData:
+def _read_trial(text: str, deck: DeckInfo | None) -> SlideData:
     import tempfile
 
     from pptx import Presentation
@@ -458,7 +516,7 @@ def _read_trial(text: str, deck: DeckInfo) -> SlideData:
         path = Path(tmp) / "t.pptx"
         build(text, path)
         prs = Presentation(str(path))
-        ctx = ReadCtx(accent=deck.accent or "")
+        ctx = ReadCtx(accent=(deck.accent if deck else None) or "")
         ctx.slide_index[prs.slides[0].part] = 1
         return read_slide(prs.slides[0], ctx)
 

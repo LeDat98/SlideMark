@@ -79,8 +79,8 @@ def style_to_css(style: Style) -> str:
         d.append(("border-style", _DASH[s.line_dash]))
     for side in ("top", "right", "bottom", "left"):
         v = getattr(s, f"border_{side}")
-        if v is not None:
-            d.append((f"border-{side}", v))
+        if v is not None:  # canonical "1pt dash #hex" -> css keywords (dashed, dotted)
+            d.append((f"border-{side}", re.sub(r"\b(dash|dot)\b", lambda m: _DASH[m.group(1)], v)))
     if s.radius is not None:
         d.append(("border-radius", _len(s.radius)))
     if s.shadow is not None and s.shadow is not True:
@@ -130,6 +130,8 @@ def style_to_css(style: Style) -> str:
         d.append(_grid(s.grid))
     if s.rotation is not None:
         d.append(("transform", f"rotate({_n(s.rotation)}deg)"))
+    if s.width is not None:
+        d.append(("width", s.width))
     return "; ".join(f"{k}: {v}" for k, v in d)
 
 
@@ -164,17 +166,43 @@ def _referenced(deck: Deck) -> set[str]:
     return names
 
 
-def _boxes(elements: list[Any], names: set[str], out: list[list[str]]) -> None:
-    """Append ``[heading, name, ...]`` for each container whose classes or id are in ``names``."""
+def _boxes(elements: list[Any], names: set[str], out: list[list[str]], every: bool = False) -> None:
+    """Append ``[heading, name, ...]`` for each container whose classes or id are in ``names``.
+
+    ``every`` also records the boxes without such a name (``[heading]``): their heading text is stored
+    because a CSS ``text-transform`` changed its casing on the slide.
+    """
     for el in elements:
         if getattr(el, "type", None) != "container":
             continue
         mine = [c for c in el.classes if c in names]
         if el.id and "#" + el.id in names:
             mine.append("#" + el.id)
-        if mine and el.title is not None:
+        if (mine or every) and el.title is not None:
             out.append(["".join(p.plain for p in el.title.paragraphs), *mine])
-        _boxes(el.children, names, out)
+        _boxes(el.children, names, out, every)
+
+
+def _texts(elements: list[Any], names: set[str], out: list[list[str]]) -> None:
+    """Append ``[first paragraph, name, ...]`` for each text block that carries a class in ``names``."""
+    for el in elements:
+        t = getattr(el, "type", None)
+        if t == "container":
+            _texts(el.children, names, out)
+        elif t == "text" and el.paragraphs and el.role == "body":
+            mine = [c for c in el.classes if c in names]
+            if el.id and "#" + el.id in names:
+                mine.append("#" + el.id)
+            if mine:
+                out.append([el.paragraphs[0].plain, *mine])
+
+
+def _transforms(deck: Deck) -> bool:
+    """True when some css rule or token of the deck sets ``text-transform`` (a literal re-casing of text)."""
+    for sl in [deck, *deck.slides]:
+        if any(r.style.text_transform not in (None, "none") for r in sl.css or []):
+            return True
+    return any("text-transform" in k or "text_transform" in k for k in deck.tokens or {})
 
 
 def _fences(elements: list[Any], out: list[dict[str, Any]], top: bool = True) -> None:
@@ -203,15 +231,23 @@ def design_payload(deck: Deck, slide_ids: list[int | None]) -> dict[str, Any]:
         data["css"] = rules_payload(deck.css)
     slides: list[dict[str, Any]] = []
     names = _referenced(deck)
+    recase = _transforms(deck)
     for i, sl in enumerate(deck.slides):
         ent: dict[str, Any] = {}
         if sl.css:
             ent["css"] = rules_payload(sl.css)
-        if names:
+        if names or recase:
             els: list[list[str]] = []
-            _boxes(sl.elements, names, els)
+            _boxes(sl.elements, names, els, recase)
             if els:
                 ent["el"] = els
+        if names:
+            txs: list[list[str]] = []
+            _texts(sl.elements, names, txs)
+            if txs:
+                ent["tx"] = txs
+        if recase and sl.title is not None and sl.html is None:
+            ent["ttl"] = "".join(p.plain for p in sl.title.paragraphs)
         fences: list[dict[str, Any]] = []
         _fences(sl.elements, fences)
         if fences:
