@@ -39,6 +39,11 @@ W_MEAN = 6.0  # x shortfall of the mean card fill
 W_WIDTH = 12.0  # x shortfall of the mean horizontal fill (short lines in wide cards)
 W_UNBALANCED = 3.0  # per unbalanced row
 W_EMPTY = 14.0  # x empty share above EMPTY_OK
+BAR_FILL = (
+    0.5  # a bar (>= BAR_WIDE of the body width) whose longest line spans less than this is a stretched box
+)
+BAR_WIDE = 0.6
+W_BAR = 4.0  # per such bar: stacking a few short boxes into wide bars must not win
 W_ASPECT = 6.0  # x log2 distance from the OK aspect range
 
 
@@ -145,7 +150,11 @@ def score(items: list[Placed], body: Rect, theme: Theme, *, over: int = 0) -> Sc
         if len(fills) > 1:
             parts["spread"] = W_SPREAD * statistics.pstdev(fills)
         parts["mean"] = W_MEAN * max(0.0, FILL_TARGET - statistics.fmean(fills))
-    wf = [w for w in (_width_fill(c, inner) for c, inner in cards) if w is not None]
+    wfs = [(c, _width_fill(c, inner)) for c, inner in cards]
+    wf = [w for _c, w in wfs if w is not None]
+    bars = sum(1 for c, w in wfs if w is not None and w < BAR_FILL and c.w >= BAR_WIDE * body.w)
+    if bars and len(cards) <= 4:
+        parts["bars"] = W_BAR * bars
     if wf:
         parts["width"] = W_WIDTH * max(0.0, WIDTH_TARGET - statistics.fmean(wf))
     unbalanced = 0

@@ -72,17 +72,19 @@ class LayoutTokens(BaseModel):
     tree_slack: float = 1.15  # org-tree boxes are at most this much taller than their content
     roomy_left: float = 0.25  # share of the body left empty that triggers the roomy pass
     roomy_grow: float = 1.2  # the roomy pass grows box / tree text by up to this factor more
-    roomy_grow_dense: float = 1.4  # dense slides: sparse cards may grow text this much more
-    dense_roomy_body: float = 1.6  # dense slides: body text stays at most this multiple of the body size
-    roomy_row: float = 0.62  # a lone row of boxes reaches this share of the body height
+    roomy_grow_dense: float = 1.6  # dense slides: sparse cards may grow text this much more
+    dense_roomy_body: float = 2.0  # dense slides: body text stays at most this multiple of the body size
+    roomy_row: float = 0.86  # a lone row of boxes reaches this share of the body height
     roomy_row_air: float = 1.9  # ... but never taller than this multiple of the natural height
     balance_air: float = (
-        1.7  # normal density: a lone row of boxes may grow to this multiple of its height (0 = off)
+        1.9  # normal density: a lone row of boxes may grow to this multiple of its height (0 = off)
     )
-    balance_row: float = 0.72  # ... but never beyond this share of the body
+    balance_max_pt: float = 36  # ... but body text never beyond this size (pt)
+    balance_grow: float = 1.9  # ... its text may also grow by up to this factor (no new wrapped lines)
+    balance_row: float = 0.85  # ... but never beyond this share of the body
     balance_shift: float = 0.0  # ... and the part of the rest above the 20% band that moves the block down
     balance_left: float = 0.2  # ... when more than this share of the body would stay empty
-    roomy_row_air_dense: float = 1.6  # ... dense slides
+    roomy_row_air_dense: float = 2.3  # ... dense slides
     peer_step: float = 1.12  # table text is at most this much smaller than the box text on the same slide
     beside_min: float = 0.5  # a box beside a chart / image is at least this share of the visual height
     beside_fill: float = 0.6  # ... a shorter one grows by this share of the way to that minimum
@@ -106,7 +108,7 @@ class LayoutTokens(BaseModel):
     room_free: float = 0.35  # a card with more than this share of its inner height free spreads paragraphs
     room_use: float = 0.6  # ... using this share of the free height
     room_gap_max: float = 0.6  # ... up to this space-before (em) per paragraph
-    room_gap_max_dense: float = 0.8  # ... dense slides
+    room_gap_max_dense: float = 1.2  # ... dense slides
     slide_peer_step: float = 1.12  # slide-level text is at most this much smaller than the box text beside it
     grow_fill: float = 0.85  # growth stops when the content would fill more than this share of the grid
     grow_box_fill: float = 0.92  # ... or more than this share of a box
