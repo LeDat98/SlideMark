@@ -91,7 +91,7 @@ def test_text_grows_before_cards_stretch():  # 13-brand-aurora slide 2: cards we
     fills = [f for _t, f in card_fills(items)]
     assert fills and max(fills) >= 0.5 and sum(fills) / len(fills) >= 0.38
     body = [p for p in items if getattr(p.element, "role", None) == "body"]
-    assert 1.2 <= min(p.font_scale for p in body) <= 1.3 + 1e-6  # text grew first, within ``grow_max``
+    assert 1.2 <= min(p.font_scale for p in body) <= 1.5 + 1e-6  # text grew first, within ``sparse_step_max``
 
 
 def test_dense_two_box_slide_cards_are_half_filled():  # 11-jp-consulting slide 9: short CJK lines cannot grow

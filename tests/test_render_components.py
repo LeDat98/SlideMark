@@ -166,7 +166,7 @@ def test_kpi_card_text(tmp_path):
     prs, _, th = build(Deck(slides=[s]), tmp_path)
     tb = next(x for x in prs.slides[0].shapes if x.has_text_frame and x.text_frame.text.startswith("12.4M"))
     big, cap = tb.text_frame.paragraphs
-    assert big.runs[0].font.size == Pt(th.classes["kpi"].font_size)
+    assert big.runs[0].font.size >= Pt(th.classes["kpi"].font_size)  # a KPI row alone may grow
     assert big.runs[0].font.bold and str(big.runs[0].font.color.rgb) == th.color("primary").lstrip("#")
     assert cap.runs[0].font.size < big.runs[0].font.size
     assert str(cap.runs[0].font.color.rgb) == th.color("muted").lstrip("#")

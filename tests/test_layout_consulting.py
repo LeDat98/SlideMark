@@ -177,7 +177,7 @@ def test_chevron_row_height_is_text_plus_padding():
     placed, _ = lay(s, "jp-business")
     chev = [p for p in placed if isinstance(p.element, Shape) and p.element.shape == "chevron"]
     assert len(chev) == 3
-    assert 0.7 * 914400 - 1 <= chev[0].h <= 1.3 * 914400 + 1
+    assert 0.7 * 914400 - 1 <= chev[0].h <= 2.8 * 914400 + 1  # alone: up to ``chevron_max_alone_sparse``
     size = (chev[0].style.font_size or 0) * chev[0].font_scale
     assert size >= 11  # at least the theme body size
 
@@ -427,4 +427,7 @@ def test_explicit_css_size_never_grows_and_body_growth_is_capped():
     heads = [p for p in placed if isinstance(p.element, Text) and p.element.role == "heading"]
     assert heads and all(p.font_scale == 1.0 for p in heads)
     body = [p for p in placed if isinstance(p.element, Text) and p.element.role == "body"]
-    assert body and max(p.font_scale for p in body) <= theme.layout.grow_max + 1e-6
+    assert (
+        body
+        and max(p.font_scale for p in body) <= max(theme.layout.grow_max, theme.layout.sparse_step_max) + 1e-6
+    )

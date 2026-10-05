@@ -182,6 +182,20 @@ class LayoutTokens(BaseModel):
     )
     sparse_step_max: float = 1.5  # ... it first tries steps up to this factor (text, nodes, paddings)
     sparse_low_max_pt: float = 24  # ... body text of such a slide may reach this size (pt)
+    # --- sparse completion: a slide that still leaves more than sparse_left_max of the body empty
+    sparse_left_max: float = 0.35  # ... grows text / cards / chevrons, then moves the block down (0 = off)
+    sparse_left_target: float = 0.3  # ... the band below the block is brought down to this share of the body
+    sparse_text_max_pt: float = (
+        28  # ... body text may reach this size (pt), at most sparse_step_max x the theme body
+    )
+    sparse_row_gap_max: Length = "0.5in"  # ... rows of blocks move apart by at most this much per gap, first
+    sparse_air: float = 1.0  # ... paragraph gap (em) of plain body text, at most (lists on a sparse slide)
+    sparse_card_air: float = 1.15  # ... a lone row of cards may reach this multiple of its natural height
+    sparse_kpi_air: float = 1.15  # ... KPI cards may be this much taller than their content
+    chevron_alone_share_sparse: float = (
+        0.4  # ... a chevron row alone aims at this share of the body height ...
+    )
+    chevron_max_alone_sparse: Length = "2.8in"  # ... up to this height
 
 
 class RenderTokens(BaseModel):
