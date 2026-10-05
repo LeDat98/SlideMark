@@ -16,6 +16,7 @@ from pygments import lex
 from pygments.lexers import TextLexer, get_lexer_by_name
 from pygments.token import Comment, Keyword, Name, Number, Operator, String
 
+from ..contrast import best_ink, ratio
 from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Series, Style, Table
 from ..layout import measure
 from ..layout.css import border_spec, cell_insets
@@ -344,6 +345,61 @@ def label_color_on(fill_hex: str, theme: Theme | None = None) -> str:
     return light if 1.05 / (lum + 0.05) > (lum + 0.05) / (dark + 0.05) else dark_hex
 
 
+def _ink_hex(theme: Theme, fill: str, fallback: str, *backs: str) -> str:
+    """'RRGGBB' ink readable on ``fill`` (and on every ``backs`` color when one ink can do both)."""
+    cands = [c.lstrip("#").upper() for c in theme.ink_candidates()]
+    need = theme.render.contrast_min
+    both = [c for c in cands if all(ratio("#" + c, "#" + b) >= need for b in (fill, *backs))]
+    if both:
+        return both[0]
+    return best_ink("#" + fill, ["#" + c for c in cands], need).lstrip("#").upper() or fallback
+
+
+def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct) -> None:
+    """Per-slice ``c:dLbl`` so each label has its own readable ink (slices differ in fill).
+
+    A doughnut label always sits on its slice. A pie label may land inside or outside (best fit), so its
+    ink must also read on the slide background when one does both; else it reads on the slice.
+    """
+    dls = ser.data_labels  # series-level dLbls override the plot-level ones: repeat the shared settings
+    dls.font.size = Pt(size * theme.render.chart_label_scale)
+    dls.font.color.rgb = fg
+    if lab_pct:
+        dls.show_value, dls.show_percentage = False, True
+        dls.number_format = nf if (nf and "%" in nf) else "0%"
+        dls.number_format_is_linked = False
+    else:
+        dls.show_value = True
+        if nf:
+            dls.number_format = nf
+            dls.number_format_is_linked = False
+    if kind == "pie":
+        dls.position = XL_LABEL_POSITION.BEST_FIT
+    bg, fg_hex = hex6(theme, "bg"), hex6(theme, "fg")
+    for pi in range(n):
+        fill = pal[pi % len(pal)]
+        ink = _ink_hex(theme, fill, fg_hex, *([bg] if kind == "pie" else []))
+        dl = ser.points[pi].data_label
+        dl.font.size = Pt(size * theme.render.chart_label_scale)
+        dl.font.color.rgb = RGBColor.from_string(ink)
+        el = dl._dLbl
+        if el is None:
+            continue
+        for tag, val in (("c:showVal", not lab_pct), ("c:showPercent", lab_pct)):
+            e = el.find(qn(tag))
+            if e is not None:
+                e.set("val", "1" if val else "0")
+        if lab_pct or nf:
+            fmt = (nf if (nf and "%" in nf) else "0%") if lab_pct else nf
+            nfe = el.makeelement(qn("c:numFmt"), {"formatCode": fmt, "sourceLinked": "0"})
+            anchor = el.find(qn("c:spPr"))
+            if anchor is None:
+                anchor = el.find(qn("c:txPr"))
+            anchor.addprevious(nfe)
+        if kind == "pie":
+            dl.position = XL_LABEL_POSITION.BEST_FIT
+
+
 def _distinct(colors: list[str]) -> list[str]:
     """Drop repeated colors (``accent`` and ``danger`` may share one value), keep the order."""
     return list(dict.fromkeys(c.upper() for c in colors))
@@ -458,6 +514,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     pt.format.fill.solid()
                     pt.format.fill.fore_color.rgb = RGBColor.from_string(pal[pi % len(pal)])
                     pt.format.line.color.rgb = rgb(theme, "bg")
+                if lab_on:
+                    _pie_point_labels(ser, pal, len(cats), theme, kind, fg, size, nf, lab_pct)
             elif kind in ("line", "radar", "scatter"):
                 if kind == "scatter":
                     ser.format.line.fill.background()
@@ -479,7 +537,9 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     sdl = ser.data_labels
                     sdl.show_value = True
                     sdl.font.size = Pt(size * theme.render.chart_label_scale)
-                    sdl.font.color.rgb = RGBColor.from_string(label_color_on(color, theme))
+                    sdl.font.color.rgb = RGBColor.from_string(
+                        _ink_hex(theme, color, label_color_on(color, theme))
+                    )
                     sdl.position = XL_LABEL_POSITION.CENTER
                     # a zero-width segment gets no (clipped) label: the zero section of the format is empty
                     sdl.number_format = (
