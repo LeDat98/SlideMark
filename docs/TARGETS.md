@@ -28,7 +28,7 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 - [ ] Autofit with real font metrics: 0 overflow on all examples; overflow diagnostic when below `min_font_size`
 - [ ] CJK correct: `<a:ea>` font set, full-width measurement, no broken line wrapping in JP examples
 - [ ] ≥ 3 polished themes (light, dark, `jp-business` dense)
-- [ ] Golden image tests catch any visual regression
+- [x] Golden image tests catch any visual regression (tests/test_golden.py)
 
 ## L3: Dense & rich (target: day 7, end of foundation)
 - [ ] Dense JP slide set (≥ 8 slides: 3–4 column boxes, KPI tables, process arrows, lead line, ※ footnotes,

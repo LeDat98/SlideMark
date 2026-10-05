@@ -32,7 +32,7 @@ Cú pháp đầy đủ: [docs/SYNTAX.md](docs/SYNTAX.md).
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-04 · commit `6c9c317` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-05 · commit `bd9d7f8` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 

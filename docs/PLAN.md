@@ -86,7 +86,8 @@ daily routine keeps climbing L4 → L7, picking the unchecked gates with the bes
 - [x] Merge, end-to-end test, README gallery, bench
 
 ## Day 1 leftovers (carried to day 2)
-- [ ] Table/`>` after the last `##` box become children of that box and (in a chevron box) vanish: add a way to end a box + diagnostic when a visual is dropped (found in `examples/02-jp-dense.md` slide 2)
+- [x] Box terminator `@end` + `dropped-content` diagnostic (day 2)
+- [ ] Slide-level table after an `@end` (with `chevron` grid) is placed in ONE grid cell, cramped; slide-level visuals should get their own full-width row below the grid (jp-dense slide 2)
 
 ## Day 2 work packages (incl. day 1 leftover)
 - **A: parser + CLI** (`src/slidemark/parser/`, `src/slidemark/cli.py`, `tests/test_parser*.py`, `tests/test_cli.py`):
@@ -108,8 +109,8 @@ daily routine keeps climbing L4 → L7, picking the unchecked gates with the bes
   + token gate test (fail if slidemark tokens regress >3%), examples, gallery, docs.
 
 ## Day 2 status
-- [ ] Contract: `@end` in SYNTAX.md
-- [ ] A: lenient parsing + hints + `@end` + fuzz
-- [ ] B: dropped-content diag, autofit/kinsoku, table styling, image cover
-- [ ] Orchestrator: golden images, BASELINE.json token gate
-- [ ] Merge, gallery, bench
+- [x] Contract: `@end` in SYNTAX.md
+- [x] A: lenient parsing + hints + `@end` + fuzz
+- [x] B: dropped-content diag, autofit/kinsoku, table styling, image cover
+- [x] Orchestrator: golden images, BASELINE.json token gate
+- [x] Merge, gallery, bench
