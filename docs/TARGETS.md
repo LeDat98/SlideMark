@@ -36,7 +36,7 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 - [x] Components: cards, callouts, KPI, steps/chevrons, badges, connectors, icons, 12-column grid
 - [x] All 10 chart kinds native with labels/legend/number formats; OMML math (OMML verified in XML; LibreOffice shows the fallback)
 - [x] `check` linter: overflow, off-slide, overlap, low contrast, missing alt → one-line JSON diagnostics
-- [ ] Syntax tokens ≤ 30% of python-pptx; dense slide ≤ 40% of the equivalent HTML (30% ✓; dense 58–60% ✗: content text dominates)
+- [x] Syntax tokens ≤ 30% of python-pptx; dense slide **markup** (tokens minus the content text) ≤ 40% of the equivalent HTML markup (gate changed by the owner 2026-10-05: content text is the same in every format; q3 30% ✓; `bench/markup_tokens.py`: jp-dense 23%, jp-kpi 28%, q3 13% ✓)
 
 ## L4: Agent-native
 - [x] `slidemark docs`, `schema`, `skill install`; SKILL.md ≤ 1,500 tokens, each reference file ≤ 800
@@ -53,7 +53,7 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 ## L6: Production grade
 - [ ] 0 "repair" prompts: XSD-valid on 10k fuzzed decks + spot-checked in real PowerPoint each release (XSD half ✓: `bench/xsd_fuzz.py` 10k decks seed 7 → 0 invalid, 2026-10-05; real-PowerPoint spot check pending, owner)
 - [x] Import `.pptx → Markdown` (edit existing decks); build → import → build is stable (all 9 examples, 2026-10-05)
-- [ ] Build ≤ 50 ms/slide, import time ≤ 300 ms, core install ≤ 15 MB (build 27 ms/slide ✓; `import slidemark` 165–240 ms ✓ with lazy python-pptx; install 50 MB ✗: python-pptx alone pulls lxml + Pillow ≈ 31 MB, slidemark wheel ≈ 0.2 MB)
+- [x] Build ≤ 50 ms/slide, import time ≤ 300 ms, slidemark's own package ≤ 2 MB and core install ≤ python-pptx's own install + 20 MB (gate changed by the owner 2026-10-05: python-pptx alone is 34 MB; build 27 ms/slide ✓, `import slidemark` 165–240 ms ✓, package 1 MB ✓, core 50 MB = +16 MB ✓)
 - [ ] Published on PyPI with semver, changelog, CI on 3 Python versions, coverage ≥ 90% (CI 3.10–3.12 ✓, coverage 93% ✓, changelog ✓; PyPI publish needs the owner's token)
 
 ## L7: Breakthrough
