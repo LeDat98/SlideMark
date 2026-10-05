@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import uuid
 from pathlib import Path
 
 from lxml import etree
@@ -31,6 +32,7 @@ from ..layout.engine import CHEVRON_ADJ
 from ..template import clone_footer, open_template, pick_layout
 from ..theme import Theme
 from ..units import slide_size
+from .anim import build_timing
 from .math import add_math
 from .objects import add_chart, add_image, add_table, code_paragraphs, resolve_image
 from .text import fill_text, insert_rpr_child
@@ -67,9 +69,16 @@ _TRANSITIONS = {
     "fade": "<p:fade/>",
     "push": '<p:push dir="l"/>',
     "wipe": '<p:wipe dir="l"/>',
-    "split": "<p:split/>",
+    "split": '<p:split orient="horz" dir="out"/>',
+    "cover": '<p:cover dir="l"/>',
+    "zoom": '<p:zoom dir="in"/>',
+    "morph": '<p159:morph option="byObject"/>',  # fallback: fade
 }
 _NS_P = "http://schemas.openxmlformats.org/presentationml/2006/main"
+_NS_MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+_NS_P14 = "http://schemas.microsoft.com/office/powerpoint/2010/main"
+_NS_P159 = "http://schemas.microsoft.com/office/powerpoint/2015/09/main"
+_SECTION_URI = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
 
 
 def render(deck: Deck, placed: list[list[Placed]], theme: Theme, out: str | Path) -> Path:
@@ -112,6 +121,7 @@ def render(deck: Deck, placed: list[list[Placed]], theme: Theme, out: str | Path
                 "error",
             )
     _resolve_links(rc)
+    _sections(rc, prs)
     _core_properties(prs, deck)
     out.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(out))
@@ -133,7 +143,10 @@ def _render_slide(rc: RenderCtx, prs, slide: Slide, items: list[Placed]):
     _background(rc, prs, s, slide)
     counters: dict[str, int] = {}
     used_title = False
+    shape_ids: list[list[int]] = []  # per Placed index: ids of the shapes it produced (for animations)
     for pl in items:
+        seen = {int(i) for i in s.shapes._spTree.xpath("./*/*[1]/p:cNvPr/@id")}
+        shape_ids.append([])
         try:
             use_ph = (
                 has_title and not used_title and isinstance(pl.element, Text) and pl.element.role == "title"
@@ -142,6 +155,8 @@ def _render_slide(rc: RenderCtx, prs, slide: Slide, items: list[Placed]):
             if rc.template and _native_footer(rc, s, pl):
                 continue
             _render_item(rc, s, pl, counters, use_ph)
+            now = [int(i) for i in s.shapes._spTree.xpath("./*/*[1]/p:cNvPr/@id")]
+            shape_ids[-1] = [i for i in now if i not in seen]
         except Exception as e:
             rc.diag(
                 "render-error",
@@ -161,6 +176,10 @@ def _render_slide(rc: RenderCtx, prs, slide: Slide, items: list[Placed]):
     if slide.hidden:
         s._element.set("show", "0")
     _transition(rc, s, slide)
+    try:
+        _timing(s, slide, items, shape_ids)
+    except Exception as e:  # animations are optional: keep the slide static
+        rc.diag("anim", f"build animation skipped: {type(e).__name__}: {e}", "report a bug", "warning")
     return s
 
 
@@ -222,7 +241,7 @@ def _background(rc: RenderCtx, prs, s, slide: Slide) -> None:
 
 
 def _transition(rc: RenderCtx, s, slide: Slide) -> None:
-    name = (slide.transition or "").strip().lower()
+    name, _, dur = (slide.transition or "").strip().lower().partition(":")
     if not name or name == "none":
         return
     inner = _TRANSITIONS.get(name)
@@ -231,12 +250,89 @@ def _transition(rc: RenderCtx, s, slide: Slide) -> None:
             "transition", f"unknown transition {name!r}", f"use one of: {', '.join(_TRANSITIONS)}", "info"
         )
         return
-    el = etree.fromstring(f'<p:transition xmlns:p="{_NS_P}" spd="med">{inner}</p:transition>')
+    try:
+        secs = min(max(float(dur), 0.1), 10.0) if dur else None
+    except ValueError:
+        secs = None
+    if name == "morph" and secs is None:
+        secs = 2.0
+    spd = "med" if secs is None else "fast" if secs <= 0.5 else "med" if secs <= 0.75 else "slow"
+    if secs is None:
+        xml = f'<p:transition xmlns:p="{_NS_P}" spd="{spd}">{inner}</p:transition>'
+    else:
+        fallback_inner = "<p:fade/>" if name == "morph" else inner
+        xml = (
+            f'<mc:AlternateContent xmlns:mc="{_NS_MC}" xmlns:p="{_NS_P}" xmlns:p14="{_NS_P14}" '
+            f'xmlns:p159="{_NS_P159}"><mc:Choice Requires="{"p159" if name == "morph" else "p14"}">'
+            f'<p:transition spd="{spd}" p14:dur="{round(secs * 1000)}">{inner}</p:transition></mc:Choice>'
+            f'<mc:Fallback><p:transition spd="{spd}">{fallback_inner}</p:transition></mc:Fallback>'
+            "</mc:AlternateContent>"
+        )
     sld = s._element
     anchor = sld.find(qn("p:clrMapOvr"))
     if anchor is None:
         anchor = sld.find(qn("p:cSld"))
-    anchor.addnext(el)
+    anchor.addnext(etree.fromstring(xml))
+
+
+def _timing(s, slide: Slide, items: list[Placed], shape_ids: list[list[int]]) -> None:
+    """Add ``p:timing`` after the transition (schema order: cSld, clrMapOvr, transition, timing, extLst)."""
+    counts = {shp.shape_id: len(shp.text_frame.paragraphs) for shp in s.shapes if shp.has_text_frame}
+    timing = build_timing(items, shape_ids, "build" in slide.classes, counts)
+    if timing is None:
+        return
+    sld = s._element
+    anchor = sld.find(qn("p:transition"))
+    if anchor is None:
+        for child in sld:
+            if child.tag == f"{{{_NS_MC}}}AlternateContent":
+                anchor = child
+    if anchor is None:
+        anchor = sld.find(qn("p:clrMapOvr"))
+    if anchor is None:
+        anchor = sld.find(qn("p:cSld"))
+    anchor.addnext(timing)
+
+
+def _sections(rc: RenderCtx, prs) -> None:
+    """``p14:sectionLst``: one PowerPoint section per section slide (default on, header ``sections: off``)."""
+    deck = rc.deck
+    if str(deck.attrs.get("sections", "on")).lower() == "off":
+        return
+    kinds = [_slide_kind(sl, i) for i, sl in enumerate(deck.slides)]
+    sld_ids = [e.get("id") for e in prs.slides._sldIdLst]
+    if "section" not in kinds or len(sld_ids) != len(deck.slides):
+        return
+    groups: list[tuple[str, list[str]]] = []
+    for i, sl in enumerate(deck.slides):
+        title = " ".join(p.plain for p in sl.title.paragraphs).strip() if sl.title else ""
+        if kinds[i] == "section":
+            groups.append((title or f"Section {len(groups) + 1}", []))
+        elif not groups:
+            groups.append((title if kinds[i] == "cover" and title else "Default", []))
+        groups[-1][1].append(str(sld_ids[i]))
+    parts = []
+    for k, (name, ids) in enumerate(groups):
+        guid = str(uuid.uuid5(uuid.NAMESPACE_URL, f"slidemark-section-{k}-{name}")).upper()
+        sec = etree.Element(f"{{{_NS_P14}}}section", nsmap={"p14": _NS_P14})
+        sec.set("name", name)
+        sec.set("id", "{" + guid + "}")
+        lst = etree.SubElement(sec, f"{{{_NS_P14}}}sldIdLst")
+        for sid in ids:
+            etree.SubElement(lst, f"{{{_NS_P14}}}sldId").set("id", sid)
+        parts.append(sec)
+    ext = etree.Element(qn("p:ext"))
+    ext.set("uri", _SECTION_URI)
+    sl = etree.SubElement(ext, f"{{{_NS_P14}}}sectionLst", nsmap={"p14": _NS_P14})
+    sl.extend(parts)
+    pres = prs.part._element
+    ext_lst = pres.find(qn("p:extLst"))
+    if ext_lst is None:
+        ext_lst = etree.SubElement(pres, qn("p:extLst"))
+    for old in ext_lst.findall(qn("p:ext")):
+        if old.get("uri") == _SECTION_URI:
+            ext_lst.remove(old)
+    ext_lst.insert(0, ext)
 
 
 # --------------------------------------------------------------------------- items
@@ -511,9 +607,10 @@ def _resolve_links(rc: RenderCtx) -> None:
         rc.slide_index = src_idx
         if idx is None or not 0 <= idx < len(rc.slides):
             rc.diag(
-                "link",
-                f"slide link #{target} does not exist",
-                "use #<n> with n from 1 to the slide count, or a slide id=",
+                "bad-jump",
+                f"slide link #{target} does not exist; link dropped",
+                "use #<n> with n from 1 to the slide count, or a slide id= set with '@id=name'",
+                "info",
             )
             continue
         src = rc.slides[src_idx]
