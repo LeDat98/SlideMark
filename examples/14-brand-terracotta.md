@@ -7,7 +7,6 @@ style: radius=4 border-width=0.5 card.shadow="0 2 6 #2B252218" title.band=none h
 
 # Kế hoạch mở rộng chuỗi cà phê 2027
 > Mở 12 cửa hàng mới, ưu tiên khu văn phòng
-@1:1
 ## Thị trường
 - Nhu cầu cà phê văn phòng tăng **18%/năm**
 - Khách hàng chi trung bình 52.000đ/lần
