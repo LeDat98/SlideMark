@@ -18,3 +18,6 @@ Practical patterns that cut tokens and retries. Budget: keep this file under ~1,
 10. ✅ **SKILL.md alone is enough:** ≈ 910 tokens; eval run 4 wrote 20/20 clean decks without reading any reference page.
 11. ✅ **Agents get it right from SKILL.md alone:** eval run 2 (Sonnet, 20 tasks, docs only) = 90% first-pass clean,
     ~158 tokens per deck. The two misses: `align=` letter count ≠ columns; a second `@` grid (now row groups).
+12. ✅ **Free-form HTML still gives editable slides:** a ```` ```html {render=native} ```` fence with CSS grid/flex cards
+    becomes native rounded rects + text (verified 2026-10-05, XSD-valid); canvas/SVG/gradients fall back to an image.
+13. ✅ **Video costs one line:** `![what it shows](demo.mp4)` embeds a playable native video with a poster frame.
