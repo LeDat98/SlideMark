@@ -24,4 +24,8 @@
 | `dropped-content` | a chevron/flow box could not show some content | move it out of the box |
 | `marp-syntax`, `slidev-syntax` | another tool's syntax was converted | use the native form from the hint |
 
+`slidemark review deck.md [--format json] [--png DIR]` adds `design-*` rules (info/warning, never fails) and
+`score: N/100`: `sparse-box`, `wall-of-text`, `too-many-blocks`, `unbalanced`, `empty-band`, `no-message`,
+`inconsistent-boxes`, `long-title`. Apply the hint to the source; `--png` writes previews to look at.
+
 Fix only the named slide and line, then run `check` again.
