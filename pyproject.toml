@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 preview = ["pypdfium2>=4.20"]
+html = ["playwright>=1.40"]
 dev = [
     "pytest>=8",
     "hypothesis>=6",

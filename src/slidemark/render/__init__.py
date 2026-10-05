@@ -33,6 +33,7 @@ from ..template import clone_footer, open_template, pick_layout
 from ..theme import Theme
 from ..units import slide_size
 from .anim import build_timing
+from .htmlimg import add_html_image, close_html
 from .math import add_math
 from .objects import add_chart, add_image, add_table, code_paragraphs, resolve_image
 from .text import fill_text, insert_rpr_child
@@ -120,6 +121,7 @@ def render(deck: Deck, placed: list[list[Placed]], theme: Theme, out: str | Path
                 "simplify this slide or report a bug",
                 "error",
             )
+    close_html(rc)
     _resolve_links(rc)
     _sections(rc, prs)
     _core_properties(prs, deck)
@@ -465,6 +467,10 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
         fill_text(rc, shp.text_frame, code_paragraphs(el), st, pl.font_scale, para_gap=False)
     elif isinstance(el, Raw) and el.kind == "math" and add_math(rc, s, pl, name):
         pass
+    elif isinstance(el, Raw) and el.kind == "html" and add_html_image(rc, s, pl):
+        pass
+    elif isinstance(el, Raw) and el.kind == "html":
+        _placeholder(rc, s, pl, name, "[html]")
     elif isinstance(el, Raw):
         _placeholder(rc, s, pl, name, f"[{el.kind}]")
         rc.diag(
