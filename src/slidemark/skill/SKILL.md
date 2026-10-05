@@ -55,6 +55,7 @@ num: on
 | `@3 a>b b>c` | connectors between blocks (letters = blocks in order; `a-b` = plain line) |
 | `@section` `@cover` `@center` `@blank` | force a slide type |
 | `@dense` | smaller type for one packed slide |
+| `@build` / `@t=fade` / `@hidden` | bullets appear on click / transition / hidden slide |
 
 Blocks beyond the grid's cells are stacked full width below it.
 

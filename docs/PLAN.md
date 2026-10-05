@@ -224,5 +224,5 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
 - **Orchestrator**: packaging (wheel build check, sdist excludes), `CHANGELOG.md`, release notes, AGENT_TIPS review.
 
 ## Day 7 status
-- [ ] A+B: build animations, transitions, sections, jumps
+- [x] A+B: build animations, transitions, sections, jumps
 - [x] Orchestrator: packaging, changelog

@@ -42,3 +42,5 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [env] Subagent worktrees refuse compound Bash commands; tell them to run one command per call.
 - [env] LibreOffice substituted DejaVu (much wider) for Calibri/Yu Gothic, so previews wrapped headings PowerPoint would not → `apt-get install -y fonts-crosextra-carlito`; preview.py writes a fontconfig alias file (Calibri→Carlito, Yu Gothic/Meiryo→IPAPGothic).
 - [eval] Agent eval run 1 (Sonnet, SKILL.md only): 10/10 parse+lint clean before the `connector-crosses` rule, 9/10 after; gaps found: mermaid undocumented, flow + a>b duplicates.
+- [render] Morph and transitions with a duration need `mc:AlternateContent` (p14/p159) with a fallback; slide child order is cSld, clrMapOvr, transition, timing. Build/morph/section XML is unverified in real PowerPoint.
+- [lint] A connector inside its parent box (diagram, box links) must not count as crossing that box.
