@@ -191,7 +191,8 @@ Options on the fence or the line before: `{widths=3:1:1 align=lrr header=1 hcol=
 Chart fence kinds: `column bar line area pie doughnut scatter radar stacked-column stacked-bar`. CSV body:
 first row = categories (first cell empty), then one row per series (name first). Options: `title="..."`
 `labels=on|percent|off` `legend=bottom|right|top|none` `fmt="0.0"|"#,##0"|"0%"` `min=` `max=`
-`colors=primary,accent,#888888` `axis=off`. Numbers may be `1,240`, `12%`, `▲3`. One value axis per chart.
+`colors=primary,accent,#888888` `axis=off`. Numbers may be `1,240`, `12%`, `▲3`; with `lang: vi`/`de`/`fr`… a decimal comma is fine when quoted
+(`"1,6"`) or when the rows use `;` (`T1;1,6;1,9`). One value axis per chart.
 
 ## Design tokens (header lines)
 
