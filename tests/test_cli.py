@@ -26,7 +26,8 @@ def test_check_prints_one_diagnostic_per_line(tmp_path, capsys):
     f.write_text("# A\n@aab/aa\n![](x.png)\n- x\n", encoding="utf-8")
     assert main(["check", str(f)]) == 0  # warnings only
     lines = capsys.readouterr().out.strip().splitlines()
-    assert len(lines) == 2 and all(line.startswith("warning") and "->" in line for line in lines)
+    assert len(lines) >= 2 and all(line.startswith("warning") and "->" in line for line in lines)
+    assert any("bad-grid" in line for line in lines) and any("image-alt" in line for line in lines)
 
 
 def test_check_json(tmp_path, capsys):
@@ -93,3 +94,12 @@ def test_check_never_tracebacks_on_binary_file(tmp_path, capsys):
     f.write_bytes(b"\xff\xfe\x00bad")
     assert main(["check", str(f)]) == 2
     assert "Traceback" not in capsys.readouterr().err
+
+
+def test_check_runs_layout_lint_and_reports_alt_in_json(tmp_path, capsys):
+    f = tmp_path / "a.md"
+    f.write_text("# A\n![](x.png)\n", encoding="utf-8")
+    assert main(["check", str(f), "--format", "json"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert {"image-alt", "alt"} <= {d["rule"] for d in data}
+    assert all(set(d) == {"level", "message", "line", "slide", "rule", "hint"} for d in data)

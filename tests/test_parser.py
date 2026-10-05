@@ -320,7 +320,7 @@ def test_all_chart_kinds(kind):
 def test_chart_problems_are_diagnostics():
     d = parse("# A\n```bar\n,a,b\ns,1,x,3\n```\n```pie\n```\n")
     rules = {x.rule for x in d.diagnostics}
-    assert {"chart-value", "chart-ragged", "empty-chart"} <= rules
+    assert {"bad-number", "chart-ragged", "empty-chart"} <= rules
     assert d.slides[0].elements[0].series[0].values == [1.0, None]
 
 

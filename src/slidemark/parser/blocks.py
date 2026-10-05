@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import csv
-import io
 import re
 from typing import Any
 from urllib.parse import unquote
@@ -14,6 +12,7 @@ from ..ir import Cell, Chart, Code, Image, Paragraph, Raw, Run, Series, Style, T
 from .attrs import Attrs, apply_attrs, parse_attr_body
 from .ctx import Ctx, closest
 from .inline import MD, ImageRef, inline_items, inline_runs
+from .tabular import numbers_row, read_csv
 
 CHART_KINDS = (
     "bar",
@@ -81,25 +80,6 @@ def paragraphs_from_tokens(tokens: list[Token]) -> list[Paragraph]:
         elif ty == "fence":
             out.append(Paragraph(runs=[Run(text=tok.content.rstrip("\n"), code=True)]))
     return out
-
-
-def _num(s: str) -> float | None:
-    s = s.strip().replace(",", "").replace("%", "").replace(" ", "")
-    if not s:
-        return None
-    try:
-        v = float(s)
-    except ValueError:
-        return None
-    return v if v == v and abs(v) != float("inf") else None
-
-
-def _csv_rows(body: str) -> list[list[str]]:
-    try:
-        rows = list(csv.reader(io.StringIO(body)))
-    except csv.Error:
-        rows = [line.split(",") for line in body.split("\n")]
-    return [[c.strip() for c in r] for r in rows if any(c.strip() for c in r)]
 
 
 def _cell(text: str) -> Cell:
@@ -178,7 +158,7 @@ def build_table_gfm(tokens: list[Token], ctx: Ctx, line: int) -> Table:
 
 
 def build_table_csv(body: str, ctx: Ctx, line: int) -> Table:
-    rows = _csv_rows(body)
+    rows = read_csv(body)
     if not rows:
         ctx.error("empty table", line, "empty-table", "put CSV rows inside the table fence")
         return Table(rows=[], line=line)
@@ -191,7 +171,7 @@ def build_table_csv(body: str, ctx: Ctx, line: int) -> Table:
 
 
 def build_chart(kind: str, body: str, ctx: Ctx, line: int) -> Chart:
-    rows = _csv_rows(body)
+    rows = read_csv(body)
     chart = Chart(kind=kind, line=line)  # type: ignore[arg-type]
     if not rows:
         ctx.error("chart has no data", line, "empty-chart", "add a header row and one row per series")
@@ -200,15 +180,9 @@ def build_chart(kind: str, body: str, ctx: Ctx, line: int) -> Chart:
     n = len(chart.categories)
     if len(rows) < 2:
         ctx.error("chart has no series", line, "empty-chart", "add one row per series after the header")
+    pct: list[bool] = []
     for r in rows[1:]:
-        vals: list[float | None] = []
-        for c in r[1:]:
-            v = _num(c)
-            if v is None and c.strip():
-                ctx.warn(
-                    f"'{c}' in series '{r[0]}' is not a number", line, "chart-value", "use plain numbers"
-                )
-            vals.append(v)
+        vals = numbers_row(r[1:], r[0], ctx, line, pct)
         if len(vals) != n:
             ctx.warn(
                 f"series '{r[0]}' has {len(vals)} values for {n} categories",
@@ -218,6 +192,8 @@ def build_chart(kind: str, body: str, ctx: Ctx, line: int) -> Chart:
             )
             vals = (vals + [None] * n)[:n]
         chart.series.append(Series(name=r[0], values=vals))
+    if pct and all(pct):
+        chart.options["percent"] = True
     return chart
 
 
@@ -252,10 +228,7 @@ def build_fence(tok: Token, line: int, ctx: Ctx) -> Any:
     if lang in CHART_KINDS:
         el = build_chart(lang, body, ctx, line)
         if attrs:
-            kv = dict(attrs.kv)
-            if "title" in kv:
-                el.title = kv.pop("title")
-            apply_attrs(el, Attrs(attrs.classes, attrs.id, kv), ctx, line, sink=el.options)
+            apply_attrs(el, attrs, ctx, line, sink=el.options)
         return el
     if lang == "table":
         el = build_table_csv(body, ctx, line)

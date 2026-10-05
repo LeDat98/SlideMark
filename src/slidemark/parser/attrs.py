@@ -7,8 +7,9 @@ import shlex
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..ir import Box, ElementBase, Image, Style
+from ..ir import Box, Chart, ElementBase, Image, Style, Table
 from .ctx import Ctx, closest
+from .tabular import apply_chart_kv, apply_table_kv
 
 _TOKEN = re.compile(
     r"""\s*(?:\.(?P<cls>[\w-]+)
@@ -111,6 +112,11 @@ def apply_attrs(
 ) -> None:
     """Apply parsed attributes to an element. Unknown keys go to ``sink`` (default ``el.attrs``)."""
     sink = el.attrs if sink is None else sink
+    if isinstance(el, Chart):
+        a = Attrs(a.classes, a.id, apply_chart_kv(el, a.kv, ctx, line))
+        sink = el.options
+    elif isinstance(el, Table):
+        a = Attrs(a.classes, a.id, apply_table_kv(el, a.kv, ctx, line))
     if a.id:
         el.id = a.id
     for c in a.classes:

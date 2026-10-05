@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from .ir import Deck
+from .ir import Deck, Diagnostic
 
 
 def _read(path: str) -> str | None:
@@ -35,6 +35,31 @@ def _has_errors(deck: Deck) -> bool:
     return any(d.level == "error" for d in deck.diagnostics)
 
 
+def _add_layout_diagnostics(deck: Deck, input_path: str) -> None:
+    """Run layout + lint like build() does and append their diagnostics (deduped by rule and slide)."""
+    try:
+        from .layout import layout_slide
+        from .lint import lint
+        from .theme import get_theme
+
+        deck.attrs.setdefault("base_dir", str(Path(input_path).resolve().parent))
+        theme = get_theme(deck.theme)
+        placed = [layout_slide(slide, deck, theme, i) for i, slide in enumerate(deck.slides)]
+        seen = {(d.rule, d.slide) for d in deck.diagnostics}
+        deck.diagnostics.extend(d for d in lint(deck, placed, theme) if (d.rule, d.slide) not in seen)
+    except NotImplementedError:
+        pass  # layout/lint not available in this build: parser diagnostics only
+    except Exception as e:  # check must not traceback on a layout bug
+        deck.diagnostics.append(
+            Diagnostic(
+                level="warning",
+                message=f"layout check failed: {type(e).__name__}: {e}",
+                rule="check-layout",
+                hint="report this deck as a bug; parser diagnostics above are still valid",
+            )
+        )
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     from .parser import parse
 
@@ -42,6 +67,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     if text is None:
         return 2
     deck = parse(text)
+    _add_layout_diagnostics(deck, args.input)
     if args.format == "json":
         _say(json.dumps([d.model_dump() for d in deck.diagnostics], ensure_ascii=False))
     elif deck.diagnostics:
