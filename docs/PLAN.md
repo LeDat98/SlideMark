@@ -388,3 +388,15 @@ Goal: `docs/AGENT_COST.md` work packages 1–6 in order; design freedom stays a 
   37–96k units above start); WP2 SKILL.md ✓ (patterns must never reuse brief content: sm1-b01 copied one, invalid);
   WP3 one-command build ✓; `※` kept in footnotes; decimal commas for vi/de/fr + `contrast.py` ✓. Smoke before WP4:
   b01 3 calls / 48% cost, b05 9 calls rejected (`※`), b09 5 calls / 42%. Running: WP4 (B), WP5+6 colours.
+- **Final status:** WP1–WP6 done; extra waves: sparse slide completion, KPI value fit, table text growth, pie label
+  ink, 5-step chevron headings, `look:` line, contact-sheet labels. Lead/footnote growth on sparse slides
+  (c1d65ec) reverted for build time.
+
+## Leftovers for the next run
+- [ ] AC full matrix: 9 briefs × 3 runs × skill-only + skill-open (`SM_DOCS_OPEN=1`), fresh brief set 2 for tuning checks
+- [ ] AC4 cost ≤ 35%: the python-pptx arm needs only 4–6 calls here; remaining SlideMark overhead = SKILL.md read (~3k tokens
+      carried in every call) + optional looks. Ideas: shorter SKILL.md first screen, `--png` only on request
+- [ ] Five-step chevrons: headings stay on one line but text shrinks to ~17pt in tall chevrons (agent replaced them with cards)
+- [ ] Perf: layout back under the 50 ms/slide gate with margin; then re-apply lead/footnote growth on sparse slides (c1d65ec)
+- [ ] Tables are not contrast-linted; chart label contrast is not linted
+- [ ] Owner: real PowerPoint check (gradients, shadows, customXml, media, per-point dLbl); PyPI token; L7 token gate decision
