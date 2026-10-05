@@ -816,6 +816,16 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
             lines = text_lines([*(k.heading or []), *k.paras], accent=acc, classes=cls)
             return [("meta", [head]), ("text", lines), ("meta", ["@chevron"])]
         toks = ["chevron", *toks]  # sub-boxes drawn as chevrons: the box's own ``@`` line says so
+    if len(b.children) == 1 and b.children[0].kind != "box" and not toks:
+        # one block narrower than the box: the box's own ``@N`` line made N columns and it took the first
+        c = b.children[0]
+        pad = c.x - b.x
+        inner = b.w - 2 * pad
+        g = out.deck.gap / 2
+        if 0 <= pad <= 0.03 * out.deck.width and inner > 0 and g > 0 and c.w < 0.85 * inner:
+            ncol = round((inner + g) / (c.w + g))
+            if 2 <= ncol <= 4 and abs((inner - (ncol - 1) * g) / ncol - c.w) <= 0.06 * c.w:
+                toks = [str(ncol)]
     chunks.append(("meta", [head, "@" + " ".join(toks)] if toks else [head]))
     for ch in b.children:
         chunks.extend(("itext" if k == "text" else k, ln) for k, ln in emit_block(ch, out))
