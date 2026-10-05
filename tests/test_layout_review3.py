@@ -174,3 +174,39 @@ def test_empty_cells_never_raise():
     t = Table(rows=[[cell(""), cell("")], [cell(""), cell("")]])
     placed, _ = lay(Slide(title=T("t", "title"), elements=[t]))
     assert placed
+
+
+# ---- a numeric table next to a full-width block keeps the full width (no ragged edge)
+
+
+def test_table_below_a_box_row_keeps_full_width():
+    s = Slide(title=T("t", "title"), elements=[box("A", "x"), box("B", "y"), box("C", "z"), _figures()])
+    placed, _ = lay(s)
+    (tp,) = of(placed, Table)
+    assert tp.w == full_width()
+
+
+def test_table_below_a_chart_keeps_full_width():
+    s = Slide(title=T("t", "title"), grid="1", elements=[chart(), _figures()])
+    placed, _ = lay(s)
+    (tp,) = of(placed, Table)
+    assert tp.w == full_width()
+
+
+def test_table_with_text_only_is_still_capped():
+    s = Slide(title=T("t", "title"), elements=[T("a short remark"), _figures(), T("another remark")])
+    placed, _ = lay(s)
+    (tp,) = of(placed, Table)
+    assert tp.w < 0.8 * full_width()
+
+
+def test_kpi_row_group_above_a_table_keeps_full_width():
+    md = (
+        "theme: jp-business\n\n# t\n"
+        "## A {.kpi}\n1\n## B {.kpi}\n2\n## C {.kpi}\n3\n## D {.kpi}\n4\n@end\n"
+        "| 項目 | 2026 | 2029 |\n|-|-|-|\n| 配送 | 11.2% | 9.2% |\n| 積載 | 68% | 82% |\n"
+    )
+    deck = parse(md)
+    placed = layout_slide(deck.slides[0], deck, get_theme(deck.theme), 0)
+    (tp,) = of(placed, Table)
+    assert tp.w == full_width()

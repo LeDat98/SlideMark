@@ -32,6 +32,8 @@ from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import measure
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
+from .score import score as score_layout
+from .search import alternatives
 from .tables import capped_width, column_widths, right_align_numbers, row_heights, table_grid
 
 _SIZE_KEY = {
@@ -109,6 +111,9 @@ TOP_GAP = 0.25  # inches between the title band (or lead) and the body, the same
 KPI_MIN_H = 1.1  # inches
 SHORT_EM = 30  # boxes with at most this much text (in em) are "short": four of them stay in one row
 DENSE_TIGHT = 0.7  # gap / padding factor on dense slides
+MAX_CANDIDATES = 6  # layout search: the rule's choice + at most this many - 1 alternatives per slide
+SEARCH_SKIP = 1.5  # ... and no search at all when the rule's choice scores below this (it is fine)
+SEARCH_MARGIN = 3.0  # ... an alternative must beat the rule's score by this much (the rule wins ties)
 _SCALES = [round(1.0 - 0.05 * i, 2) for i in range(15)]  # 1.0 .. 0.3
 
 
@@ -129,6 +134,9 @@ class _Ctx:
     grew: bool = False  # set when ``grow`` actually scaled some text
     fill: float | None = None  # natural content height / grid height of the slide-level grid, if known
     expand: int = 0  # extra height (EMU) the capped rows of the slide-level grid may take
+    arrange: str | None = None  # layout search: a grid token that replaces the rule-based arrangement
+    alts: list[str] = field(default_factory=list)  # layout search: alternative tokens for this slide
+    cap_tables: bool = True  # False when another block (box row, chart, ...) spans the body: no narrow table
     roomy: bool = False  # sparse dense slide with a large empty band: tables / trees may take more height
     grow_base: float = (
         1.0  # roomy pass: the growth before it; text that would wrap more at ``grow`` is refused
@@ -443,7 +451,12 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
     nrows, ncols, anchors = table_grid(el)
     size = (st.font_size or 14) * eff
     b = getattr(el, "box", None)
-    if ctx.depth == 0 and width > FULL_WIDTH * ctx.W and not (b is not None and b.w is not None):
+    if (
+        ctx.depth == 0
+        and ctx.cap_tables
+        and width > FULL_WIDTH * ctx.W
+        and not (b is not None and b.w is not None)
+    ):
         width = capped_width(el, ncols, anchors, width, size)  # a few short columns: numbers stay near labels
     cw = column_widths(el, ncols, anchors, width, size)
     rh = row_heights(el, anchors, cw, st, eff)
@@ -1151,6 +1164,10 @@ def _place_blocks(
     if not flow:
         _emit_links(ctx, links or [], rects)
         return
+    if (
+        ctx.depth == 0
+    ):  # a table next to a full-width box row / chart / image keeps the full width (no ragged edge)
+        ctx.cap_tables = not any(isinstance(b, (Container, Chart, Image, Media, Code)) for _, b in flow)
     # slide level: callouts are never grid cells, they close the slide body as full-width rows
     callouts: list[tuple[int, object]] = []
     if ctx.depth == 0 and len(flow) > 1:
@@ -1160,8 +1177,15 @@ def _place_blocks(
         flow = [(i, b) for i, b in flow if (i, b) not in callouts]
     gs = parse_spec(grid, len(flow), classes)
     tables: list[tuple[int, object]] = []
+    searchable = False
     if gs is None or not gs.cols:  # no explicit grid token: infer the arrangement from the blocks
+        searchable = gs is None and not links and ctx.depth == 0 and len(flow) > 1
         gs, flow, tables = _auto_plan(flow, gs, classes, links or [])
+        searchable = searchable and not (gs and gs.flags)
+        if searchable and ctx.arrange:  # layout search: lay out this candidate instead of the rule's choice
+            alt = parse_spec(ctx.arrange, len(flow), classes)
+            if alt is not None and alt.cols and not alt.errors:
+                gs = alt
     elif gs.capacity is None and gs.areas is None and not gs.flags and len(flow) > 2:
         k = len(flow)  # `@4` / `@1:2`: tables closing a row of boxes (a `.kpi` row) are not grid cells
         while k > 0 and isinstance(flow[k - 1][1], Table):
@@ -1176,10 +1200,15 @@ def _place_blocks(
         flags = gs.flags
     if gs is None or not gs.cols:
         text_visual, short = _block_kind_hint([b for _, b in flow])
-        if text_visual and not isinstance(flow[0][1], Text):
+        swapped = text_visual and not isinstance(flow[0][1], Text)
+        if swapped:
             flow = [flow[1], flow[0]]
         wide = any(isinstance(b, Code) and max(map(len, b.text.split("\n")), default=0) > 45 for _, b in flow)
         gs = auto_spec(len(flow), text_visual=text_visual, short=short, wide_visual=wide)
+        if searchable and not ctx.arrange:
+            ctx.alts = _search_tokens(flow, gs, classes, bool(tables), swapped)
+    elif searchable and not ctx.arrange:
+        ctx.alts = _search_tokens(flow, gs, classes, bool(tables), False)
     # blocks beyond the grid's cells are stacked full width below it
     extra: list[tuple[int, object]] = []
     if gs.capacity is not None and len(flow) > gs.capacity:
@@ -1250,6 +1279,21 @@ def _place_blocks(
     if ctx.depth == 0 and extra and len(flow) == 1 and _is_diagram(flow[0][1]):
         _hug_tail(ctx, start, area, gap)
     _emit_links(ctx, links or [], rects)
+
+
+def _same_grid(a: GridSpec | None, b: GridSpec | None) -> bool:
+    return a is not None and b is not None and (a.cols, a.rows, a.areas) == (b.cols, b.rows, b.areas)
+
+
+def _search_tokens(flow: list, rule: GridSpec, classes: list[str], tail: bool, swapped: bool) -> list[str]:
+    """Alternative arrangements (grid tokens) of the slide-level blocks, minus the rule's own choice."""
+    if (
+        swapped
+    ):  # the rule put the text first; as written (visual first) the only token that reorders is `b/a`
+        return ["b/a"]
+    n = len(flow)
+    toks = alternatives([b for _, b in flow], [_weight(b) for _, b in flow], tail=tail)
+    return [t for t in toks if not _same_grid(parse_spec(t, n, classes), rule)]
 
 
 def _text_mate(flow: list) -> bool:
@@ -1563,6 +1607,30 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
     return fin
 
 
+def _search(first: _Ctx, solve, theme: Theme, body: Rect) -> tuple[_Ctx, str | None]:
+    """Layout search: try the alternative arrangements of ``first`` (the rule's choice) and keep the best.
+
+    The rule's choice wins unless it is already good (``SEARCH_SKIP``) or another candidate beats it by at
+    least ``SEARCH_MARGIN``. Returns the winning context and its token (``None``: the rule's choice stays).
+    """
+    if not first.alts or not first.out:
+        return first, None
+    base = score_layout(first.out, body, theme, over=len(first.over))
+    if base.total < SEARCH_SKIP:
+        return first, None
+    best: tuple[float, _Ctx, str] | None = None
+    for tok in first.alts[: MAX_CANDIDATES - 1]:
+        c = solve(tok)
+        if not c.out:
+            continue
+        sc = score_layout(c.out, body, theme, over=len(c.over)).total
+        if best is None or sc < best[0] - 1e-9:
+            best = (sc, c, tok)
+    if best is not None and base.total - best[0] >= SEARCH_MARGIN:
+        return best[1], best[2]
+    return first, None
+
+
 def layout_slide(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     """Return every visible item of ``slide`` (title included) in z-order, with final boxes and merged styles.
 
@@ -1799,34 +1867,55 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         body_pt = theme.sizes.get("body", 18) * ctx.dense_k
         very = body_pt >= GROW_VERY_SPARSE_PT and _very_sparse(elements)
 
-        def run(area: Rect, **kw) -> _Ctx:
-            c = _Ctx(
-                deck, theme, slide, index, W, H, dense_k=ctx.dense_k, tight=ctx.tight, head_grow=very, **kw
-            )
-            _place_blocks(
-                c, elements, area, slide_inherit, slide.grid, slide.classes, sgap, None, slide.links
-            )
-            return c
+        def solve(arrange: str | None = None) -> _Ctx:
+            def run(area: Rect, **kw) -> _Ctx:
+                c = _Ctx(
+                    deck,
+                    theme,
+                    slide,
+                    index,
+                    W,
+                    H,
+                    dense_k=ctx.dense_k,
+                    tight=ctx.tight,
+                    head_grow=very,
+                    arrange=arrange,
+                    **kw,
+                )
+                _place_blocks(
+                    c, elements, area, slide_inherit, slide.grid, slide.classes, sgap, None, slide.links
+                )
+                return c
 
-        for s in _SCALES:
-            final_ctx = run(body, scale=s)
-            if not final_ctx.over:
-                break
-        assert final_ctx is not None
-        if final_ctx.scale >= 1.0 and not final_ctx.over:
-            # sparse slide: grow text uniformly (siblings share one factor), more for small themes
-            top = GROW_SMALL if (body_pt <= GROW_SMALL_PT) else GROW_BIG
-            if ctx.dense_k < 1.0:  # dense slides: up to DENSE_GROW_BODY x the theme body size
-                top = max(top, DENSE_GROW_BODY / ctx.dense_k)
-            if very:
-                top = max(top, min(GROW_VERY_SPARSE, GROW_VERY_SPARSE_MAX_PT / body_pt))
-            n = round((top - 1.05) / 0.05)
-            for g in [round(top - 0.05 * i, 2) for i in range(n + 1)]:
-                c3 = run(body, grow=g)
-                if c3.grew and not c3.over and (c3.fill is None or c3.fill <= GROW_FILL):
-                    final_ctx = c3
+            for s in _SCALES:
+                fc = run(body, scale=s)
+                if not fc.over:
                     break
-            final_ctx = _spread(ctx, final_ctx, run, body, elements)
+            if fc.scale >= 1.0 and not fc.over:
+                # sparse slide: grow text uniformly (siblings share one factor), more for small themes
+                top = GROW_SMALL if (body_pt <= GROW_SMALL_PT) else GROW_BIG
+                if ctx.dense_k < 1.0:  # dense slides: up to DENSE_GROW_BODY x the theme body size
+                    top = max(top, DENSE_GROW_BODY / ctx.dense_k)
+                if very:
+                    top = max(top, min(GROW_VERY_SPARSE, GROW_VERY_SPARSE_MAX_PT / body_pt))
+                n = round((top - 1.05) / 0.05)
+                for g in [round(top - 0.05 * i, 2) for i in range(n + 1)]:
+                    c3 = run(body, grow=g)
+                    if c3.grew and not c3.over and (c3.fill is None or c3.fill <= GROW_FILL):
+                        fc = c3
+                        break
+                fc = _spread(ctx, fc, run, body, elements)
+            return fc
+
+        final_ctx = solve()
+        final_ctx, chosen = _search(final_ctx, solve, theme, body)
+        if chosen:
+            ctx.diag(
+                "auto-layout",
+                f"arranged as `@{chosen}` (the default arrangement scored worse)",
+                f"write `@{chosen}` to pin it",
+                level="info",
+            )
         ctx.diags += final_ctx.diags
         seen: set[str] = set()
         for lab in final_ctx.over:
