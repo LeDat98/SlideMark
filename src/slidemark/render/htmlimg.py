@@ -7,8 +7,9 @@ and every request that is not ``data:`` / ``about:`` is aborted, so untrusted HT
 from __future__ import annotations
 
 import glob
-import html
 import os
+import re
+from contextlib import contextmanager
 from io import BytesIO
 
 from pptx.util import Emu
@@ -17,7 +18,7 @@ from ..ir import Placed, Raw
 from ..theme import Theme
 from .util import RenderCtx, hex6
 
-__all__ = ["HtmlRenderer", "add_html_image", "close_html", "render_html_png"]
+__all__ = ["HtmlRenderer", "add_html_image", "add_html_native", "close_html", "render_html_png"]
 
 SCALE = 2
 TIMEOUT_MS = 15_000
@@ -26,15 +27,34 @@ ALT = "HTML block (image fallback)"
 HINT = "pip install slidemark[html] (Playwright + Chromium) to render HTML blocks as images"
 
 
+# metric-compatible stand-ins, tried right after the theme font (what PowerPoint/LibreOffice would use)
+_ALIASES = {
+    "calibri": "Carlito",
+    "arial": "Liberation Sans",
+    "helvetica": "Liberation Sans",
+    "times new roman": "Liberation Serif",
+    "yu gothic": "IPAPGothic",
+    "meiryo": "IPAPGothic",
+    "ms pgothic": "IPAPGothic",
+}
+
+
+def _family(theme: Theme) -> str:
+    names: list[str] = []
+    for f in (theme.fonts.body, theme.fonts.ea):
+        f = re.sub(r"[^\w .-]", "", f or "").strip()
+        if f:
+            names += [f, _ALIASES.get(f.lower(), "")]
+    return ", ".join(f"'{n}'" for n in names if n) + ", sans-serif"
+
+
 def _page(source: str, theme: Theme) -> str:
     fg, bg = hex6(theme, "fg"), hex6(theme, "bg", "#FFFFFF")
-    fonts = theme.fonts
-    family = ", ".join(f"'{f}'" for f in (fonts.body, fonts.ea)) + ", sans-serif"
     size = theme.sizes.get("body", 18) * 96 / 72
     return (
         '<!doctype html><html><head><meta charset="utf-8">'
         f"<style>*{{box-sizing:border-box}}html,body{{margin:0;padding:0;background:#{bg};}}"
-        f"body{{font-family:{html.escape(family)};font-size:{size:.1f}px;color:#{fg};overflow:hidden}}"
+        f"body{{font-family:{_family(theme)};font-size:{size:.1f}px;color:#{fg};overflow:hidden}}"
         f"</style></head><body>{source}</body></html>"
     )
 
@@ -79,16 +99,18 @@ class HtmlRenderer:
             self.close()
         return self._browser
 
-    def render(self, source: str, width_px: int, height_px: int, theme: Theme) -> bytes | None:
+    @contextmanager
+    def _session(self, source: str, width_px: int, height_px: int, theme: Theme, scale: int = SCALE):
+        """A loaded page (JS off, only data:/about: requests), or None when Chromium is unavailable."""
         browser = self._launch()
         if browser is None:
-            return None
-        width_px, height_px = max(int(width_px), 1), max(int(height_px), 1)
-        ctx = None
+            yield None
+            return
+        ctx = page = None
         try:
             ctx = browser.new_context(
-                viewport={"width": width_px, "height": height_px},
-                device_scale_factor=SCALE,
+                viewport={"width": max(int(width_px), 1), "height": max(int(height_px), 1)},
+                device_scale_factor=scale,
                 java_script_enabled=False,
             )
             ctx.set_default_timeout(TIMEOUT_MS)
@@ -102,19 +124,40 @@ class HtmlRenderer:
             ctx.route("**/*", gate)
             page = ctx.new_page()
             page.set_content(_page(source, theme), wait_until="load", timeout=TIMEOUT_MS)
-            return page.screenshot(
-                type="png",
-                clip={"x": 0, "y": 0, "width": width_px, "height": height_px},
-                timeout=TIMEOUT_MS,
-            )
         except Exception:
-            return None
+            page = None
+        try:
+            yield page
         finally:
             if ctx is not None:
                 try:
                     ctx.close()
                 except Exception:
                     pass
+
+    def render(self, source: str, width_px: int, height_px: int, theme: Theme) -> bytes | None:
+        width_px, height_px = max(int(width_px), 1), max(int(height_px), 1)
+        with self._session(source, width_px, height_px, theme) as page:
+            if page is None:
+                return None
+            try:
+                return page.screenshot(
+                    type="png",
+                    clip={"x": 0, "y": 0, "width": width_px, "height": height_px},
+                    timeout=TIMEOUT_MS,
+                )
+            except Exception:
+                return None
+
+    def evaluate(self, source: str, width_px: int, height_px: int, theme: Theme, script: str):
+        """Lay the HTML out at the given size and return ``script``'s JSON result (None on any failure)."""
+        with self._session(source, width_px, height_px, theme, scale=1) as page:
+            if page is None:
+                return None
+            try:
+                return page.evaluate(script)
+            except Exception:
+                return None
 
     def close(self) -> None:
         for obj, meth in ((self._browser, "close"), (self._pw, "stop")):
@@ -159,3 +202,28 @@ def close_html(rc: RenderCtx) -> None:
     if renderer is not None:
         renderer.close()
         rc.html_renderer = None  # type: ignore[attr-defined]
+
+
+def add_html_native(rc: RenderCtx, pl: Placed, draw) -> bool:
+    """Try the native-shape path for an HTML block: ``draw(placed)`` renders each item. False = use the image.
+
+    ``{render=image}`` skips it; ``{render=native}`` skips the ``convertible`` check. Never raises.
+    """
+    from ..htmlnative import convertible, html_to_placed
+
+    el: Raw = pl.element  # type: ignore[assignment]
+    mode = str(el.attrs.get("render", "")).lower()
+    if mode == "image" or (mode != "native" and not convertible(el.source)):
+        return False
+    renderer = getattr(rc, "html_renderer", None)
+    if renderer is None:
+        renderer = rc.html_renderer = HtmlRenderer()  # type: ignore[attr-defined]
+    res = html_to_placed(el.source, pl.x, pl.y, pl.w, pl.h, rc.theme, rc.base_dir, renderer=renderer)
+    if res is None:
+        return False
+    items, diags = res
+    for d in diags:
+        rc.diag(d.rule or "html-native", d.message, d.hint or "", d.level, line=el.line)
+    for item in items:
+        draw(item)
+    return True

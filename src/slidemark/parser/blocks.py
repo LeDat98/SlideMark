@@ -256,7 +256,8 @@ def build_fence(tok: Token, line: int, ctx: Ctx) -> Any:
     elif lang == "mermaid":
         el = build_mermaid(body, ctx, line)
     elif lang == "html":
-        els = html_blocks(body, ctx, line)
+        forced = attrs is not None and attrs.kv.get("render") in ("native", "image")
+        els = None if forced else html_blocks(body, ctx, line)  # {render=...} skips the structural subset
         if els is not None:
             return els
         el = Raw(kind="html", source=body, line=line)

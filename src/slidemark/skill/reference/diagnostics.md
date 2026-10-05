@@ -17,6 +17,7 @@
 | `connector-crosses` | a connector runs through another block | link neighbours, reorder blocks, or use mermaid |
 | `duplicate-link` (info) | `a>b` repeats a `flow` arrow | drop it |
 | `mermaid-unsupported`, `html-fallback` (info) | not converted to native shapes | use a flowchart / the HTML subset |
+| `html-native-overflow` | measured ```html is bigger than its block | shorten it or give the block more room |
 | `bad-theme`, `bad-json` | theme file or JSON deck unreadable | fix the path / field named in the message |
 | `bad-chart-option`, `bad-table-option`, `bad-number` | invalid option or CSV value | use the listed values |
 | `unknown-attr` | misspelled `{key=}` | follow the did-you-mean hint |
