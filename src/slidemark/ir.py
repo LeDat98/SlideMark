@@ -295,8 +295,8 @@ class Placed(Model):
     - ``.kpi`` boxes: the first paragraph is the big number (role style ``kpi``), the rest is caption text.
     - Callouts (``> [!note]``) are ``Text`` with classes ``["callout", "<kind>"]``; badges are runs with
       ``highlight`` set (theme color name) and ``color`` for the text.
-    - Icons (``icon=name`` on a box) are ``Shape(shape="icon", attrs={"icon": name})`` Placed items; the renderer
-      draws them as native custom geometry filled with ``style.fill`` (or ``style.color``).
+    - Icons (``icon=name`` on a box) are ``Shape(shape="icon", attrs={"icon": name})`` Placed items; the
+      renderer draws them as native custom geometry filled with ``style.fill`` (or ``style.color``).
     - Slide-level settings (background, notes, hidden, transition, ids) come from ``Slide``.
     """
 
