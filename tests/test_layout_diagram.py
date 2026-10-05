@@ -14,6 +14,8 @@ from slidemark.theme import get_theme
 from slidemark.units import EMU_PER_INCH as IN
 from slidemark.units import slide_size
 
+from .helpers import top_anchored
+
 ROOT = Path(__file__).resolve().parent.parent
 
 APPROVAL = """# Approval flow
@@ -51,7 +53,7 @@ C -->|retry| A
 
 def lay(md: str):
     deck = parse(md)
-    theme = get_theme(deck.theme)
+    theme = top_anchored(get_theme(deck.theme))
     placed = layout_slide(deck.slides[0], deck, theme, 0)
     return deck, theme, placed
 

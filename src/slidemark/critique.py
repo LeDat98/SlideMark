@@ -28,7 +28,7 @@ import re
 from .ir import Container, Deck, Diagnostic, Placed, Text
 from .layout import css, measure
 from .theme import Theme
-from .units import EMU_PER_PT, slide_size
+from .units import EMU_PER_PT, slide_size, to_emu
 
 SPARSE_FILL = 0.30
 WALL_LINES = 8
@@ -272,17 +272,20 @@ def critique_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) ->
 
     # empty band at the bottom
     top = max((p.y + p.h for p in items if role(p) in ("title", "subtitle", "lead")), default=0)
-    limit = H
+    limit = H - to_emu(theme.margin_y)
     for p in items:
         if role(p) in ("conclusion", "footnote", "caption"):
             limit = min(limit, p.y)
     bottom = max((p.y + p.h for p in body), default=top)
     span = limit - top
-    if not free and slide.conclusion is None and span > 0 and (limit - bottom) / span >= EMPTY_BAND:
+    below = limit - bottom
+    above = max(min((p.y for p in body), default=top) - top - to_emu(theme.layout.top_gap), 0)
+    worst, where = (above, "above the content") if above > below else (below, "at the bottom")
+    if not free and slide.conclusion is None and span > 0 and worst / span >= EMPTY_BAND:
         add(
-            "warning" if (limit - bottom) / span >= EMPTY_BAND_WARN else "info",
+            "warning" if worst / span >= EMPTY_BAND_WARN else "info",
             "design-empty-band",
-            f"{(limit - bottom) / span:.0%} of the body is empty at the bottom",
+            f"{worst / span:.0%} of the body is empty {where}",
             "add a `>` conclusion or a chart/table, or grow content",
         )
 
