@@ -318,8 +318,14 @@ def test_heading_band_on_jp_business_only():
 @pytest.mark.parametrize("theme", THEMES)
 def test_dense_tightens_gaps_and_paddings(theme):
     els = [box("a"), box("b")]
-    normal, _ = lay(Slide(title=T("t", "title"), grid="2", elements=els), theme)
-    dense, _ = lay(Slide(title=T("t", "title"), grid="2", classes=["dense"], elements=els), theme)
+    th = get_theme(theme).model_copy(deep=True)  # the sparse step (padding x step) is tested elsewhere
+    th.layout = th.layout.model_copy(update={"sparse_step": 1.0, "sparse_step_min": 1.0})
+
+    def lay_(slide):
+        return layout_slide(slide, Deck(slides=[slide]), th, 0), None
+
+    normal, _ = lay_(Slide(title=T("t", "title"), grid="2", elements=els))
+    dense, _ = lay_(Slide(title=T("t", "title"), grid="2", classes=["dense"], elements=els))
     n1, n2 = of(normal, Container)
     d1, d2 = of(dense, Container)
     gap_n, gap_d = n2.x - (n1.x + n1.w), d2.x - (d1.x + d1.w)
