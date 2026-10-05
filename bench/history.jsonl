@@ -39,3 +39,4 @@
 {"date": "2026-10-05T07:03:23+00:00", "commit": "c5e5be2", "metric": "import_fidelity", "import_fidelity": 0.975, "value": 0.975, "decks": 19, "worst": [["05-org", 0.854], ["09-process", 0.945], ["08-math", 0.948]]}
 {"date": "2026-10-05T08:47:11+00:00", "commit": "2fd77ea", "metric": "html_fidelity", "slides": 30, "native": 1.0, "native_90": 30, "diff": 0.0116, "diff_native": 0.0116, "value": 1.0, "worst": [["01-gradient-hero", 1.0], ["02-kpi-dashboard", 1.0], ["03-timeline", 1.0], ["04-jp-dense", 1.0], ["05-svg-diagram", 1.0]]}
 {"date": "2026-10-05T08:57:11+00:00", "commit": "37c4198", "metric": "design_tokens", "css": 139, "html": 362, "tokens": 128, "value": 0.354}
+{"date": "2026-10-05T08:57:18+00:00", "commit": "96063ce", "metric": "design_tokens", "css": 139, "html": 362, "tokens": 128, "value": 0.354}

@@ -25,7 +25,8 @@ def main() -> int:
     for k, v in counts.items():
         print(f"{k:<8} {v:>5}  {v / html:5.0%} of html")
     if "--record" in sys.argv:
-        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True)
+        cmd = ["git", "rev-parse", "--short", "HEAD"]
+        sha = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
         row = {
             "date": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "commit": sha.stdout.strip(),
