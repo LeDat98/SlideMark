@@ -61,12 +61,18 @@ def _text_pad(p: Placed) -> int:
 
 
 def _spread(
-    p: Placed, avail: int, lt: LayoutTokens, pad: int, s: float = 1.0, short: bool = False
-) -> tuple[Placed, float] | None:
+    p: Placed,
+    avail: int,
+    lt: LayoutTokens,
+    pad: int,
+    s: float = 1.0,
+    short: bool = False,
+    cap_to: float | None = None,
+) -> tuple[Placed, float, float] | None:
     """Text of ``p`` grown by ``s`` and its paragraph gaps spread (capped) to span ``avail`` EMU.
 
-    Returns the new item (``h`` = ``avail``) and the free height left under the text; ``None`` when the
-    grown text would wrap onto more lines or not fit (the caller keeps the smaller step)."""
+    Returns the new item (``h`` = ``avail``), the free height left under the text and the extra gap (em) it
+    got; ``None`` when the grown text would wrap onto more lines or not fit (caller keeps the smaller one)."""
     paras = p.element.paragraphs
     pad = _text_pad(p)  # the text's own inset (what lint and the renderer measure with)
     width = p.w - 2 * pad
@@ -86,10 +92,13 @@ def _spread(
         return None
     size = (p.style.font_size or 18) * p.font_scale * EMU_PER_PT
     if n < 2 or free <= 0 or size <= 0:
-        return p, max(free, 0.0)
+        return p, max(free, 0.0), 0.0
     cap = lt.l3_gap_extra_numbered if paras[0].marker == "number" else lt.l3_gap_extra
     if short and n <= lt.l3_short_items:
         cap = max(cap, lt.l3_gap_extra_short)
+    cap = min(cap, lt.l3_gap_cap)  # one even rhythm, never a stretched list
+    if cap_to is not None:
+        cap = min(cap, cap_to)  # sibling cards share the smallest rhythm
     extra = min(max(cap, 0.0), free / ((n - 1) * size))
     for _ in range(10):  # the estimate carries a safety factor: shrink until it surely fits
         if extra <= 0.01 or measure.paragraphs_height(
@@ -98,7 +107,7 @@ def _spread(
             break
         extra *= 0.9
     if extra <= 0.01:
-        return p, free
+        return p, free, 0.0
     need = measure.paragraphs_height(paras, width, p.style, p.font_scale, gap=g0 + extra)
     p = p.model_copy(
         update={
@@ -107,7 +116,7 @@ def _spread(
             )
         }
     )
-    return p, max(avail - 2 * pad - need, 0.0)
+    return p, max(avail - 2 * pad - need, 0.0), extra
 
 
 def _max_step(card: Placed, inner: list[Placed], lt: LayoutTokens) -> float:
@@ -118,7 +127,7 @@ def _max_step(card: Placed, inner: list[Placed], lt: LayoutTokens) -> float:
         return 1.0
     m = mains[0]
     pt = (m.style.font_size or 18) * m.font_scale
-    cap = lt.sparse_low_max_pt
+    cap = lt.l3_text_max_pt
     if heads:
         hp = max((h.style.font_size or 18) * h.font_scale for h in heads)
         cap = min(cap, hp * lt.l3_body_head_max)
@@ -133,10 +142,12 @@ def _fill_card(
     lt: LayoutTokens,
     s: float = 1.0,
     short: bool = False,
-) -> tuple[dict[int, Placed], float, float] | None:
+    cap_to: float | None = None,
+) -> tuple[dict[int, Placed], float, float, float] | None:
     """New geometry of ``card`` and its texts for the box ``top..bottom``; ``None`` = leave it alone.
 
-    Also returns the free height under the body text and the text's end below ``top`` (EMU)."""
+    Also returns the free height under the body text, the text's end below ``top`` (EMU) and the extra
+    paragraph gap (em) the text got."""
     dy = top - card.y
     heads = [p for p in inner if p.element.role == "heading"]
     notes = [p for p in inner if p.element.role != "heading" and _is_note(p)]
@@ -160,12 +171,22 @@ def _fill_card(
         return None
     if kpi:
         res[id(main)] = m.model_copy(update={"h": avail})
-        return res, 0.0, avail
-    sp = _spread(m, avail, lt, pad, s, short)
+        return res, 0.0, avail, 0.0
+    sp = None
+    if heads:  # air between the heading band and the first item
+        size = (m.style.font_size or 18) * m.font_scale * EMU_PER_PT
+        gap = round(lt.l3_head_pad * size)
+        if gap and avail - gap >= main.h - 2:
+            mg = m.model_copy(update={"y": m.y + gap})
+            sp = _spread(mg, avail - gap, lt, pad, s, short, cap_to)
+            if sp is not None:
+                m, avail = mg, avail - gap
+    if sp is None:
+        sp = _spread(m, avail, lt, pad, s, short, cap_to)
     if sp is None:
         return None
-    res[id(main)], free = sp
-    return res, free + pad, m.y - top + (avail - free)  # the card's bottom inset is empty too
+    res[id(main)], free, extra = sp
+    return res, free + pad, m.y - top + (avail - free), extra  # the card's bottom inset is empty too
 
 
 def _apply(out: list[Placed], res: dict[int, Placed]) -> list[Placed]:
@@ -241,26 +262,25 @@ def _fill_row(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool)
 
     def run(h: int, s: float, short: bool):
         """(placed items, free heights, text ends) of every card at row height ``h``; ``None`` = refused."""
-        res: dict[int, Placed] = {}
-        frees: list[float] = []
-        ends: list[float] = []
-        for c in cards:
-            r = _fill_card(c, plan[id(c)], top, top + h, lt, s, short)
-            if r is None:
+        rs = [_fill_card(c, plan[id(c)], top, top + h, lt, s, short) for c in cards]
+        if any(r is None for r in rs):
+            return None
+        extras = [r[3] for r in rs]
+        if max(extras) - min(extras) > 0.01:  # one rhythm for every card of the row
+            rs = [_fill_card(c, plan[id(c)], top, top + h, lt, s, short, min(extras)) for c in cards]
+            if any(r is None for r in rs):
                 return None
+        res: dict[int, Placed] = {}
+        for r in rs:
             res.update(r[0])
-            frees.append(r[1])
-            ends.append(r[2])
-        return res, frees, ends
+        return res, [r[1] for r in rs], [r[2] for r in rs]
 
     r = run(full, 1.0, False)
     if r is None:
         return out  # one card refuses: the row stays as it was
     h, s_ok = full, 1.0
     tail_max = lt.l3_tail_max * full
-    if (
-        not kpi and max(r[1]) > tail_max
-    ):  # (a) grow the text, (b) wider gaps of short lists, (c) shorter cards
+    if not kpi and max(r[1]) > tail_max:  # (a) grow the text (capped gaps), (c) shorter cards
         s_top = min(_max_step(c, plan[id(c)], lt) for c in cards)
         k = 1
         while s_top > 1.0 + 1e-6 and max(r[1]) > tail_max:
@@ -272,9 +292,6 @@ def _fill_row(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool)
             k += 1
             if s >= s_top:
                 break
-        if max(r[1]) > tail_max:
-            nxt = run(full, s_ok, True)
-            r = nxt if nxt is not None else r
         if max(r[1]) > tail_max:  # (c) the shortest row whose emptiest card keeps its tail within the limit
             nat = max(c.h for c in cards)
             h0 = max((full - max(r[1])) / (1.0 - lt.l3_tail_aim), nat)
@@ -303,15 +320,54 @@ def _fill_share(card: Placed, inner: list[Placed]) -> float:
     return (max(p.y + _text_h(p) for p in inner) - card.y) / max(card.h, 1)
 
 
-def fill_panels(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
-    """Text panels beside a chart / image: spread paragraphs, anchor the trailing note to the panel bottom."""
+def fill_panels(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool = False) -> list[Placed]:
+    """Text panels beside a chart / image: text grows, gaps stay even and capped, the panel shrinks to its
+    content (a trailing note follows the text)."""
     try:
-        return _fill_panels(out, body, lt)
+        return _fill_panels(out, body, lt, consulting)
     except Exception:  # never raise on bad input
         return out
 
 
-def _fill_panels(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+def _fill_panel(c: Placed, inner: list[Placed], lt: LayoutTokens, consulting: bool):
+    """Geometry of one panel: grow the text (capped gaps), then shrink the panel to its content."""
+    bottom = c.y + c.h
+    r = _fill_card(c, inner, c.y, bottom, lt)
+    if r is None:
+        return None
+    if not consulting:
+        return r[0]
+    tail_max = lt.l3_tail_max * c.h
+    s_top = _max_step(c, inner, lt)
+    k = 1
+    while s_top > 1.0 + 1e-6 and r[1] > tail_max:
+        s = min(1.0 + k * lt.l3_grow_step, s_top)
+        nxt = _fill_card(c, inner, c.y, bottom, lt, s)
+        if nxt is None:
+            break
+        r = nxt
+        k += 1
+        if s >= s_top:
+            break
+    res = r[0]
+    if r[1] > tail_max:  # still sparse: the panel ends at its content (+ padding), not at the chart bottom
+        pad = _pad(next(p for p in inner if p.element.role != "heading"), c)
+        h = round(c.h - (r[1] - pad) * lt.l3_panel_shrink)
+        s_ok = max(
+            (
+                res[id(p)].font_scale / p.font_scale
+                for p in inner
+                if id(p) in res and p.element.role != "heading"
+            ),
+            default=1.0,
+        )
+        nxt = _fill_card(c, inner, c.y, c.y + h, lt, s_ok)
+        if nxt is not None:
+            res = nxt[0]
+    return res
+
+
+def _fill_panels(out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool) -> list[Placed]:
     if not lt.l3_fill or lt.body_valign == "top" or body.h <= 0:
         return out
     items = _body_items(out, body)
@@ -323,9 +379,9 @@ def _fill_panels(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed
         inner = _inner_texts(c, items)
         if inner is None or c.h < visual_h * 0.9 or _fill_share(c, inner) >= lt.panel_fill_min:
             continue
-        r = _fill_card(c, inner, c.y, c.y + c.h, lt)
+        r = _fill_panel(c, inner, lt, consulting)
         if r is not None:
-            res.update(r[0])
+            res.update(r)
     return _apply(out, res) if res else out
 
 
