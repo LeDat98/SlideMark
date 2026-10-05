@@ -184,5 +184,5 @@ each, o200k proxy), shipped as package data; written by the orchestrator.
 
 ## Day 5 status
 - [x] Orchestrator: SKILL.md + reference/ + budget test
-- [ ] A: docs, schema, JSON input, skill install
+- [x] A: docs, schema, JSON input, skill install
 - [ ] B: user templates, master placeholders for footer/number

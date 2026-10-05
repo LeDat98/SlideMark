@@ -13,15 +13,26 @@ from .theme import get_theme
 
 
 def build(source: str | Path, out: str | Path, *, base_dir: str | Path | None = None) -> Deck:
-    """Build a .pptx from Markdown text or a path to a .md file. Returns the Deck (with diagnostics)."""
-    is_path = isinstance(source, Path) or ("\n" not in source and source.endswith(".md"))
+    """Build a .pptx from Markdown text or a path to a .md/.json file. Returns the Deck (with diagnostics)."""
+    is_path = isinstance(source, Path) or ("\n" not in source and str(source).endswith((".md", ".json")))
     if is_path:
         path = Path(source)
-        text = path.read_text(encoding="utf-8")
         base_dir = base_dir or path.parent
+        if path.suffix == ".json":
+            from .jsonio import load_deck
+
+            deck = load_deck(path)
+            if any(d.rule == "bad-json" for d in deck.diagnostics):
+                return deck
+            return build_deck(deck, out, base_dir)
+        text = path.read_text(encoding="utf-8")
     else:
         text = str(source)
-    deck = parse(text)
+    return build_deck(parse(text), out, base_dir)
+
+
+def build_deck(deck: Deck, out: str | Path, base_dir: str | Path | None = None) -> Deck:
+    """Layout + lint + render a parsed Deck. Lint findings already reported by layout are deduped."""
     deck.attrs.setdefault("base_dir", str(base_dir or Path.cwd()))
     theme = get_theme(deck.theme)
     placed = [layout_slide(slide, deck, theme, i) for i, slide in enumerate(deck.slides)]

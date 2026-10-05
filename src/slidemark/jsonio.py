@@ -47,16 +47,7 @@ def load_deck(path_or_text: str | Path) -> Deck:
 
 
 def build_deck(deck: Deck, out: str | Path, base_dir: str | Path | None = None) -> Deck:
-    """Layout + lint + render an existing Deck (mirrors build.build, without parsing)."""
-    from .layout import layout_slide
-    from .lint import lint
-    from .render import render
-    from .theme import get_theme
+    """Layout + lint + render an existing Deck (see ``slidemark.build.build_deck``)."""
+    from .build import build_deck as _build_deck
 
-    deck.attrs.setdefault("base_dir", str(base_dir or Path.cwd()))
-    theme = get_theme(deck.theme)
-    placed = [layout_slide(slide, deck, theme, i) for i, slide in enumerate(deck.slides)]
-    seen = {(d.rule, d.slide) for d in deck.diagnostics}
-    deck.diagnostics.extend(d for d in lint(deck, placed, theme) if (d.rule, d.slide) not in seen)
-    render(deck, placed, theme, out)
-    return deck
+    return _build_deck(deck, out, base_dir)

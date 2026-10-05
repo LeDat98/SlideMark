@@ -35,3 +35,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [render] Equations must be `mc:AlternateContent` → `mc:Choice Requires="a14"` → `a14:m` → `m:oMathPara` inside `a:p`, with an `mc:Fallback` run; LibreOffice 24.2 shows only the fallback text.
 - [render] A pie chart draws only its first series → fold one-point-per-row CSV into categories; reversed bar charts need `c:crosses val=max` set on the value axis XML directly.
 - [parser] CSV delimiter detection must ignore quoted segments (`"a,b";1`).
+- [cli] A default arg `file=sys.stderr` binds at import time and escapes pytest capture → default None, resolve at call time.
