@@ -1,4 +1,4 @@
-"""Command line: ``slidemark build|check|preview|docs|schema|skill|version``."""
+"""Command line: ``slidemark build|check|import|preview|docs|schema|skill|version``."""
 
 from __future__ import annotations
 
@@ -121,6 +121,32 @@ def cmd_build(args: argparse.Namespace) -> int:
     return 1 if _has_errors(deck) else 0
 
 
+def cmd_import(args: argparse.Namespace) -> int:
+    from .importer import import_pptx
+
+    src = Path(args.input)
+    if not src.is_file():
+        print(f"error: cannot read {args.input}: no such file", file=sys.stderr)
+        return 2
+    out = Path(args.output) if args.output else None
+    text, diags = import_pptx(src, out.parent if out else None)
+    for d in diags:
+        _say(str(d), sys.stderr)
+    if any(d.rule == "import-unreadable" for d in diags):
+        return 2
+    if out is None:
+        sys.stdout.write(text if text.endswith("\n") else text + "\n")
+    else:
+        try:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(text, encoding="utf-8")
+        except OSError as e:
+            print(f"error: cannot write {out}: {e}", file=sys.stderr)
+            return 2
+        print(f"wrote {out}")
+    return 1 if any(d.level == "error" for d in diags) else 0
+
+
 def cmd_preview(args: argparse.Namespace) -> int:
     try:
         from .preview import pptx_to_pngs
@@ -226,6 +252,11 @@ def make_parser() -> argparse.ArgumentParser:
     c.add_argument("input")
     c.add_argument("--format", choices=["text", "json"], default="text")
     c.set_defaults(func=cmd_check)
+
+    im = sub.add_parser("import", help="convert a .pptx to SlideMark text (stdout, or -o file + images/)")
+    im.add_argument("input")
+    im.add_argument("-o", "--output", help="output .md (pictures go to images/ next to it)")
+    im.set_defaults(func=cmd_import)
 
     v = sub.add_parser("preview", help="render slides to PNG images (needs LibreOffice)")
     v.add_argument("input")
