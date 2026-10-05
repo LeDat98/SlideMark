@@ -30,11 +30,11 @@ Never limit the agent's design ability: mechanisms, not looks. These gates come 
 The product metric is the cost of the agent run that ends with an accepted deck: model calls first, output tokens
 (thinking included) second, input tokens third. Source-size ratios are a regression guard only.
 - [x] AC1 Harness: `bench/agent_cost.py` reads subagent transcripts and prints calls, output, cost, cost above start, images viewed, docs attempts (run 5: + `bench/agent_accept.py`, `bench/briefs/` 9 briefs, python-pptx baseline for all 9)
-- [ ] AC2 SKILL only: with reference pages unavailable ≥ 90% accepted over ≥ 27 runs (9 briefs × 3); with them available median 0 lookups (run 5 smoke: 9 briefs × 1, 9/9 accepted after the `※` fix, 0 docs attempts in every run)
-- [ ] AC3 Calls: median ≤ 4 model calls from brief to hand-back, p90 ≤ 6 (run 5 latest per brief: median 5, 3 of 9 runs at 3 calls; python-pptx median 5)
-- [ ] AC4 Cost: median cost above common start ≤ 35% of the python-pptx arm, ≤ 30% on briefs of ≥ 5 slides (run 5: 38–160% per brief, median ≈ 57%; the python-pptx arm is cheap here: 4–6 calls)
-- [ ] AC5 Output: median output tokens (thinking included) ≤ 30% of the python-pptx arm (run 5 smoke: 25% median over 9 runs; needs the full 27-run matrix)
-- [ ] AC6 Trust: median 0 images viewed per run; reviewer-found defects in zero-warning decks ≤ 0.02 per slide (run 5: median 3 images; blind review 2 verified defects / 54 slides = 0.037, fixes in progress)
+- [x] AC2 SKILL only: with reference pages unavailable ≥ 90% accepted over ≥ 27 runs (9 briefs × 3); with them available median 0 lookups (run 6, brief set 2: skill-only 27/27 accepted, blind review 1 defect / 54 slides; skill-open 27/27, 0 lookups in all 27 runs)
+- [x] AC3 Calls: median ≤ 4 model calls from brief to hand-back, p90 ≤ 6 (run 6: median 3, p90 4 in both arms; python-pptx median 4)
+- [ ] AC4 Cost: median cost above common start ≤ 35% of the python-pptx arm, ≤ 30% on briefs of ≥ 5 slides (run 6 matrix: 47%, ≥ 5 slides 41%; 3-slide briefs 49–69%, 10-slide 28–41%; a 3-call run has a ≈ 12k-unit floor from re-reads + SKILL.md, see AGENT_COST.md "Run 6 findings": owner decision needed)
+- [x] AC5 Output: median output tokens (thinking included) ≤ 30% of the python-pptx arm (run 6: 21% skill-only, 22% skill-open over 27 runs each)
+- [x] AC6 Trust: median 0 images viewed per run; reviewer-found defects in zero-warning decks ≤ 0.02 per slide (run 6: median 0 images in both arms (4 / 9 of 27 runs looked); blind review 1 verified defect / 54 slides = 0.019, a JA chevron word break, fixed in run 6)
 
 ## L1: Works (target: day 2)
 - [x] Title, text, nested lists, inline styles, images, tables with merges, code, charts, notes → native objects
