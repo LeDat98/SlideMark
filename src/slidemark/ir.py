@@ -46,6 +46,25 @@ class Style(Model):
     opacity: float | None = None  # 0..1
     # True = theme default shadow; or CSS box-shadow "0 8 24 #00000055" (x y blur [spread] color, pt)
     shadow: bool | str | None = None
+    # --- CSS mappings (DF3; ```css fences). All optional, None = inherit ---
+    padding_top: Length | None = None  # per-side padding, overrides `padding` on that side
+    padding_right: Length | None = None
+    padding_bottom: Length | None = None
+    padding_left: Length | None = None
+    # per-side borders, canonical "<width>pt <solid|dash|dot> <color>" or "none"; override line/line_width
+    border_top: str | None = None
+    border_right: str | None = None
+    border_bottom: str | None = None
+    border_left: str | None = None
+    line_dash: Literal["solid", "dash", "dot"] | None = None  # border style of `line`
+    letter_spacing: float | None = None  # pt, added between characters
+    text_transform: Literal["upper", "lower", "capitalize", "none"] | None = None
+    underline: bool | None = None
+    strike: bool | None = None
+    rotation: float | None = None  # degrees clockwise (CSS transform: rotate())
+    margin: Length | None = None  # outer space around a block inside its cell
+    gap: Length | None = None  # gap between the children of a container / slide body
+    grid: str | None = None  # `@` grid spec from grid-template-columns / -areas ("1:2", "aab/aac")
 
     def merged(self, *others: Style | None) -> Style:
         """Return a copy where later non-None fields override earlier ones."""
@@ -57,6 +76,24 @@ class Style(Model):
                 if v is not None:
                     data[k] = v
         return Style(**data)
+
+
+class CssRule(Model):
+    """One rule of a ```css fence: a single selector (comma lists are split) and its mapped declarations.
+
+    Selector grammar (subset of CSS, matched by the layout against the IR):
+    compound = [type] [.class]* [#id] [:nth-child(even|odd|N)] [:first-child] [:last-child]
+    selector = compound ((" " | " > ") compound)*
+    types: ``slide`` (classes = slide classes + ``cover``/``section`` layout), ``h1`` (slide title),
+    ``h2`` (box heading), ``p``/``li`` (body text), ``.lead`` ``.conclusion`` ``.footnote`` ``.subtitle``
+    (role classes), ``.box`` (any ``##`` box / Container), ``table`` ``tr`` ``th`` ``td``, ``code``,
+    ``img``, ``.chart``, ``.kpi`` ``.chevron`` ``.callout`` and any class/id written with ``{.x}``/``{#x}``.
+    Later rules and higher specificity win, like CSS; inline ``{}`` styles win over CSS.
+    """
+
+    selector: str
+    style: Style
+    line: int | None = None  # source line of the rule, for diagnostics
 
 
 class Box(Model):
@@ -254,6 +291,7 @@ class Slide(Model):
     hidden: bool = False
     classes: list[str] = Field(default_factory=list)
     attrs: dict[str, Any] = Field(default_factory=dict)
+    css: list[CssRule] = Field(default_factory=list)  # ```css fences inside this slide: this slide only
     line: int | None = None
 
 
@@ -284,6 +322,7 @@ class Deck(Model):
     # inline design tokens from header lines (colors:/fonts:/sizes:/style:), canonical path -> raw value,
     # e.g. {"colors.primary": "#7C5CFF", "classes.card.radius": "14"}; applied on top of `theme`
     tokens: dict[str, str] = Field(default_factory=dict)
+    css: list[CssRule] = Field(default_factory=list)  # ```css fences in the deck header: every slide
     slides: list[Slide] = Field(default_factory=list)
     attrs: dict[str, Any] = Field(default_factory=dict)
     diagnostics: list[Diagnostic] = Field(default_factory=list)

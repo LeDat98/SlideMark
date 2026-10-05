@@ -302,6 +302,43 @@ Attributes on a table (`{...}` on the line before a GFM table, or on a `table` f
 
 Numeric columns are right-aligned automatically.
 
+## CSS fence
+
+A ` ```css ` fence styles SlideMark elements with CSS. In the deck header (before the first `#`) it applies to
+every slide; inside a slide it applies to that slide only. It is never drawn.
+
+````markdown
+```css
+h1 { color: #7C5CFF; letter-spacing: 1pt; text-transform: uppercase }
+.box { background: linear-gradient(135deg, #141A2E, #1E2540); border-radius: 14px; box-shadow: 0 8px 24px #0006 }
+.box > h2 { color: #00D1B2; border-bottom: 2px solid #00D1B2 }
+tr:nth-child(even) td { background: #F6F7FB }
+.hero { background: #FF5A1F; color: white; transform: rotate(-2deg) }
+```
+````
+
+Selectors: `slide`, `slide.cover`, `slide.section`, `h1` (slide title), `h2` (box heading), `p`/`li` (body
+text), `.lead`, `.conclusion`, `.footnote`, `.subtitle`, `.box` (any `##` box), `.kpi`, `.chevron`, `.callout`,
+`table`, `tr`, `th`, `td`, `code`, `img`, `.chart`, and any `{.class}` / `{#id}`; combined with descendant
+(` `) and child (`>`) combinators, `:nth-child(even|odd|N)`, `:first-child`, `:last-child`. Comma lists are
+split. Later rules and higher specificity win; inline `{}` attributes win over CSS.
+
+| Group | Properties (mapped to native PowerPoint) |
+|---|---|
+| Color and fill | `color`, `background`, `background-color` (color, `linear-gradient`, `radial-gradient`, `url()`) |
+| Border | `border`, `border-top/right/bottom/left`, `border-color`, `border-width`, `border-style`, `border-radius` |
+| Effects | `box-shadow`, `opacity` |
+| Font | `font-family`, `font-size`, `font-weight`, `font-style` |
+| Text | `letter-spacing`, `line-height`, `text-align`, `vertical-align`, `text-transform`, `text-decoration` |
+| Box | `padding` (1–4 values), `padding-top/right/bottom/left`, `margin`, `gap` |
+| Grid | `grid-template-columns` (`1fr 2fr` → `@1:2`, `repeat(3, 1fr)` → `@3`), `grid-template-areas` |
+| Transform | `transform: rotate(<deg>)` |
+
+Units: `px` (= 0.75 pt), `pt`, `em` (× the element's font size), `%` for opacity. Colors: hex (`#RGB`,
+`#RGBA`, `#RRGGBB`, `#RRGGBBAA`), `rgb()/rgba()`, CSS named colors, theme names (`primary`) and
+`var(--primary)`. Any other property, selector or value gives a one-line diagnostic and is never silently
+dropped.
+
 ## Other fences
 
 | Fence | Result |

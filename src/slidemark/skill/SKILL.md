@@ -6,12 +6,12 @@ description: Write PowerPoint decks as compact SlideMark text and build native, 
 # SlideMark
 
 ```bash
-slidemark check deck.md     # "warning slide 2 L14 rule: message -> hint"; --fix repairs simple ones
+slidemark check deck.md     # warnings with hints; --fix repairs simple ones
 slidemark review deck.md    # design critique + score
 slidemark build deck.md -o deck.pptx
 ```
 
-More: `slidemark docs syntax|components|charts-tables|jp-dense|icons|diagnostics`.
+More: `slidemark docs syntax|design|components|charts-tables|jp-dense|icons|diagnostics`.
 
 ```markdown
 theme: jp-business
@@ -30,20 +30,21 @@ num: on
 ※ 出所: 社内調査（2026年9月）
 ```
 
-- Header: `theme` (`default` `midnight` `jp-business` or a .pptx path), `lang`, `footer`, `num: on`.
-- `# Title` = slide; title + ≤ 2 short lines = cover (first slide) or section divider.
+- Header: `theme` (`default` `midnight` `jp-business`, a .pptx path, or `none`), `lang`, `footer`, `num: on`.
+- Own design: header lines `colors: primary=#7C5CFF bg=#0B1020`, `fonts: body="Inter"`, `sizes: body=16`,
+  `style: radius=14 card.fill=… title.band=none` override any token (`slidemark docs design`).
+- `# Title` = slide; title + ≤ 2 short lines = cover or section divider.
 - `## Heading` = box; boxes arrange themselves. `>` after the title = key message, `>` last = conclusion
-  bar, `※` = footnote, `??? ` = speaker notes. Each line is its own line.
+  bar, `※` = footnote, `??? ` = speaker notes.
 - `@end` closes the last box; what follows (table, chart) goes full width below.
 
-`@` line, only if the auto layout is wrong: `@3` columns, `@2x2`, `@1:2` ratios, `@aab/aac` areas
-(big left + 2 stacked), `chevron` steps, `flow` arrows, `a>b` connectors (letters = blocks in order),
+`@` line, only if the auto layout is wrong: `@3` columns, `@2x2`, `@1:2` ratios, `@aab/aac` areas,
+`chevron` steps, `flow` arrows, `a>b` connectors (letters = blocks in order),
 `@section`, `@dense`, `@build` (click to reveal), `@t=fade`. `@` after `@end` = new row of boxes.
 
 Content:
 - `**b**` `*i*` `==accent==` `[x]{.danger}` `[済]{.badge .success}` `[link](url)`.
-- `## 売上 {.kpi icon=yen}` + `12.4億円` + caption line = KPI card;
-  `icon=` works on any box heading (`slidemark docs icons`).
+- `## 売上 {.kpi icon=yen}` + `12.4億円` + caption line = KPI card; `icon=` on any box heading.
 - `> [!warn] text` callout (`note` `tip` `warn` `caution`).
 - GFM table; a lone `<` merges left, `^` merges up; `{align=lrr}` on the line before.
 - Chart fence (`column bar line pie doughnut area scatter radar stacked-column stacked-bar`), CSV: first row =
@@ -61,5 +62,4 @@ Content:
   Other fences = code. `[go](#5)` jumps to slide 5; `@hidden` hides a slide.
 - Given HTML/CSS: rewrite it as `#`/`##`/tables, or keep it in a ` ```html {render=native} ` fence.
 
-Rules: no positions or font sizes; table emphasis = `**bold**`/`==x==` in cells; one message per slide (the
-`>` lead); ≤ 4 boxes × 6 bullets, tables ≤ 8 rows, else split; `check` to zero warnings.
+Rules: no positions; one message per slide (the `>` lead); ≤ 4 boxes × 6 bullets, tables ≤ 8 rows, else split; `check` to zero warnings.
