@@ -99,3 +99,5 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [fuzz] `bench/fuzz_long.py` now mixes CSS fences and `@html` slides and lays out with `deck_theme` (tokens applied): 20k inputs, 0 crashes.
 - [layout] Short-CJK dense cards cannot grow text (wrap guard) → paragraph spacing (`layout.room_gap_max_dense`) is the lever; shorter cards only move the empty band outside them.
 - [env] Worktree subagents that install only `.[dev]` see `tests/test_design_roundtrip.py` html cases fail (no Playwright) → tell them `.[dev,html]`.
+- [layout] Roomy/balance floors skipped any slide with a tail (callout under a flow row) → use the grid area as reference when the tail is text. A lone html block hugs the top of its box → wrap its source in a `100vh` flex column (`layout.html_fit`, `{fit=off}`).
+- [import] Foreign decks: derived look tokens (`importer/look.py`) must win a trial build (a dominant-text-color guess misfired on SlideMark decks: roundtrip 113 → 98 without the check); strict majority for bg; skip radii that vary per card.
