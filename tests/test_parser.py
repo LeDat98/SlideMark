@@ -365,3 +365,114 @@ def test_q3_structure():
 def test_empty_and_garbage_input():
     assert parse("").diagnostics[0].rule == "no-slides"
     assert parse("\x00\x01 {{{{ [[[ ``` ").slides is not None
+
+
+# --- connectors, callouts, badges, kpi
+
+
+def rules(deck):
+    return [d.rule for d in deck.diagnostics]
+
+
+def test_slide_links_letters_digits_and_areas_grid():
+    d = parse("# T\n@aab/aac a>b a-c 1>3\n\n## A\nx\n## B\ny\n## C\nz\n")
+    s = d.slides[0]
+    assert s.grid == "aab/aac"
+    assert [(link.src, link.dst, link.arrow) for link in s.links] == [
+        (0, 1, True),
+        (0, 2, False),
+        (0, 2, True),
+    ]
+    assert not d.diagnostics
+
+
+def test_links_on_a_box_target_its_children():
+    d = parse("# T\n\n## Box\n@2 a>b\n### X\nx\n### Y\ny\n")
+    box = d.slides[0].elements[0]
+    assert box.grid == "2" and len(box.children) == 2
+    assert [(link.src, link.dst) for link in box.links] == [(0, 1)]
+    assert d.slides[0].links == []
+
+
+def test_bad_links_are_dropped_with_hint():
+    d = parse("# T\n@3 a>a a>z 1>9\n\n## A\nx\n## B\ny\n")
+    assert d.slides[0].links == []
+    bad = [x for x in d.diagnostics if x.rule == "bad-link"]
+    assert len(bad) == 3
+    assert "slide has 2 blocks: use letters a..b" in bad[1].hint
+    assert all("\n" not in x.hint for x in bad)
+
+
+def test_callout_kinds_and_marker_removed():
+    for word, kind in [
+        ("note", "note"),
+        ("TIP", "tip"),
+        ("warn", "warn"),
+        ("Warning", "warn"),
+        ("important", "note"),
+        ("caution", "caution"),
+    ]:
+        d = parse(f"# T\n\ntext\n\n> [!{word}] hello **x**\n\nmore\n")
+        c = [e for e in d.slides[0].elements if isinstance(e, Text) and "callout" in e.classes]
+        assert len(c) == 1 and c[0].role == "body" and c[0].classes == ["callout", kind]
+        assert c[0].paragraphs[0].plain == "hello x"
+    assert not d.diagnostics
+
+
+def test_callout_is_never_lead_or_conclusion_and_works_in_boxes():
+    d = parse("# T\n> [!tip] first\n\n## Box\n> [!warn] inside\n\n> [!note] last\n")
+    s = d.slides[0]
+    assert s.lead is None and s.conclusion is None
+    box = s.elements[-1]
+    assert isinstance(box, Container) and len([c for c in box.children if "callout" in c.classes]) == 3 - 1
+    d2 = parse("# T\n\nbody\n\n> [!note] last\n")
+    assert d2.slides[0].conclusion is None and d2.slides[0].elements[-1].classes == ["callout", "note"]
+
+
+def test_callout_only_slide_is_not_a_cover():
+    d = parse("# T\n\n> [!note] x\n")
+    assert d.slides[0].layout is None and len(d.slides[0].elements) == 1
+
+
+def test_unknown_callout_is_note_with_hint():
+    d = parse("# T\n\n> [!tpi] x\n")
+    t = d.slides[0].elements[0]
+    assert t.classes == ["callout", "note"]
+    w = [x for x in d.diagnostics if x.rule == "unknown-callout"]
+    assert w and "tip" in w[0].hint
+
+
+def test_plain_quote_still_a_lead():
+    assert parse("# T\n> lead\n\nbody\n").slides[0].lead is not None
+
+
+def test_badge_default_and_color_class():
+    t = parse("# T\n\nA [済]{.badge} B [NEW]{.badge .danger} C\n\n- x\n- y\n- z\n").slides[0].elements[0]
+    rs = runs(t)
+    b1 = next(r for r in rs if r.text == "済")
+    b2 = next(r for r in rs if r.text == "NEW")
+    assert (b1.highlight, b1.color, b1.bold) == ("primary", "bg", True)
+    assert (b2.highlight, b2.color, b2.bold) == ("danger", "bg", True)
+    assert all(r.highlight is None for r in rs if r.text not in ("済", "NEW"))
+    # plain color span unchanged
+    r = runs(parse("# T\n\n[x]{.danger}\n\n- a\n- b\n- c\n").slides[0].elements[0])[0]
+    assert r.color == "danger" and r.highlight is None
+
+
+def test_kpi_box_lines_are_separate_paragraphs():
+    d = parse("# T\n@2\n\n## 売上 {.kpi}\n12.4億円\n前年比 +8%\n\n## 利益 {.kpi}\n- 3億円\n- 前年比 +1%\n")
+    for box in d.slides[0].elements:
+        assert "kpi" in box.classes
+        assert len(box.children) == 1 and isinstance(box.children[0], Text)
+        assert len(box.children[0].paragraphs) == 2
+        assert all(p.marker is None for p in box.children[0].paragraphs)
+    assert d.slides[0].elements[0].children[0].paragraphs[0].plain == "12.4億円"
+
+
+def test_nested_at_in_box_builds_nested_containers():
+    d = parse("# T\n@2\n\n## Left\n@2\n### a\nx\n### b\ny\n@end\n## Right\nz\n")
+    left, right = d.slides[0].elements
+    assert d.slides[0].grid == "2" and left.grid == "2"
+    assert [type(c).__name__ for c in left.children] == ["Container", "Container"]
+    assert [c.title.paragraphs[0].plain for c in left.children] == ["a", "b"]
+    assert isinstance(right, Container) and right.grid is None

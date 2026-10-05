@@ -12,7 +12,7 @@ from markdown_it.token import Token
 
 from ..ir import Cell, Chart, Code, Image, Paragraph, Raw, Run, Series, Style, Table, Text
 from .attrs import Attrs, apply_attrs, parse_attr_body
-from .ctx import Ctx
+from .ctx import Ctx, closest
 from .inline import MD, ImageRef, inline_items, inline_runs
 
 CHART_KINDS = (
@@ -28,6 +28,15 @@ CHART_KINDS = (
     "radar",
 )
 RAW_KINDS = ("mermaid", "math", "html")
+CALLOUT_RE = re.compile(r"^\[!(\w+)\]\s*")
+CALLOUT_KINDS = {
+    "note": "note",
+    "tip": "tip",
+    "warn": "warn",
+    "warning": "warn",
+    "caution": "caution",
+    "important": "note",
+}
 MARP_SIZE = re.compile(r"^(w|h|width|height):(\d+(?:\.\d+)?(?:px|pt|cm|mm|in|%)?)$", re.I)
 
 
@@ -341,6 +350,31 @@ class _Builder:
             apply_attrs(el, ref.attrs, self.ctx, line)
         self.out.append(el)
 
+    def callout_kind(self, inner: list[Token], line: int) -> str | None:
+        """Detect a leading ``[!kind]`` in a quote, strip it from the first inline token, return the kind."""
+        first = next((t for t in inner if t.type == "inline"), None)
+        if first is None:
+            return None
+        m = CALLOUT_RE.match(first.content)
+        if not m:
+            return None
+        word = m.group(1).lower()
+        kind = CALLOUT_KINDS.get(word)
+        if kind is None:
+            near = closest(word, CALLOUT_KINDS)
+            hint = f"did you mean '[!{near}]'? " if near else ""
+            self.ctx.warn(
+                f"unknown callout '[!{m.group(1)}]'",
+                line,
+                "unknown-callout",
+                f"{hint}use [!note], [!tip], [!warn] or [!caution]; treated as note",
+            )
+            kind = "note"
+        first.content = first.content[m.end() :]
+        toks = MD.parseInline(first.content)
+        first.children = toks[0].children if toks else []
+        return kind
+
     def run(self, tokens: list[Token]) -> None:
         i = 0
         while i < len(tokens):
@@ -362,8 +396,13 @@ class _Builder:
                     self.add_paragraph(p, line)
             elif ty == "blockquote_open":
                 self.flush()
-                q = self.take(Text(role="quote"), line)
+                kind = self.callout_kind(inner, line)
+                q = self.take(Text(role="body" if kind else "quote"), line)
+                if kind:
+                    q.classes += [c for c in ("callout", kind) if c not in q.classes]
                 q.paragraphs = paragraphs_from_tokens(inner)
+                if kind:
+                    q.paragraphs = [p for p in q.paragraphs if p.runs]
                 self.out.append(q)
             elif ty == "fence":
                 self.flush()

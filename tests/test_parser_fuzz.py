@@ -80,6 +80,16 @@ FRAGMENTS = [
     "![w:1 h:2 bg](a.png){w=3}",
     "\n---\nlayout: cover\n---\n",
     "\n###",
+    "@a>b",
+    "@1>9",
+    "@2 a-b a>b",
+    "@aab/aac a>c",
+    "> [!warn] x",
+    "> [!",
+    "> [!xyz]",
+    "[x]{.badge}",
+    "[x]{.badge .danger}",
+    "## K {.kpi}",
 ]
 
 
@@ -114,6 +124,11 @@ LENIENT = [
     "???",
     "> q",
     "※ n",
+    "@2 a>b",
+    "@1>9",
+    "> [!warn] x",
+    "[x]{.badge}",
+    "## K {.kpi}",
     "日本語<br>テキスト",
 ]
 

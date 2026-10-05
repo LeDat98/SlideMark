@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import difflib
 from collections.abc import Iterable
+from typing import Any
 
 from ..ir import Diagnostic
 
@@ -20,6 +21,9 @@ class Ctx:
     def __init__(self, diagnostics: list[Diagnostic]):
         self.diagnostics = diagnostics
         self.slide: int | None = None
+        self.box_links: list[
+            tuple[Any, list[Any]]
+        ] = []  # (Container, raw `@` connectors) of the current slide
 
     def add(self, level: str, message: str, line: int | None, rule: str, hint: str) -> None:
         self.diagnostics.append(

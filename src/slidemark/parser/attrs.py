@@ -184,6 +184,7 @@ _N = re.compile(r"^\d+$")
 _CXR = re.compile(r"^\d+x\d+$")
 _RATIO = re.compile(r"^\d+(?:\.\d+)?(?::\d+(?:\.\d+)?)+$")
 _AREAS = re.compile(r"^[a-z.]+(?:/[a-z.]+)+$")
+_LINK = re.compile(r"^([a-z]|\d+)([>-])([a-z]|\d+)$")
 
 
 @dataclass
@@ -197,6 +198,22 @@ class AtSpec:
     background: str | None = None
     transition: str | None = None
     hidden: bool = False
+    links: list[RawLink] = field(default_factory=list)
+
+
+@dataclass
+class RawLink:
+    """An unresolved connector token: ``src``/``dst`` are 0-based indices; validated once blocks are known."""
+
+    src: int
+    dst: int
+    arrow: bool
+    token: str
+    line: int
+
+
+def _link_index(t: str) -> int:
+    return ord(t) - 97 if t.isalpha() else int(t) - 1
 
 
 def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
@@ -227,6 +244,9 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
             spec.hidden = True
         elif tok in FLAGS:
             spec.classes.append(tok)
+        elif _LINK.match(tok):
+            a, op, b = _LINK.match(tok).groups()  # type: ignore[union-attr]
+            spec.links.append(RawLink(_link_index(a), _link_index(b), op == ">", tok, line))
         elif _N.match(tok) or _CXR.match(tok) or _RATIO.match(tok) or _AREAS.match(tok):
             if tok.isdigit() and int(tok) < 1:
                 ctx.warn("grid needs at least 1 column", line, "bad-grid", "use e.g. @2 or @2x2")
