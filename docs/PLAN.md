@@ -410,3 +410,16 @@ Goal: run-5 leftovers (AC matrix, AC4, chevrons, sparse lead growth + perf, tabl
 - **Orchestrator:** brief set 2 (`bench/briefs2/`, fresh content), eval runner dirs `/opt/smeval`, python-pptx
   baseline for set 2, then the AC matrix (2 eval agents at a time); SKILL.md first-screen cut.
 - **Wave 2 B (layout):** L3 two-card decision slides and chart + text panel slides fill their space.
+- **Status (23:35 UTC):** wave 1 A table/chart contrast lint ✓, B perf (38 → 22 ms/slide cold), sparse lead/footnote growth
+  re-landed, two-line chevron headings ✓; wave 2 B L3 fill (top-anchored rows, KPI rows, chart side panels) ✓; wave 3 B
+  card tails, flow rows, JA chevron word breaks ✓; wave 4 B auto-fit instead of stretching ✓; orchestrator: brief set 2,
+  full AC matrix (9 python-pptx + 27 skill-only + 27 skill-open, 63/63 accepted), blind review, post-fix check (4/4 at
+  3 calls, 0 images), grouped-number chart labels, zero-based bar axes, deck-locale previews, accent usage in `look:`.
+
+## Leftovers for the next run
+- [ ] AC4 cost: 47% (≥ 5 slides 41%) on set 2; the floor analysis in `docs/AGENT_COST.md` needs an owner decision
+      (≥ 5-slide briefs only, or a gate net of shared re-reads); remaining levers are SKILL.md size and output tokens
+- [ ] L3 consulting-grade: designer review run 6 = 3.5 (16) / 3.0 (11) before wave 4; content-bound decision slides keep an
+      empty bottom band; re-score after wave 5 (summary cards above a KPI table, panel top vs chart plot top)
+- [ ] Lone chevron rows are tall with modest text after the JA word-break fix (text could grow inside the chevron)
+- [ ] Owner: real PowerPoint check (gradients, shadows, customXml, media, per-point dLbl); PyPI token; L7 token gate; AC4 gate wording
