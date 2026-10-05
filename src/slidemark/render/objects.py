@@ -432,7 +432,8 @@ def add_image(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
         if im.fit == "contain" and iw and ih:
             s = min(w / iw, h / ih)
             dw, dh = round(iw * s), round(ih * s)
-            x, y, w, h = x + (w - dw) // 2, y + (h - dh) // 2, dw, dh
+            top = pl.style.valign == "top"  # beside text: tops line up
+            x, y, w, h = x + (w - dw) // 2, y + (0 if top else (h - dh) // 2), dw, dh
         elif im.fit == "cover" and iw and ih:
             ia, ba = iw / ih, w / h
             crop = ((1 - ba / ia) / 2, 0.0) if ia > ba else (0.0, (1 - ia / ba) / 2)

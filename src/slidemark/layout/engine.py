@@ -32,7 +32,7 @@ from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import measure
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
-from .tables import column_widths, right_align_numbers, row_heights, table_grid
+from .tables import capped_width, column_widths, right_align_numbers, row_heights, table_grid
 
 _SIZE_KEY = {
     "title": "title",
@@ -70,6 +70,14 @@ CHEVRON_VPAD = 0.17  # inches above and below the text of a chevron
 CODE_GROW = 1.25  # code text grows with the sparse-slide growth, up to this factor
 TABLE_GROW = 1.4  # rows of a table with spare room grow up to this factor (a row stays near its text)
 TABLE_FONT_GROW = 1.2  # table text grows with the sparse-slide growth, up to this factor
+TABLE_GROW_ROOMY = 2.0  # ... and rows up to this factor when a quarter of the body would stay empty
+TREE_SLACK_ROOMY = 1.3  # org-tree boxes may be this much taller than their content on such slides
+ROOMY_LEFT = 0.25  # share of the body left empty (top-anchored) that triggers the roomy pass
+ROOMY_GROW = 1.2  # ... which also grows box / tree text by up to this factor on top of the sparse growth
+BESIDE_MIN = 0.5  # a box beside a chart / image takes its natural height, at least this share of the visual
+BESIDE_FILL = 0.6  # ... a shorter one grows by this share of the way to that minimum
+BESIDE_SLACK = 1.12  # ... headroom over the natural height (grown text keeps some air)
+FULL_WIDTH = 0.6  # a table wider than this share of the slide width counts as a full-width table
 ROW_SLACK = 1.35  # a grid row is at most this much taller than its tallest content ...
 TREE_SLACK = 1.15  # org-tree boxes are at most this much taller than their content
 ROW_MIN_TAIL = 0.12  # ... when blocks (a chart, a table) follow the grid: the row hugs its content
@@ -121,6 +129,10 @@ class _Ctx:
     grew: bool = False  # set when ``grow`` actually scaled some text
     fill: float | None = None  # natural content height / grid height of the slide-level grid, if known
     expand: int = 0  # extra height (EMU) the capped rows of the slide-level grid may take
+    roomy: bool = False  # sparse dense slide with a large empty band: tables / trees may take more height
+    grow_base: float = (
+        1.0  # roomy pass: the growth before it; text that would wrap more at ``grow`` is refused
+    )
     out: list[Placed] = field(default_factory=list)
     over: list[str] = field(default_factory=list)
     diags: list[Diagnostic] = field(default_factory=list)
@@ -418,6 +430,10 @@ def _table_style(ctx: _Ctx, el: Table) -> Style:
     return st.merged(*_class_styles(ctx, el), el.style)
 
 
+def _table_grow(ctx: _Ctx) -> float:
+    return TABLE_GROW_ROOMY if ctx.roomy else TABLE_GROW
+
+
 def _table_geom(ctx: _Ctx, el: Table, width: int):
     st = _table_style(ctx, el)
     eff = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
@@ -425,7 +441,11 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
         eff *= min(ctx.grow, TABLE_FONT_GROW)
         ctx.grew = True
     nrows, ncols, anchors = table_grid(el)
-    cw = column_widths(el, ncols, anchors, width, (st.font_size or 14) * eff)
+    size = (st.font_size or 14) * eff
+    b = getattr(el, "box", None)
+    if ctx.depth == 0 and width > FULL_WIDTH * ctx.W and not (b is not None and b.w is not None):
+        width = capped_width(el, ncols, anchors, width, size)  # a few short columns: numbers stay near labels
+    cw = column_widths(el, ncols, anchors, width, size)
     rh = row_heights(el, anchors, cw, st, eff)
     return st, eff, anchors, cw, rh
 
@@ -439,6 +459,12 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         need = _text_need(ctx, el, st, rect.w, eff)
         if need > rect.h * _TOL:
             ctx.over.append(_label(el))
+        elif ctx.roomy and ctx.grow > ctx.grow_base >= 1.0 and eff > 0:
+            small = (
+                eff * ctx.grow_base / ctx.grow
+            )  # growing must not add wrapped lines (orphan CJK characters)
+            if need > _text_need(ctx, el, st, rect.w, small) * (ctx.grow / ctx.grow_base) * 1.04:
+                ctx.over.append(_label(el))
         if isinstance(el, Text) and "callout" in el.classes:
             rect = Rect(rect.x, rect.y, rect.w, min(rect.h, round(need)))  # callouts never stretch
         ctx.emit(el, rect, st, eff)
@@ -458,14 +484,14 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         if total > rect.h * _TOL:
             ctx.over.append(_label(el))
         elif rect.h > total:  # spare room: rows grow up to TABLE_GROW, cell text stays centered
-            target = min(rect.h, round(total * TABLE_GROW))
+            target = min(rect.h, round(total * _table_grow(ctx)))
             rh = [round(h * target / total) for h in rh]
             rh[-1] += target - sum(rh)
             total = sum(rh)
         attrs = {**el.attrs, "_col_w": cw, "_row_h": rh}
         ctx.emit(
             right_align_numbers(el).model_copy(update={"attrs": attrs}),
-            Rect(rect.x, rect.y, rect.w, min(total, rect.h) if total > rect.h else total),
+            Rect(rect.x, rect.y, min(rect.w, sum(cw)), min(total, rect.h) if total > rect.h else total),
             st,
             eff,
         )
@@ -750,7 +776,7 @@ def _place_stack(
         if tabs and spare > 0:
             share = spare / len(tabs)
             for k in tabs:
-                nat[k] = round((nat[k] or 0) + min(share, (nat[k] or 0) * (TABLE_GROW - 1)))
+                nat[k] = round((nat[k] or 0) + min(share, (nat[k] or 0) * (_table_grow(ctx) - 1)))
     y = area.y
     used = 0
     for (i, ch), n in zip(flow, nat, strict=True):
@@ -1007,7 +1033,7 @@ def _cell_nat(ctx: _Ctx, blk, width: int, inherit: Style) -> tuple[int | None, s
         return _box_nat(ctx, blk, width, inherit), "kpi" if "kpi" in blk.classes else "other"
     if isinstance(blk, Table):
         n = _natural_height(ctx, blk, width, inherit)
-        return (None if n is None else round(n * TABLE_GROW)), "table"
+        return (None if n is None else round(n * _table_grow(ctx))), "table"
     if isinstance(blk, (Text, Code)):
         return _natural_height(ctx, blk, width, inherit), "other"
     return None, "other"
@@ -1061,7 +1087,7 @@ def _row_heights(
         elif kinds[row] == {"table"}:
             caps.append(n)
         elif tree:  # org-tree levels hug their boxes (+ modest slack): the connectors fill the gaps
-            caps.append(round(n * TREE_SLACK))
+            caps.append(round(n * (TREE_SLACK_ROOMY if ctx.roomy else TREE_SLACK)))
         else:
             lone = nr == 1 and not has_tail and ctx.dense_k < 1.0
             floor = ROW_MIN_TAIL if has_tail else (ROW_MIN_DENSE if lone else ROW_MIN)
@@ -1181,6 +1207,8 @@ def _place_blocks(
                 tgap = tail_area.y - grid_area.bottom
                 ty = grid_area.y + used + tgap
                 tail_area = Rect(area.x, ty, area.w, max(area.bottom - ty, 0))
+    if "chevron" not in flags and ctx.depth == 0:
+        cells = _hug_beside_visual(ctx, gs, flow, cells, inherit)
     start = len(ctx.out)
     chev_eff: float | None = None  # one text size for the whole chevron row
     chev_h: int | None = None
@@ -1201,6 +1229,8 @@ def _place_blocks(
             rects[i] = _place_chevron(ctx, blk, r, inherit, chev_eff, chev_h)
         else:
             _place_block(ctx, blk, r, inherit)
+            if isinstance(blk, (Image, Media)) and _text_mate(flow):
+                _top_align(ctx.out[-1])
     if "flow" in flags:
         for a, b in zip(cells, cells[1:], strict=False):
             g = b.x - a.right
@@ -1220,6 +1250,51 @@ def _place_blocks(
     if ctx.depth == 0 and extra and len(flow) == 1 and _is_diagram(flow[0][1]):
         _hug_tail(ctx, start, area, gap)
     _emit_links(ctx, links or [], rects)
+
+
+def _text_mate(flow: list) -> bool:
+    """True when a visual shares the grid with text or boxes (their tops line up)."""
+    return any(isinstance(b, (Text, Container)) for _, b in flow)
+
+
+def _top_align(p: Placed) -> None:
+    """A picture / video beside text sits at the top of its cell (the renderer honors ``valign``)."""
+    if p.style.valign is None:
+        p.style = p.style.merged(Style(valign="top"))
+
+
+def _hug_beside_visual(ctx: _Ctx, gs, flow: list, cells: list[Rect], inherit: Style) -> list[Rect]:
+    """A box beside a chart / image takes its natural height, top-aligned with the visual.
+
+    Text-only boxes next to a visual used to stretch over the visual's whole height and stayed mostly empty.
+    A box that would end up under ``BESIDE_MIN`` of the visual height grows part of the way to that minimum.
+    """
+    if gs.areas is not None or not gs.cols:
+        return cells
+    ncol = len(gs.cols)
+    out = list(cells)
+    for k, ((_i, blk), r) in enumerate(zip(flow, cells, strict=True)):
+        if not isinstance(blk, Container) or {"kpi", "group"} & set(blk.classes):
+            continue
+        b = blk.box
+        if b is not None and (b.h is not None or b.y is not None):
+            continue
+        row = k // ncol
+        if not any(
+            isinstance(o, (Chart, Image, Media))
+            for j, (_n, o) in enumerate(flow)
+            if j // ncol == row and j != k
+        ):
+            continue
+        n = _box_nat(ctx, blk, r.w, inherit)
+        if n is None:
+            continue
+        floor = round(BESIDE_MIN * r.h)
+        h = round(n * BESIDE_SLACK)
+        if h < floor:
+            h = round(h + BESIDE_FILL * (floor - h))
+        out[k] = Rect(r.x, r.y, r.w, min(h, r.h))
+    return out
 
 
 def _is_diagram(b) -> bool:
@@ -1461,13 +1536,28 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
         if not c.over and c.out:
             fin = c
             left = body.bottom - _bottom(fin)
+    small_theme = ctx.theme.sizes.get("body", 18) <= GROW_SMALL_PT  # consulting themes (jp-business: 11pt)
+    if left >= ROOMY_LEFT * body.h and (
+        fin.dense_k < 1.0 or small_theme
+    ):  # a quarter of the body stays empty
+        for f in (ROOMY_GROW, 1.15, 1.1, 1.05, 1.0):  # tables / trees take more height, text grows a little
+            c = run(body, grow=round(fin.grow * f, 2), expand=fin.expand, roomy=True, grow_base=fin.grow)
+            if not c.over and c.out and _bottom(c) > _bottom(fin):
+                fin = c
+                left = body.bottom - _bottom(fin)
+                break
     top = min((p.y for p in fin.out), default=body.y)
     if _bottom(fin) - top < VERY_SPARSE_FILL * body.h:
         dy = round(
             left * (LEFT_SHIFT if any(isinstance(e, Container) for e in elements) else LEFT_SHIFT_TABLE)
         )
         if dy > 0:
-            c = run(Rect(body.x, body.y + dy, body.w, body.h - dy), grow=fin.grow, expand=fin.expand)
+            c = run(
+                Rect(body.x, body.y + dy, body.w, body.h - dy),
+                grow=fin.grow,
+                expand=fin.expand,
+                roomy=fin.roomy,
+            )
             if not c.over and c.out:
                 fin = c
     return fin

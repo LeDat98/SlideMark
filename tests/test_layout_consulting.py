@@ -115,7 +115,7 @@ def test_table_rows_are_capped_near_text_height():
     placed, _ = lay(s, "jp-business")
     (tp,) = of(placed, Table)
     size = (tp.style.font_size or 12) * tp.font_scale
-    assert max(tp.element.attrs["_row_h"]) <= (1.8 * size * 1.2 + 7.3) * 12700
+    assert max(tp.element.attrs["_row_h"]) <= 2.0 * (1.8 * size * 1.2 + 7.3) * 12700  # TABLE_GROW_ROOMY
 
 
 # ---- top anchoring, chevron / tree heights, table column widths (review pass 2)

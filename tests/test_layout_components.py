@@ -74,7 +74,7 @@ def test_chevron_row_then_full_width_table(theme):
     assert len({c.y for c in chev}) == 1  # a single row
     assert tbl.y >= max(c.y + c.h for c in chev)
     th = get_theme(theme)
-    assert tbl.w == slide_size("16:9")[0] - 2 * to_emu(th.margin_x)  # full width
+    assert tbl.x == to_emu(th.margin_x) and tbl.w <= slide_size("16:9")[0] - 2 * to_emu(th.margin_x)
     assert chev[0].h <= tbl.y - chev[0].y  # compact: the table follows right below
     in_bounds(placed)
     assert not [d for d in deck.diagnostics if d.rule == "overflow"]
