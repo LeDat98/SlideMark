@@ -44,3 +44,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [eval] Agent eval run 1 (Sonnet, SKILL.md only): 10/10 parse+lint clean before the `connector-crosses` rule, 9/10 after; gaps found: mermaid undocumented, flow + a>b duplicates.
 - [render] Morph and transitions with a duration need `mc:AlternateContent` (p14/p159) with a fallback; slide child order is cSld, clrMapOvr, transition, timing. Build/morph/section XML is unverified in real PowerPoint.
 - [lint] A connector inside its parent box (diagram, box links) must not count as crossing that box.
+- [render] HTML image fallback: one lazy Playwright browser per deck, JS off, all non-data: requests aborted; Playwright may pin another Chromium revision than /opt/pw-browsers → fall back to the found binary.

@@ -162,7 +162,7 @@ Contract (committed by orchestrator): `ir.Link` + `Slide.links`/`Container.links
 - [x] Leftover: slide-level visuals under a chevron/grid row get full-width rows
 - [x] A: links, callouts, badges, kpi parsing
 - [x] B: kpi/callout/badge/connector rendering, heading band, dense spacing, 12-col snap
-- [ ] Orchestrator: ≥ 5 dense JP examples, review
+- [x] Orchestrator: ≥ 5 dense JP examples, review
 
 ## Day 4 status
 - [x] A: chart/table options, CSV edge cases, check JSON via linter
@@ -200,9 +200,9 @@ each, o200k proxy), shipped as package data; written by the orchestrator.
   results), docs.
 
 ## Day 6 status
-- [ ] A: mermaid flowchart → native, HTML subset → IR
-- [ ] B: HTML image fallback via Playwright
-- [ ] Orchestrator: eval harness v0
+- [x] A: mermaid flowchart → native, HTML subset → IR
+- [x] B: HTML image fallback via Playwright
+- [x] Orchestrator: eval harness v0
 
 ## Next layout package (auto-arrangement v2, from the gallery review)
 - A run of `##` boxes closed by `@end` and followed by visuals = boxes in ONE row + visuals full width below,
