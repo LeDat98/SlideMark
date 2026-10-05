@@ -186,3 +186,20 @@ each, o200k proxy), shipped as package data; written by the orchestrator.
 - [x] Orchestrator: SKILL.md + reference/ + budget test
 - [x] A: docs, schema, JSON input, skill install
 - [ ] B: user templates, master placeholders for footer/number
+
+## Day 6 work packages
+- **A: parser + CLI**: ` ```mermaid ` flowcharts (`graph`/`flowchart` TD/LR, `A[text]`, `A(text)`, `A{text}`,
+  `A-->B`, `A---B`, `A-->|label|B`, chains, `;`) → a `Container(classes=["diagram"])` of node `Text`/boxes with
+  `links` and an areas `grid` from a layered layout (rank = longest path); unsupported diagrams stay `Raw` +
+  info diagnostic. ` ```html ` fences and `.html` input: structural subset (`section.slide`, `h1`, `p.lead`, `h2`
+  cards, `ul/ol`, `table`, `mark`, `b/i`, inline `grid-template-columns`/areas, `footer .note`, `.callout`,
+  `.kpi`, `.badge`) → the same IR as the Markdown form; anything else → `Raw(kind="html")` + info diagnostic.
+- **B: layout + renderer**: `Raw(kind="html")` leftovers rendered via Playwright (Chromium) to a PNG image
+  fallback at the block size; measurement of HTML text with Chromium when available.
+- **Orchestrator:** agent eval harness v0 (`bench/tasks/*.md` prompts + `bench/eval.py` scoring check/lint
+  results), docs.
+
+## Day 6 status
+- [ ] A: mermaid flowchart → native, HTML subset → IR
+- [ ] B: HTML image fallback via Playwright
+- [ ] Orchestrator: eval harness v0
