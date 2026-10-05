@@ -77,3 +77,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] Judge the roomy pass before row expansion and cap grown rows at ≈ 1.9× natural, or multi-row grids get empty cards; table text needs a growth floor tied to box text on the same slide.
 - [fix] `check --fix` applies edits bottom-up, idempotent, never touches content text; token regexes need `(?<![^\s@])` because `@` is glued to the first token.
 - [render] Inline-source blocks (```svg) ride in `Image.src` as a `data:` URI, so layout/lint/score need no hooks; SVG pictures = PNG fallback blip + `asvg:svgBlip` ext (unverified in real PowerPoint); sanitize SVG before embedding and rasterizing.
+- [layout] The review score has threshold cliffs (empty band 55%, very sparse 40%): tiny heading changes moved scores → 2% tolerance. The search scorer must measure text exactly like lint/critique (incl. paragraph spacing).
