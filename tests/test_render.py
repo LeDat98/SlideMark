@@ -242,7 +242,7 @@ def test_internal_links(tmp_path):
     assert xml.count("hlinksldjump") == 2
     rels = [r for r in prs.slides[0].part.rels.values() if r.reltype.endswith("/slide")]
     assert len(rels) == 2
-    assert any(x.rule == "link" for x in d.diagnostics)
+    assert any(x.rule == "bad-jump" for x in d.diagnostics)
 
 
 def test_flow_and_chevron_shapes(tmp_path):

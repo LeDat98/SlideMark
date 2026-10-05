@@ -185,7 +185,8 @@ def apply_attrs(
 LAYOUT_WORDS = ("cover", "section", "blank", "center")
 FLAGS = ("flow", "chevron")
 AT_KEYS = ("bg", "t", "id", "gap")
-KNOWN_WORDS = (*LAYOUT_WORDS, *FLAGS, "hidden", "dense", "dark", "light", "plain")
+KNOWN_WORDS = (*LAYOUT_WORDS, *FLAGS, "hidden", "build", "dense", "dark", "light", "plain")
+TRANSITIONS = ("fade", "push", "wipe", "split", "cover", "zoom", "morph")
 _N = re.compile(r"^\d+$")
 _CXR = re.compile(r"^\d+x\d+$")
 _RATIO = re.compile(r"^\d+(?:\.\d+)?(?::\d+(?:\.\d+)?)+$")
@@ -222,6 +223,26 @@ def _link_index(t: str) -> int:
     return ord(t) - 97 if t.isalpha() else int(t) - 1
 
 
+def check_transition(v: str, ctx: Ctx, line: int | None) -> str | None:
+    """Validate ``name`` or ``name:seconds`` (0.1-10 s); a bad value warns and returns ``None``."""
+    name, _, dur = v.strip().lower().partition(":")
+    if name == "none" and not dur:
+        return None
+    hint = f"use t=<{'|'.join(TRANSITIONS)}> or t=fade:0.5 (duration 0.1-10 s)"
+    if name not in TRANSITIONS:
+        ctx.warn(f"bad transition '{v}'", line, "bad-transition", hint)
+        return None
+    if dur:
+        try:
+            ok = 0.1 <= float(dur) <= 10
+        except ValueError:
+            ok = False
+        if not ok:
+            ctx.warn(f"bad transition duration '{v}'", line, "bad-transition", hint)
+            return None
+    return name + (f":{dur}" if dur else "")
+
+
 def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
     spec = AtSpec()
     try:
@@ -234,7 +255,7 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
             if k == "bg":
                 spec.background = v
             elif k == "t":
-                spec.transition = v
+                spec.transition = check_transition(v, ctx, line)
             elif k == "id":
                 spec.id = v
             elif k == "gap":

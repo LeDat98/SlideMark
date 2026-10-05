@@ -15,6 +15,7 @@ from .attrs import (
     Attrs,
     RawLink,
     apply_attrs,
+    check_transition,
     parse_at,
     parse_attr_body,
     split_trailing_attrs,
@@ -29,7 +30,7 @@ H1_RE = re.compile(r"^#(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
 HN_RE = re.compile(r"^(#{2,3})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
 HR_RE = re.compile(r"^-{3,}[ \t]*$")
 KV_RE = re.compile(r"^([A-Za-z_][\w-]*)[ \t]*:[ \t]*(.*?)[ \t]*$")
-HEADER_KEYS = ("theme", "size", "lang", "title", "author", "footer", "num", "density")
+HEADER_KEYS = ("theme", "size", "lang", "title", "author", "footer", "num", "density", "sections")
 SHORT_LINE = 60
 MARP_IGNORED = (
     "header",
@@ -105,6 +106,14 @@ def _set_header(deck: Deck, key: str, value: str, ctx: Ctx, line: int) -> None:
             deck.density = value  # type: ignore[assignment]
         else:
             ctx.warn(f"bad density '{value}'", line, "bad-header", "use density: normal or density: dense")
+    elif k == "sections":
+        v = value.lower()
+        if v in ("on", "true", "yes", "1", ""):
+            deck.attrs["sections"] = "on"
+        elif v in ("off", "false", "no", "0"):
+            deck.attrs["sections"] = "off"
+        else:
+            ctx.warn(f"bad sections '{value}'", line, "bad-header", "use sections: on or sections: off")
     elif k == "marp":
         ctx.warn(
             "Marp header 'marp: true' ignored",
@@ -508,7 +517,10 @@ def parse_slide(
         kv = dict(title_attrs.kv)
         for key, attr in (("bg", "background"), ("t", "transition")):
             if key in kv:
-                setattr(slide, attr, kv.pop(key))
+                val = kv.pop(key)
+                if key == "t":
+                    val = check_transition(val, ctx, slide.line)
+                setattr(slide, attr, val)
         if "hidden" in kv:
             slide.hidden = kv.pop("hidden") not in ("false", "0", "no", "off")
         slide.id = title_attrs.id or slide.id
