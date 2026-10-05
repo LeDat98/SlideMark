@@ -228,6 +228,9 @@ class Item:
     pending: Attrs | None = None
 
 
+IMAGE_LINE = re.compile(r"^\s*!\[[^\]]*\]\([^)]*\)(\{[^}]*\})?\s*$")
+
+
 def _scan_body(lines: list[str], inside: list[bool], c: Chunk, ctx: Ctx) -> tuple[list[Item], str | None]:
     items: list[Item] = []
     buf: list[str] = []
@@ -285,6 +288,8 @@ def _scan_body(lines: list[str], inside: list[bool], c: Chunk, ctx: Ctx) -> tupl
             flush()  # no lazy continuation into or out of a `>` quote
         if text.startswith("|") and buf and buf[-1].strip() and not buf[-1].startswith("|"):
             flush()  # a table right under a list/paragraph would be swallowed as lazy continuation
+        if buf and buf[-1].strip() and (IMAGE_LINE.match(text) or IMAGE_LINE.match(buf[-1])):
+            flush()  # an image/media line is its own block, never a lazy continuation (in or out)
         if not buf:
             buf_line = i + 1
         buf.append(text)

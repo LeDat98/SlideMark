@@ -505,3 +505,15 @@ def test_icon_attr():
     assert a.attrs.get("icon") == "chart" and "icon" not in b.attrs
     d = [d for d in deck.diagnostics if d.rule == "unknown-icon"]
     assert d and "chart" in d[0].hint
+
+
+def test_image_line_right_under_a_list_is_its_own_block():
+    deck = parse("# T\n## 目的\n- a\n- b\n![動画](demo.mp4)\n")
+    box = deck.slides[0].elements[0]
+    assert [c.type for c in box.children] == ["text", "media"]
+    assert [p.plain for p in box.children[0].paragraphs] == ["a", "b"]
+
+
+def test_text_right_under_an_image_line_is_not_swallowed():
+    deck = parse("# T\n- a\n![x](a.png)\ntext after\n")
+    assert [e.type for e in deck.slides[0].elements] == ["text", "image", "text"]

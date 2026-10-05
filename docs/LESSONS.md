@@ -68,3 +68,5 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [import] Foreign decks: box bodies must be emitted as children (`Block.paras` was dropped); a KPI inside a card is not the title; org-chart buses are unglued T-junctions (tee tolerance ≈ 0.1 in); cap column stacks at 3 texts.
 - [layout] Growing sparse text can add CJK wraps/orphans → growth steps need a "no new wrapped lines" guard. A box beside a visual takes natural height; text-only tables are never width-capped (Gantt).
 - [critique] Layout autofits sibling boxes to one scale (font-spread rules rarely fire); judge title length at nominal size because titles shrink instead of wrapping.
+- [parser] `![x](a.mp4)` right under a list item was swallowed as lazy continuation (alt text appended to the bullet, media dropped silently; found by the eval reference answers) → the line scanner flushes before and after a standalone image line.
+- [eval] Missing-asset diagnostics appear only at render time → eval.py renders into an empty temp dir and tolerates only asset-missing rules.
