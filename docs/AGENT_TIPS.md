@@ -25,3 +25,4 @@ Practical patterns that cut tokens and retries. Budget: keep this file under ~1,
 - Own brand in 3–4 header lines (`theme: none` + `colors:` + `fonts:` + `style:`): verified on 20 brand briefs (run-6-brand, Sonnet, design.md only): 19/20 check-clean first pass, 20 distinct palettes.
 - With a dark `bg`, set `surface` and `border` too, or cards keep the light neutral defaults (seen in eval decks).
 - Gradient cards need a text color that passes on every stop: lint checks each stop (`hero.fill` teal end failed 2.6:1 in examples/13).
+- Tables as a ```` ```table ```` CSV fence instead of GFM pipes: −7.1% tokens on the 66 eval decks with tables, merges (`<` `^`) and badges intact (run 4, `bench/token_floor.py`).

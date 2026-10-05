@@ -109,3 +109,7 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [tokens] A dark brand `bg` without `muted` kept the preset grey (2.5:1 lead lines, eval 137) → muted is derived from fg/bg when the grey fails 4.5:1 and the deck did not declare it.
 - [env] Two processes running `soffice` at once: one gets "source file could not be loaded" / no PDF → retry once; subagents in worktrees may get compound `cd … &&` Bash commands refused.
 - [bench] Content alone is 25% of the q3 python-pptx file, so "syntax ≤ 20%" is below the floor there; agent-written python-pptx decks are ~2,700 tokens (SlideMark 6%) → `bench/token_floor.py`.
+- [layout] A gate on the wrong token (`hug_shift > 0`) silently disabled card hugging for a whole wave → gate on the token you mean and test the default path. Rows holding a table inside a card keep their slack, or table growth overflows and is rejected.
+- [layout] Explicit font sizes (CSS, `{size=}`, element tokens) must bypass every growth path (`_explicit_size`), or a 12pt CSS heading renders at 20pt on sparse slides.
+- [tokens] Role aliases (`title.color`) used to create an unused class; route them to element CSS (`h1`). An icon name is lowercased everywhere → handle `icon=file.svg` paths before lowercasing.
+- [css] A KPI label's muted defaults must be merged before its CSS, or `.kpi h2` loses. `width: fit-content` only makes sense for text blocks.

@@ -340,3 +340,9 @@ HTML corpus, L7 token research). Design freedom stays the rule: fixes are mechan
   every CSS property + alias hints, ~20 more icons + `icon=file.svg`.
 - **Wave 2 B: sparse fill v4** (`layout/`, `render/`, `bench/whitespace.py`): card-tail metric; no card tail > 25%;
   leftover as one bottom band; deck-consistent type.
+- **Wave 2 status:** A `.kpi` CSS on the number, element tokens = any CSS property (+aliases), 26 icons + `icon=file.svg`,
+  CSS `width`/`inline-block`; B hugging on all decks (`hug_cards`), centered cards beside visuals, explicit sizes never
+  grow, `grow_max`, card-tail metric (row leaders 0/62 > 25%). Both merged (1291 tests).
+- **Wave 3 A: CSS deck round trip** (`importer/`): examples/17-editorial-css (width, lead CSS vs runs, text-transform
+  casing, KPI misdetection, `@1`, `@html`).
+- **Wave 3 B: sparse step** (`layout/`): one deck-wide step-up type size for slides < 55% filled; band ≤ 35%.
