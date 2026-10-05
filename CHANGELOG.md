@@ -4,6 +4,18 @@ All notable changes. Versions follow semver once 0.1.0 is published.
 
 ## Unreleased (0.1.0 candidate)
 
+### Design freedom
+- No fixed look: every color, font, size, spacing, band, card style and layout constant is a token
+  (`slidemark tokens`); built-in themes are YAML presets (`src/slidemark/presets/`); `theme: none` is a neutral canvas.
+- Header token lines `colors:` `fonts:` `sizes:` `style:` (new classes such as `hero.fill=` too), validated with
+  did-you-mean hints; shorthands `border="0.75pt solid #B08D57"`, `fill=none`, `shadow=none`.
+- ` ```css ` fences (deck or slide): 34 CSS properties mapped to native PowerPoint (gradients, shadows, per-side
+  borders, letter-spacing, text-transform, rotation, grid templates, table cell styles), selector matching.
+- `@html` slides and `slidemark build deck.html`: Chromium layout converted to native shapes (gradients, shadows,
+  rotation, ellipses, pills, simple inline SVG); theme tokens as CSS custom properties.
+- `@free` slides: explicit `{x y w h}` positions, no automatic arrangement.
+- The design source (tokens, CSS, HTML) survives `slidemark import` (customXml part).
+
 ### Syntax
 - Headings as structure (`#` slide, `##` box), one `@` grid line (`@3`, `@2x2`, `@1:2`, `@aab/aac`), `@end`.
 - Components: `.kpi` boxes, callouts `> [!note|tip|warn|caution]`, badges `[x]{.badge}`, connectors `@ a>b a-b`,
