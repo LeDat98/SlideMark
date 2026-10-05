@@ -106,7 +106,9 @@ def test_roomy_table_rows_grow_up_to_2x_and_text_up_to_1_2x():
     s = Slide(title=T("t", "title"), elements=[_plain_table()])
     placed, deck = lay(s)
     (tp,) = of(placed, Table)
-    assert tp.font_scale <= 1.2 * LayoutTokens().sparse_step + 1e-9  # the sparse step comes on top
+    lt = LayoutTokens()
+    body = get_theme("jp-business").sizes["body"]
+    assert tp.font_scale <= max(1.2 * lt.sparse_step, lt.table_text_max * body / tp.style.font_size) + 1e-9
     nat = 1.2 * tp.style.font_size * tp.font_scale * 12700 + 2 * 45720
     assert max(tp.element.attrs["_row_h"]) <= TABLE_GROW_ROOMY * nat * 1.15
     assert sum(tp.element.attrs["_row_h"]) == tp.h

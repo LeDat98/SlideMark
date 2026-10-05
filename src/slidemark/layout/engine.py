@@ -102,6 +102,7 @@ class _Ctx:
     text_only: bool = False  # the slide body is plain text only: its body text grows like box text
     head_grow: bool = False  # very sparse boxes: box headings grow with ``grow`` (up to ``GROW_HEAD``)
     grew: bool = False  # set when ``grow`` actually scaled some text
+    tgrow: float = 1.0  # extra table text growth of a table that has room (``_table_text``)
     step: float = 1.0  # sparse step: padding, table / chevron text and paragraph gaps scale with it
     chev_adj: float | None = None  # point depth / shorter side of the chevron row being placed (None = token)
     chev_grow: float = 1.0  # a chevron row alone on the slide: its text grows with ``grow``
@@ -586,6 +587,17 @@ def _table_style(ctx: _Ctx, el: Table) -> Style:
     return _styled(ctx, el, st)
 
 
+def _cells_sized(el: Table) -> bool:
+    return any(c.style is not None and c.style.font_size is not None for row in el.rows for c in row)
+
+
+def _table_size_explicit(ctx: _Ctx, el: Table) -> bool:
+    """The author fixed the table text size (``sizes: table=``, CSS, ``{size=}``): it never grows further."""
+    if "sizes.table" in (ctx.deck.tokens or {}) or _explicit_size(ctx, el):
+        return True
+    return _cells_sized(ctx.css.table(el))  # CSS td / th font-size and {size=} on a cell
+
+
 def _tables_alone(ctx: _Ctx) -> bool:
     """Roomy pass of a normal-density slide that holds nothing but tables: they may grow more."""
     return ctx.roomy and not _consulting(ctx) and all(isinstance(e, Table) for e in ctx.slide.elements)
@@ -681,7 +693,10 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
     st = _table_style(ctx, el)
     eff = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
     if (
-        ctx.grow > 1.0 and ctx.scale >= 1.0 and not (ctx.css.active and ctx.css.own(el).font_size is not None)
+        ctx.grow > 1.0
+        and ctx.scale >= 1.0
+        and not (ctx.css.active and ctx.css.own(el).font_size is not None)
+        and not _cells_sized(el)
     ):  # sparse slide: table text grows too (less than box text)
         t = min(
             ctx.grow,
@@ -703,6 +718,8 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
             and box / have <= ctx.lt.unify_max
         ):  # a table smaller than the card text beside it inverts the hierarchy: lift it to the same size
             eff *= box / have
+    if ctx.tgrow > 1.0 and ctx.scale >= 1.0 and not _table_size_explicit(ctx, el):
+        eff *= ctx.tgrow
     nrows, ncols, anchors = table_grid(el)
     size = (st.font_size or 14) * eff
     b = getattr(el, "box", None)
@@ -776,6 +793,10 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
             rh[-1] += target - sum(rh)
             total = sum(rh)
         attrs = {**el.attrs, "_col_w": cw, "_row_h": rh}
+        if ctx.tgrow > 1.0:
+            attrs["_row_cap"] = (
+                True  # text grown by ``_table_text``: the vertical fill keeps rows <= row_max_em
+            )
         ctx.emit(
             right_align_numbers(el).model_copy(update={"attrs": attrs}),
             Rect(rect.x, rect.y, min(rect.w, sum(cw)), min(total, rect.h) if total > rect.h else total),
@@ -2701,6 +2722,64 @@ def _sparse_step(ctx: _Ctx, fc: _Ctx, run, body: Rect, stepped: list[float]) -> 
     return fc
 
 
+def _table_text(ctx: _Ctx, fc: _Ctx, run, body: Rect, elements: list) -> _Ctx:
+    """A table that leaves the body mostly empty grows its text first, then its rows (``table_row_max_em``).
+
+    Only slides of tables and text (no cards): the largest factor that fits wins, up to ``table_text_max`` x
+    the theme body size and ``sparse_text_max_pt``. A candidate is refused when something overflows or rows
+    wrap more than before. Explicit sizes (``sizes: table=``, CSS, ``{size=}``) never change.
+    """
+    lt = ctx.lt
+    tabs = [p for p in fc.out if isinstance(p.element, Table)]
+    if (
+        lt.table_text_step <= 0
+        or ctx.dense_k < 1.0  # dense decks keep their capped type
+        or not tabs
+        or any(isinstance(e, Container) for e in elements)
+        or any(_table_size_explicit(fc, e) for e in elements if isinstance(e, Table))
+    ):
+        return fc
+    free = body.bottom - _bottom(fc)
+    if free <= lt.body_free_max * body.h:
+        return fc
+    body_pt = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k
+    cap_pt = min(lt.sparse_text_max_pt, body_pt * lt.table_text_max)
+
+    def size(p) -> float:
+        return (p.style.font_size or 14) * p.font_scale
+
+    def tall(c: _Ctx) -> int:  # rows above the cap: they wrapped
+        n = 0
+        for p in c.out:
+            if isinstance(p.element, Table):
+                lim = lt.table_row_max_em * size(p) * EMU_PER_PT * 1.02 if lt.table_row_max_em > 0 else 0
+                n += sum(1 for h in p.element.attrs.get("_row_h", []) if lim and h > lim)
+        return n
+
+    s0 = max(size(p) for p in tabs)
+    h0 = sum(p.h for p in tabs)
+    top = min(cap_pt / max(s0, 1e-6), (h0 + free) / max(h0, 1))
+    n = round((top - 1.0) / lt.table_text_step)
+    base_tall = tall(fc)
+    for i in range(n):
+        f = round(top - lt.table_text_step * i, 3)
+        if f <= 1.0 + 1e-6:
+            break
+        c = run(
+            body,
+            grow=fc.grow,
+            step=fc.step,
+            roomy=fc.roomy,
+            grow_base=fc.grow_base,
+            expand=fc.expand,
+            tgrow=f,
+        )
+        if c.over or not c.out or tall(c) > base_tall or _bottom(c) > body.bottom:
+            continue
+        return c
+    return fc
+
+
 def _panel_step(ctx: _Ctx, fc: _Ctx, run, body: Rect, stepped: list[float], panel: float) -> _Ctx:
     """Text of a panel beside a chart / image grows (largest step that fits) to use the panel height."""
     top = ctx.lt.sparse_step_max
@@ -3117,6 +3196,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 fc = _sparse_step(ctx, fc, run, body, stepped)
             if fc.scale >= 1.0 and not fc.over:
                 fc = _spread(ctx, fc, run, body, elements)
+                fc = _table_text(ctx, fc, run, body, elements)
                 if complete:
                     fc = _complete(ctx, fc, run, body, elements)
             return fc
@@ -3146,6 +3226,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 ctx.lt.card_pad_share,
                 ctx.lt.card_stretch,
                 ctx.lt.card_stretch_share,
+                ctx.lt.table_row_max_em,
             )
         ctx.diags += final_ctx.diags
         seen: set[str] = set()

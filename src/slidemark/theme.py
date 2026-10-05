@@ -78,6 +78,10 @@ class LayoutTokens(BaseModel):
     kpi_grow_max: float = 1.7  # a KPI card beside free text grows its text up to this factor (1 = never)
     table_fill_width: bool = True  # a lone body table spans the full width
     table_row_max_em: float = 3.6  # grown table rows <= this x the text size (0 = off)
+    table_text_max: float = (
+        1.6  # a table with room grows its text first, up to this x the theme body size ...
+    )
+    table_text_step: float = 0.05  # ... in steps of this factor (never beyond sparse_text_max_pt; 0 = off)
     table_grow_roomy: float = 2.0  # table rows grow up to this factor when a quarter of the body stays empty
     tree_slack_roomy: float = 1.15  # org-tree boxes may be this much taller than their content (roomy slides)
     tree_slack: float = 1.15  # org-tree boxes are at most this much taller than their content

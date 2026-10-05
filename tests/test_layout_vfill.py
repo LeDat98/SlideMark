@@ -42,8 +42,8 @@ def _span(placed):
 
 def test_sparse_table_rows_spread_and_block_is_centered():
     s = _table_slide()
-    top = _lay(s, body_valign="top")
-    mid = _lay(s)
+    top = _lay(s, body_valign="top", table_text_step=0)  # ungrown text: rows stretch (no row cap)
+    mid = _lay(s, table_text_step=0)
     (t0,), (t1,) = of(top, Table), of(mid, Table)
     assert t0.h < t1.h <= 1.4 * t0.h + 2  # rows grew by at most body_spread_max
     assert sum(t1.element.attrs["_row_h"]) == t1.h
@@ -58,13 +58,13 @@ def test_sparse_table_rows_spread_and_block_is_centered():
 def test_valign_top_keeps_the_block_at_the_top_and_threshold_gates_auto():
     s = _table_slide()
     lead_bottom = lambda pl: next(p for p in pl if isinstance(p.element, Text) and p.element.role == "lead")  # noqa: E731
-    top = _lay(s, body_valign="top")
+    top = _lay(s, body_valign="top", table_text_step=0)
     lb = lead_bottom(top)
     assert _span(top)[0] - (lb.y + lb.h) == to_emu(_theme().layout.top_gap)
     # a threshold above the leftover turns auto off: same as top
-    off = _lay(s, body_free_max=0.95)
+    off = _lay(s, body_free_max=0.95, table_text_step=0)
     assert _span(off) == _span(top)
-    assert _span(_lay(s, body_valign="center")) != _span(top)
+    assert _span(_lay(s, body_valign="center", table_text_step=0)) != _span(top)
 
 
 def test_full_slide_is_not_moved():

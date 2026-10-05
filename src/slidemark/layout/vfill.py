@@ -16,6 +16,7 @@ Never raises: anything unexpected returns the items unchanged.
 from __future__ import annotations
 
 from ..ir import Container, Placed, Shape, Table, Text
+from ..units import EMU_PER_PT
 from .grid import Rect
 
 
@@ -25,6 +26,13 @@ def _contains(a: Placed, b: Placed) -> bool:
 
 def _is_line(p: Placed) -> bool:
     return isinstance(p.element, Shape) and p.element.shape == "line"
+
+
+def _row_cap(p: Placed, row_max_em: float) -> int | None:
+    """Tallest a row of table ``p`` may get (EMU): ``row_max_em`` x its text size; None = no cap."""
+    if row_max_em <= 0 or not isinstance(p.element, Table) or not p.element.attrs.get("_row_cap"):
+        return None
+    return round(row_max_em * (p.style.font_size or 14) * p.font_scale * EMU_PER_PT)
 
 
 def _is_chevron(p: Placed) -> bool:
@@ -86,6 +94,7 @@ def fill_body(
     pad_share: float = 0.0,
     card_stretch: bool = False,
     card_share: float = 0.5,
+    row_max_em: float = 0.0,
 ) -> list[Placed]:
     try:
         return _fill(
@@ -99,6 +108,7 @@ def fill_body(
             pad_share,
             card_stretch,
             card_share,
+            row_max_em,
         )
     except Exception:  # never raise on odd input
         return items
@@ -115,6 +125,7 @@ def _fill(
     pad_share: float,
     card_stretch: bool,
     card_share: float,
+    row_max_em: float = 0.0,
 ) -> list[Placed]:
     if valign == "top" or not items or body.h <= 0:
         return items
@@ -160,7 +171,18 @@ def _fill(
             }
             ok = kinds <= {Table, "chev", "card"} and 0 not in kinds
             share = spread_max * (card_share if kinds == {"card"} else 1.0)
-            want.append(round(share * (bots[r] - tops[r])) if ok else 0)
+            w = round(share * (bots[r] - tops[r])) if ok else 0
+            tabs = [items[i] for i in row if isinstance(items[i].element, Table)]
+            caps = [_row_cap(tp, row_max_em) for tp in tabs]
+            if w and tabs and len(tabs) == len(row) and all(caps):  # grown tables: rows stay <= row_max_em
+                w = min(
+                    w,
+                    max(
+                        sum(max(c - h, 0) for h in tp.element.attrs.get("_row_h", []))
+                        for tp, c in zip(tabs, caps, strict=True)
+                    ),
+                )
+            want.append(w)
         take = min(budget, sum(want))
         if sum(want) > 0 and take > 0:
             for r in range(len(rows)):
@@ -229,8 +251,11 @@ def _fill(
                 if isinstance(p.element, Table):
                     rh = p.element.attrs.get("_row_h")
                     if rh:
+                        cap = _row_cap(p, row_max_em)
                         new = [round(x * ratio) for x in rh]
                         new[-1] += round(sum(rh) * ratio) - sum(new)
+                        if cap:  # a row that is already tall enough keeps its height
+                            new = [min(n, max(x, cap)) for n, x in zip(new, rh, strict=True)]
                         el = p.element.model_copy(update={"attrs": {**p.element.attrs, "_row_h": new}})
                         out[i] = p.model_copy(update={"element": el, "y": p.y + dy, "h": sum(new)})
                         continue
