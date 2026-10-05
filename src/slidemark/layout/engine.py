@@ -98,6 +98,8 @@ class _Ctx:
     dense_k: float = 1.0
     tight: float = 1.0  # gap / padding factor (dense slides)
     grow: float = 1.0  # body text growth inside boxes (sparse grids), shared by all sibling boxes
+    lead_k: float = 1.0  # sparse slide: growth of the lead line (second layout pass)
+    foot_k: float = 1.0  # sparse slide: growth of the footnotes (second layout pass)
     depth: int = 0  # 0 = slide level, > 0 inside a box
     text_only: bool = False  # the slide body is plain text only: its body text grows like box text
     head_grow: bool = False  # very sparse boxes: box headings grow with ``grow`` (up to ``GROW_HEAD``)
@@ -2762,7 +2764,32 @@ def layout_slide(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Pla
 
         return layout_html_slide(slide, deck, theme, index)
     try:
-        return _layout(slide, deck, theme, index)
+        n_diag = len(deck.diagnostics)
+        info: dict = {}
+        out = _layout(slide, deck, theme, index, info=info)
+        g = info.get("grow", 1.0)
+        lt = theme.layout
+        if (
+            g > 1.0
+            and lt.grow
+            and (slide.lead is not None or slide.footnotes or _reserve_lead(deck, lt.reserve_lead))
+        ):
+            title_pt = theme.sizes.get("title", DEFAULT_SIZES["title"])
+            lead_pt = theme.sizes.get("lead", DEFAULT_SIZES["lead"])
+            lead_k = min(g, lt.sparse_lead_grow, lt.sparse_lead_title_max * title_pt / max(lead_pt, 1.0))
+            foot_k = min(g, lt.sparse_footnote_grow)
+            if lead_k > 1.0 or foot_k > 1.0:
+                first = deck.diagnostics[n_diag:]
+                del deck.diagnostics[n_diag:]
+                out2 = _layout(slide, deck, theme, index, max(lead_k, 1.0), max(foot_k, 1.0))
+                bad = {d.rule for d in deck.diagnostics[n_diag:] if d.level != "info"} - {
+                    d.rule for d in first if d.level != "info"
+                }
+                if out2 and not bad:
+                    return out2
+                del deck.diagnostics[n_diag:]
+                deck.diagnostics.extend(first)
+        return out
     except Exception as e:  # never raise on bad input
         deck.diagnostics.append(
             Diagnostic(
@@ -2819,14 +2846,22 @@ def _layout_free(ctx: _Ctx, elements: list, body: Rect, slide: Slide, theme: The
     return c
 
 
-def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
+def _layout(
+    slide: Slide,
+    deck: Deck,
+    theme: Theme,
+    index: int,
+    lead_k: float = 1.0,
+    foot_k: float = 1.0,
+    info: dict | None = None,
+) -> list[Placed]:
     try:
         W, H = slide_size(deck.size)
     except ValueError:
         W, H = slide_size("16:9")
     measure.set_default_font(theme.fonts.body)
     measure.set_tokens(theme.layout)
-    ctx = _Ctx(deck, theme, slide, index, W, H)
+    ctx = _Ctx(deck, theme, slide, index, W, H, lead_k=lead_k, foot_k=foot_k)
     dense = deck.density == "dense" or "dense" in slide.classes
     ctx.dense_k = theme.dense_scale if dense else 1.0
     ctx.tight = ctx.lt.dense_tight if dense else 1.0
@@ -2934,6 +2969,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             if kind == "blank" or el is None or not el.paragraphs:
                 continue
             st = _styled(ctx, el, _role_style(ctx, role))
+            if role == "lead" and ctx.lead_k > 1.0 and st.font_size and not _explicit_size(ctx, el):
+                st = st.model_copy(update={"font_size": st.font_size * ctx.lead_k})
             size = st.font_size or 18
             h = round(_text_need(ctx, el, st, inner_w, 1.0))
             max_h = round(H * 0.18)
@@ -2954,6 +2991,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             and _reserve_lead(deck, ctx.lt.reserve_lead)
         ):  # most slides of the deck have a lead line: keep its slot so the body starts at the same y
             st = _styled(ctx, _text_el("lead", "x"), _role_style(ctx, "lead"))
+            if ctx.lead_k > 1.0 and st.font_size:
+                st = st.model_copy(update={"font_size": st.font_size * ctx.lead_k})
             h = round(_text_need(ctx, _text_el("lead", "x"), st, inner_w, 1.0))
             head_bottom = y + (sg // 2 if y == My else 0) + h
         y_top = y if head_bottom is None else head_bottom + _emu(ctx.lt.top_gap)
@@ -2990,6 +3029,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         notes = [f for f in slide.footnotes if f.paragraphs]
         if notes:
             sts = [_styled(ctx, f, _role_style(ctx, "footnote"), classes=False) for f in notes]
+            if ctx.foot_k > 1.0:
+                sts = [
+                    st.model_copy(update={"font_size": st.font_size * ctx.foot_k})
+                    if st.font_size and not _explicit_size(ctx, f)
+                    else st
+                    for f, st in zip(notes, sts, strict=True)
+                ]
             max_h = round(H * ctx.lt.footnote_max)
             effs = [1.0] * len(notes)
             hs = [round(_text_need(ctx, f, st, inner_w, 1.0)) for f, st in zip(notes, sts, strict=True)]
@@ -3147,6 +3193,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 ctx.lt.card_stretch,
                 ctx.lt.card_stretch_share,
             )
+        if (
+            info is not None and ctx.dense_k >= 1.0 and (final_ctx.completed or final_ctx.step > 1.0)
+        ):  # dense decks keep their size ratios
+            info["grow"] = final_ctx.grow  # a sparse slide: the lead / footnotes follow the body text
         ctx.diags += final_ctx.diags
         seen: set[str] = set()
         for lab in final_ctx.over:
