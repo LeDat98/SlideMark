@@ -528,7 +528,9 @@ def read_sections(prs) -> list[tuple[str, list[int]]]:
                 nums = [
                     ids.index(int(s.get("id"))) + 1
                     for s in sec.iter()
-                    if isinstance(s.tag, str) and etree.QName(s).localname == "sldId" and int(s.get("id")) in ids
+                    if isinstance(s.tag, str)
+                    and etree.QName(s).localname == "sldId"
+                    and int(s.get("id")) in ids
                 ]
                 out.append((sec.get("name") or "", nums))
         return out

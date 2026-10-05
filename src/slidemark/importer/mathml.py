@@ -115,7 +115,11 @@ def convert(el, tables=None) -> str:
             return out
         if tag == "nary":
             pr = c.find(_q("naryPr"))
-            chr_ = pr.find(_q("chr")).get(_q("val")) if pr is not None and pr.find(_q("chr")) is not None else "∑"
+            chr_ = (
+                pr.find(_q("chr")).get(_q("val"))
+                if pr is not None and pr.find(_q("chr")) is not None
+                else "∑"
+            )
             name = next((k for k, v in rm.NARY.items() if v == chr_), "sum")
             sub_hide = pr is not None and pr.find(_q("subHide")) is not None
             sup_hide = pr is not None and pr.find(_q("supHide")) is not None
@@ -140,7 +144,9 @@ def convert(el, tables=None) -> str:
             return "\\left" + _DELIM.get(beg, beg) + seq(c.find(_q("e"))) + "\\right" + _DELIM.get(end, end)
         if tag == "acc":
             pr = c.find(_q("accPr"))
-            chr_ = pr.find(_q("chr")).get(_q("val")) if pr is not None and pr.find(_q("chr")) is not None else "̂"
+            chr_ = (
+                pr.find(_q("chr")).get(_q("val")) if pr is not None and pr.find(_q("chr")) is not None else "̂"
+            )
             return "\\" + _ACC.get(chr_, "hat") + braced(c.find(_q("e")))
         if tag.endswith("Pr"):
             return ""

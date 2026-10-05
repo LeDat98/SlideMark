@@ -26,7 +26,9 @@ class DeckInfo:
     accent: str | None = None  # RRGGBB of the theme accent (emphasis color)
     colors: dict[str, str] = field(default_factory=dict)  # name -> RRGGBB
     footers: set[str] = field(default_factory=set)
-    sections: list[tuple[str, list[int]]] = field(default_factory=list)  # PowerPoint sections (name, slide numbers)
+    sections: list[tuple[str, list[int]]] = field(
+        default_factory=list
+    )  # PowerPoint sections (name, slide numbers)
     margin_x: int = 0  # theme side margin and column gap (EMU); 0 = unknown
     gap: int = 0
 
@@ -691,7 +693,13 @@ def plan_grid(
         if not extras and (C, R) == (3, 2):
             return [], ordered, extras
         return [f"{C}x{R}"], ordered, extras
-    if single and equal and C >= 2 and R >= 2 and all(cells.get((i // C, i % C)) == seen[i] for i in range(n)):
+    if (
+        single
+        and equal
+        and C >= 2
+        and R >= 2
+        and all(cells.get((i // C, i % C)) == seen[i] for i in range(n))
+    ):
         return [str(C)], ordered, extras  # N columns, blocks wrap row by row, the last row may be short
     if (
         single
@@ -764,7 +772,10 @@ def _table_align(rows) -> str | None:
         body = [
             row[c]
             for row in rows[1:]
-            if c < len(row) and not row[c].hmerge and not row[c].vmerge and any(p.plain.strip() for p in row[c].paras)
+            if c < len(row)
+            and not row[c].hmerge
+            and not row[c].vmerge
+            and any(p.plain.strip() for p in row[c].paras)
         ]
         if not body:
             letters.append("l")
@@ -780,7 +791,7 @@ def _table_align(rows) -> str | None:
 
 
 def _fit_attr(it: Item) -> str:
-    """``{fit=cover}`` for a cropped picture, ``{fit=stretch}`` when its box has another aspect than the image."""
+    """``{fit=cover}`` for a cropped picture, ``{fit=stretch}`` when the box aspect differs from the image."""
     if it.cropped:
         return "{fit=cover}"
     try:
@@ -973,11 +984,13 @@ def build_slide(
     arrow_items = [i for i in pool if i.kind == "shape" and i.prst and "rrow" in i.prst]
     if groups:
         grid, extras = [], []
-        for gi, g in enumerate(groups):
+        for g in groups:
             tk, gr, ex = plan_grid(g, deck.width, deck.height, gdiag, deck.margin_x, deck.gap)
             tk = tk or [str(len(gr))]
             top_y, bot_y = min(b.y for b in g), max(b.y + b.h for b in g)
-            nar = sum(1 for a in arrow_items if top_y - 0.03 * deck.height <= a.cy <= bot_y + 0.03 * deck.height)
+            nar = sum(
+                1 for a in arrow_items if top_y - 0.03 * deck.height <= a.cy <= bot_y + 0.03 * deck.height
+            )
             if nar and "chevron" not in tk and len(gr) > 1 and nar >= len(gr) - 1:
                 tk = [*tk, "flow"]
             group_tokens.append(tk)

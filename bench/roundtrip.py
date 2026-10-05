@@ -1,6 +1,6 @@
 """L7 gate "lossless round-trip of any deck the library produced".
 
-For every deck of the corpus: build A.pptx -> import to text T -> build B.pptx, then compare A and B per slide:
+For every deck of the corpus: build A.pptx -> import to text T -> build B.pptx, then compare per slide:
   text      ordered paragraph texts (whitespace-normalised) of text frames and table cells
   objects   kinds and counts: text frames, tables (+ cell texts), charts (+ kind, categories, series values,
             options), pictures / media, connectors, plain shapes (prst)
@@ -69,7 +69,13 @@ def _run_fmt(rpr, part=None, slides=None) -> tuple:
     if hl is not None:
         c = hl.find(qn("a:srgbClr"))
         hlc = c.get("val").upper() if c is not None and c.get("val") else "x"
-    return (rpr.get("b") in ("1", "true"), rpr.get("i") in ("1", "true"), col, hlc, _link(rpr, part, slides or {}))
+    return (
+        rpr.get("b") in ("1", "true"),
+        rpr.get("i") in ("1", "true"),
+        col,
+        hlc,
+        _link(rpr, part, slides or {}),
+    )
 
 
 def _paras(txbody, part=None, slides=None) -> list[dict]:
@@ -118,7 +124,14 @@ def _paras(txbody, part=None, slides=None) -> list[dict]:
                 break
         algn = ppr.get("algn") if ppr is not None else None
         out.append(
-            {"text": text, "marker": marker, "lvl": lvl, "runs": _merge_style(runs), "size": size, "algn": algn}
+            {
+                "text": text,
+                "marker": marker,
+                "lvl": lvl,
+                "runs": _merge_style(runs),
+                "size": size,
+                "algn": algn,
+            }
         )
     return out
 
@@ -223,7 +236,13 @@ def slide_facts(slide, ctx_slide_index: dict) -> dict:
                             "kind": "chart",
                             "key": ch.kind + ":" + _norm(ch.title or ""),
                             "box": box,
-                            "chart": (ch.kind, ch.title, ch.categories, ch.series, sorted(ch.options.items())),
+                            "chart": (
+                                ch.kind,
+                                ch.title,
+                                ch.categories,
+                                ch.series,
+                                sorted(ch.options.items()),
+                            ),
                         }
                     )
             else:
@@ -236,7 +255,11 @@ def slide_facts(slide, ctx_slide_index: dict) -> dict:
         elif tag == "sp":
             paras = _paras(el.find(qn("p:txBody")), slide.part, ctx_slide_index)
             g = el.find(qn("p:spPr") + "/" + qn("a:prstGeom"))
-            prst = g.get("prst") if g is not None else ("custom" if el.find(qn("p:spPr") + "/" + qn("a:custGeom")) is not None else "?")
+            prst = (
+                g.get("prst")
+                if g is not None
+                else ("custom" if el.find(qn("p:spPr") + "/" + qn("a:custGeom")) is not None else "?")
+            )
             sp = el.find(qn("p:spPr"))
             fill = None
             if sp is not None and sp.find(qn("a:solidFill")) is not None:
@@ -270,7 +293,11 @@ def slide_facts(slide, ctx_slide_index: dict) -> dict:
         if etree.QName(t).localname == "transition":
             trans.append(
                 (
-                    sorted((etree.QName(c).localname, tuple(sorted(c.attrib.items()))) for c in t.iter() if c is not t),
+                    sorted(
+                        (etree.QName(c).localname, tuple(sorted(c.attrib.items())))
+                        for c in t.iter()
+                        if c is not t
+                    ),
                     t.get("spd"),
                     t.get("{http://schemas.microsoft.com/office/powerpoint/2010/main}dur"),
                 )
@@ -290,9 +317,15 @@ def deck_facts(path: Path) -> dict:
     from pptx import Presentation
 
     prs = Presentation(str(path))
-    sections = [s.get("name") for s in prs._element.iter() if isinstance(s.tag, str) and s.tag.endswith("}section")]
+    sections = [
+        s.get("name") for s in prs._element.iter() if isinstance(s.tag, str) and s.tag.endswith("}section")
+    ]
     idx = {s.part: i for i, s in enumerate(prs.slides, 1)}
-    return {"size": (int(prs.slide_width), int(prs.slide_height)), "sections": sections, "slides": [slide_facts(s, idx) for s in prs.slides]}
+    return {
+        "size": (int(prs.slide_width), int(prs.slide_height)),
+        "sections": sections,
+        "slides": [slide_facts(s, idx) for s in prs.slides],
+    }
 
 
 # --------------------------------------------------------------------------- comparison
@@ -319,7 +352,7 @@ def _match(a_items: list[dict], b_items: list[dict]):
             ((_center_dist(x["box"], y["box"]), i, j) for i, x in enumerate(la) for j, y in enumerate(lb)),
         )
         ua, ub = set(), set()
-        for d, i, j in cand:
+        for _d, i, j in cand:
             if i in ua or j in ub:
                 continue
             ua.add(i)
@@ -394,7 +427,12 @@ def _compare_pair(n, x, y, diffs) -> None:
             diffs.append(("style", f"s{n}: shape {x['shape']} vs {y['shape']} for {x['key'][:30]!r}"))
         for pa, pb in zip(x["paras"], y["paras"], strict=False):
             if (pa["marker"], pa["lvl"]) != (pb["marker"], pb["lvl"]):
-                diffs.append(("marker", f"s{n}: {pa['text'][:30]!r} {pa['marker']}/{pa['lvl']} vs {pb['marker']}/{pb['lvl']}"))
+                diffs.append(
+                    (
+                        "marker",
+                        f"s{n}: {pa['text'][:30]!r} {pa['marker']}/{pa['lvl']} vs {pb['marker']}/{pb['lvl']}",
+                    )
+                )
             elif pa["runs"] != pb["runs"]:
                 diffs.append(("style", f"s{n}: runs of {pa['text'][:30]!r}: {pa['runs']} vs {pb['runs']}"))
             elif (pa["algn"] or "l") != (pb["algn"] or "l"):
@@ -402,7 +440,9 @@ def _compare_pair(n, x, y, diffs) -> None:
             elif _size_differs(pa["size"], pb["size"]):
                 diffs.append(("size", f"s{n}: size of {pa['text'][:30]!r}: {pa['size']} vs {pb['size']}"))
     elif k == "table":
-        if len(x["rows"]) != len(y["rows"]) or any(len(r) != len(s) for r, s in zip(x["rows"], y["rows"], strict=False)):
+        if len(x["rows"]) != len(y["rows"]) or any(
+            len(r) != len(s) for r, s in zip(x["rows"], y["rows"], strict=False)
+        ):
             diffs.append(("table", f"s{n}: table shape differs"))
             return
         for r, s in zip(x["rows"], y["rows"], strict=True):
@@ -418,10 +458,14 @@ def _compare_pair(n, x, y, diffs) -> None:
                         diffs.append(("style", f"s{n}: cell {pa['text'][:30]!r} runs differ"))
                         return
                     if (pa["algn"] or "l") != (pb["algn"] or "l"):
-                        diffs.append(("style", f"s{n}: cell {pa['text'][:30]!r} align {pa['algn']} vs {pb['algn']}"))
+                        diffs.append(
+                            ("style", f"s{n}: cell {pa['text'][:30]!r} align {pa['algn']} vs {pb['algn']}")
+                        )
                         return
                     if _size_differs(pa["size"], pb["size"]):
-                        diffs.append(("size", f"s{n}: cell {pa['text'][:30]!r} size {pa['size']} vs {pb['size']}"))
+                        diffs.append(
+                            ("size", f"s{n}: cell {pa['text'][:30]!r} size {pa['size']} vs {pb['size']}")
+                        )
                         return
         if x["cols"] != y["cols"] and any(abs(p - q) > 1 for p, q in zip(x["cols"], y["cols"], strict=False)):
             diffs.append(("table", f"s{n}: column widths {x['cols']} vs {y['cols']}"))
@@ -453,7 +497,9 @@ def corpus() -> list[Path]:
     return out
 
 
-def roundtrip_text(text: str, work: Path, base_dir: Path | None = None) -> tuple[list[tuple[str, str]], str, Path, Path]:
+def roundtrip_text(
+    text: str, work: Path, base_dir: Path | None = None
+) -> tuple[list[tuple[str, str]], str, Path, Path]:
     """Build text -> A, import -> T, build T -> B; returns (diffs, T, A, B)."""
     from slidemark.build import build
     from slidemark.importer import import_pptx
@@ -517,7 +563,9 @@ def main() -> int:
     print(f"\nlossless {good}/{n} = {share:.1%}; imported/source tokens {ratio:.2f}")
     print("decks affected per kind:", dict(kinds.most_common()))
     if args.record:
-        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=ROOT)
+        sha = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=ROOT
+        )
         row = {
             "date": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
             "commit": sha.stdout.strip(),

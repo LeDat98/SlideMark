@@ -346,7 +346,7 @@ def _geom_key(it) -> str | None:
 
 
 def _geom_err(orig: SlideData, trial: SlideData) -> float:
-    """Sum over the original's texts and tables of the distance (in) to the trial's item with the same text."""
+    """Sum over the original's texts and tables of the distance (in) to the trial's same-text item."""
     pool: dict[str, list] = {}
     for it in trial.items:
         if (k := _geom_key(it)) is not None:
@@ -360,9 +360,13 @@ def _geom_err(orig: SlideData, trial: SlideData) -> float:
         if not cand:
             err += 3.0
             continue
-        best = min(cand, key=lambda c: max(abs(c.x - it.x), abs(c.y - it.y), abs(c.w - it.w), abs(c.h - it.h)))
+        best = min(
+            cand, key=lambda c: max(abs(c.x - it.x), abs(c.y - it.y), abs(c.w - it.w), abs(c.h - it.h))
+        )
         cand.remove(best)
-        err += min(3.0, max(abs(best.x - it.x), abs(best.y - it.y), abs(best.w - it.w), abs(best.h - it.h)) / 914400)
+        err += min(
+            3.0, max(abs(best.x - it.x), abs(best.y - it.y), abs(best.w - it.w), abs(best.h - it.h)) / 914400
+        )
     return err
 
 
@@ -381,7 +385,7 @@ def _add_dense(lines: list[str], info: dict) -> list[str]:
 
 
 def _dense_decision(lines, info, sd, deck, header, theme) -> tuple[bool, bool]:
-    """(tried, dense): a trial build with the ``dense`` class matches the original's text boxes much better."""
+    """(tried, dense): a trial build with the ``dense`` class fits the original's text boxes much better."""
     extra = info.get("extra")
     if extra is None or info.get("title_only") or "dense" in extra:
         return False, False
