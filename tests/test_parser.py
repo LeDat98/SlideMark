@@ -476,3 +476,17 @@ def test_nested_at_in_box_builds_nested_containers():
     assert [type(c).__name__ for c in left.children] == ["Container", "Container"]
     assert [c.title.paragraphs[0].plain for c in left.children] == ["a", "b"]
     assert isinstance(right, Container) and right.grid is None
+
+
+def test_missing_end_hint():
+    src = "# T\n@3\n## A\n- a\n## B\n- b\n## C\n- c\n| x | y |\n|-|-|\n| 1 | 2 |\n"
+    deck = parse(src)
+    assert any(d.rule == "missing-end" for d in deck.diagnostics)
+    fixed = src.replace("- c\n", "- c\n@end\n")
+    assert not any(d.rule == "missing-end" for d in parse(fixed).diagnostics)
+
+
+def test_closing_quote_needs_no_end():
+    deck = parse("# T\n## A\n- a\n## B\n- b\n> conclusion\n")
+    assert not any(d.rule == "missing-end" for d in deck.diagnostics)
+    assert deck.slides[0].conclusion is not None

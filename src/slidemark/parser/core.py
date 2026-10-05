@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from ..ir import Container, Deck, Link, Paragraph, Run, Slide, Text
+from ..ir import Chart, Container, Deck, Link, Paragraph, Run, Slide, Table, Text
 from .attrs import (
     STANDALONE,
     AtSpec,
@@ -488,6 +488,8 @@ def parse_slide(
             h2, content, ats = boxes[val]
             slide.elements.append(_build_box(h2, content, ats, ctx))
 
+    _hint_missing_end(slide, boxes, order, ctx)
+
     # slide-level `@` line and heading attributes
     if top_ats:
         spec = _merge_specs([parse_at(a.text, ctx, a.line) for a in top_ats], ctx, [a.line for a in top_ats])
@@ -523,6 +525,37 @@ def parse_slide(
         box.links = _resolve_links(raw, len(box.children), "box", ctx)
     ctx.box_links = []
     return slide
+
+
+def _hint_missing_end(slide: Slide, boxes: list, order: list, ctx: Ctx) -> None:
+    """Info when the last `##` box seems to swallow slide-level content (a forgotten `@end`).
+
+    A closing `>` needs no `@end`: it becomes the conclusion anyway (``_lead_and_conclusion``)."""
+    if len(boxes) < 2 or not order or order[-1][0] != "box":
+        return
+    box_els = [e for e in slide.elements if isinstance(e, Container)]
+    if len(box_els) != len(boxes):
+        return
+    *rest, last = box_els
+
+    def visual(e: Any) -> bool:
+        return isinstance(e, (Table, Chart)) or (isinstance(e, Text) and "callout" in e.classes)
+
+    odd = next((e for e in last.children if visual(e)), None)
+    if odd is None or any(visual(c) for b in rest for c in b.children):
+        return
+    what = "a callout" if isinstance(odd, Text) else f"a {odd.type}"
+    ctx.add(
+        "info",
+        f"the last box '{_box_title(last)}' holds {what} that its sibling boxes do not",
+        getattr(odd, "line", None) or last.line,
+        "missing-end",
+        "if it belongs to the slide, put a line '@end' before it",
+    )
+
+
+def _box_title(c: Container) -> str:
+    return c.title.paragraphs[0].plain[:20] if c.title and c.title.paragraphs else "box"
 
 
 def _resolve_links(raw: list[RawLink], n: int, owner: str, ctx: Ctx) -> list[Link]:

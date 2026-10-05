@@ -77,7 +77,9 @@ Three things are not blocks and have fixed places:
 A `>` anywhere else is a quote.
 
 `@end` on its own line closes the current `##` box: what follows belongs to the slide again (a table under a
-row of chevron boxes, a closing `>` conclusion). Without it a box runs to the end of the slide.
+row of chevron boxes). Without it a box runs to the end of the slide; `check` hints when the last box holds a
+table, chart or callout that its siblings do not. A `>` that ends the slide is the conclusion even without
+`@end`.
 
 Blocks beyond the cells of the slide grid (for example a table after `@end` under `@4 chevron`, or a fourth
 block under `@aab/aac`) are stacked **full width below the grid**, each in its own row.
