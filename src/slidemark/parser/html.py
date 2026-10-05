@@ -68,7 +68,7 @@ HEADS = {"h1", "h2", "h3", "h4", "h5", "h6"}
 P_CLOSERS = {"div", "p", "ul", "ol", "table", "section", "header", "footer", "blockquote", "pre", *HEADS}
 BOX_CLASSES = {"card", "kpi", "chevron", "box"}
 KEEP_CLASSES = {"kpi", "dense", "muted", "zebra"}
-LAYOUT_WORDS = {"cover", "section", "blank", "center"}
+LAYOUT_WORDS = {"cover", "section", "blank", "center", "free"}
 CALLOUTS = {
     "note": "note", "info": "note", "tip": "tip", "success": "tip", "warn": "warn", "warning": "warn",
     "caution": "caution", "danger": "caution", "important": "note",
@@ -884,7 +884,7 @@ def _slide(node: Node, ctx: Ctx, index: int) -> Slide:
     slide.classes = list(sink.classes)
     cls = node.classes
     slide.layout = next((k for k in cls if k in LAYOUT_WORDS), None) or node.attrs.get("data-layout") or None
-    if slide.layout not in (None, "cover", "section", "blank", "center"):
+    if slide.layout not in (None, "cover", "section", "blank", "center", "free"):
         slide.layout = None
     for k in ("dense", "dark", "light", "plain"):
         if k in cls and k not in slide.classes:

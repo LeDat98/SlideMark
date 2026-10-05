@@ -159,6 +159,7 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `flow` | arrows between blocks in reading order (process diagrams) | `@4 flow` |
 | `chevron` | blocks drawn as chevrons (steps) | `@4 chevron` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
+| `free` | absolute positioning: every block with `{x= y= w= h=}` (% of the area under the title, or lengths) sits exactly there, with no growth, balance or search; unplaced blocks stack on top (info `free-unplaced`) | `{x=10% y=30% w=40% h=20%}` |
 | `key=value` | `bg=` color or image, `t=` transition (`fade`, `push`, `wipe`, `split`, `cover`, `zoom`, `morph`; `t=fade:0.5` sets seconds), `id=`, `gap=` | `@bg=#0F172A t=fade` |
 | `a>b` `a-b` | **connector** from block `a` to block `b` (arrow / plain line). Letters count blocks in source order (`a` = 1st), digits work too (`1>3`). With `flow`, the links replace the flow arrows (info `flow-links`) | `@3 a>b a>c` |
 | `hidden` | hide the slide in the show | |

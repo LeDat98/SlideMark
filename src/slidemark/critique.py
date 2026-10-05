@@ -165,6 +165,7 @@ def critique_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) ->
     body = [p for p in body if not (isinstance(p.element, Text) and p.element.attrs.get("field"))]
     cards = _cards(items)
     special = (slide.layout in _SPECIAL_LAYOUTS) or not body
+    free = slide.layout == "free"  # absolute positioning is a design choice: no balance / fill rules
 
     # long title (also on cover/section: those are meant to be short too, but they are big on purpose)
     if not special:
@@ -220,7 +221,7 @@ def critique_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) ->
     sparse = []
     for c, inner in cards:
         used = sum(min(c.h, _natural_height(p)) for p in inner)
-        if used / c.h < SPARSE_FILL:
+        if not free and used / c.h < SPARSE_FILL:
             sparse.append((c, used / c.h))
     if sparse:
         c, fill = sparse[0]
@@ -235,7 +236,7 @@ def critique_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) ->
 
     rows = _rows(cards)
     # unbalanced rows
-    for row in rows:
+    for row in [] if free else rows:
         if any(
             "kpi" in c.element.classes or any(not getattr(p.element, "paragraphs", None) for p in inner)
             for c, inner in row
@@ -277,7 +278,7 @@ def critique_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) ->
             limit = min(limit, p.y)
     bottom = max((p.y + p.h for p in body), default=top)
     span = limit - top
-    if slide.conclusion is None and span > 0 and (limit - bottom) / span >= EMPTY_BAND:
+    if not free and slide.conclusion is None and span > 0 and (limit - bottom) / span >= EMPTY_BAND:
         add(
             "warning" if (limit - bottom) / span >= EMPTY_BAND_WARN else "info",
             "design-empty-band",

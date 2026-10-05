@@ -2019,22 +2019,30 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
         body_pt0 = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"])
         has_diagram = any(isinstance(e, Container) and "diagram" in e.classes for e in elements)
         steps = max(0, round((ctx.lt.balance_grow - 1.0) / 0.05)) if ctx.lt.grow and not has_diagram else 0
-        # text and cards grow together, smallest text first, until the empty band is small enough
-        # (the wrap guard refuses new wrapped CJK lines; Latin text may wrap more)
+        # text first: grow it (cards follow at most ``balance_text_air`` x their natural height) until the
+        # empty band is small enough; only then stretch the cards. The wrap guard refuses new wrapped CJK
+        # lines; Latin text may wrap more.
+        best_g = fin.grow
         for f in [1.0] + [round(1.0 + 0.05 * i, 2) for i in range(1, steps + 1)]:
             g = round(fin.grow * f, 2)
             if g > fin.grow and g * body_pt0 > ctx.lt.balance_max_pt:
                 break
-            c = run(body, grow=g, expand=fin.expand, lone_air=ctx.lt.balance_air, grow_base=fin.grow)
+            c = run(body, grow=g, expand=fin.expand, lone_air=ctx.lt.balance_text_air, grow_base=fin.grow)
             if c.over or not c.out:
                 if f > 1.0:
                     break  # bigger text only overflows more
                 continue
+            best_g = g
             if _bottom(c) > _bottom(fin):
                 fin = c
                 left = body.bottom - _bottom(fin)
             if left <= ctx.lt.balance_left * body.h:
                 break
+        if left > ctx.lt.balance_left * body.h:  # text cannot grow any more: stretch the cards
+            c = run(body, grow=best_g, expand=fin.expand, lone_air=ctx.lt.balance_air, grow_base=fin.grow)
+            if not c.over and c.out and _bottom(c) > _bottom(fin):
+                fin = c
+                left = body.bottom - _bottom(fin)
         dy = round((left - ctx.lt.balance_left * body.h) * ctx.lt.balance_shift)
         if dy > 0:  # what is still empty is split: part above the block, the rest below
             c = run(
@@ -2117,6 +2125,49 @@ def layout_slide(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Pla
         return []
 
 
+def _layout_free(ctx: _Ctx, elements: list, body: Rect, slide: Slide, theme: Theme, sg: int) -> _Ctx:
+    """`@free`: blocks with a box sit exactly there (no growth, balance or search); the rest stack on top."""
+    c = _Ctx(
+        ctx.deck,
+        theme,
+        slide,
+        ctx.index,
+        ctx.W,
+        ctx.H,
+        dense_k=ctx.dense_k,
+        tight=ctx.tight,
+        css=ctx.css,
+    )
+    inherit = Style()
+    for n in slide.classes:
+        if n in theme.classes:
+            inherit = inherit.merged(_only_inheritable(theme.classes[n]))
+    inherit = inherit.merged(_only_inheritable(ctx.css.own(slide)))
+    loose = []
+    for b in elements:
+        bx = getattr(b, "box", None)
+        if bx is not None and any(v is not None for v in (bx.x, bx.y, bx.w, bx.h)):
+            _place_block(c, b, _apply_box(c, b, body, True), inherit)
+        else:
+            loose.append(b)
+    y = body.y
+    for b in loose:
+        h = _natural_height(c, b, body.w, inherit)
+        if h is None:
+            h = round(min(body.bottom - y, body.h * 0.4))
+        h = max(min(h, body.bottom - y), 0)
+        _place_block(c, b, Rect(body.x, y, body.w, h), inherit)
+        y += h + sg
+        c.diag(
+            "free-unplaced",
+            f"{_label(b)} has no position on a @free slide",
+            "add {x= y= w= h=} (e.g. {x=10% y=30% w=40% h=20%}) to place it",
+            level="info",
+            line=getattr(b, "line", None),
+        )
+    return c
+
+
 def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     try:
         W, H = slide_size(deck.size)
@@ -2130,10 +2181,12 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     ctx.tight = ctx.lt.dense_tight if dense else 1.0
 
     kind = slide.layout
-    if kind not in ("cover", "section", "blank", "center", "content"):
+    if kind not in ("cover", "section", "blank", "center", "content", "free"):
         if kind:
             ctx.diag(
-                "layout", f"unknown layout {kind!r}", "use cover, section, blank or center; using automatic"
+                "layout",
+                f"unknown layout {kind!r}",
+                "use cover, section, blank, center or free; using automatic",
             )
         kind = None
     if kind is None:
@@ -2222,6 +2275,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 r = Rect(Mx, My, inner_w, tr_h)
                 y = My + tr_h
                 head_bottom = y
+            if kind == "free" and getattr(slide.title, "box", None) is not None:
+                r = _apply_box(ctx, slide.title, Rect(0, 0, W, H), True)  # an explicit title box wins
             st = _styled(ctx, slide.title, st, classes=False)
             put(head, slide.title, r, st, fit_text(slide.title, r, st))
         for role, el in (("subtitle", slide.subtitle), ("lead", slide.lead)):
@@ -2324,7 +2379,12 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     # ---- body with global autofit
     elements = list(slide.elements)
     final_ctx: _Ctx | None = None
-    if body is not None and elements and body.h > 0:
+    if kind == "free" and body is not None and elements and body.h > 0:
+        final_ctx = _layout_free(ctx, elements, body, slide, theme, sg)
+        ctx.diags += final_ctx.diags
+        for lab in dict.fromkeys(final_ctx.over):
+            ctx.diag("overflow", f"{lab} overflows its box", "enlarge its {x= y= w= h=} or shorten the text")
+    elif body is not None and elements and body.h > 0:
         slide_inherit = Style()
         for n in slide.classes:
             if n in theme.classes:
