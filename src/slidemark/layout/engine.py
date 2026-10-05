@@ -559,7 +559,14 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         need = _text_need(ctx, el, st, rect.w, eff)
         if need > rect.h * _TOL:
             ctx.over.append(_label(el))
-        elif ctx.roomy and ctx.grow > ctx.grow_base >= 1.0 and eff > 0:
+        elif (
+            (
+                ctx.roomy
+                or (ctx.lone_air > 0 and measure.has_cjk(_plain(getattr(el, "paragraphs", None) or [])))
+            )
+            and ctx.grow > ctx.grow_base >= 1.0
+            and eff > 0
+        ):
             small = (
                 eff * ctx.grow_base / ctx.grow
             )  # growing must not add wrapped lines (orphan CJK characters)
@@ -2009,10 +2016,25 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
         and not fin.roomy
         and body.bottom - _bottom(fin) > ctx.lt.balance_left * body.h
     ):  # normal density: a lone row of boxes gets taller cards instead of a 40% empty band
-        c = run(body, grow=fin.grow, expand=fin.expand, lone_air=ctx.lt.balance_air)
-        if not c.over and c.out and _bottom(c) > _bottom(fin):
-            fin = c
-            left = body.bottom - _bottom(fin)
+        body_pt0 = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"])
+        has_diagram = any(isinstance(e, Container) and "diagram" in e.classes for e in elements)
+        steps = max(0, round((ctx.lt.balance_grow - 1.0) / 0.05)) if ctx.lt.grow and not has_diagram else 0
+        # text and cards grow together, smallest text first, until the empty band is small enough
+        # (the wrap guard refuses new wrapped CJK lines; Latin text may wrap more)
+        for f in [1.0] + [round(1.0 + 0.05 * i, 2) for i in range(1, steps + 1)]:
+            g = round(fin.grow * f, 2)
+            if g > fin.grow and g * body_pt0 > ctx.lt.balance_max_pt:
+                break
+            c = run(body, grow=g, expand=fin.expand, lone_air=ctx.lt.balance_air, grow_base=fin.grow)
+            if c.over or not c.out:
+                if f > 1.0:
+                    break  # bigger text only overflows more
+                continue
+            if _bottom(c) > _bottom(fin):
+                fin = c
+                left = body.bottom - _bottom(fin)
+            if left <= ctx.lt.balance_left * body.h:
+                break
         dy = round((left - ctx.lt.balance_left * body.h) * ctx.lt.balance_shift)
         if dy > 0:  # what is still empty is split: part above the block, the rest below
             c = run(

@@ -70,12 +70,12 @@ def test_sparse_boxes_are_capped_and_top_aligned():
         placed, _ = lay(s, theme)
         cs = cards(placed)
         assert len({c.h for c in cs}) == 1 and len({c.y for c in cs}) == 1  # equal heights in a row
-        assert cs[0].h < 0.75 * H  # not stretched over the whole body
+        assert cs[0].h < 0.9 * H  # not stretched over the whole body
         assert cs[0].h > 0.2 * H  # but not tiny either
         below, body_h = _gap_below(placed, theme)
         assert (
-            0.22 * body_h <= cs[0].h <= (0.6 if theme == "default" else 0.65) * body_h
-        )  # follows content; consulting rows reach ~60%
+            0.22 * body_h <= cs[0].h <= 0.9 * body_h
+        )  # follows content; a lone sparse row reaches at most ~85% of the body
         title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
         above = cs[0].y - (title.y + title.h)
         assert above > 0 and below > above  # a single sparse row sits in the upper-middle of the free body
@@ -96,7 +96,7 @@ def test_sparse_boxes_grow_text_uniformly_within_the_theme_limit():
         grid="3",
         elements=[box("a", "x", "y"), box("b", "x" * 10, "y"), box("c", "x", "y")],
     )
-    for theme, limit in (("default", 1.4), ("jp-business", 1.35 * 1.2)):  # consulting: + roomy pass
+    for theme, limit in (("default", 36 / 18), ("jp-business", 1.35 * 1.6)):  # + balance / roomy pass
         placed, _ = lay(s, theme)
         scales = {p.font_scale for p in of(placed, Text) if p.element.role == "body"}
         assert len(scales) == 1
@@ -298,11 +298,11 @@ def test_very_sparse_boxes_of_a_large_theme_grow_up_to_1_4_and_headings_follow_t
     body, head, placed = _body_scales(s)
     assert len(body) == 1 and len(head) == 1  # siblings share one scale
     bs, hs = body.pop(), head.pop()
-    assert 1.15 < bs <= 1.4 + 1e-9
+    assert 1.15 < bs <= 36 / 18 + 1e-9  # very sparse 1.4x, a lone row may balance up to 36pt
     th = get_theme("default")
     assert 1.0 < hs
     assert th.sizes["heading"] * hs >= th.sizes["body"] * bs * 0.98  # heading never smaller than its body
-    assert th.sizes["body"] * bs <= 26 + 1e-6
+    assert th.sizes["body"] * bs <= 36 + 1e-6
 
 
 def test_normal_boxes_of_a_large_theme_keep_the_small_growth():
@@ -312,7 +312,7 @@ def test_normal_boxes_of_a_large_theme_keep_the_small_growth():
         elements=[box("a", "x", "y", "z"), box("b", "x", "y", "z"), box("c", "x", "y", "z")],
     )
     body, head, _ = _body_scales(s)
-    assert max(body) <= 1.15 + 1e-9
+    assert max(body) <= 36 / 18 + 1e-9  # a lone row balances: text and cards grow together, capped at 36pt
     th = get_theme("default")
     assert th.sizes["heading"] * min(head) >= th.sizes["body"] * max(body) * 0.98
 
@@ -495,6 +495,7 @@ def test_unknown_font_heading_wraps_before_the_body_is_placed():
         theme = get_theme("default").model_copy(deep=True)
         theme.fonts.heading = font
         theme.fonts.body = font
+        theme.layout.balance_air = 0.0  # no lone-row growth: headings would wrap in both fonts
         s = Slide(
             title=T("t", "title"),
             grid="3",
