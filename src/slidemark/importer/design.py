@@ -53,11 +53,21 @@ def css_fence(rules: list[list[str]]) -> list[str]:
     return ["```css", *(f"{sel} {{ {decl} }}" for sel, decl in rules), "```"]
 
 
-def design_header(design: dict[str, Any]) -> tuple[list[str], list[str]]:
-    """(``theme:`` + token lines, header css fence lines) of the stored design."""
+def is_template_path(theme: Any) -> bool:
+    """True for a ``theme:`` that names a .pptx/.potx template file rather than a preset."""
+    return isinstance(theme, str) and theme.lower().endswith((".pptx", ".potx"))
+
+
+def design_header(design: dict[str, Any], src_name: str = "") -> tuple[list[str], list[str]]:
+    """(``theme:`` + token lines, header css fence lines) of the stored design.
+
+    A stored template path is relative to where the deck was first built; the imported file itself is the
+    template that is always at hand (``src_name``).
+    """
     head: list[str] = []
-    if design.get("theme"):
-        head.append(f"theme: {design['theme']}")
+    theme = design.get("theme")
+    if theme:
+        head.append(f"theme: {src_name if src_name and is_template_path(theme) else theme}")
     head += token_lines(design.get("tokens") or {})
     return head, css_fence(design.get("css") or [])
 
@@ -124,6 +134,34 @@ def html_slide_lines(ent: dict[str, Any], sd, notes: list[str]) -> list[str]:
     ticks = "`" * max(3, max((len(m) + 1 for m in re.findall(r"`+", html)), default=0))
     lines += [ticks + "html", html.rstrip("\n"), ticks]
     return lines + notes
+
+
+def _key(text: str) -> str:
+    return re.sub(r"[\W_]+", "", text).lower()
+
+
+def tag_boxes(lines: list[str], ent: dict[str, Any] | None) -> list[str]:
+    """Re-attach the stored classes and ids (``el``) to the ``##`` / ``###`` box headings they belonged to."""
+    todo = [e for e in (ent or {}).get("el") or [] if isinstance(e, list) and len(e) > 1]
+    if not todo:
+        return lines
+    out = list(lines)
+    in_fence = False
+    for k, ln in enumerate(out):
+        if ln.startswith(("```", "~~~")):
+            in_fence = not in_fence
+        m = None if in_fence else re.match(r"(#{2,3} )(.*?)(?: \{([^{}]*)\})?$", ln)
+        if not m:
+            continue
+        for e in todo:
+            if _key(str(e[0])) == _key(m.group(2)):
+                have = (m.group(3) or "").split()
+                add = [("." + n if not n.startswith("#") else n) for n in map(str, e[1:])]
+                add = [t for t in add if t not in have]
+                out[k] = f"{m.group(1)}{m.group(2)} {{{' '.join([*add, *have])}}}" if add else ln
+                todo.remove(e)
+                break
+    return out
 
 
 def edited(ent: dict[str, Any], sd) -> bool:
