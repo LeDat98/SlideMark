@@ -282,3 +282,19 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
 - [ ] Chromium HTML imports as boxes, not back to an html fence (xfail in test_import); math shows LibreOffice fallback
 - [ ] Owner: open media/SVG/animation/morph decks in real PowerPoint (repair check); PyPI token
 - [ ] L7 tokens ≤ 20% of python-pptx (now 30%): needs a syntax design pass
+
+## Run 2026-10-05 (run 3, design freedom) work packages
+Contract (orchestrator, committed first): `theme.py` token schema (`LayoutTokens`, `RenderTokens`, `classes`
+open to new names), presets as YAML (`src/slidemark/presets/*.yaml`), `theme: none`, `apply_tokens` /
+`canonical_token` / `schema_table`, `template.deck_theme`, `ir.Deck.tokens`, `Style.fill` gradients and
+`Style.shadow` CSS strings, SYNTAX.md "Design tokens".
+- **Wave 1 A: inline tokens front** (`parser/`, `cli.py`): `colors:`/`fonts:`/`sizes:`/`style:` header lines
+  and YAML front-matter maps → `Deck.tokens` with did-you-mean diagnostics; `slidemark tokens [--theme]
+  [--format json]`, `slidemark themes`; `import` keeps tokens; fuzz.
+- **Wave 1 B: no hard-coded looks back** (`layout/`, `render/`): constants → `theme.layout`/`theme.render`;
+  color literals → tokens; gradient fills, CSS shadows, opacity rendered natively; literal-scanner test (DF1);
+  `theme: none` + tokens render test.
+- **Wave 2 A: CSS fence parsing** (DF3): ` ```css ` in header/slide → per-element `Style` via selectors.
+- **Wave 2 B: CSS native mappings** (DF3): new `Style` fields rendered (per-side borders, letter-spacing,
+  line-height, text-transform, rotation …).
+- **Orchestrator:** SKILL.md tokens section, brand-look examples, gallery review, docs.

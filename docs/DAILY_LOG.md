@@ -49,3 +49,10 @@ Run goal:
 - Bugs found by new tooling: title > 255 chars crashed, negative chart axIds, empty media timing sequence (XSD), image line swallowed under a list (eval).
 - Problems: a parallel owner session pushed to main (merged); I pushed one red commit (pipe hid pytest's exit code), fixed in minutes.
 - Next: L3 consulting judgement (slide 9 fill), PowerPoint spot check of media/SVG/animation XML (owner), PyPI token (owner).
+
+## 2026-10-05 (run 3, manual, design freedom, 07:40 UTC–)
+Run goal:
+- [ ] DF1 no hard-coded design: layout/render constants → `theme.layout`/`theme.render` tokens, presets as YAML, `theme: none`, literal-scanner test
+- [ ] DF2 inline tokens: `colors:`/`fonts:`/`sizes:`/`style:` header lines → `Deck.tokens`, `slidemark tokens`, SKILL.md
+- [ ] DF3 CSS fence (if time): selectors + native mappings (gradients, shadows, per-side borders, letter-spacing …)
+- [ ] Examples with agent-designed looks (brand colors, gradients, dark/light) next to dense JP; gallery reviewed

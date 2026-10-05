@@ -37,7 +37,7 @@ num: on
 
 | Key | Values | Default |
 |---|---|---|
-| `theme` | `default`, `midnight`, `jp-business`, or a path to `.yaml`/`.potx`/`.pptx` | `default` |
+| `theme` | a preset (`default`, `midnight`, `jp-business`), `none` (bare schema defaults), or a path to `.yaml`/`.potx`/`.pptx` | `default` |
 | `size` | `16:9`, `4:3`, `A4`, `16:10`, `<w>x<h>` (e.g. `10inx7.5in`) | `16:9` |
 | `lang` | `ja`, `vi`, `en`, ... (fonts, line breaking) | auto |
 | `title`, `author` | text | first slide title |
@@ -46,7 +46,37 @@ num: on
 | `density` | `normal` / `dense` (smaller default type for packed slides) | `normal` |
 | `sections` | `on` / `off`: section slides start PowerPoint sections named after their title | `on` |
 
+| `colors`, `fonts`, `sizes`, `style` | design tokens as `key=value` pairs (below) | from the theme |
+
 A YAML front-matter block between `---` lines is accepted as well.
+
+### Design tokens
+
+Every visual decision is a token (`slidemark tokens` prints all of them with their values). Built-in themes
+are presets written in the same schema (`src/slidemark/presets/*.yaml`); a deck extends one and overrides any
+token inline. Values are colors (`#RRGGBB`, `#RRGGBBAA` or a color name), numbers, lengths (`12pt`, `0.3in`,
+bare numbers = pt), `none`, or quoted text.
+
+```markdown
+theme: none
+colors: bg=#0B1020 fg=#E6E8EF primary=#7C5CFF accent=#00D1B2 muted=#8A90A6
+fonts: heading="Inter" body="Noto Sans JP" mono="JetBrains Mono"
+sizes: title=40 body=16 caption=11
+style: radius=14 gap=20 card.fill=#141A2E card.shadow="0 8 24 #00000055" title.band=none
+```
+
+| Line | Keys |
+|---|---|
+| `colors:` | any color name; new names (`brand=#FF5A1F`) are usable everywhere a color is |
+| `fonts:` | `heading`, `body`, `mono`, `ea` (East Asian) |
+| `sizes:` | text roles: `title`, `subtitle`, `heading`, `body`, `lead`, `quote`, `caption`, `footnote`, `code`, `table`, `cover-title`, `cover-subtitle` (pt) |
+| `style:` | any other token: theme fields (`gap`, `margin_x`, `title.band`, `heading.band`, `table.header.fill`, `palette=primary,#FF5A1F`), `<class>.<field>` styles (`card.fill`, `card.shadow`, `kpi.color`; a new class name such as `hero.fill` creates the class for `{.hero}`), `layout.<x>` and `render.<x>` constants, and the shortcuts `radius`, `padding`, `shadow`, `border`, `border-width`, `card` (all for `card`), `bg`, `fg`, `margin` |
+
+Class style fields: `fill` (a color or `linear-gradient(...)`/`radial-gradient(...)`), `line`, `line_width`,
+`radius`, `padding`, `shadow` (`"x y blur [spread] color"` in pt), `opacity`, `color`, `font`, `font_size`,
+`bold`, `italic`, `align`, `valign`, `line_spacing`. An unknown key gives a did-you-mean hint; a bad value is
+skipped with a `bad-token` warning. A theme file is the same tokens as YAML (`colors: {primary: "#7C5CFF"}`,
+`classes: {card: {radius: 14}}`), extends `default` unless it sets `extends: none` or another preset.
 
 ## Slides
 

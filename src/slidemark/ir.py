@@ -37,13 +37,15 @@ class Style(Model):
     align: Literal["left", "center", "right", "justify"] | None = None
     valign: Literal["top", "middle", "bottom"] | None = None
     line_spacing: float | None = None  # multiple of font size, e.g. 1.2
-    fill: str | None = None  # background color of the shape / container
+    # background: a color, or a CSS gradient "linear-gradient(135deg, #7C5CFF, #00D1B2)" / radial
+    fill: str | None = None
     line: str | None = None  # border color
     line_width: float | None = None  # pt
     radius: float | None = None  # corner radius in pt (rounded rectangle)
     padding: Length | None = None  # inner padding of text frames / containers
     opacity: float | None = None  # 0..1
-    shadow: bool | None = None
+    # True = theme default shadow; or CSS box-shadow "0 8 24 #00000055" (x y blur [spread] color, pt)
+    shadow: bool | str | None = None
 
     def merged(self, *others: Style | None) -> Style:
         """Return a copy where later non-None fields override earlier ones."""
@@ -279,6 +281,9 @@ class Deck(Model):
     footer: str | None = None
     slide_number: bool = False
     density: Literal["normal", "dense"] = "normal"
+    # inline design tokens from header lines (colors:/fonts:/sizes:/style:), canonical path -> raw value,
+    # e.g. {"colors.primary": "#7C5CFF", "classes.card.radius": "14"}; applied on top of `theme`
+    tokens: dict[str, str] = Field(default_factory=dict)
     slides: list[Slide] = Field(default_factory=list)
     attrs: dict[str, Any] = Field(default_factory=dict)
     diagnostics: list[Diagnostic] = Field(default_factory=list)

@@ -15,9 +15,17 @@ from pathlib import Path
 from lxml import etree
 
 from .ir import Diagnostic
-from .theme import DEFAULT, Fonts, Theme, get_theme
+from .theme import DEFAULT, Fonts, Theme, apply_tokens, get_theme, theme_from_data
 
-__all__ = ["resolve_theme", "template_size", "footer_top", "open_template", "pick_layout", "clone_footer"]
+__all__ = [
+    "deck_theme",
+    "resolve_theme",
+    "template_size",
+    "footer_top",
+    "open_template",
+    "pick_layout",
+    "clone_footer",
+]
 
 _A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 _P = "http://schemas.openxmlformats.org/presentationml/2006/main"
@@ -77,6 +85,15 @@ def resolve_theme(name: str, base_dir: str | Path | None = None) -> tuple[Theme,
                 "fix or re-save the file (PowerPoint: Save As .pptx); using default",
             )
         ]
+
+
+def deck_theme(deck, base_dir: str | Path | None = None) -> tuple[Theme, list[Diagnostic]]:
+    """The deck's theme (preset, file or template) with its inline header tokens applied."""
+    theme, diags = resolve_theme(deck.theme, base_dir)
+    if deck.tokens:
+        theme, more = apply_tokens(theme, deck.tokens)
+        diags = diags + more
+    return theme, diags
 
 
 def _hex_rgb(h: str) -> tuple[int, int, int]:
@@ -171,13 +188,11 @@ def _from_yaml(path: Path) -> Theme:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError("YAML theme must be a mapping of Theme fields")
-    base = DEFAULT.model_dump()
-    base["name"] = path.stem
-    merged = _merge(base, data)
-    tpl = merged.get("template")
+    data.setdefault("extends", "default")  # a theme file extends `default` unless it says otherwise
+    tpl = data.get("template")
     if tpl and not Path(tpl).is_absolute():
-        merged["template"] = str((path.parent / tpl).resolve())
-    return Theme.model_validate(merged)
+        data["template"] = str((path.parent / tpl).resolve())
+    return theme_from_data(data, path.stem)
 
 
 def template_size(theme: Theme) -> str | None:

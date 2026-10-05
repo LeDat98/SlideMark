@@ -18,7 +18,7 @@ from slidemark.critique import critique, review_score
 from slidemark.layout import layout_slide
 from slidemark.lint import lint
 from slidemark.parser import parse
-from slidemark.template import resolve_theme
+from slidemark.template import deck_theme
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -27,7 +27,7 @@ def review(path: Path) -> tuple[int, list]:
     deck = parse(path.read_text(encoding="utf-8"))
     diags = list(deck.diagnostics)
     deck.attrs.setdefault("base_dir", str(path.resolve().parent))
-    theme, tdiags = resolve_theme(deck.theme, deck.attrs["base_dir"])
+    theme, tdiags = deck_theme(deck, deck.attrs["base_dir"])
     diags.extend(tdiags)
     placed = [layout_slide(s, deck, theme, i) for i, s in enumerate(deck.slides)]
     seen = {(d.rule, d.slide) for d in diags}

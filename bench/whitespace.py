@@ -14,7 +14,7 @@ from pathlib import Path
 from slidemark.ir import Container, Placed
 from slidemark.layout import layout_slide, measure
 from slidemark.parser import parse
-from slidemark.template import resolve_theme
+from slidemark.template import deck_theme
 from slidemark.units import to_emu
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,7 +59,7 @@ def main() -> int:
     fills: list[float] = []
     for md in sorted((ROOT / "examples").glob("*.md")):
         deck = parse(md.read_text(encoding="utf-8"))
-        theme, _ = resolve_theme(deck.theme, md.parent)
+        theme, _ = deck_theme(deck, md.parent)
         for i, s in enumerate(deck.slides):
             for title, fill in card_fills(layout_slide(s, deck, theme, i)):
                 cards += 1

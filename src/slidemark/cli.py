@@ -44,10 +44,10 @@ def _add_layout_diagnostics(deck: Deck, input_path: str) -> None:
     try:
         from .layout import layout_slide
         from .lint import lint
-        from .template import resolve_theme, template_size
+        from .template import deck_theme, template_size
 
         deck.attrs.setdefault("base_dir", str(Path(input_path).resolve().parent))
-        theme, diags = resolve_theme(deck.theme, deck.attrs["base_dir"])
+        theme, diags = deck_theme(deck, deck.attrs["base_dir"])
         deck.diagnostics.extend(diags)
         if size := template_size(theme):
             deck.size = size
@@ -138,10 +138,10 @@ def cmd_review(args: argparse.Namespace) -> int:
             from .critique import critique
             from .layout import layout_slide
             from .lint import lint
-            from .template import resolve_theme, template_size
+            from .template import deck_theme, template_size
 
             deck.attrs.setdefault("base_dir", str(Path(args.input).resolve().parent))
-            theme, tdiags = resolve_theme(deck.theme, deck.attrs["base_dir"])
+            theme, tdiags = deck_theme(deck, deck.attrs["base_dir"])
             diags.extend(tdiags)
             if size := template_size(theme):
                 deck.size = size

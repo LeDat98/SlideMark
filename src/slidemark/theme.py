@@ -1,10 +1,24 @@
-"""Theme model: design tokens shared by layout (sizes, spacing) and renderer (colors, fonts)."""
+"""Theme model: the public design-token schema shared by layout (sizes, spacing) and renderer (colors, fonts).
+
+Design freedom (docs/DESIGN_FREEDOM.md): SlideMark ships mechanisms, not looks. Every visual decision is a
+token in this schema. Built-in themes are YAML presets in ``presets/`` written in the same schema an agent can
+write (``theme: ./brand.yaml``) or override inline with header lines (``colors:``, ``fonts:``, ``sizes:``,
+``style:``, see :func:`apply_tokens`). ``theme: none`` is the bare schema defaults (a neutral canvas).
+"""
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+import difflib
+import re
+from functools import cache
+from pathlib import Path
+from typing import Any
 
-from .ir import Length, Style
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from .ir import Diagnostic, Length, Style
+
+PRESET_DIR = Path(__file__).parent / "presets"
 
 
 class Fonts(BaseModel):
@@ -16,50 +30,119 @@ class Fonts(BaseModel):
     ea: str = "Yu Gothic"  # East Asian typeface for ja/zh/ko text (written to <a:ea>)
 
 
+class LayoutTokens(BaseModel):
+    """Layout constants that change the look (gaps, line heights, component sizes, growth limits).
+
+    Lengths are ``Length`` strings (bare numbers = pt); ratios are plain floats. Defaults reproduce the
+    original look. Algorithm internals (search weights, step lists, tolerances) are not tokens.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    top_gap: Length = "0.25in"  # title band (or lead) -> body, the same on every slide
+    line_latin: float = 1.2  # line height / font size for Latin text
+    line_cjk: float = 1.3  # ... for CJK text
+    para_gap: float = 0.25  # space before every paragraph but the first, x font size
+    cell_pad_x: Length = "0.1in"  # table cell margins
+    cell_pad_y: Length = "0.05in"
+    dense_tight: float = 0.7  # gap / padding factor on dense slides
+    kpi_min_h: Length = "1.1in"
+    icon_head: float = 1.2  # icon side / heading font size
+    icon_kpi: float = 2.0  # icon side / kpi label font size
+    icon_gap: float = 0.4  # gap between icon and text, in icon sides
+    chevron_adj: float = 0.3  # chevron point depth / shorter side
+    chevron_pad: Length = "4pt"
+    chevron_min_h: Length = "0.7in"
+    chevron_max_h: Length = "1.3in"
+    chevron_vpad: Length = "0.17in"
+    footnote_max: float = 0.2  # footnotes never take more than this share of the slide height
+    math_grow: float = 1.6  # an equation alone in its cell is this much larger than body text
+    grow: bool = True  # sparse slides grow text / cards to fill the body (False = keep nominal sizes)
+
+
+class RenderTokens(BaseModel):
+    """Renderer defaults that change the look (line widths, readable ink colors, chart text scales)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    line_width: float = 0.75  # pt, a bordered shape without its own line width
+    connector_width: float = 1.5  # pt, connectors / arrows between blocks
+    chart_line_width: float = 2.25  # pt, line chart series
+    chart_title_scale: float = 1.2  # chart title size / chart text size
+    chart_label_scale: float = 0.9  # data label size / chart text size
+    ink_dark: str = "#1F2937"  # text on light fills when the color is chosen for contrast (badges, labels)
+    ink_light: str = "#FFFFFF"  # text on dark fills
+    highlight: str = "#FFFF00"  # default ==highlight== color
+    code_style: str = "default"  # pygments style for code blocks
+
+
+NEUTRAL_COLORS = {
+    "bg": "#FFFFFF",
+    "fg": "#111827",
+    "primary": "#111827",
+    "secondary": "#4B5563",
+    "accent": "#6B7280",
+    "muted": "#6B7280",
+    "border": "#D1D5DB",
+    "surface": "#F3F4F6",  # card / table header background
+    "danger": "#B91C1C",
+    "success": "#15803D",
+}
+
+DEFAULT_SIZES = {
+    "title": 32,
+    "subtitle": 20,
+    "heading": 20,
+    "body": 18,
+    "lead": 18,
+    "quote": 20,
+    "caption": 12,
+    "footnote": 10,
+    "code": 14,
+    "table": 14,
+    "cover-title": 44,
+    "cover-subtitle": 24,
+}
+
+
+def _base_classes() -> dict[str, Style]:
+    """Mechanism classes every theme has (components need them); presets restyle them."""
+    return {
+        "card": Style(fill="surface", line="border", line_width=0.75, radius=6, padding="10pt"),
+        "callout": Style(fill="surface", line="primary", line_width=1, padding="10pt"),
+        "muted": Style(color="muted"),
+        "dense": Style(font_size=11),
+        "kpi": Style(font_size=36, bold=True, color="primary", align="center", valign="middle"),
+        # callout kinds (`> [!note]` ...): border color. Badges: `[x]{.badge}`.
+        "note": Style(line="primary"),
+        "tip": Style(line="success"),
+        "warn": Style(line="accent"),
+        "caution": Style(line="danger"),
+        "badge": Style(fill="primary", color="bg", bold=True),
+        # mermaid flowchart nodes
+        "node": Style(
+            fill="surface", line="primary", line_width=1, padding="6pt", align="center", valign="middle"
+        ),
+        "round": Style(radius=12),
+        "decision": Style(fill="bg", line="accent"),
+    }
+
+
 class Theme(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    colors: dict[str, str] = Field(
-        default_factory=lambda: {
-            "bg": "#FFFFFF",
-            "fg": "#1F2937",
-            "primary": "#1D4ED8",
-            "secondary": "#0F766E",
-            "accent": "#F59E0B",
-            "muted": "#6B7280",
-            "border": "#D1D5DB",
-            "surface": "#F3F4F6",  # card / table header background
-            "danger": "#DC2626",
-            "success": "#16A34A",
-        }
-    )
+    colors: dict[str, str] = Field(default_factory=lambda: dict(NEUTRAL_COLORS))
     fonts: Fonts = Field(default_factory=Fonts)
     # font sizes in pt, by text role
-    sizes: dict[str, float] = Field(
-        default_factory=lambda: {
-            "title": 32,
-            "subtitle": 20,
-            "heading": 20,
-            "body": 18,
-            "lead": 18,
-            "quote": 20,
-            "caption": 12,
-            "footnote": 10,
-            "code": 14,
-            "table": 14,
-            "cover-title": 44,
-            "cover-subtitle": 24,
-        }
-    )
+    sizes: dict[str, float] = Field(default_factory=lambda: dict(DEFAULT_SIZES))
     min_font_size: float = 8  # autofit never shrinks below this
     margin_x: Length = "0.5in"
     margin_y: Length = "0.4in"
     gap: Length = "0.25in"
     title_height: Length = "0.9in"
-    # named styles used by `{.name}` and `::: name`, e.g. "card", "callout", "kpi"
-    classes: dict[str, Style] = Field(default_factory=dict)
-    # --- additive tokens (all optional, defaults reproduce the original look) ---
+    # named styles used by `{.name}`, e.g. "card", "callout", "kpi"; tokens may add new ones (`hero.fill=`)
+    classes: dict[str, Style] = Field(default_factory=_base_classes)
     heading_color: str = "fg"
     title_color: str = "fg"
     lead_color: str = "muted"
@@ -80,6 +163,8 @@ class Theme(BaseModel):
     palette: list[str] = Field(
         default_factory=lambda: ["primary", "secondary", "accent", "danger", "success", "muted"]
     )
+    layout: LayoutTokens = Field(default_factory=LayoutTokens)
+    render: RenderTokens = Field(default_factory=RenderTokens)
 
     def color(self, value: str | None) -> str | None:
         """Resolve a theme color name ("primary") or pass a hex value through."""
@@ -88,112 +173,41 @@ class Theme(BaseModel):
         return self.colors.get(value, value)
 
 
-# callout kinds (`> [!note]` ...): fill tint + border color. Badges: `[x]{.badge}`.
-_COMMON = {
-    "note": Style(line="primary"),
-    "tip": Style(line="success"),
-    "warn": Style(line="accent"),
-    "caution": Style(line="danger"),
-    "badge": Style(fill="primary", color="bg", bold=True),
-    # mermaid flowchart nodes
-    "node": Style(
-        fill="surface", line="primary", line_width=1, padding="6pt", align="center", valign="middle"
-    ),
-    "round": Style(radius=12),
-    "decision": Style(fill="bg", line="accent"),
-}
+# --------------------------------------------------------------------------- presets (YAML data)
 
-DEFAULT = Theme(
-    name="default",
-    classes={
-        "card": Style(fill="surface", line="border", line_width=0.75, radius=6, padding="10pt"),
-        "callout": Style(fill="#EFF6FF", line="primary", line_width=1, padding="10pt"),
-        "muted": Style(color="muted"),
-        "dense": Style(font_size=11),
-        "kpi": Style(font_size=36, bold=True, color="primary", align="center", valign="middle"),
-        **_COMMON,
-    },
-)
 
-MIDNIGHT = Theme(
-    name="midnight",
-    colors={
-        "bg": "#0F172A",
-        "fg": "#E2E8F0",
-        "primary": "#38BDF8",
-        "secondary": "#2DD4BF",
-        "accent": "#FBBF24",
-        "muted": "#94A3B8",
-        "border": "#334155",
-        "surface": "#1E293B",
-        "danger": "#F87171",
-        "success": "#4ADE80",
-    },
-    title_color="primary",
-    table_header_fill="#334155",
-    classes={
-        "card": Style(fill="surface", line="border", line_width=0.75, radius=8, padding="10pt"),
-        "callout": Style(fill="surface", line="primary", line_width=1.25, padding="10pt"),
-        "muted": Style(color="muted"),
-        "dense": Style(font_size=11),
-        "kpi": Style(font_size=36, bold=True, color="primary", align="center", valign="middle"),
-        **_COMMON,
-    },
-)
+def merge_data(base: dict, over: dict) -> dict:
+    """Deep merge of plain token mappings (``over`` wins; nested mappings merge)."""
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = merge_data(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
 
-JP_BUSINESS = Theme(
-    name="jp-business",
-    colors={
-        "bg": "#FFFFFF",
-        "fg": "#1F2937",
-        "primary": "#1E3A5F",
-        "secondary": "#2F6B9A",
-        "accent": "#C00000",
-        "muted": "#5B6573",
-        "border": "#BFC7D1",
-        "surface": "#F1F4F8",
-        "danger": "#C00000",
-        "success": "#2E7D32",
-    },
-    fonts=Fonts(heading="Yu Gothic", body="Yu Gothic", mono="Consolas", ea="Yu Gothic"),
-    sizes={
-        "title": 24,
-        "subtitle": 16,
-        "heading": 13,
-        "body": 11,
-        "lead": 13,
-        "quote": 11,
-        "caption": 9,
-        "footnote": 9,
-        "code": 10,
-        "table": 10.5,
-        "cover-title": 34,
-        "cover-subtitle": 18,
-    },
-    min_font_size=7,
-    margin_x="0.45in",
-    margin_y="0.3in",
-    gap="0.15in",
-    title_height="0.75in",
-    title_band="primary",
-    title_band_color="#FFFFFF",
-    heading_color="primary",
-    table_header_fill="primary",
-    table_header_color="#FFFFFF",
-    dense_scale=0.9,
-    classes={
-        "card": Style(fill="surface", line="border", line_width=0.5, radius=0, padding="7pt"),
-        "callout": Style(fill="#FDF2F2", line="danger", line_width=1, padding="7pt"),
-        "muted": Style(color="muted"),
-        "dense": Style(font_size=10.5),
-        "kpi": Style(font_size=26, bold=True, color="primary", align="center", valign="middle"),
-        **_COMMON,
-    },
-    heading_band="primary",
-    heading_band_color="#FFFFFF",
-)
 
-_REGISTRY: dict[str, Theme] = {"default": DEFAULT, "midnight": MIDNIGHT, "jp-business": JP_BUSINESS}
+def theme_from_data(data: dict, name: str) -> Theme:
+    """A Theme from a token mapping. ``extends: <preset>`` starts from that preset, else schema defaults."""
+    data = dict(data)
+    parent = data.pop("extends", None)
+    base = get_theme(str(parent)).model_dump() if parent else Theme(name=name).model_dump()
+    base["name"] = name
+    merged = merge_data(base, data)
+    merged["name"] = name
+    return Theme.model_validate(merged)
+
+
+@cache
+def _preset(name: str) -> Theme:
+    import yaml
+
+    data = yaml.safe_load((PRESET_DIR / f"{name}.yaml").read_text(encoding="utf-8")) or {}
+    return theme_from_data(data, name)
+
+
+def _preset_names() -> list[str]:
+    return sorted(p.stem for p in PRESET_DIR.glob("*.yaml"))
+
+
+_REGISTRY: dict[str, Theme] = {"none": Theme(name="none")}
 
 
 def register(theme: Theme) -> None:
@@ -201,11 +215,202 @@ def register(theme: Theme) -> None:
 
 
 def get_theme(name: str) -> Theme:
-    try:
+    if name in _REGISTRY:
         return _REGISTRY[name]
-    except KeyError:
-        raise KeyError(f"unknown theme {name!r}; available: {', '.join(sorted(_REGISTRY))}") from None
+    if name in _preset_names():
+        return _preset(name)
+    raise KeyError(f"unknown theme {name!r}; available: {', '.join(available())}")
 
 
 def available() -> list[str]:
-    return sorted(_REGISTRY)
+    return sorted(set(_REGISTRY) | set(_preset_names()))
+
+
+DEFAULT = _preset("default")
+MIDNIGHT = _preset("midnight")
+JP_BUSINESS = _preset("jp-business")
+
+
+# --------------------------------------------------------------------------- inline tokens
+
+TOKEN_GROUPS = ("colors", "fonts", "sizes", "style")
+# short `style:` keys -> canonical token paths
+STYLE_ALIASES = {
+    "radius": "classes.card.radius",
+    "padding": "classes.card.padding",
+    "shadow": "classes.card.shadow",
+    "border": "classes.card.line",
+    "border-width": "classes.card.line_width",
+    "card": "classes.card.fill",
+    "bg": "colors.bg",
+    "fg": "colors.fg",
+    "margin": "margin_x",
+}
+_STYLE_FIELDS = tuple(Style.model_fields)
+_NUM = re.compile(r"^-?\d+(?:\.\d+)?$")
+
+
+def _norm(key: str) -> str:
+    return key.strip().replace("-", "_")
+
+
+def token_paths(theme: Theme | None = None) -> list[str]:
+    """Every settable canonical token path (for did-you-mean hints and ``slidemark tokens``)."""
+    th = theme or Theme(name="none")
+    out: list[str] = []
+    for f in Theme.model_fields:
+        if f == "name":
+            continue
+        if f == "colors":
+            out += [f"colors.{k}" for k in th.colors]
+        elif f == "sizes":
+            out += [f"sizes.{k}" for k in th.sizes]
+        elif f == "fonts":
+            out += [f"fonts.{k}" for k in Fonts.model_fields]
+        elif f in ("layout", "render"):
+            model = LayoutTokens if f == "layout" else RenderTokens
+            out += [f"{f}.{k}" for k in model.model_fields]
+        elif f == "classes":
+            out += [f"classes.{c}.{k}" for c in th.classes for k in _STYLE_FIELDS]
+        else:
+            out.append(f)
+    return out
+
+
+def canonical_token(group: str, key: str) -> tuple[str | None, str]:
+    """Map a header token (``group`` line, ``key``) to a canonical path, or (None, hint).
+
+    ``colors:`` accepts any color name (new names become theme colors usable everywhere). ``sizes:`` takes
+    text roles. ``style:`` takes any other path: a Theme field (``gap``, ``title.band`` = ``title_band``),
+    ``<class>.<style field>`` (``card.fill``, ``hero.color``: unknown classes are created),
+    ``layout.<x>``, ``render.<x>``, a full path (``colors.bg``) or a short alias (``radius``).
+    """
+    g = group.lower()
+    k = key.strip()
+    if not k:
+        return None, "write key=value pairs, e.g. 'colors: primary=#7C5CFF'"
+    if g == "colors":
+        if not re.fullmatch(r"[A-Za-z][\w-]*", k):
+            return None, "color names are words, e.g. primary, brand-2"
+        return f"colors.{k}", ""
+    if g == "fonts":
+        if k in Fonts.model_fields:
+            return f"fonts.{k}", ""
+        return None, _did_you_mean(k, list(Fonts.model_fields))
+    if g == "sizes":
+        if k in DEFAULT_SIZES or k in ("kpi",):
+            return f"sizes.{k}", ""
+        return None, _did_you_mean(k, list(DEFAULT_SIZES))
+    # style: generic path
+    if k in STYLE_ALIASES:
+        return STYLE_ALIASES[k], ""
+    parts = k.split(".")
+    head = parts[0]
+    if head in ("colors", "fonts", "sizes") and len(parts) == 2:
+        return canonical_token(head, parts[1])
+    if head in ("layout", "render") and len(parts) == 2:
+        model = LayoutTokens if head == "layout" else RenderTokens
+        f = _norm(parts[1])
+        if f in model.model_fields:
+            return f"{head}.{f}", ""
+        return None, _did_you_mean(f, [f"{head}.{x}" for x in model.model_fields], prefix=f"{head}.")
+    joined = _norm("_".join(parts))
+    if len(parts) > 1 and joined in Theme.model_fields and joined not in ("classes", "layout", "render"):
+        return joined, ""  # title.band -> title_band, table.header.fill -> table_header_fill
+    if head == "classes" and len(parts) == 3:
+        parts = parts[1:]
+    if len(parts) == 2:
+        cls, field = parts[0], _norm(parts[1])
+        field = {"border": "line", "border_width": "line_width", "size": "font_size"}.get(field, field)
+        if field in _STYLE_FIELDS and re.fullmatch(r"[A-Za-z][\w-]*", cls):
+            return f"classes.{cls}.{field}", ""
+        return None, _did_you_mean(field, list(_STYLE_FIELDS), prefix=f"{cls}.")
+    f = _norm(k)
+    if len(parts) == 1 and f in Theme.model_fields and f not in ("name", "classes", "layout", "render"):
+        return f, ""
+    cands = [p for p in token_paths() if not p.startswith("classes.")] + list(STYLE_ALIASES)
+    return None, _did_you_mean(k, cands)
+
+
+def _did_you_mean(key: str, cands: list[str], prefix: str = "") -> str:
+    near = difflib.get_close_matches(key, [c.removeprefix(prefix) for c in cands], n=1, cutoff=0.6)
+    tip = "`slidemark tokens` lists every token"
+    return f"did you mean '{prefix}{near[0]}'? {tip}" if near else tip
+
+
+def _value(raw: str) -> Any:
+    v = raw.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+        return v[1:-1]
+    if v.lower() in ("none", "null", "off"):
+        return None
+    if v.lower() in ("true", "on", "yes"):
+        return True
+    if v.lower() in ("false", "no"):
+        return False
+    if _NUM.match(v):
+        return float(v) if "." in v else int(v)
+    return v
+
+
+def apply_tokens(theme: Theme, tokens: dict[str, str]) -> tuple[Theme, list[Diagnostic]]:
+    """Apply canonical ``path -> raw value`` tokens (``Deck.tokens``) on top of ``theme``.
+
+    Never raises: a token that does not validate is skipped with a ``bad-token`` diagnostic.
+    """
+    diags: list[Diagnostic] = []
+    data = theme.model_dump()
+    for path, raw in tokens.items():
+        trial = merge_data(data, {})
+        try:
+            _set_path(trial, path.split("."), _value(raw) if isinstance(raw, str) else raw)
+            Theme.model_validate(trial)
+        except (ValidationError, ValueError, TypeError, KeyError) as e:
+            why = e.errors()[0]["msg"] if isinstance(e, ValidationError) else str(e) or type(e).__name__
+            diags.append(
+                Diagnostic(
+                    level="warning",
+                    message=f"token {path}={raw!s}: {why[:100]}",
+                    rule="bad-token",
+                    hint="check the value type (color #RRGGBB or name, number, length like 12pt/0.3in)",
+                )
+            )
+            continue
+        data = trial
+    return Theme.model_validate(data), diags
+
+
+def _set_path(data: dict, parts: list[str], value: Any) -> None:
+    head, rest = parts[0], parts[1:]
+    if not rest:
+        if head == "palette" and isinstance(value, str):
+            value = [p.strip() for p in value.split(",") if p.strip()]
+        data[head] = value
+        return
+    node = data.get(head)
+    if node is None:
+        node = {}
+        data[head] = node
+    if not isinstance(node, dict):
+        raise ValueError(f"{head} is not a group")
+    if head == "classes" and len(rest) == 2 and rest[0] not in node:
+        node[rest[0]] = {}
+    if head == "classes" and len(rest) == 2 and node[rest[0]] is None:
+        node[rest[0]] = {}
+    _set_path(node, rest, value)
+
+
+def schema_table(theme: Theme | None = None) -> list[tuple[str, str]]:
+    """``(path, current value)`` rows for every token, for ``slidemark tokens``."""
+    th = theme or Theme(name="none")
+    data = th.model_dump()
+    rows: list[tuple[str, str]] = []
+    for path in token_paths(th):
+        node: Any = data
+        for p in path.split("."):
+            node = node.get(p) if isinstance(node, dict) else None
+        if path.startswith("classes.") and node is None:
+            continue
+        text = ",".join(node) if isinstance(node, list) else str(node)
+        rows.append((path, "none" if node is None else text))
+    return rows
