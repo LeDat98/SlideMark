@@ -19,7 +19,8 @@ def _tokens(text: str) -> int:
 
 
 def test_budgets():
-    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 1500
+    # SKILL.md is the only document an agent reads (docs/AGENT_COST.md): budget for completeness, not brevity
+    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 3000
     refs = sorted((SKILL / "reference").glob("*.md"))
     assert len(refs) >= 5
     for p in refs:
