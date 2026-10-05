@@ -11,7 +11,9 @@ from markdown_it.token import Token
 from ..ir import Cell, Chart, Code, Image, Paragraph, Raw, Run, Series, Style, Table, Text
 from .attrs import Attrs, apply_attrs, parse_attr_body
 from .ctx import Ctx, closest
+from .html import html_blocks
 from .inline import MD, ImageRef, inline_items, inline_runs
+from .mermaid import build_mermaid
 from .tabular import numbers_row, read_csv
 
 CHART_KINDS = (
@@ -232,6 +234,13 @@ def build_fence(tok: Token, line: int, ctx: Ctx) -> Any:
         return el
     if lang == "table":
         el = build_table_csv(body, ctx, line)
+    elif lang == "mermaid":
+        el = build_mermaid(body, ctx, line)
+    elif lang == "html":
+        els = html_blocks(body, ctx, line)
+        if els is not None:
+            return els
+        el = Raw(kind="html", source=body, line=line)
     elif lang in RAW_KINDS:
         el = Raw(kind=lang, source=body, line=line)
     else:
@@ -380,8 +389,9 @@ class _Builder:
             elif ty == "fence":
                 self.flush()
                 el = build_fence(tok, line, self.ctx)
-                self.take(el, line)
-                self.out.append(el)
+                for one in el if isinstance(el, list) else [el]:
+                    self.take(one, line)
+                    self.out.append(one)
             elif ty == "table_open":
                 self.flush()
                 el = build_table_gfm(inner, self.ctx, line)

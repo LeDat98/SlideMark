@@ -326,11 +326,11 @@ def test_chart_problems_are_diagnostics():
 
 def test_raw_and_code_fences():
     d = parse(
-        "# A\n```mermaid\ngraph TD; a-->b\n```\n```math\nx^2\n```\n```html\n<b>x</b>\n```\n```\nplain\n```\n"
+        "# A\n```mermaid\ngantt\nA->>B\n```\n```math\nx^2\n```\n```html\n<svg/>\n```\n```\nplain\n```\n"
     )
     kinds = [(type(e).__name__, getattr(e, "kind", getattr(e, "lang", None))) for e in d.slides[0].elements]
     assert kinds == [("Raw", "mermaid"), ("Raw", "math"), ("Raw", "html"), ("Code", None)]
-    assert isinstance(d.slides[0].elements[0], Raw) and "a-->b" in d.slides[0].elements[0].source
+    assert isinstance(d.slides[0].elements[0], Raw) and "A->>B" in d.slides[0].elements[0].source
 
 
 # --------------------------------------------------------------------------- corpus and examples

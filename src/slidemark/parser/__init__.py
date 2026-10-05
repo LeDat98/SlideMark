@@ -4,11 +4,19 @@ from __future__ import annotations
 
 from ..ir import Deck, Diagnostic
 from .core import parse_deck
+from .html import parse_html
+
+
+def _looks_like_html(text: str) -> bool:
+    head = text.lstrip("\ufeff \t\r\n")[:20].lower()
+    return head.startswith(("<!doctype html", "<html", "<section"))
 
 
 def parse(text: str) -> Deck:
     """Parse SlideMark Markdown into a Deck. Never raises: problems go to ``deck.diagnostics``."""
     try:
+        if _looks_like_html(text):
+            return parse_html(text)
         return parse_deck(text)
     except Exception as e:  # last-resort guard: bad input must never crash the caller
         deck = Deck()
@@ -23,4 +31,4 @@ def parse(text: str) -> Deck:
         return deck
 
 
-__all__ = ["parse"]
+__all__ = ["parse", "parse_html"]
