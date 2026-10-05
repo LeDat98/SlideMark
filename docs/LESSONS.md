@@ -94,3 +94,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [eval] Lint must use the deck's real design (`deck_theme`, tokens applied): tests that used `resolve_theme` saw neutral colors and missed/raised contrast falsely.
 - [import] PowerPoint drops unknown package parts → the design source (tokens, css, html) rides in a customXml item keyed by `p:sldId` (reorder-safe); an HTML slide whose text was edited imports as shapes (`import-html-edited`).
 - [layout] The search stacked short boxes into wide bars because the scorer counted short cards as sparse → `bars` penalty (bar ≥ 60% wide whose longest line < 50%). Closing the empty band by stretching cards only moves the emptiness inside the cards: grow text first.
+- [import] A stored `theme:` path is relative to the original build directory → when the deck has its own masters, import uses the imported .pptx itself as the template.
