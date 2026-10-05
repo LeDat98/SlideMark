@@ -34,3 +34,11 @@ Run goal:
 - Problems: preview fonts (DejaVu for Calibri) faked wraps → Carlito + aliases; I pushed two red commits (fixed within minutes).
 - Open: dense ≤ 40% of HTML gate is content-bound (markup overhead is ~16% of HTML's); PowerPoint repair check for animations/morph/sections/OMML not possible here.
 - Next: L3 consulting-grade review pass, video/audio, Chromium HTML measurement, XSD validation, PyPI packaging.
+
+## 2026-10-05 (run 2, manual, 04:10 UTC–)
+Run goal:
+- [ ] Leftover: sparse box slides + consulting-grade layout pass (box height ∝ content, table rows, gaps)
+- [ ] Leftover: importer reconstructs connectors (`a>b`) and mermaid diagrams
+- [ ] L5: video/audio natively embedded
+- [ ] L3: dense JP consulting deck ≥ 8 slides (examples/11) reviewed
+- [ ] L6: XSD validation of generated decks; CI on 3 Python versions; coverage measured

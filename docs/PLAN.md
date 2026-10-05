@@ -238,3 +238,18 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
 - [ ] L3 consulting-grade pass on JP slides (02 slide 1 right boxes sparse, 07 slide 2 empty band)
 - [ ] Video/audio; Chromium measurement for HTML; XSD validation of output; PowerPoint repair check (owner)
 - [ ] Importer: reconstruct connectors (`a>b`) and mermaid
+
+## Run 2026-10-05 (manual, 04:10 UTC) work packages
+- **Wave 1 A: importer** (`src/slidemark/importer/`, `tests/test_import*.py`): reconstruct connectors between
+  boxes as `@ a>b` tokens (glued `stCxn/endCxn` first, else nearest box edges), and mermaid diagrams
+  (`.diagram` containers built by us) back into a ` ```mermaid ` fence; round trip stays stable.
+- **Wave 1 B: layout consulting-grade pass** (`src/slidemark/layout/`, `tests/test_layout*.py`, goldens):
+  card height follows content (no 70%-empty cards; very sparse rows centered vertically), table rows capped
+  near their natural height (no stretched 64 px rows of 10.5 pt text), same title→body gap on every slide,
+  box rows above a chart/table take their natural height, no empty band above the conclusion bar (07 slide 2),
+  stacked boxes in one column get height in proportion to content (02 slide 1), chevron lists without bullets.
+- **Wave 2 A+B: video/audio** (contract `ir.Media` committed by orchestrator): `![](x.mp4)`/`![](x.mp3)` →
+  native embedded media with poster frame; missing file → placeholder + diagnostic.
+- **Wave 2 B / 3: fixes from the gallery review** of wave 1 and of the new dense JP consulting deck.
+- **Orchestrator:** `examples/11-jp-consulting.md` (≥ 8 dense slides, L3 gate), CI on 3 Python versions +
+  coverage report, XSD/schema validation script for generated decks (L6), docs.
