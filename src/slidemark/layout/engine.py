@@ -35,6 +35,7 @@ from .grid import row_heights as grid_row_heights
 from .score import score as score_layout
 from .search import alternatives
 from .tables import capped_width, column_widths, right_align_numbers, row_heights, table_grid
+from .vfill import fill_body
 
 _SIZE_KEY = {
     "title": "title",
@@ -338,7 +339,34 @@ def _text_style(ctx: _Ctx, el: Text | Shape, inherit: Style) -> Style:
         kind = next((k for k in _CALLOUT_KINDS if k in el.classes), None)
         if kind and (tint := _tint(ctx.theme, st.line)):
             st = st.merged(Style(fill=tint))
-    return _tighten(ctx, st)
+    st = _tighten(ctx, st)
+    if isinstance(el, Text) and "callout" in el.classes:
+        st = _callout_floor(ctx, st)
+    return st
+
+
+def _callout_floor(ctx: _Ctx, st: Style) -> Style:
+    """A callout keeps ``callout_pad_min`` padding on every side and text at least as large as a footnote."""
+    floor = to_emu(ctx.lt.callout_pad_min) / EMU_PER_PT
+    upd: dict = {}
+    for f in ("padding", "padding_top", "padding_right", "padding_bottom", "padding_left"):
+        v = getattr(st, f)
+        if v is None:
+            continue
+        try:
+            if to_emu(v) / EMU_PER_PT < floor:
+                upd[f] = f"{floor}pt"
+        except ValueError:
+            continue
+    if all(
+        getattr(st, f) is None
+        for f in ("padding", "padding_top", "padding_right", "padding_bottom", "padding_left")
+    ):
+        upd["padding"] = f"{floor}pt"
+    small = ctx.theme.sizes.get("footnote", DEFAULT_SIZES["footnote"])
+    if st.font_size is not None and st.font_size < small:
+        upd["font_size"] = small
+    return st.merged(Style(**upd)) if upd else st
 
 
 def _only_inheritable(s: Style) -> Style:
@@ -591,10 +619,20 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
         )
         if _has_box_text(ctx):  # ... but stays within one step of the box text on the same slide
             body = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
-            want = body / ctx.lt.peer_step / max(st.font_size or 14, 1) / max(eff, 1e-6)
+            peer = 1.0 if ctx.lt.body_size_unify else ctx.lt.peer_step  # unify: never below the box text
+            want = body / peer / max(st.font_size or 14, 1) / max(eff, 1e-6)
             t = max(t, min(want, ctx.grow * 1.1))
         eff *= t
         ctx.grew = True
+    elif ctx.lt.body_size_unify and ctx.scale >= 1.0 and _has_box_text(ctx) and not _tables_alone(ctx):
+        box = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
+        have = (st.font_size or 14) * eff
+        if (
+            box > have
+            and not (ctx.css.active and ctx.css.own(el).font_size is not None)
+            and box / have <= ctx.lt.unify_max
+        ):  # a table smaller than the card text beside it inverts the hierarchy: lift it to the same size
+            eff *= box / have
     nrows, ncols, anchors = table_grid(el)
     size = (st.font_size or 14) * eff
     b = getattr(el, "box", None)
@@ -2049,6 +2087,24 @@ def _run(text: str):
     return Run(text=text)
 
 
+def _reserve_lead(deck: Deck, mode: str) -> bool:
+    """``reserve_lead``: on, off, or auto = at least half of the deck's content slides carry a lead line."""
+    if mode == "on":
+        return True
+    if mode == "off":
+        return False
+    body = [s for s in deck.slides if s.title and s.elements and s.layout in (None, "content")]
+    return bool(body) and sum(s.lead is not None for s in body) * 2 >= len(body)
+
+
+def _has_chart(elements: list) -> bool:
+    """True when a chart sits anywhere in ``elements`` (its legend needs air above the footnote band)."""
+    for e in elements:
+        if isinstance(e, Chart) or (isinstance(e, Container) and _has_chart(e.children)):
+            return True
+    return False
+
+
 def _bottom(c: _Ctx) -> int:
     return max((p.y + p.h for p in c.out), default=0)
 
@@ -2491,6 +2547,17 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             put(head, el, r, st, eff)
             y = r.bottom + sg // 2
             head_bottom = r.bottom
+        if (
+            kind == "content"
+            and slide.title
+            and slide.lead is None
+            and slide.subtitle is None
+            and head_bottom is not None
+            and _reserve_lead(deck, ctx.lt.reserve_lead)
+        ):  # most slides of the deck have a lead line: keep its slot so the body starts at the same y
+            st = _styled(ctx, _text_el("lead", "x"), _role_style(ctx, "lead"))
+            h = round(_text_need(ctx, _text_el("lead", "x"), st, inner_w, 1.0))
+            head_bottom = y + (sg // 2 if y == My else 0) + h
         y_top = y if head_bottom is None else head_bottom + _emu(ctx.lt.top_gap)
         body = None
 
@@ -2560,7 +2627,11 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             for f, st, h, e in zip(notes, sts, hs, effs, strict=True):
                 put(tail, f, Rect(Mx, fy0, inner_w, h), st, e)
                 fy0 += h
-            bottom = bottom - sum(hs) - sg // 2
+            bottom = (
+                bottom
+                - sum(hs)
+                - (max(sg // 2, _emu(ctx.lt.footnote_gap)) if _has_chart(slide.elements) else sg // 2)
+            )
         if slide.conclusion is not None and slide.conclusion.paragraphs:
             c = slide.conclusion
             st = _styled(ctx, c, _role_style(ctx, "conclusion"))
@@ -2658,6 +2729,15 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 f"arranged as `@{chosen}` (the default arrangement scored worse)",
                 f"write `@{chosen}` to pin it",
                 level="info",
+            )
+        if kind == "content" and not final_ctx.over and final_ctx.out:
+            final_ctx.out = fill_body(
+                final_ctx.out,
+                body,
+                ctx.lt.body_free_max,
+                ctx.lt.body_valign,
+                ctx.lt.body_spread_max,
+                _emu(ctx.lt.top_gap) if (slide.conclusion or slide.footnotes) else 0,
             )
         ctx.diags += final_ctx.diags
         seen: set[str] = set()

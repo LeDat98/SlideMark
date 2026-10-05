@@ -9,6 +9,8 @@ from slidemark.layout import layout_slide
 from slidemark.parser import parse
 from slidemark.template import deck_theme
 
+from .helpers import top_anchored
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -128,6 +130,7 @@ def test_rendered_cards_hug_their_text(tmp_path):
     md = ROOT / "examples" / "16-jp-strategy.md"
     deck = parse(md.read_text(encoding="utf-8"))
     theme, _ = deck_theme(deck, md.parent)
+    theme = top_anchored(theme)
     placed = [layout_slide(s, deck, theme, i) for i, s in enumerate(deck.slides)]
     out = tmp_path / "d.pptx"
     render(deck, placed, theme, out)

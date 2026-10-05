@@ -12,6 +12,7 @@ from slidemark.parser import parse
 from slidemark.theme import LayoutTokens, get_theme
 from slidemark.units import EMU_PER_INCH, slide_size, to_emu
 
+from .helpers import top_anchored
 from .test_layout_policies import T, box, bullets, cell, of
 
 W, H = slide_size("16:9")
@@ -19,7 +20,7 @@ W, H = slide_size("16:9")
 
 def lay(slide, theme="jp-business"):
     deck = Deck(slides=[slide])
-    return layout_slide(slide, deck, get_theme(theme), 0), deck
+    return layout_slide(slide, deck, top_anchored(get_theme(theme)), 0), deck
 
 
 def chart():

@@ -13,7 +13,7 @@ def T(s, role="body"):
 
 def themed(name="default", **layout):
     th = get_theme(name)
-    return th.model_copy(update={"layout": LayoutTokens(**layout)})
+    return th.model_copy(update={"layout": LayoutTokens(**{"body_valign": "top", **layout})})
 
 
 def sparse_box_slide():

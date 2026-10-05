@@ -10,6 +10,7 @@ from slidemark.layout import layout_slide
 from slidemark.render import render
 from slidemark.theme import get_theme
 
+from .helpers import top_anchored
 from .test_layout_policies import H, T, box, bullets, cards, cell, lay, of
 
 
@@ -255,7 +256,7 @@ def _lay_md(src):
 
     deck = parse(src)
     theme, _ = resolve_theme(deck.theme, None)
-    return layout_slide(deck.slides[0], deck, theme, 0), deck
+    return layout_slide(deck.slides[0], deck, top_anchored(theme), 0), deck
 
 
 def _pt(p):

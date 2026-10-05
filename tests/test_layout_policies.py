@@ -8,6 +8,8 @@ from slidemark.layout.tables import column_widths, is_numeric, table_grid
 from slidemark.theme import LayoutTokens, get_theme
 from slidemark.units import EMU_PER_INCH, slide_size
 
+from .helpers import top_anchored
+
 W, H = slide_size("16:9")
 
 
@@ -33,7 +35,7 @@ def cell(t, **kw):
 
 def lay(slide, theme="jp-business"):
     deck = Deck(slides=[slide])
-    return layout_slide(slide, deck, get_theme(theme), 0), deck
+    return layout_slide(slide, deck, top_anchored(get_theme(theme)), 0), deck
 
 
 def _lay_tall(slide, theme="default"):
