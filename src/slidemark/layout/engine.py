@@ -33,6 +33,7 @@ from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import css, measure
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
+from .l3fill import fill_panels, fill_row
 from .score import score as score_layout
 from .search import alternatives
 from .tables import capped_width, column_widths, right_align_numbers, row_heights, table_grid
@@ -3396,6 +3397,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 ctx.lt.card_stretch_share,
                 ctx.lt.table_row_max_em,
             )
+        if kind == "content" and not final_ctx.over and final_ctx.out:
+            if final_ctx.completed:  # a sparse row of text cards: top-anchored, tall, spread paragraphs
+                small = theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
+                final_ctx.out = fill_row(
+                    final_ctx.out, body, ctx.lt, consulting=final_ctx.dense_k < 1.0 or small
+                )
+            final_ctx.out = fill_panels(final_ctx.out, body, ctx.lt)
         if (
             ctx.dense_k >= 1.0
             and ctx.lt.grow

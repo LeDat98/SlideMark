@@ -14,10 +14,12 @@ from .helpers import top_anchored
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def _slide(name: str, number: int) -> tuple[list[Placed], int]:
+def _slide(name: str, number: int, hug: bool = False) -> tuple[list[Placed], int]:
     md = ROOT / "examples" / f"{name}.md"
     deck = parse(md.read_text(encoding="utf-8"))
     theme, _ = deck_theme(deck, md.parent)
+    if hug:  # `layout.body_valign=top` keeps the hugging cards (the default fills the body: L3 fill)
+        theme = top_anchored(theme)
     items = layout_slide(deck.slides[number - 1], deck, theme, number - 1)
     return items, 6492240  # slide bottom minus the page margin (EMU)
 
@@ -68,7 +70,7 @@ def test_html_mixed_card_row_has_no_big_band():  # 15-html-mixed slide 2
 
 
 def test_dense_two_box_slide_hugs_its_text():  # 11-jp-consulting slide 9
-    items, h = _slide("11-jp-consulting", 9)
+    items, h = _slide("11-jp-consulting", 9, hug=True)
     cards = _cards(items)
     assert len(cards) == 2 and len({c.y for c in cards}) == 1
     import sys
@@ -115,6 +117,9 @@ def test_no_row_leader_card_has_a_tail_over_a_quarter_on_any_example():
     for md in sorted((ROOT / "examples").glob("*.md")):
         deck = parse(md.read_text(encoding="utf-8"))
         theme, _ = deck_theme(deck, md.parent)
+        theme = top_anchored(
+            theme
+        )  # the default stretches decision rows on purpose (tests/test_layout_l3_fill.py)
         for i, s in enumerate(deck.slides):
             tails = _lead_tails(layout_slide(s, deck, theme, i))
             if tails and max(tails) > TAIL_MAX:

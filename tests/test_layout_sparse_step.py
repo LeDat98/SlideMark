@@ -46,8 +46,8 @@ def test_sparse_slide_takes_the_step_and_does_not_overflow():
 
 
 def test_step_widens_paragraph_gap_and_card_padding():
-    placed0, _ = lay_with(DENSE + TWO_CARDS, sparse_step=1.0, sparse_step_min=1.0)
-    placed1, _ = lay_with(DENSE + TWO_CARDS)
+    placed0, _ = lay_with(DENSE + TWO_CARDS, sparse_step=1.0, sparse_step_min=1.0, l3_fill=False)
+    placed1, _ = lay_with(DENSE + TWO_CARDS, l3_fill=False)
     gaps = [p.element.attrs.get("para_gap") for p in of(placed1, Text) if p.element.role == "body"]
     assert gaps and all(g is not None and g >= LayoutTokens().sparse_para_gap - 1e-9 for g in gaps)
     gaps0 = [p.element.attrs.get("para_gap") for p in of(placed0, Text) if p.element.role == "body"]
