@@ -68,7 +68,7 @@ Never limit the agent's design ability: mechanisms, not looks. These gates come 
 ## L7: Breakthrough
 - [ ] Blind review: agent-made decks preferred or tied against professional human decks in ≥ 50% of pairs
 - [ ] Vision self-review loop: `preview` + automatic design critique fixes layout issues without human input
-- [ ] Tokens near the floor: syntax ≤ 20% of python-pptx; ≥ 95% of tasks need only SKILL.md (no reference reads)
+- [ ] Tokens near the floor: syntax ≤ 20% of python-pptx; ≥ 95% of tasks need only SKILL.md (no reference reads) (run 4: q3 content floor alone is 25% → unreachable on q3; agent-written decks 6% of python-pptx answers, 99% of 100 tasks pass from SKILL.md only; owner decision proposed in `docs/TOKEN_FLOOR.md`)
 - [x] Agent eval first-pass success ≥ 98% across ≥ 100 tasks, including dense JP and HTML-heavy decks (100 tasks: run-4 01–20 20/20 + run-5 21–100 79/80 = 99%; jp 34/34, html 17/17, hard 10/10; Sonnet, SKILL.md only, 2026-10-05)
 - [ ] Lossless round-trip of any deck the library produced (`bench/roundtrip.py`: 114/115 = 99.1% on examples + 100 eval answers, design source round trip 3/3, 2026-10-05 run 3); real-world `.pptx` import ≥ 95% fidelity (`bench/import_fidelity.py` on 19 agent-written python-pptx decks: 0.975, lenient metric; color fidelity 0.847 via derived look tokens; true real-world decks still needed)
 - [ ] Every presentation feature of PowerPoint reachable from text; nothing requires opening PowerPoint to fix

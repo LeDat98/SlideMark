@@ -46,7 +46,7 @@ Content:
 - `**b**` `*i*` `==accent==` `[x]{.danger}` `[済]{.badge .success}` `[link](url)`.
 - `## 売上 {.kpi icon=yen}` + `12.4億円` + caption line = KPI card; `icon=` on any box heading.
 - `> [!warn] text` callout (`note` `tip` `warn` `caution`).
-- GFM table; a lone `<` merges left, `^` merges up; `{align=lrr}` on the line before.
+- Table: ```` ```table ```` CSV (header first; cheaper than GFM) or GFM; a lone `<` merges left, `^` up; `{align=lrr}` before it.
 - Chart fence (`column bar line pie doughnut area scatter radar stacked-column stacked-bar`), CSV: first row =
   categories, one row per series; options `title legend=bottom|none labels=on|percent fmt="0%"`:
 
