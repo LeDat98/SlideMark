@@ -50,7 +50,7 @@ slidemark skill install      # cài skill cho Claude Code
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-05 · commit `101bdbf` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-05 · commit `01addba` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -173,6 +173,21 @@ Nguồn: [`examples/15-html-mixed.md`](examples/15-html-mixed.md)
 ![15-html-mixed slide 1](docs/gallery/15-html-mixed/slide-01.png)
 ![15-html-mixed slide 2](docs/gallery/15-html-mixed/slide-02.png)
 ![15-html-mixed slide 3](docs/gallery/15-html-mixed/slide-03.png)
+
+### 16-jp-strategy
+
+Nguồn: [`examples/16-jp-strategy.md`](examples/16-jp-strategy.md)
+
+![16-jp-strategy slide 1](docs/gallery/16-jp-strategy/slide-01.png)
+![16-jp-strategy slide 2](docs/gallery/16-jp-strategy/slide-02.png)
+![16-jp-strategy slide 3](docs/gallery/16-jp-strategy/slide-03.png)
+![16-jp-strategy slide 4](docs/gallery/16-jp-strategy/slide-04.png)
+![16-jp-strategy slide 5](docs/gallery/16-jp-strategy/slide-05.png)
+![16-jp-strategy slide 6](docs/gallery/16-jp-strategy/slide-06.png)
+![16-jp-strategy slide 7](docs/gallery/16-jp-strategy/slide-07.png)
+![16-jp-strategy slide 8](docs/gallery/16-jp-strategy/slide-08.png)
+![16-jp-strategy slide 9](docs/gallery/16-jp-strategy/slide-09.png)
+![16-jp-strategy slide 10](docs/gallery/16-jp-strategy/slide-10.png)
 <!-- gallery:end -->
 
 ## Tài liệu
