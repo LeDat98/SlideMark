@@ -196,7 +196,7 @@ def test_chevron_text_uses_the_interior_and_words_fit():
         assert avail >= 0.55 * p.w  # the text frame is not half the chevron
         assert _longest_word_pt(p) * EMU_PER_PT <= avail  # no word is broken
     assert not [d for d in deck.diagnostics if d.rule == "chevron-word-break"]
-    assert max(p.h for p in chevs) <= 0.4 * 6858000  # alone: ``chevron_alone_share_sparse`` of the body
+    assert max(p.h for p in chevs) <= 0.5 * 6858000  # alone: top-anchored, ``chevron_fill_share`` of the body
 
 
 def test_chevron_word_break_is_flagged_when_nothing_fits():

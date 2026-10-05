@@ -66,6 +66,12 @@ class LayoutTokens(BaseModel):
     )
     chevron_head_min_scale: float = 0.7  # ... shrinking the text at most to this share of the base size
     chevron_head_slack: float = 1.25  # a heading must fit this much narrower (DejaVu-like fallback fonts)
+    chevron_cjk_slack: float = (
+        1.25  # a CJK chevron line must fit this much narrower (fallback fonts), else shrink
+    )
+    chevron_fill_share: float = (
+        0.66  # a lone chevron row (top-anchored) is this share of the body tall at least
+    )
     chevron_pad: Length = "4pt"
     chevron_min_h: Length = "0.7in"
     chevron_max_h: Length = "1.3in"
@@ -204,7 +210,7 @@ class LayoutTokens(BaseModel):
     )
     sparse_row_gap_max: Length = "0.5in"  # ... rows of blocks move apart by at most this much per gap, first
     kpi_fit_margin: float = 0.9  # ... a grown KPI number fills at most this share of the width it fits in
-    sparse_air: float = 1.0  # ... paragraph gap (em) of plain body text, at most (lists on a sparse slide)
+    sparse_air: float = 0.8  # ... paragraph gap (em) of plain body text, at most (lists on a sparse slide)
     sparse_card_air: float = 1.15  # ... a lone row of cards may reach this multiple of its natural height
     sparse_kpi_air: float = 1.15  # ... KPI cards may be this much taller than their content
     sparse_lead_grow: float = 1.4  # ... the lead line grows with the body text, at most this factor ...
@@ -224,6 +230,15 @@ class LayoutTokens(BaseModel):
     )
     l3_gap_extra_numbered: float = 1.8  # ... the same for numbered items (decisions)
     panel_fill_min: float = 0.7  # ... a panel beside a chart whose content fills less of it is spread
+    l3_tail_max: float = 0.25  # ... a text card of a lone row keeps at most this share of its height empty
+    l3_tail_aim: float = (
+        0.22  # ... a row shortened to meet it aims at this share (rounding stays within the limit)
+    )
+    l3_grow_step: float = 0.05  # ... its text grows in steps of this factor (CJK wrap guard stays on) ...
+    l3_body_head_max: float = 1.2  # ... up to this multiple of the card heading size (and sparse_text_max_pt)
+    l3_gap_extra_short: float = 3.0  # ... lists of at most l3_short_items items may spread this much (em) ...
+    l3_wrap_margin: float = 0.12  # ... grown text must also fit this much narrower (renderers wrap earlier)
+    l3_short_items: int = 4  # ... before the row is shortened to meet l3_tail_max (top-anchored)
 
 
 class RenderTokens(BaseModel):

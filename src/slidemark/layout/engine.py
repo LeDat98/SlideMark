@@ -33,7 +33,7 @@ from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import css, measure
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
-from .l3fill import fill_panels, fill_row
+from .l3fill import fill_chevron_row, fill_panels, fill_row
 from .score import score as score_layout
 from .search import alternatives
 from .tables import capped_width, column_widths, right_align_numbers, row_heights, table_grid
@@ -1862,6 +1862,8 @@ def _place_blocks(
             head_cap = _chevron_head_cap(ctx, flow, cells, chev_h, inherit)
             nominal = _chevron_nominal(ctx, flow, inherit)
             head_ok = head_cap is None or head_cap >= min(nominal, 1.0)
+            cjk_cap = _chevron_cjk_cap(ctx, flow, cells, chev_h, inherit)
+            head_ok = head_ok and (cjk_cap is None or cjk_cap >= min(nominal, 1.0))
             roomy = all(
                 _chevron_text_w(r, fast_style(), None, _cadj(ctx)) >= ctx.lt.chevron_text_share * r.w
                 for r in cells
@@ -1881,6 +1883,8 @@ def _place_blocks(
             chev_eff = word_cap if chev_eff is None else min(chev_eff, word_cap)
         if head_cap is not None and chev_eff is not None:  # ... and a bit more before a heading wraps
             chev_eff = min(chev_eff, head_cap)
+        if cjk_cap is not None and chev_eff is not None:  # CJK lines never break (fallback fonts run wider)
+            chev_eff = min(chev_eff, cjk_cap)
     for (i, blk), r in zip(flow, cells, strict=True):
         r = _css_width(ctx, blk, _apply_box(ctx, blk, r, False), inherit)
         rects[i] = r
@@ -2218,6 +2222,38 @@ def _chevron_head_cap(ctx: _Ctx, flow: list, cells: list[Rect], h: int, inherit:
         if fit is None:
             continue
         cap = fit if cap is None else min(cap, fit)
+    return cap
+
+
+def _chevron_cjk_cap(ctx: _Ctx, flow: list, cells: list[Rect], h: int, inherit: Style) -> float | None:
+    """Text scale at which every CJK line of a chevron row stays on ONE line in a fallback font.
+
+    A Japanese label has no spaces, so it breaks anywhere ("受取拠点の開 / 設") and leaves a one-character
+    orphan. Every paragraph with CJK text is measured ``chevron_cjk_slack`` x wider; the text shrinks (down to
+    ``chevron_head_min_scale`` of its size) until all of them fit. ``None`` = nothing to do.
+    """
+    lt = ctx.lt
+    top = max(ctx.chev_grow, 1.0)
+    cap: float | None = None
+    for (_i, blk), r in zip(flow, cells, strict=True):
+        if not isinstance(blk, (Text, Shape, Container)):
+            continue
+        sh, st, rect = _chevron_geom(ctx, blk, _apply_box(ctx, blk, r, False), inherit, h)
+        size = max(st.font_size or 18, 1.0)
+        avail = _chevron_text_w(rect, st, sh, _cadj(ctx)) / EMU_PER_PT / max(lt.chevron_cjk_slack, 1.0)
+        for i, para in enumerate(sh.paragraphs):
+            if not measure.has_cjk(para.plain):
+                continue
+            segs = measure.para_segments(
+                para, i == 0 and bool(para.runs) and all(run.bold for run in para.runs)
+            )
+            s_ = top
+            floor = lt.chevron_head_min_scale
+            while s_ > floor + 1e-9 and measure.count_lines(segs, avail, size * s_, st.font) > 1:
+                s_ = round(s_ - 0.025 * top, 3)
+            if measure.count_lines(segs, avail, size * s_, st.font) > 1:
+                continue  # even the smallest size would wrap: leave it to the usual wrap rules
+            cap = s_ if cap is None else min(cap, s_)
     return cap
 
 
@@ -3398,12 +3434,16 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 ctx.lt.table_row_max_em,
             )
         if kind == "content" and not final_ctx.over and final_ctx.out:
-            if final_ctx.completed:  # a sparse row of text cards: top-anchored, tall, spread paragraphs
+            linked_sparse = bool(slide.links) and (
+                body.bottom - _content_bottom(final_ctx.out) > round(ctx.lt.sparse_left_max * body.h)
+            )  # a flow row: the sparse completion skips linked slides, the row fill does not
+            if final_ctx.completed or linked_sparse:  # a sparse row of text cards: top-anchored, tall, spread
                 small = theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
                 final_ctx.out = fill_row(
                     final_ctx.out, body, ctx.lt, consulting=final_ctx.dense_k < 1.0 or small
                 )
             final_ctx.out = fill_panels(final_ctx.out, body, ctx.lt)
+            final_ctx.out = fill_chevron_row(final_ctx.out, body, ctx.lt)
         if (
             ctx.dense_k >= 1.0
             and ctx.lt.grow
