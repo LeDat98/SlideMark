@@ -33,7 +33,9 @@ num: on
 - Header: `theme` (`default` `midnight` `jp-business`, .pptx, `none`), `lang`, `footer`, `num: on`.
 - Own design: `colors: primary=#7C5CFF bg=#0B1020`, `fonts: body="Inter"`, `style: radius=14 title.band=none`
   header lines, CSS or `@html` slides (`slidemark docs design`).
-- `# Title` = slide; title + ≤ 2 short lines = cover or section divider.
+- `# Title` = slide; title + ≤ 2 short lines = cover or section divider (`@cover`, `@section` force it; `##` there is a subtitle line).
+- `size: 4:3` (also `A4`). `@bg=#0B1020` or `@bg="linear-gradient(135deg,#1A0B2E,#7A1FA2)"` = slide background;
+  dark bg flips the text light by itself (`@dark` / `@light` force it).
 - `## Heading` = box; boxes arrange themselves. `>` after the title = key message, `>` last = conclusion
   bar, `※` = footnote, `??? ` = speaker notes.
 - `@end` closes the last box; a table/chart after it goes full width.
@@ -43,6 +45,7 @@ num: on
 `@section`, `@dense`, `@build` (click to reveal), `@t=fade`. `@` after `@end` = new row of boxes.
 
 Content:
+- `- [ ] todo` `- [x] done` = ☐ ☑ list.
 - `**b**` `*i*` `==accent==` `[x]{.danger}` `[済]{.badge .success}` `[link](url)`.
 - `## 売上 {.kpi icon=yen}` + `12.4億円` + caption line = KPI card; `icon=` on any box heading.
 - `> [!warn] text` callout (`note` `tip` `warn` `caution`).
