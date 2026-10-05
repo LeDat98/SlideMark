@@ -168,3 +168,21 @@ Contract (committed by orchestrator): `ir.Link` + `Slide.links`/`Container.links
 - [ ] A: chart/table options, CSV edge cases, check JSON via linter
 - [ ] B: all chart kinds + options, OMML math
 - [ ] Orchestrator: lint v1
+
+## Day 5 work packages
+Contract: skill files live in `src/slidemark/skill/` (`SKILL.md` ≤ 1,500 tokens, `reference/*.md` ≤ 800 tokens
+each, o200k proxy), shipped as package data; written by the orchestrator.
+- **A: parser + CLI**: `slidemark docs [topic]` (SKILL.md, or `reference/<topic>.md`; unknown topic → list),
+  `slidemark schema` (JSON schema of `Deck`), `build`/`check` accept a `.json` Deck, `slidemark skill install
+  [--dir]` (default `~/.claude/skills/slidemark`, copies SKILL.md + reference/, idempotent, prints the path).
+- **B: layout + renderer**: `theme: path.pptx|.potx` → the file is the base presentation (masters, layouts, slide
+  size), theme colors/fonts read from its `a:theme` into a `Theme` (rest from `default`); title goes into the
+  layout's title placeholder; footer and slide number use the master's footer/sldNum placeholders when present
+  (native fields). Existing slides of the template are removed. Never raise: missing/corrupt file → default theme + diagnostic.
+- **Orchestrator:** SKILL.md + reference/ (syntax, components, charts-tables, jp-dense, diagnostics), token
+  budget test, AGENT_TIPS review.
+
+## Day 5 status
+- [ ] Orchestrator: SKILL.md + reference/ + budget test
+- [ ] A: docs, schema, JSON input, skill install
+- [ ] B: user templates, master placeholders for footer/number
