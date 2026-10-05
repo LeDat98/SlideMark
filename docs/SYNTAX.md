@@ -188,6 +188,9 @@ arrow-up, arrow-down, arrow-right). An unknown name is a warning with a did-you-
 
 ## Inline text
 
+Each source line of plain text is its own line on the slide (no Markdown soft-break merging); a line right
+under a list item still continues that item.
+
 Inline text is Markdown: `**bold**`, `*italic*`, `~~strike~~`, `` `code` ``, `[link](url)`, and `[go](#5)` to jump
 to slide 5. Additions:
 
