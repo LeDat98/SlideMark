@@ -189,3 +189,10 @@ def finish_timing(rc: RenderCtx, slide) -> None:
         seq = main[0].find(qn("p:childTnLst"))
         for k, xml in enumerate(auto):
             seq.insert(k, etree.fromstring(xml))
+    # an empty main sequence (no autoplay, no build animations) is a schema error: drop it and renumber
+    for cTn in timing.xpath(".//p:cTn[@nodeType='mainSeq']", namespaces=ns):
+        if len(cTn.find(qn("p:childTnLst"))) == 0:
+            seq = cTn.getparent()
+            seq.getparent().remove(seq)
+            for k, node in enumerate(timing.xpath(".//p:cTn", namespaces=ns), start=1):
+                node.set("id", str(k))

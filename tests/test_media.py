@@ -229,6 +229,14 @@ def test_xsd_valid(files):
     assert validate_pptx(out) == []
 
 
+@pytest.mark.skipif(_load_schema() is None, reason="ECMA-376 schemas not available")
+def test_xsd_valid_without_autoplay(files):
+    # no autoplay and no build animation: an empty main sequence would be a schema error
+    out = files / "y.pptx"
+    build_deck(parse("# T\n![demo](demo.mp4)\n- a\n"), out, base_dir=files)
+    assert validate_pptx(out) == []
+
+
 # ------------------------------------------------------------------ importer
 
 
