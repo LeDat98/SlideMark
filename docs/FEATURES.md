@@ -40,3 +40,9 @@ step does not apply (no visual risk to lint, or no syntax).
 | `check --fix [-o]` mechanical source repairs (`fix.py`) | x | x | x | - | - | - | - | - |
 | `.pptx` import (round trip) | x | x | x | x | x | - | - | x |
 | `review` design critique (`design-*` rules + score, `--png`) | x | x | x | - | - | - | x | - |
+| Design tokens: presets as YAML, `theme: none`, `colors:`/`fonts:`/`sizes:`/`style:` lines, `slidemark tokens` | x | x | x | x | x | x | x | x |
+| No hard-coded looks (`layout.*`/`render.*` tokens, DF1 scanner test) | x | - | - | x | x | x | - | x |
+| Gradients, CSS shadows, opacity on shapes and cards | x | x | x | x | x | x | x | - |
+| ` ```css ` fence: selectors + 34 properties native | x | x | x | x | x | x | x | x |
+| `@html` slides, `build deck.html`, shared CSS vars | x | x | x | x | x | x | x | x |
+| HTML → native fidelity (`bench/html_fidelity.py`, 30 slides) | x | - | - | x | x | x | x | x |
