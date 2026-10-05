@@ -61,3 +61,5 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] Row expansion is for multi-row grids only: a lone sparse row stays near natural height. The body top is `head_bottom + TOP_GAP` on every slide kind. `_row_heights` returning None skipped stacked-box weighting.
 - [render] python-pptx `add_movie` rebuilds `p:timing` (clashes with build animations) → drop its node and rewrite timing in `finish_timing`; `_Relationship.reltype` is a lazyproperty (pop it from `__dict__` before retyping to audio).
 - [parser] Shared helpers (`media_kind`) live in attrs.py: blocks.py ↔ html.py imports are circular.
+- [layout] Consulting slides are top-anchored: shift down only when content < 40% of the body, else the leftover stays at the bottom. Chevron row height comes from wrapped text height, not width × ratio.
+- [render] Theme palettes can repeat a color (accent == danger in jp-business) → de-duplicate before assigning series colors; inside data labels need per-series dLbls for contrast.

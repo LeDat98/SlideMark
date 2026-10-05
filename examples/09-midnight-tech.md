@@ -53,3 +53,9 @@ print(entry.account, entry.amount)
 ```
 - One endpoint, idempotent by receipt hash
 - Webhooks for review results
+
+# Product demo
+![Receipt upload to posted entry in 20 seconds](assets/demo.mp4)
+- Upload a photo, get a posted entry
+- Review queue for low-confidence cases
+- Plays inside PowerPoint (native video)

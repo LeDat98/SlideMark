@@ -47,7 +47,7 @@ slidemark skill install      # cài skill cho Claude Code
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-05 · commit `9016af2` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-05 · commit `ea7d09b` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -118,6 +118,7 @@ Nguồn: [`examples/09-midnight-tech.md`](examples/09-midnight-tech.md)
 ![09-midnight-tech slide 3](docs/gallery/09-midnight-tech/slide-03.png)
 ![09-midnight-tech slide 4](docs/gallery/09-midnight-tech/slide-04.png)
 ![09-midnight-tech slide 5](docs/gallery/09-midnight-tech/slide-05.png)
+![09-midnight-tech slide 6](docs/gallery/09-midnight-tech/slide-06.png)
 
 ### Template .pptx của người dùng, ảnh (cover crop), biểu đồ, callout
 
