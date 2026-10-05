@@ -21,16 +21,16 @@ Newest at the bottom. ≤ 10 lines per day: done · metrics · problems · next.
 - Problems: libreoffice-impress had to be apt-installed again; jp-dense slide 2 table now renders but is squeezed into one grid cell.
 - Next: slide-level visuals below a chevron/grid row, day 3 (components, dense JP, connectors).
 
-## 2026-10-05 (days 3–7 + gates, Opus-led run, 01:34–~03:45 UTC)
+## 2026-10-05 (days 3–7 + gates, Opus-led run, 01:34–03:35 UTC)
 Run goal:
 - [x] Day 2 leftover: slide-level visual under a chevron/grid row gets its own full-width row
 - [x] Day 3: components (kpi, callouts, badges, connectors, heading band, dense), ≥ 5 dense JP decks
 - [x] Day 4: chart/table options, all chart kinds, OMML math, `check` linter v1 + JSON
 - [x] Extended: days 5–7 (docs/schema/skill, templates, mermaid/HTML, animations/sections), icons, .pptx import, row groups, font metrics
-- Done: 8 waves, 17 Sonnet subagents + 5 eval agents; L2 reached, all L4 gates pass; L3 3/5, L5 1/4, L6 1/4.
-- Metrics: tests 597 passed; q3 155 tokens = 30% of python-pptx, 48% of HTML; jp-dense 482 vs HTML 828 (58%); unchanged.
+- Done: 9 waves, 18 Sonnet coding subagents + 5 eval agents; L2 reached, all L4 gates pass; L3 3/5, L5 2/4, L6 1/4.
+- Metrics: tests 602 passed (1 skipped); q3 155 tokens = 30% of python-pptx, 48% of HTML; jp-dense 482 vs HTML 828 (58%); unchanged.
 - Agent eval (Sonnet, SKILL.md only, 20 tasks): 100% first pass, (skill 909 + deck 152) / python-pptx 2,704 = 0.39.
-- Layout inference 100% (28/28 slides); fuzz 100k inputs 0 crashes; build 27 ms/slide.
+- Layout inference 100% (28/28 slides); fuzz 100k inputs 0 crashes; build 27 ms/slide; import ~200 ms; install 50 MB (python-pptx deps).
 - Problems: preview fonts (DejaVu for Calibri) faked wraps → Carlito + aliases; I pushed two red commits (fixed within minutes).
 - Open: dense ≤ 40% of HTML gate is content-bound (markup overhead is ~16% of HTML's); PowerPoint repair check for animations/morph/sections/OMML not possible here.
 - Next: L3 consulting-grade review pass, video/audio, Chromium HTML measurement, XSD validation, PyPI packaging.
