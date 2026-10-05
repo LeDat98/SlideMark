@@ -11,6 +11,7 @@ from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 
 from ..ir import Placed, Raw
+from ..theme import DEFAULT_SIZES
 from .util import RenderCtx, hex6
 
 M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
@@ -371,7 +372,9 @@ def add_math(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
     el: Raw = pl.element  # type: ignore[assignment]
     theme = rc.theme
     size = (
-        el.style.font_size if el.style and el.style.font_size else theme.sizes.get("body", 18)
+        el.style.font_size
+        if el.style and el.style.font_size
+        else theme.sizes.get("body", DEFAULT_SIZES["body"])
     ) * pl.font_scale
     color = hex6(theme, (el.style.color if el.style else None) or "fg")
     try:

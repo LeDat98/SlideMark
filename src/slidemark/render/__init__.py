@@ -29,11 +29,12 @@ from ..ir import (
     Table,
     Text,
 )
-from ..layout.engine import CHEVRON_ADJ
+from ..layout import measure
 from ..template import clone_footer, open_template, pick_layout
-from ..theme import Theme
+from ..theme import DEFAULT_SIZES, Theme
 from ..units import slide_size
 from .anim import build_timing
+from .effects import apply_fill, apply_shadow
 from .htmlimg import add_html_image, add_html_native, close_html
 from .icons import add_icon
 from .math import add_math
@@ -89,6 +90,7 @@ def render(deck: Deck, placed: list[list[Placed]], theme: Theme, out: str | Path
     """Write ``deck`` to ``out``. ``placed[i]`` is the layout result for ``deck.slides[i]``."""
     out = Path(out)
     prs = None
+    measure.set_tokens(theme.layout)
     rc = RenderCtx(deck=deck, theme=theme, base_dir=str(deck.attrs.get("base_dir", ".")))
     if theme.template:
         try:
@@ -243,7 +245,7 @@ def _background(rc: RenderCtx, prs, s, slide: Slide) -> None:
         tree.insert(2, pic._element)
         return
     fill.solid()
-    fill.fore_color.rgb = rgb(theme, bg or "bg", theme.colors.get("bg", "#FFFFFF"))
+    fill.fore_color.rgb = rgb(theme, bg or "bg", theme.render.slide_bg)
 
 
 def _transition(rc: RenderCtx, s, slide: Slide) -> None:
@@ -376,22 +378,19 @@ def _name(pl: Placed, counters: dict[str, int]) -> str:
     return f"{base} {counters[base]}"
 
 
-def _style_shape(rc: RenderCtx, shp, st: Style) -> None:
+def _style_shape(rc: RenderCtx, shp, st: Style, pl: Placed | None = None) -> None:
     theme = rc.theme
-    if st.fill:
-        shp.fill.solid()
-        shp.fill.fore_color.rgb = rgb(theme, st.fill)
-        if st.opacity is not None and 0 <= st.opacity < 1:
-            clr = shp._element.spPr.find(qn("a:solidFill")).find(qn("a:srgbClr"))
-            etree.SubElement(clr, qn("a:alpha")).set("val", str(round(st.opacity * 100000)))
-    else:
+    spPr = shp._element.spPr
+    if not apply_fill(rc, spPr, st):
         shp.fill.background()
     if st.line:
         shp.line.color.rgb = rgb(theme, st.line)
-        shp.line.width = Pt(st.line_width if st.line_width is not None else 0.75)
+        shp.line.width = Pt(st.line_width if st.line_width is not None else theme.render.line_width)
     else:
         shp.line.fill.background()
-    if not st.shadow:
+    if st.shadow:
+        apply_shadow(rc, spPr, st, pl.w if pl else 0, pl.h if pl else 0)
+    else:
         shp.shadow.inherit = False
 
 
@@ -409,7 +408,7 @@ def _autoshape(rc: RenderCtx, slide, pl: Placed, kind, name: str):
         style_el is not None
     ):  # drop theme style refs: LibreOffice/PowerPoint would add a shadow and white text
         shp._element.remove(style_el)
-    _style_shape(rc, shp, pl.style)
+    _style_shape(rc, shp, pl.style, pl)
     _round(shp, pl.style, pl)
     return shp
 
@@ -472,7 +471,7 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
             if inset := el.attrs.get("icon_inset"):  # room for the icon the layout placed before the text
                 shp.text_frame.margin_left = Emu(shp.text_frame.margin_left + int(inset))
         if el.shape == "chevron":
-            shp.adjustments[0] = CHEVRON_ADJ
+            shp.adjustments[0] = rc.theme.layout.chevron_adj
     elif isinstance(el, Table):
         add_table(rc, s, pl, name)
     elif isinstance(el, Chart):
@@ -485,7 +484,14 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
             _placeholder(rc, s, pl, name, f"[{el.kind}: {el.alt or el.src}]")
     elif isinstance(el, Code):
         shp = _autoshape(rc, s, pl, MSO_SHAPE.RECTANGLE, name)
-        fill_text(rc, shp.text_frame, code_paragraphs(el), st, pl.font_scale, para_gap=False)
+        fill_text(
+            rc,
+            shp.text_frame,
+            code_paragraphs(el, rc.theme.render.code_style, rc.diag),
+            st,
+            pl.font_scale,
+            para_gap=False,
+        )
     elif isinstance(el, Raw) and el.kind == "math" and add_math(rc, s, pl, name):
         pass
     elif (
@@ -537,7 +543,7 @@ def _connector(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     _glue(slide, cx, el.attrs, fh, fv)
     st = pl.style
     cx.line.color.rgb = rgb(rc.theme, st.line or "primary")
-    cx.line.width = Pt(st.line_width if st.line_width is not None else 1.5)
+    cx.line.width = Pt(st.line_width if st.line_width is not None else rc.theme.render.connector_width)
     if el.attrs.get("head") == "arrow":
         ln = cx.line._get_or_add_ln()
         tail = etree.SubElement(ln, qn("a:tailEnd"))
@@ -616,7 +622,7 @@ def _elbow_geometry(cx, attrs: dict, pl: Placed, fh: bool, fv: bool) -> None:
 
 def _placeholder(rc: RenderCtx, s, pl: Placed, name: str, label: str) -> None:
     st = Style(
-        font_size=12,
+        font_size=rc.theme.sizes.get("caption", DEFAULT_SIZES["caption"]),
         color="muted",
         fill="surface",
         line="border",

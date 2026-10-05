@@ -17,7 +17,7 @@ import statistics
 from dataclasses import dataclass
 
 from ..ir import Chart, Container, Image, Media, Placed, Text
-from ..theme import Theme
+from ..theme import DEFAULT_SIZES, Theme
 from ..units import EMU_PER_PT, to_emu
 from . import measure
 from .grid import Rect
@@ -138,7 +138,7 @@ def score(items: list[Placed], body: Rect, theme: Theme, *, over: int = 0) -> Sc
     """Score the body items of one candidate layout (``over`` = number of overflowing blocks)."""
     parts: dict[str, float] = {}
     hard = HARD_OVER * over
-    body_pt = theme.sizes.get("body", 18)
+    body_pt = theme.sizes.get("body", DEFAULT_SIZES["body"])
     texts = [p for p in items if isinstance(p.element, Text) and getattr(p.element, "paragraphs", None)]
     tiny = [p for p in texts if (p.style.font_size or body_pt) * p.font_scale < theme.min_font_size - 0.05]
     hard += HARD_TINY * len(tiny)

@@ -21,25 +21,107 @@ _NAMED = {
     "gray": "808080",
     "grey": "808080",
     "orange": "FFA500",
-    "transparent": "FFFFFF",
+    "transparent": "FFFFFF",  # fully transparent: parse_color reports alpha 0
 }
 
 
+_HEX = re.compile(r"#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})")
+_FUNC = re.compile(r"rgba?\(\s*([\d.]+%?)[\s,]+([\d.]+%?)[\s,]+([\d.]+%?)(?:[\s,/]+([\d.]+%?))?\s*\)")
+_GRADIENT = re.compile(r"^\s*(?:repeating-)?(?:linear|radial)-gradient\(", re.I)
+_DIRECTION = re.compile(
+    r"^(?:-?[\d.]+(?:deg|rad|turn|grad)|to\s.*|(?:circle|ellipse|closest|farthest)\b.*|at\s.*)$", re.I
+)
+
+
+def split_top(text: str) -> list[str]:
+    """Split on commas that are not inside parentheses (``rgba(0, 0, 0, .5)`` stays whole)."""
+    out, depth, cur = [], 0, []
+    for ch in text:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        if ch == "," and depth == 0:
+            out.append("".join(cur).strip())
+            cur = []
+        else:
+            cur.append(ch)
+    out.append("".join(cur).strip())
+    return [p for p in out if p]
+
+
+def gradient_args(css: str) -> tuple[str, list[str]]:
+    """``('linear' | 'radial', top-level arguments)`` of a CSS gradient string (arguments may be empty)."""
+    m = _GRADIENT.match(css)
+    if not m:
+        return "", []
+    kind = "radial" if "radial" in m.group(0).lower() else "linear"
+    body = css.strip()[m.end() :]
+    if body.endswith(")"):
+        body = body[:-1]
+    return kind, split_top(body)
+
+
+def is_direction(part: str) -> bool:
+    return bool(_DIRECTION.match(part.strip()))
+
+
+def is_gradient(value: str | None) -> bool:
+    return bool(value) and bool(_GRADIENT.match(value))  # type: ignore[arg-type]
+
+
+def _channel(v: str) -> int:
+    n = float(v[:-1]) * 2.55 if v.endswith("%") else float(v)
+    return max(0, min(255, round(n)))
+
+
+def _alpha(v: str) -> float:
+    n = float(v[:-1]) / 100 if v.endswith("%") else float(v)
+    return max(0.0, min(1.0, n))
+
+
+def try_color(theme: Theme, value: str | None, names: bool = True) -> tuple[str, float | None] | None:
+    """Like ``parse_color`` but None when ``value`` does not name a color. ``names`` = look up theme names."""
+    if not value:
+        return None
+    candidate = (theme.color(value) if names else value) or ""
+    c = candidate.strip().lower()
+    if _GRADIENT.match(c):
+        stops = [p for p in gradient_args(candidate)[1] if not is_direction(p)]
+        # the first stop stands in for the whole gradient
+        return try_color(theme, re.sub(r"\s+[-\d.]+(?:%|px|pt)$", "", stops[0])) if stops else None
+    if c in _NAMED:
+        return _NAMED[c], (0.0 if c == "transparent" else None)
+    m = _HEX.fullmatch(c)
+    if m:
+        h = m.group(1)
+        if len(h) in (3, 4):
+            h = "".join(ch * 2 for ch in h)
+        return h[:6].upper(), (int(h[6:8], 16) / 255 if len(h) == 8 else None)
+    m = _FUNC.fullmatch(c)
+    if m:
+        try:
+            return "".join(f"{_channel(m.group(i)):02X}" for i in (1, 2, 3)), (
+                _alpha(m.group(4)) if m.group(4) else None
+            )
+        except ValueError:
+            return None
+    return None
+
+
+def parse_color(theme: Theme, value: str | None, fallback: str = "#000000") -> tuple[str, float | None]:
+    """Resolve a theme color name / #RGB / #RGBA / #RRGGBB / #RRGGBBAA / rgb() / rgba() / CSS name to
+    ``('RRGGBB', alpha)``; ``alpha`` is 0..1 or None when opaque. A gradient string yields its first stop.
+    Never raises: unresolvable values use ``fallback`` and finally black."""
+    return try_color(theme, value) or try_color(theme, fallback, names=False) or ("000000", None)
+
+
 def hex6(theme: Theme, value: str | None, fallback: str = "#000000") -> str:
-    """Resolve a theme color name / #RGB / #RRGGBB / CSS name to 'RRGGBB' (never raises)."""
-    for candidate in (theme.color(value) if value else None, fallback):
-        if not candidate:
-            continue
-        c = candidate.strip().lower()
-        if c in _NAMED:
-            return _NAMED[c]
-        m = re.fullmatch(r"#?([0-9a-f]{6})", c)
-        if m:
-            return m.group(1).upper()
-        m = re.fullmatch(r"#?([0-9a-f]{3})", c)
-        if m:
-            return "".join(ch * 2 for ch in m.group(1)).upper()
-    return "000000"
+    """Resolve a theme color name / #RGB / #RRGGBB / #RRGGBBAA / CSS name to 'RRGGBB' (never raises).
+
+    An alpha channel is dropped here; ``parse_color`` returns it.
+    """
+    return parse_color(theme, value, fallback)[0]
 
 
 def rgb(theme: Theme, value: str | None, fallback: str = "#000000") -> RGBColor:

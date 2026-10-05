@@ -27,7 +27,7 @@ from ..ir import (
     Text,
 )
 from ..template import footer_top
-from ..theme import Theme
+from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import measure
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
@@ -61,80 +61,25 @@ _INHERIT_FIELDS = (
 )
 _VISUALS = (Image, Media, Chart, Table, Code)
 _TOL = 1.01
-ICON_HEAD = 1.2  # icon side / heading font size (icon left of the heading text)
-ICON_KPI = 2.0  # icon side / label font size (icon above a kpi number)
-ICON_GAP = 0.4  # gap between icon and text, in icon sides
-CHEVRON_ADJ = 0.3  # chevron point depth / shorter side; the renderer sets the same adjustment
-CHEVRON_PAD_PT = 4  # text padding inside a chevron (the preset's text rectangle already clears the points)
-CHEVRON_MIN_H = 0.7  # inches: a chevron row is its text height + padding, at least this tall ...
-CHEVRON_MAX_H = 1.3  # ... and at most this tall
-CHEVRON_VPAD = 0.17  # inches above and below the text of a chevron
-CHEVRON_MAX_ALONE = 2.0  # inches: a chevron row that is all the slide holds may be this tall ...
-CHEVRON_ALONE_SHARE = 0.28  # ... aiming at this share of the body height (a thin band looks unfinished)
-CODE_GROW = 1.25  # code text grows with the sparse-slide growth, up to this factor
-TABLE_GROW = 1.4  # rows of a table with spare room grow up to this factor (a row stays near its text)
-TABLE_FONT_GROW = 1.2  # table text grows with the sparse-slide growth, up to this factor
-TABLE_GROW_ROOMY = 2.0  # ... and rows up to this factor when a quarter of the body would stay empty
-TREE_SLACK_ROOMY = 1.3  # org-tree boxes may be this much taller than their content on such slides
-ROOMY_LEFT = 0.25  # share of the body left empty (top-anchored) that triggers the roomy pass
-ROOMY_GROW = 1.2  # ... which also grows box / tree text by up to this factor on top of the sparse growth
-ROOMY_GROW_DENSE = (
-    1.4  # dense slides: sparse cards may grow text this much more (consulting decks fill cards)
-)
-DENSE_ROOMY_BODY = 1.6  # ... but body text stays at most this multiple of the theme body size
-ROOMY_ROW = 0.62  # ... and a lone row of boxes reaches this share of the body height (consulting decks rarely
-# leave half a slide blank)
-ROOMY_ROW_AIR = 1.9  # ... but never taller than this multiple of the natural height (no half-empty cards)
-ROOMY_ROW_AIR_DENSE = 1.6  # ... dense slides: cards hug their text a little closer
-PEER_STEP = 1.12  # table text is at most this much smaller than the box body text on the same slide
-BESIDE_MIN = 0.5  # a box beside a chart / image takes its natural height, at least this share of the visual
-BESIDE_FILL = 0.6  # ... a shorter one grows by this share of the way to that minimum
-BESIDE_SLACK = 1.12  # ... headroom over the natural height (grown text keeps some air)
-FULL_WIDTH = 0.6  # a table wider than this share of the slide width counts as a full-width table
-ROW_SLACK = 1.35  # a grid row is at most this much taller than its tallest content ...
-TREE_SLACK = 1.15  # org-tree boxes are at most this much taller than their content
-ROW_MIN_TAIL = 0.12  # ... when blocks (a chart, a table) follow the grid: the row hugs its content
-STACK_MIN = 0.4  # stacked boxes beside a tall block: each gets at least this share of the natural total
-ROW_MIN_DENSE = 0.42  # dense slides: a lone row of boxes is at least this share of the body (fuller boxes)
-ROW_MIN = 0.3  # ... but never shorter than this share of the body height (0.12 when blocks follow the grid)
-GROW_SMALL = (
-    1.35  # sparse slides: text grows up to this factor when the theme body size is <= GROW_SMALL_PT ...
-)
-GROW_SMALL_PT = 14
-GROW_BIG = 1.15  # ... and up to this factor for larger themes
-GROW_VERY_SPARSE = (
-    1.4  # very sparse boxes (<= SPARSE_LINES short lines each) of a theme with body >= ..._PT ...
-)
-GROW_VERY_SPARSE_PT = 16
-GROW_VERY_SPARSE_MAX_PT = 26  # ... grow up to this factor, but never beyond this body size
-GROW_HEAD = 1.25  # box headings grow along with the body text, up to this factor
-HEAD_BODY = 1.05  # a box heading is at least this much x the (grown) body text of the same box ...
-HEAD_TOL = (
-    0.98  # ... but only when it would be more than this much smaller (a 1% gap is not worth a taller band)
-)
-ROOM_FREE = 0.35  # a card with more than this share of its inner height free spreads its paragraphs ...
-ROOM_USE = 0.6  # ... using this share of the free height ...
-ROOM_GAP_MAX = 0.6  # ... up to this space-before (em, about half a line) per paragraph
-ROOM_GAP_MAX_DENSE = 0.8  # ... dense slides: up to this (about 0.8 line)
-SLIDE_PEER_STEP = 1.12  # slide-level text is at most this much smaller than the box body text beside it
 SPARSE_LINES = 2
 SPARSE_LINE_EM = 22  # a "short" line
-GROW_FILL = 0.85  # growth stops when the content would fill more than this share of the grid
-GROW_BOX_FILL = 0.92  # ... or more than this share of a box
-LEFT_KEEP = 0.12  # rows of a sparse slide expand until at most this share of the body is left over ...
-VERY_SPARSE_FILL = 0.4  # content below this share of the body (after growth) is "very sparse" ...
-LEFT_SHIFT = 1 / 3  # ... and only then moves down, by at most this share of the leftover (boxes) ...
-LEFT_SHIFT_TABLE = 0.2  # ... or this share (slides without boxes: a lone table, a chart)
-DENSE_GROW_BODY = 1.25  # dense slides: text may grow up to this multiple of the theme body size
-MATH_GROW = 1.6  # an equation alone in its cell is this much larger than body text
-TOP_GAP = 0.25  # inches between the title band (or lead) and the body, the same on every slide
-KPI_MIN_H = 1.1  # inches
 SHORT_EM = 30  # boxes with at most this much text (in em) are "short": four of them stay in one row
-DENSE_TIGHT = 0.7  # gap / padding factor on dense slides
+HEAD_TOL = 0.98  # a box heading is raised to ctx.lt.head_body x its body only when it is more than 2% smaller
 MAX_CANDIDATES = 6  # layout search: the rule's choice + at most this many - 1 alternatives per slide
 SEARCH_SKIP = 1.5  # ... and no search at all when the rule's choice scores below this (it is fine)
 SEARCH_MARGIN = 3.0  # ... an alternative must beat the rule's score by this much (the rule wins ties)
 _SCALES = [round(1.0 - 0.05 * i, 2) for i in range(15)]  # 1.0 .. 0.3
+
+
+TABLE_GROW_ROOMY = LayoutTokens().table_grow_roomy  # alias of the token default (tests, docs)
+
+
+def _emu(value) -> int:
+    """A length token (``0.7in``, ``4pt``) in EMU; a malformed value counts as 0."""
+    try:
+        return to_emu(value)
+    except (ValueError, TypeError):
+        return 0
 
 
 @dataclass
@@ -172,6 +117,10 @@ class _Ctx:
     out: list[Placed] = field(default_factory=list)
     over: list[str] = field(default_factory=list)
     diags: list[Diagnostic] = field(default_factory=list)
+
+    @property
+    def lt(self) -> LayoutTokens:
+        return self.theme.layout
 
     def diag(self, rule: str, message: str, hint: str, level: str = "warning", line: int | None = None):
         self.diags.append(
@@ -218,7 +167,7 @@ def _role_style(ctx: _Ctx, role: str, cover: bool = False) -> Style:
         if cover and role == "subtitle"
         else _SIZE_KEY.get(role, "body")
     )
-    size = t.sizes.get(key, t.sizes.get("body", 18))
+    size = t.sizes.get(key, t.sizes.get("body", DEFAULT_SIZES["body"]))
     if role in ("body", "quote"):
         size *= ctx.dense_k
     heading_font = role in ("title", "heading", "subtitle")
@@ -313,7 +262,7 @@ def _text_style(ctx: _Ctx, el: Text | Shape, inherit: Style) -> Style:
         st = Style(
             font=t.fonts.body,
             font_ea=t.fonts.ea,
-            font_size=t.sizes.get("body", 18) * ctx.dense_k,
+            font_size=t.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k,
             color="bg",
             fill="primary",
             align="center",
@@ -414,8 +363,8 @@ def _grown(ctx: _Ctx, el, eff: float) -> float:
         and _has_box_text(ctx)
     ):  # slide-level text beside grown boxes: at most one step smaller than their body text
         base = max(_text_style(ctx, el, Style()).font_size or 18, 1.0)
-        box_pt = ctx.theme.sizes.get("body", 18) * ctx.dense_k * ctx.grow
-        f = min(max(box_pt / SLIDE_PEER_STEP / base, 1.0), ctx.grow)
+        box_pt = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
+        f = min(max(box_pt / ctx.lt.slide_peer_step / base, 1.0), ctx.grow)
         if f > 1.0:
             ctx.grew = True
             return eff * f
@@ -450,7 +399,7 @@ def _code_eff(ctx: _Ctx, st: Style) -> float:
     eff = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
     if ctx.grow > 1.0 and ctx.scale >= 1.0:
         ctx.grew = True
-        eff *= min(ctx.grow, CODE_GROW)
+        eff *= min(ctx.grow, ctx.lt.code_grow)
     return eff
 
 
@@ -459,7 +408,7 @@ def _code_style(ctx: _Ctx, el: Code) -> Style:
     st = Style(
         font=t.fonts.mono,
         font_ea=t.fonts.ea,
-        font_size=t.sizes.get("code", 14) * ctx.dense_k,
+        font_size=t.sizes.get("code", DEFAULT_SIZES["code"]) * ctx.dense_k,
         color="fg",
         fill="surface",
         padding="8pt",
@@ -474,7 +423,7 @@ def _table_style(ctx: _Ctx, el: Table) -> Style:
     st = Style(
         font=t.fonts.body,
         font_ea=t.fonts.ea,
-        font_size=t.sizes.get("table", 14) * ctx.dense_k,
+        font_size=t.sizes.get("table", DEFAULT_SIZES["table"]) * ctx.dense_k,
         color="fg",
         align="left",
         valign="middle",
@@ -483,7 +432,7 @@ def _table_style(ctx: _Ctx, el: Table) -> Style:
 
 
 def _table_grow(ctx: _Ctx) -> float:
-    return TABLE_GROW_ROOMY if ctx.roomy else TABLE_GROW
+    return ctx.lt.table_grow_roomy if ctx.roomy else ctx.lt.table_grow
 
 
 def _has_box_text(ctx: _Ctx) -> bool:
@@ -503,10 +452,10 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
     st = _table_style(ctx, el)
     eff = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
     if ctx.grow > 1.0 and ctx.scale >= 1.0:  # sparse slide: table text grows too (less than box text)
-        t = min(ctx.grow, TABLE_FONT_GROW)
+        t = min(ctx.grow, ctx.lt.table_font_grow)
         if _has_box_text(ctx):  # ... but stays within one step of the box text on the same slide
-            body = ctx.theme.sizes.get("body", 18) * ctx.dense_k * ctx.grow
-            want = body / PEER_STEP / max(st.font_size or 14, 1) / max(eff, 1e-6)
+            body = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
+            want = body / ctx.lt.peer_step / max(st.font_size or 14, 1) / max(eff, 1e-6)
             t = max(t, min(want, ctx.grow * 1.1))
         eff *= t
         ctx.grew = True
@@ -516,7 +465,7 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
     if (
         ctx.depth == 0
         and ctx.cap_tables
-        and width > FULL_WIDTH * ctx.W
+        and width > ctx.lt.full_width * ctx.W
         and not (b is not None and b.w is not None)
     ):
         width = capped_width(el, ncols, anchors, width, size)  # a few short columns: numbers stay near labels
@@ -562,7 +511,7 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         total = sum(rh)
         if total > rect.h * _TOL:
             ctx.over.append(_label(el))
-        elif rect.h > total:  # spare room: rows grow up to TABLE_GROW, cell text stays centered
+        elif rect.h > total:  # spare room: rows grow up to ctx.lt.table_grow, cell text stays centered
             target = min(rect.h, round(total * _table_grow(ctx)))
             rh = [round(h * target / total) for h in rh]
             rh[-1] += target - sum(rh)
@@ -577,7 +526,10 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
     elif isinstance(el, Chart):
         t = ctx.theme
         st = Style(
-            font=t.fonts.body, font_ea=t.fonts.ea, font_size=t.sizes.get("table", 14), color="fg"
+            font=t.fonts.body,
+            font_ea=t.fonts.ea,
+            font_size=t.sizes.get("table", DEFAULT_SIZES["table"]),
+            color="fg",
         ).merged(el.style)
         ctx.emit(el, rect, st)
     elif isinstance(el, (Image, Media)):
@@ -586,7 +538,7 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         t = ctx.theme
         st = Style(
             font=t.fonts.body,
-            font_size=t.sizes.get("caption", 12),
+            font_size=t.sizes.get("caption", DEFAULT_SIZES["caption"]),
             color="muted",
             fill="surface",
             line="border",
@@ -605,8 +557,8 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
 
 def _math_scale(ctx: _Ctx, el: Raw, rect: Rect) -> float:
     """Font scale of an equation alone in a cell: ``MATH_GROW`` x body, less when it would not fit."""
-    body = ctx.theme.sizes.get("body", 18) * ctx.dense_k
-    size = body * MATH_GROW * ctx.scale
+    body = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k
+    size = body * ctx.lt.math_grow * ctx.scale
     flat = re.sub(r"\\[A-Za-z]+|[{}\s]", "", el.source)
     lines = max(el.source.count("\\\\") + 1, 1)
     width = max(len(flat) / lines, 1) * 0.6  # em, rough
@@ -620,9 +572,7 @@ def _card_style(ctx: _Ctx, c: Container) -> Style:
     if "plain" in c.classes:
         base = Style(padding="0pt")
     else:
-        base = ctx.theme.classes.get(
-            "card", Style(fill="surface", line="border", line_width=0.75, radius=6, padding="10pt")
-        )
+        base = ctx.theme.classes.get("card", Style(padding=ctx.lt.box_pad))
     others = _class_styles(ctx, c, skip=("plain", "kpi"))
     return _tighten(ctx, Style().merged(base, *others, c.style))
 
@@ -635,7 +585,7 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
     h_el = c.title if c.title.role == "heading" else c.title.model_copy(update={"role": "heading"})
     hst = _text_style(ctx, h_el, Style())
     if kpi:
-        body_size = ctx.theme.sizes.get("body", 18) * ctx.dense_k
+        body_size = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k
         hst = hst.merged(Style(align="center", color="muted", bold=False, font_size=body_size))
     if band:
         hst = hst.merged(
@@ -649,11 +599,11 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
         )
     eff = measure.effective_scale(hst.font_size or 18, ctx.scale, ctx.theme.min_font_size)
     if ctx.head_grow and ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi:
-        eff *= min(ctx.grow, GROW_HEAD)
+        eff *= min(ctx.grow, ctx.lt.grow_head)
     if ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi and (body := _box_body_pt(ctx, c)):
         size = max(hst.font_size or 18, 1.0)
         if size * eff < body * HEAD_TOL:  # never smaller than its own body
-            eff = body * HEAD_BODY / size
+            eff = body * ctx.lt.head_body / size
     return h_el, hst, eff, band
 
 
@@ -681,7 +631,7 @@ def _head_metrics(ctx: _Ctx, c: Container, rect_w: int, pad: int, kpi: bool, row
         return None
     h_el, hst, eff, band = parts
     icon = _icon_name(c)
-    isz, shift = _icon_side(hst, eff, kpi) if icon else (0, 0)
+    isz, shift = _icon_side(ctx, hst, eff, kpi) if icon else (0, 0)
     if icon and kpi:
         isz = min(isz, max(rect_w - 2 * pad, 1))
         shift = 0
@@ -705,7 +655,7 @@ def _equalize_heads(ctx: _Ctx, boxes: list[tuple[Container, int, int]]) -> None:
     rows: dict[int, list[tuple[Container, int, int]]] = {}
     for c, w, key in boxes:
         if isinstance(c, Container) and "kpi" not in c.classes and c.title is not None:
-            pad = _pad(_card_style(ctx, c), 10 * EMU_PER_PT * ctx.tight)
+            pad = _pad(_card_style(ctx, c), _emu(ctx.lt.box_pad) * ctx.tight)
             m = _head_metrics(ctx, c, w, pad, False, row=False)
             if m is not None:
                 rows.setdefault(key, []).append((c, w, m[3]))
@@ -726,15 +676,15 @@ def _icon_item(name: str) -> Shape:
     return Shape(shape="icon", attrs={"icon": name})
 
 
-def _icon_side(hst: Style, eff: float, kpi: bool) -> tuple[int, int]:
+def _icon_side(ctx: _Ctx, hst: Style, eff: float, kpi: bool) -> tuple[int, int]:
     """(icon side, space the icon takes left of the heading text) in EMU."""
-    side = round((ICON_KPI if kpi else ICON_HEAD) * (hst.font_size or 18) * eff * EMU_PER_PT)
-    return side, side + round(ICON_GAP * side)
+    side = round((ctx.lt.icon_kpi if kpi else ctx.lt.icon_head) * (hst.font_size or 18) * eff * EMU_PER_PT)
+    return side, side + round(ctx.lt.icon_gap * side)
 
 
 def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> None:
     style = _card_style(ctx, c)
-    pad = _pad(style, 10 * EMU_PER_PT * ctx.tight)
+    pad = _pad(style, _emu(ctx.lt.box_pad) * ctx.tight)
     if "diagram" in c.classes and c.title is None:
         from .diagram import place_diagram  # flowcharts size and route their own nodes
 
@@ -808,7 +758,7 @@ def _box_nat(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None:
     if c.grid or c.links or any(n in ("flow", "chevron") for n in c.classes):
         return None
     style = _card_style(ctx, c)
-    pad = _pad(style, 10 * EMU_PER_PT * ctx.tight)
+    pad = _pad(style, _emu(ctx.lt.box_pad) * ctx.tight)
     kpi = "kpi" in c.classes
     total = 2 * pad if c.children or c.title else 0
     if metrics := _head_metrics(ctx, c, width, pad, kpi):
@@ -848,8 +798,10 @@ def _kpi_children(ctx: _Ctx, children: list, width: int) -> list:
         return children
     ch = children[i]
     th = ctx.theme
-    big = th.classes.get("kpi", Style(font_size=36, bold=True, color="primary", align="center"))
-    cap = Style(font_size=th.sizes.get("caption", 12), color="muted", align="center", bold=False)
+    big = th.classes.get("kpi") or _base_classes()["kpi"]
+    cap = Style(
+        font_size=th.sizes.get("caption", DEFAULT_SIZES["caption"]), color="muted", align="center", bold=False
+    )
     paras: list[Paragraph] = []
     for j, p in enumerate(ch.paragraphs):
         if j == 0:
@@ -892,14 +844,14 @@ def _share_gaps(ctx: _Ctx, boxes: list) -> None:
     members = [ids for b in boxes if isinstance(b, Container) and (ids := ctx.boxes.get(id(b)))]
     if len(members) < 2:
         return
-    floor = min(ctx.gaps.get(i, measure.PARA_GAP) for ids in members for i in ids)
+    floor = min(ctx.gaps.get(i, measure.para_gap()) for ids in members for i in ids)
     for ids in members:
         for i in ids:
-            if ctx.gaps.get(i, measure.PARA_GAP) <= floor + 1e-9:
+            if ctx.gaps.get(i, measure.para_gap()) <= floor + 1e-9:
                 continue
             p = ctx.out[ctx.text_out[i]]
             attrs = {k: v for k, v in p.element.attrs.items() if k != "para_gap"}
-            if floor > measure.PARA_GAP + 1e-9:
+            if floor > measure.para_gap() + 1e-9:
                 attrs["para_gap"] = floor
                 ctx.gaps[i] = floor
             else:
@@ -918,7 +870,7 @@ def _roomy_paragraphs(ctx: _Ctx, flow: list, nat: list, area: Rect, inherit: Sty
         return
     fixed = sum(n or 0 for n in nat) + gap * (len(flow) - 1)
     free = area.h - fixed
-    if area.h <= 0 or free <= ROOM_FREE * area.h:
+    if area.h <= 0 or free <= ctx.lt.room_free * area.h:
         return
     cands: list[tuple[int, Text, float]] = []  # (index, text, sum of font sizes over its paragraph gaps)
     for k, (_i, ch) in enumerate(flow):
@@ -936,13 +888,13 @@ def _roomy_paragraphs(ctx: _Ctx, flow: list, nat: list, area: Rect, inherit: Sty
     slots = sum(c[2] for c in cands)
     if not slots:
         return
-    gmax = ROOM_GAP_MAX_DENSE if ctx.dense_k < 1.0 else ROOM_GAP_MAX
-    g = min(gmax, measure.PARA_GAP + free * ROOM_USE / EMU_PER_PT / slots)
-    while g > measure.PARA_GAP + 0.02:
+    gmax = ctx.lt.room_gap_max_dense if ctx.dense_k < 1.0 else ctx.lt.room_gap_max
+    g = min(gmax, measure.para_gap() + free * ctx.lt.room_use / EMU_PER_PT / slots)
+    while g > measure.para_gap() + 0.02:
         for k, ch, _ in cands:
             ctx.gaps[id(ch)] = g
             nat[k] = round(_natural_height(ctx, ch, area.w, inherit) or 0)
-        if sum(n or 0 for n in nat) + gap * (len(flow) - 1) <= area.h * (1 - ROOM_FREE * 0.5):
+        if sum(n or 0 for n in nat) + gap * (len(flow) - 1) <= area.h * (1 - ctx.lt.room_free * 0.5):
             return
         g -= 0.05
     for k, ch, _ in cands:  # no room for more than the default gap after all
@@ -970,7 +922,7 @@ def _place_stack(
         flex_h = max((area.h - fixed) // nflex, int(0.8 * EMU_PER_INCH))
     elif center and len(flow) == 1:
         nat = [max(nat[0] or 0, area.h)]  # a lone block fills the area (its text is centered by its style)
-    else:  # spare room goes to tables (rows grow up to TABLE_GROW), everything else stays natural and on top
+    else:  # spare room goes to tables (up to table_grow), everything else stays natural and on top
         tabs = [k for k, (_i, ch) in enumerate(flow) if isinstance(ch, Table)]
         spare = area.h - fixed
         if tabs and spare > 0:
@@ -990,7 +942,9 @@ def _place_stack(
         used += h + gap
     used -= gap
     _share_gaps(ctx, [ch for _, ch in flow])
-    limit = GROW_BOX_FILL if ctx.grow > 1.0 and ctx.depth > 0 else _TOL  # grown text keeps some headroom
+    limit = (
+        ctx.lt.grow_box_fill if ctx.grow > 1.0 and ctx.depth > 0 else _TOL
+    )  # grown text keeps some headroom
     if used > area.h * limit:
         ctx.over.append(_label(owner) if owner is not None else "content")
     return rects
@@ -1210,7 +1164,11 @@ def _emit_links(ctx: _Ctx, links: list[Link], rects: dict[int, Rect]) -> None:
             "dst_box": [b.x, b.y, b.w, b.h],
         }
         rect = Rect(min(p0[0], p1[0]), min(p0[1], p1[1]), abs(p1[0] - p0[0]), abs(p1[1] - p0[1]))
-        ctx.emit(Shape(shape="line", attrs=attrs), rect, Style(line="primary", line_width=1.5))
+        ctx.emit(
+            Shape(shape="line", attrs=attrs),
+            rect,
+            Style(line="primary", line_width=ctx.theme.render.connector_width),
+        )
 
 
 def _group_nat(ctx: _Ctx, g: Container, width: int, inherit: Style) -> tuple[int | None, str]:
@@ -1291,24 +1249,27 @@ def _row_heights(
         if not covered[row] or n is None or n <= 0:
             caps.append(None)
         elif kinds[row] == {"kpi"}:
-            caps.append(max(n, round(KPI_MIN_H * EMU_PER_INCH)))
+            caps.append(max(n, _emu(ctx.lt.kpi_min_h)))
         elif kinds[row] == {"table"}:
             caps.append(n)
         elif tree:  # org-tree levels hug their boxes (+ modest slack): the connectors fill the gaps
-            caps.append(round(n * (TREE_SLACK_ROOMY if ctx.roomy else TREE_SLACK)))
+            caps.append(round(n * (ctx.lt.tree_slack_roomy if ctx.roomy else ctx.lt.tree_slack)))
         elif onecol and rowtext[row]:  # a stack of text / code: each row is its natural height, no gap
             caps.append(n)
             kinds[row] = {"stack"}
         else:
             lone = nr == 1 and not has_tail and ctx.dense_k < 1.0
-            floor = ROW_MIN_TAIL if has_tail else (ROW_MIN_DENSE if lone else ROW_MIN)
+            floor = ctx.lt.row_min_tail if has_tail else (ctx.lt.row_min_dense if lone else ctx.lt.row_min)
             if ctx.roomy and nr == 1 and not has_tail and ctx.grow > ctx.grow_base:
                 floor = max(
                     floor,
-                    min(ROOMY_ROW * body.h, (ROOMY_ROW_AIR_DENSE if ctx.dense_k < 1.0 else ROOMY_ROW_AIR) * n)
+                    min(
+                        ctx.lt.roomy_row * body.h,
+                        (ctx.lt.roomy_row_air_dense if ctx.dense_k < 1.0 else ctx.lt.roomy_row_air) * n,
+                    )
                     / body.h,
                 )  # fill stays >= ~50%
-            caps.append(max(round(n * ROW_SLACK), round(floor * body.h)))
+            caps.append(max(round(n * ctx.lt.row_slack), round(floor * body.h)))
     extra_h = 0  # natural height that spanning blocks need beyond their rows
     for r0, r1, n in spans:
         rows = range(r0, r1 + 1)
@@ -1336,7 +1297,7 @@ def _row_heights(
         return None
     if stacked and all(n for n in nat):  # boxes stacked beside a tall block share its height by content
         tot = sum(nat)  # type: ignore[arg-type]
-        w = [max(n or 0, STACK_MIN * tot) for n in nat]
+        w = [max(n or 0, ctx.lt.stack_min * tot) for n in nat]
         return grid_row_heights(replace(gs, rows=[float(x) for x in w]), grid_area.h, gap, caps)
     if (
         ctx.expand > 0 and nr >= 2 and not tree
@@ -1351,7 +1312,10 @@ def _row_heights(
                     grown,
                     max(
                         caps[r] or 0,
-                        round((ROOMY_ROW_AIR_DENSE if ctx.dense_k < 1.0 else ROOMY_ROW_AIR) * (nat[r] or 0)),
+                        round(
+                            (ctx.lt.roomy_row_air_dense if ctx.dense_k < 1.0 else ctx.lt.roomy_row_air)
+                            * (nat[r] or 0)
+                        ),
                     ),
                 )
             caps[r] = grown
@@ -1585,10 +1549,10 @@ def _hug_beside_visual(ctx: _Ctx, gs, flow: list, cells: list[Rect], inherit: St
         n = _box_nat(ctx, blk, r.w, inherit)
         if n is None:
             continue
-        floor = round(BESIDE_MIN * r.h)
-        h = round(n * BESIDE_SLACK)
+        floor = round(ctx.lt.beside_min * r.h)
+        h = round(n * ctx.lt.beside_slack)
         if h < floor:
-            h = round(h + BESIDE_FILL * (floor - h))
+            h = round(h + ctx.lt.beside_fill * (floor - h))
         out[k] = Rect(r.x, r.y, r.w, min(h, r.h))
     return out
 
@@ -1661,7 +1625,10 @@ def _chevron_font(ctx: _Ctx, sh: Shape, st: Style) -> Style:
     if sh.style and sh.style.font_size:
         return st
     t = ctx.theme
-    floor = max(t.sizes.get("body", 18), t.sizes.get("table", 14) * ctx.dense_k * TABLE_FONT_GROW)
+    floor = max(
+        t.sizes.get("body", DEFAULT_SIZES["body"]),
+        t.sizes.get("table", DEFAULT_SIZES["table"]) * ctx.dense_k * ctx.lt.table_font_grow,
+    )
     return st.merged(Style(font_size=max(st.font_size or 18, floor)))
 
 
@@ -1673,26 +1640,27 @@ def _chevron_geom(
     if hcap is not None:
         rect = Rect(rect.x, rect.y, rect.w, min(rect.h, hcap))
     # the preset text rectangle already starts a point depth inside both ends: add only a small padding
-    st = st.merged(Style(padding=f"{CHEVRON_PAD_PT}pt", align="center", valign="middle"))
+    st = st.merged(Style(padding=ctx.lt.chevron_pad, align="center", valign="middle"))
     if icon := _icon_name(blk):  # the icon sits left of the text: reserve its room as a left inset
-        side = min(round(ICON_HEAD * (st.font_size or 18) * EMU_PER_PT), round(0.4 * rect.h))
+        side = min(round(ctx.lt.icon_head * (st.font_size or 18) * EMU_PER_PT), round(0.4 * rect.h))
         sh = sh.model_copy(
             update={
                 "attrs": {
                     **sh.attrs,
                     "icon": icon,
                     "icon_side": side,
-                    "icon_inset": side + round(ICON_GAP * side),
+                    "icon_inset": side + round(ctx.lt.icon_gap * side),
                 }
             }
         )
     return sh, st, rect
 
 
-def _chevron_text_w(rect: Rect, st: Style, sh: Shape | None = None) -> int:
+def _chevron_text_w(rect: Rect, st: Style, sh: Shape | None = None, adj: float | None = None) -> int:
     """Width of a chevron's text area: the shape minus both point depths, the padding and the icon."""
     inset = sh.attrs.get("icon_inset", 0) if sh is not None else 0
-    return rect.w - 2 * round(CHEVRON_ADJ * min(rect.w, rect.h)) - 2 * _pad(st) - inset
+    adj = LayoutTokens().chevron_adj if adj is None else adj
+    return rect.w - 2 * round(adj * min(rect.w, rect.h)) - 2 * _pad(st) - inset
 
 
 def _chevron_alone(ctx: _Ctx, flow: list, extra: list, links) -> bool:
@@ -1712,10 +1680,10 @@ def _chevron_row_h(ctx: _Ctx, blocks: list, width: int, inherit: Style, alone_h:
     A row alone on the slide (``alone_h`` = the body height) aims at ``CHEVRON_ALONE_SHARE`` of it, up to
     ``CHEVRON_MAX_ALONE``.
     """
-    lo, hi = round(CHEVRON_MIN_H * EMU_PER_INCH), round(CHEVRON_MAX_H * EMU_PER_INCH)
+    lo, hi = _emu(ctx.lt.chevron_min_h), _emu(ctx.lt.chevron_max_h)
     if alone_h is not None:
-        hi = round(CHEVRON_MAX_ALONE * EMU_PER_INCH)
-        lo = max(lo, min(hi, round(CHEVRON_ALONE_SHARE * alone_h)))
+        hi = _emu(ctx.lt.chevron_max_alone)
+        lo = max(lo, min(hi, round(ctx.lt.chevron_alone_share * alone_h)))
     h = round(EMU_PER_INCH)
     for _ in range(3):  # the point depth depends on the height, the height on the wrapped text
         need = 0
@@ -1727,8 +1695,13 @@ def _chevron_row_h(ctx: _Ctx, blocks: list, width: int, inherit: Style, alone_h:
                 measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
                 * ctx.chev_grow
             )
-            need = max(need, measure.paragraphs_height(sh.paragraphs, _chevron_text_w(rect, st, sh), st, eff))
-        h = min(max(round(need / 0.8), round(need + 2 * CHEVRON_VPAD * EMU_PER_INCH), lo), hi)
+            need = max(
+                need,
+                measure.paragraphs_height(
+                    sh.paragraphs, _chevron_text_w(rect, st, sh, ctx.lt.chevron_adj), st, eff
+                ),
+            )
+        h = min(max(round(need / 0.8), round(need + 2 * _emu(ctx.lt.chevron_vpad)), lo), hi)
     return h
 
 
@@ -1739,7 +1712,7 @@ def _chevron_eff(ctx: _Ctx, blk, rect: Rect, inherit: Style, hcap: int | None = 
     "KPI モニタリン / グ"): shrink until the line count no longer changes in a 12% narrower area (>= 80%).
     """
     sh, st, rect = _chevron_geom(ctx, blk, rect, inherit, hcap)
-    width = _chevron_text_w(rect, st, sh)
+    width = _chevron_text_w(rect, st, sh, ctx.lt.chevron_adj)
     base = st.font_size or 18
     first = measure.effective_scale(base, ctx.scale, ctx.theme.min_font_size) * ctx.chev_grow
     for m in (1.0, 0.95, 0.9, 0.85, 0.8):
@@ -1760,14 +1733,16 @@ def _place_chevron(
     if eff_cap is not None:
         eff = min(eff, eff_cap)
     # centered text may use the middle 80% of the height
-    need = measure.paragraphs_height(sh.paragraphs, _chevron_text_w(rect, st, sh), st, eff)
+    need = measure.paragraphs_height(
+        sh.paragraphs, _chevron_text_w(rect, st, sh, ctx.lt.chevron_adj), st, eff
+    )
     if need > rect.h * 0.8:
         ctx.over.append(_label(blk))
     ctx.emit(sh, rect, st, eff)
     if "icon_side" in sh.attrs:  # icon just before the (centered) text block, vertically centered
         side = sh.attrs["icon_side"]
-        left = rect.x + round(CHEVRON_ADJ * min(rect.w, rect.h)) + _pad(st)
-        avail = _chevron_text_w(rect, st, sh)
+        left = rect.x + round(ctx.lt.chevron_adj * min(rect.w, rect.h)) + _pad(st)
+        avail = _chevron_text_w(rect, st, sh, ctx.lt.chevron_adj)
         size = (st.font_size or 18) * eff
         line = max(
             (measure.text_em(p.plain, bold=True) * size * EMU_PER_PT for p in sh.paragraphs), default=0
@@ -1857,29 +1832,33 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
         return fin
     left = body.bottom - _bottom(fin)
     left0 = left
-    keep = round(LEFT_KEEP * body.h)
+    keep = round(ctx.lt.left_keep * body.h)
     if left > keep:
         c = run(body, grow=fin.grow, expand=left - keep)
         if not c.over and c.out:
             fin = c
             left = body.bottom - _bottom(fin)
-    small_theme = ctx.theme.sizes.get("body", 18) <= GROW_SMALL_PT  # consulting themes (jp-business: 11pt)
-    if max(left, left0) >= ROOMY_LEFT * body.h and (
+    small_theme = (
+        ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
+    )  # consulting themes (jp-business: 11pt)
+    if max(left, left0) >= ctx.lt.roomy_left * body.h and (
         fin.dense_k < 1.0 or small_theme
     ):  # a quarter of the body stays empty (before the rows expanded)
         expanded = fin.expand > 0
-        steps = (ROOMY_GROW_DENSE, 1.35, 1.3, 1.25) if fin.dense_k < 1.0 else ()
+        steps = (ctx.lt.roomy_grow_dense, 1.35, 1.3, 1.25) if fin.dense_k < 1.0 else ()
         for f in (
             *steps,
-            ROOMY_GROW,
+            ctx.lt.roomy_grow,
             1.15,
             1.1,
             1.05,
             1.0,
         ):  # tables / trees take more height, text grows a little
+            if f > 1.0 and not ctx.lt.grow:  # growth is off: text keeps its nominal size
+                continue
             g = round(fin.grow * f, 2)
             if (
-                fin.dense_k < 1.0 and g * fin.dense_k > DENSE_ROOMY_BODY
+                fin.dense_k < 1.0 and g * fin.dense_k > ctx.lt.dense_roomy_body
             ):  # consulting body text stays below ~1.6x the theme size
                 continue
             if expanded:  # text first: grow it, then spread what is left over the rows
@@ -1902,9 +1881,14 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
                 left = body.bottom - _bottom(fin)
                 break
     top = min((p.y for p in fin.out), default=body.y)
-    if _bottom(fin) - top < VERY_SPARSE_FILL * body.h:
+    if _bottom(fin) - top < ctx.lt.very_sparse_fill * body.h:
         dy = round(
-            left * (LEFT_SHIFT if any(isinstance(e, Container) for e in elements) else LEFT_SHIFT_TABLE)
+            left
+            * (
+                ctx.lt.left_shift
+                if any(isinstance(e, Container) for e in elements)
+                else ctx.lt.left_shift_table
+            )
         )
         if dy > 0:
             c = run(
@@ -1969,10 +1953,11 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     except ValueError:
         W, H = slide_size("16:9")
     measure.set_default_font(theme.fonts.body)
+    measure.set_tokens(theme.layout)
     ctx = _Ctx(deck, theme, slide, index, W, H)
     dense = deck.density == "dense" or "dense" in slide.classes
     ctx.dense_k = theme.dense_scale if dense else 1.0
-    ctx.tight = DENSE_TIGHT if dense else 1.0
+    ctx.tight = ctx.lt.dense_tight if dense else 1.0
 
     kind = slide.layout
     if kind not in ("cover", "section", "blank", "center", "content"):
@@ -2044,7 +2029,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     else:
         y = My
         head_bottom: int | None = (
-            None  # bottom of the title band / title / lead: the body starts TOP_GAP below
+            None  # bottom of the title band / title / lead: the body starts ctx.lt.top_gap below
         )
         if kind != "blank" and slide.title:
             tr_h = to_emu(theme.title_height)
@@ -2081,7 +2066,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             put(head, el, r, st, eff)
             y = r.bottom + sg // 2
             head_bottom = r.bottom
-        y_top = y if head_bottom is None else head_bottom + round(TOP_GAP * EMU_PER_INCH)
+        y_top = y if head_bottom is None else head_bottom + _emu(ctx.lt.top_gap)
         body = None
 
     # bottom stack (cover/blank get no footer row)
@@ -2115,7 +2100,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         notes = [f for f in slide.footnotes if f.paragraphs]
         if notes:
             sts = [_role_style(ctx, "footnote").merged(f.style) for f in notes]
-            max_h = round(H * 0.2)
+            max_h = round(H * ctx.lt.footnote_max)
             effs = [1.0] * len(notes)
             hs = [round(_text_need(ctx, f, st, inner_w, 1.0)) for f, st in zip(notes, sts, strict=True)]
             if sum(hs) > max_h:
@@ -2155,7 +2140,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             c = slide.conclusion
             st = _role_style(ctx, "conclusion").merged(*_class_styles(ctx, c), c.style)
             h = max(round(_text_need(ctx, c, st, inner_w, 1.0)), round(0.4 * EMU_PER_INCH))
-            h = min(h, round(H * 0.2))
+            h = min(h, round(H * ctx.lt.footnote_max))
             eff = fit_text(c, Rect(0, 0, inner_w, h), st)
             put(tail, c, Rect(Mx, bottom - h, inner_w, h), st, eff)
             bottom = bottom - h - sg
@@ -2175,8 +2160,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             slide_inherit = slide_inherit.merged(Style(align="center", valign="middle"))
         sgap = _gap(ctx, slide.attrs.get("gap"), body.w)
 
-        body_pt = theme.sizes.get("body", 18) * ctx.dense_k
-        very = body_pt >= GROW_VERY_SPARSE_PT and _very_sparse(elements)
+        body_pt = theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k
+        very = body_pt >= ctx.lt.grow_very_sparse_pt and _very_sparse(elements)
         text_only = kind != "center" and all(
             isinstance(e, Text) and e.role == "body" and "callout" not in e.classes for e in elements
         )
@@ -2206,19 +2191,20 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 fc = run(body, scale=s)
                 if not fc.over:
                     break
-            if fc.scale >= 1.0 and not fc.over:
+            if fc.scale >= 1.0 and not fc.over and ctx.lt.grow:
                 # sparse slide: grow text uniformly (siblings share one factor), more for small themes
-                top = GROW_SMALL if (body_pt <= GROW_SMALL_PT) else GROW_BIG
-                if ctx.dense_k < 1.0:  # dense slides: up to DENSE_GROW_BODY x the theme body size
-                    top = max(top, DENSE_GROW_BODY / ctx.dense_k)
+                top = ctx.lt.grow_small if (body_pt <= ctx.lt.grow_small_pt) else ctx.lt.grow_big
+                if ctx.dense_k < 1.0:  # dense slides: up to ctx.lt.dense_grow_body x the theme body size
+                    top = max(top, ctx.lt.dense_grow_body / ctx.dense_k)
                 if very:
-                    top = max(top, min(GROW_VERY_SPARSE, GROW_VERY_SPARSE_MAX_PT / body_pt))
+                    top = max(top, min(ctx.lt.grow_very_sparse, ctx.lt.grow_very_sparse_max_pt / body_pt))
                 n = round((top - 1.05) / 0.05)
                 for g in [round(top - 0.05 * i, 2) for i in range(n + 1)]:
                     c3 = run(body, grow=g)
-                    if c3.grew and not c3.over and (c3.fill is None or c3.fill <= GROW_FILL):
+                    if c3.grew and not c3.over and (c3.fill is None or c3.fill <= ctx.lt.grow_fill):
                         fc = c3
                         break
+            if fc.scale >= 1.0 and not fc.over:
                 fc = _spread(ctx, fc, run, body, elements)
             return fc
 

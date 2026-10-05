@@ -15,7 +15,7 @@ from io import BytesIO
 from pptx.util import Emu
 
 from ..ir import Placed, Raw
-from ..theme import Theme
+from ..theme import DEFAULT_SIZES, Theme
 from .util import RenderCtx, hex6
 
 __all__ = ["HtmlRenderer", "add_html_image", "add_html_native", "close_html", "render_html_png"]
@@ -49,8 +49,8 @@ def _family(theme: Theme) -> str:
 
 
 def _page(source: str, theme: Theme) -> str:
-    fg, bg = hex6(theme, "fg"), hex6(theme, "bg", "#FFFFFF")
-    size = theme.sizes.get("body", 18) * 96 / 72
+    fg, bg = hex6(theme, "fg"), hex6(theme, "bg", theme.render.slide_bg)
+    size = theme.sizes.get("body", DEFAULT_SIZES["body"]) * 96 / 72
     return (
         '<!doctype html><html><head><meta charset="utf-8">'
         f"<style>*{{box-sizing:border-box}}html,body{{margin:0;padding:0;background:#{bg};}}"
