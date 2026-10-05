@@ -135,6 +135,7 @@ class LayoutTokens(BaseModel):
     hug_shift: float = (
         0.0  # share of the leftover body (beyond left_keep) that moves a card block down (0 = off)
     )
+    hug_cards: bool = True  # consulting / dense slides: cards are as tall as their content (row_slack_hug)
 
 
 class RenderTokens(BaseModel):

@@ -1011,6 +1011,11 @@ def _consulting(ctx: _Ctx) -> bool:
     return ctx.dense_k < 1.0 or ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
 
 
+def _hugging(ctx: _Ctx) -> bool:
+    """Consulting cards are as tall as their content (``row_slack_hug``) instead of ``row_slack``."""
+    return ctx.lt.hug_cards and _consulting(ctx)
+
+
 def _roomy_paragraphs(ctx: _Ctx, flow: list, nat: list, area: Rect, inherit: Style, owner, gap: int) -> None:
     """A card with plenty of free height spreads its paragraphs (space-before up to about half a line).
 
@@ -1428,7 +1433,7 @@ def _row_heights(
                 floor = max(floor, min(ctx.lt.balance_row * ref_h, ctx.lone_air * n) / body.h)
             if _consulting(ctx) and not has_tail:
                 floor = min(floor, ctx.lt.row_min_hug)  # consulting cards hug their text instead
-            slack = ctx.lt.row_slack_hug if ctx.lt.hug_shift > 0 and _consulting(ctx) else ctx.lt.row_slack
+            slack = ctx.lt.row_slack_hug if _hugging(ctx) else ctx.lt.row_slack
             caps.append(max(round(n * min(slack, ctx.lt.row_slack)), round(floor * body.h)))
     extra_h = 0  # natural height that spanning blocks need beyond their rows
     for r0, r1, n in spans:
@@ -1464,9 +1469,7 @@ def _row_heights(
     ):  # sparse slide: spread extra height over the capped rows (not kpi / table)
         rows = [r for r in range(nr) if caps[r] is not None and "other" in kinds[r]]
         tot = sum(caps[r] or 0 for r in rows)
-        airy = (ctx.roomy and ctx.grow > ctx.grow_base) or (
-            ctx.lt.hug_shift > 0 and _consulting(ctx)
-        )  # grown text / consulting cards: rows keep a card fill of about 50-70%
+        airy = (ctx.roomy and ctx.grow > ctx.grow_base) or _hugging(ctx)  # grown text / consulting cards: rows keep a card fill of about 50-70%
         for r in rows:
             grown = (caps[r] or 0) + round(ctx.expand * (caps[r] or 0) / max(tot, 1))
             if airy and nat[r]:
