@@ -66,3 +66,5 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [render] An empty `mainSeq` `p:childTnLst` is invalid PresentationML (likely a repair prompt) → drop the `p:seq` when nothing is in it. `python -m slidemark.xsd` caught it; run it on new timing/media XML.
 - [render] Two `sync_playwright` instances in one process conflict (probe and close before build). `html.escape` inside `<style>` silently drops font-family. Styled ```html cards hit the structural subset first; `{render=native}` forces Chromium.
 - [import] Foreign decks: box bodies must be emitted as children (`Block.paras` was dropped); a KPI inside a card is not the title; org-chart buses are unglued T-junctions (tee tolerance ≈ 0.1 in); cap column stacks at 3 texts.
+- [layout] Growing sparse text can add CJK wraps/orphans → growth steps need a "no new wrapped lines" guard. A box beside a visual takes natural height; text-only tables are never width-capped (Gantt).
+- [critique] Layout autofits sibling boxes to one scale (font-spread rules rarely fire); judge title length at nominal size because titles shrink instead of wrapping.
