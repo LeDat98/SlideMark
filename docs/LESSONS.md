@@ -118,3 +118,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] A per-deck probe of the sparse step inside `layout_slide` cost ~50% build time (50 ms/slide gate) → step chosen per slide; a stepped slide must be the last growth pass (the roomy pass grew it again to 21pt).
 - [review] Split parts of a long flat list each trigger `design-empty-band`; rank fix rounds by the diagnostics the loop owns first. 6 boxes × 8 bullets or 9-row tables raise no lint warning (autofit shrinks to ~10pt) → source-level `too_dense` check.
 - [process] An independent "consulting designer" review agent (Sonnet, PNGs only) found what metrics missed: top-packed slides, panel text centered in tall cards, card body larger than table text, missing-lead slides breaking vertical rhythm.
+- [process] `git commit -am` after a failed `ruff && commit` chain swept the unfixed file into the next commit and pushed red lint (fixed in minutes) → stage paths explicitly.
