@@ -203,3 +203,12 @@ each, o200k proxy), shipped as package data; written by the orchestrator.
 - [ ] A: mermaid flowchart → native, HTML subset → IR
 - [ ] B: HTML image fallback via Playwright
 - [ ] Orchestrator: eval harness v0
+
+## Next layout package (auto-arrangement v2, from the gallery review)
+- A run of `##` boxes closed by `@end` and followed by visuals = boxes in ONE row + visuals full width below,
+  without any `@` token (09-midnight-tech slide 2 gets a 2×2 today).
+- `flow`/`chevron` without N → N = number of leading boxes (05-jp-process slide 1, 08-jp-roadmap slide 3).
+- 3 blocks where block 1 has a visual or ≥ 2× the text of the others → `aab/aac` automatically.
+- Slide links forming a tree from one root → tree layout like mermaid (`.a./bcd`) automatically.
+- Math blocks scale up (≈ 1.6× body) and center; code blocks grow like text when the slide is sparse.
+- Goal: `bench/layout_inference.py` ≥ 90% with the `@` grid tokens removed from examples where redundant.

@@ -19,6 +19,7 @@ TITLES = {
     "06-jp-market": "Tiếng Nhật: biểu đồ thị trường, bảng so sánh đối thủ",
     "07-jp-org": "Tiếng Nhật: sơ đồ tổ chức, ma trận rủi ro",
     "08-jp-roadmap": "Tiếng Nhật: kế hoạch trung hạn, lộ trình",
+    "09-midnight-tech": "Theme tối (midnight): KPI, biểu đồ, Mermaid, công thức, code",
 }
 
 
