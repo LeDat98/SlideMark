@@ -72,3 +72,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [eval] Missing-asset diagnostics appear only at render time → eval.py renders into an empty temp dir and tolerates only asset-missing rules.
 - [layout] Layout search must score full pipeline results per candidate (grow/spread included); keep the empty-band weight small and add a width-fill term, or stacking sparse boxes into wide bars wins. Rule-level tests pin `engine.MAX_CANDIDATES = 1`.
 - [layout] A mermaid diagram is a Container, so "text + visual" never applied: wide diagrams (LR ≥ 4 ranks) now take full width with text below; `_side_route` checks both sides for nodes at the target rank. Rows in a text/code stack take natural height (a floor made the scorer prefer a gap).
+- [layout] A diagram overflowing by 5% at scale 1.0 shrank the whole slide to 0.55 → the diagram squeezes its own font/nodes; rank-gap minimums are per gap (one labelled elbow widened all gaps).
