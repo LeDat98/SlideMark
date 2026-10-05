@@ -140,14 +140,14 @@ def test_diagram_nodes_fit_their_longest_word():
             assert measure.text_em(w) * base * p.font_scale <= avail, (w, p.w)
 
 
-def test_diagram_is_centered_and_callout_hugs_it():
+def test_small_diagram_is_top_anchored_and_callout_hugs_it():
     md = "# t\n```mermaid\ngraph LR\nA[One] --> B[Two]\n```\n> [!tip] after\n"
     placed, _ = lay(md, "midnight")
     card = next(p for p in placed if isinstance(p.element, Container))
     call = next(p for p in placed if isinstance(p.element, Text) and "callout" in p.element.classes)
     title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
     assert 0 <= call.y - (card.y + card.h) < 0.5 * IN  # right below the diagram
-    assert card.y - (title.y + title.h) > 0.8 * IN  # the pair is centered, not top aligned
+    assert card.y - (title.y + title.h) < 0.8 * IN  # a block under 60% of the body never floats mid-height
 
 
 # ---------------------------------------------------------------- math and code

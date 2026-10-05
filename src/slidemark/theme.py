@@ -164,6 +164,16 @@ class LayoutTokens(BaseModel):
         "auto"  # auto: center while free space above body_free_max
     )
     body_spread_max: float = 0.4  # table rows, chevron rows and row gaps grow by at most this share first
+    center_min_fill: float = 0.6  # a block filling less than this share of the body is never centered
+    card_stretch: bool = False  # ... its cards may stretch (off: tails over a quarter of the card; see tests)
+    card_stretch_share: float = (
+        0.5  # ... by at most this share of body_spread_max (stretched cards look empty)
+    )
+    card_pad_share: float = (
+        0.25  # ... cards of such a block stretch; this share of the growth moves the body down
+    )
+    sparse_step_max: float = 1.5  # ... it first tries steps up to this factor (text, nodes, paddings)
+    sparse_low_max_pt: float = 24  # ... body text of such a slide may reach this size (pt)
 
 
 class RenderTokens(BaseModel):
