@@ -514,6 +514,49 @@ def roundtrip_text(
     return compare_decks(a, b), t, a, b
 
 
+def design_diffs(text: str, work: Path) -> list[tuple[str, str]] | None:
+    """DF5 gate: tokens, css rules (selectors + resolved styles), html slides and the second import's text.
+
+    Compares the parsed source with the parse of the imported text; then imports B again (build -> import ->
+    build -> import) and requires the same text. ``None`` when the deck has no design.
+    """
+    from slidemark.build import build
+    from slidemark.importer import import_pptx
+    from slidemark.parser import parse
+
+    d0 = parse(text)
+    if not (d0.tokens or d0.css or any(sl.css or sl.html is not None for sl in d0.slides)):
+        return None
+    a, b = work / "A.pptx", work / "B.pptx"
+    build(text, a, base_dir=work)
+    t1, _ = import_pptx(a, work)
+    build(t1, b, base_dir=work)
+    t2, _ = import_pptx(b, work)
+    d1 = parse(t1)
+    out: list[tuple[str, str]] = []
+
+    def rules(rs):
+        return [(r.selector, r.style.model_dump(exclude_none=True)) for r in rs]
+
+    if d0.theme != d1.theme:
+        out.append(("design-theme", f"{d0.theme!r} != {d1.theme!r}"))
+    if d0.tokens != d1.tokens:
+        out.append(("design-tokens", f"{len(d0.tokens)} tokens vs {len(d1.tokens)}"))
+    if rules(d0.css) != rules(d1.css):
+        out.append(("design-css", f"{len(d0.css)} deck rules vs {len(d1.css)}"))
+    if len(d0.slides) != len(d1.slides):
+        out.append(("design-slides", f"{len(d0.slides)} slides vs {len(d1.slides)}"))
+    else:
+        for i, (x, y) in enumerate(zip(d0.slides, d1.slides, strict=True), 1):
+            if x.html != y.html:
+                out.append(("design-html", f"slide {i}: html differs"))
+            if rules(x.css) != rules(y.css):
+                out.append(("design-slide-css", f"slide {i}: css rules differ"))
+    if t1 != t2:
+        out.append(("design-stable", "second import text differs from the first"))
+    return out
+
+
 def count_tokens(text: str) -> int:
     import tiktoken
 
@@ -530,6 +573,7 @@ def main() -> int:
     rows = []
     kinds: Counter = Counter()
     tok_src = tok_imp = 0
+    n_design = design_bad = 0
     with tempfile.TemporaryDirectory() as td:
         base = Path(args.keep) if args.keep else Path(td)
         for src in corpus():
@@ -541,6 +585,11 @@ def main() -> int:
             text = src.read_text(encoding="utf-8")
             try:
                 diffs, t, _, _ = roundtrip_text(text, work, src.parent)
+                dd = design_diffs(text, work)
+                diffs = [*diffs, *(dd or [])]
+                if dd is not None:
+                    n_design += 1
+                    design_bad += any(k.startswith("design") for k, _ in diffs)
                 (work / "T.md").write_text(t, encoding="utf-8")
                 tok_src += count_tokens(text)
                 tok_imp += count_tokens(t)
@@ -561,6 +610,9 @@ def main() -> int:
     share = good / n if n else 0.0
     ratio = tok_imp / tok_src if tok_src else 0.0
     print(f"\nlossless {good}/{n} = {share:.1%}; imported/source tokens {ratio:.2f}")
+    print(
+        f"design round trip (tokens, css, html, stable re-import): {n_design - design_bad}/{n_design} decks"
+    )
     print("decks affected per kind:", dict(kinds.most_common()))
     if args.record:
         sha = subprocess.run(
@@ -575,6 +627,8 @@ def main() -> int:
             "decks": n,
             "lossless": good,
             "token_ratio": round(ratio, 3),
+            "design_decks": n_design,
+            "design_ok": n_design - design_bad,
             "failures": dict(kinds.most_common()),
         }
         with (ROOT / "bench" / "history.jsonl").open("a", encoding="utf-8") as f:

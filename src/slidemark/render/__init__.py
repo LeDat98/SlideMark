@@ -37,6 +37,7 @@ from ..template import clone_footer, open_template, pick_layout
 from ..theme import DEFAULT_SIZES, Theme
 from ..units import slide_size
 from .anim import build_timing
+from .design_part import write_design_part
 from .effects import apply_fill, apply_shadow, cover_crop, set_picture
 from .htmlimg import add_html_image, add_html_native, close_html
 from .icons import add_icon
@@ -133,6 +134,7 @@ def render(deck: Deck, placed: list[list[Placed]], theme: Theme, out: str | Path
     _resolve_links(rc)
     _sections(rc, prs)
     _core_properties(prs, deck)
+    write_design_part(prs, deck, rc.slides)
     out.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(out))
     return out
