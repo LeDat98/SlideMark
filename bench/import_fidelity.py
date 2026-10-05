@@ -177,6 +177,18 @@ def score_pair(original: Path, rebuilt: Path) -> dict:
     }
 
 
+# --- color fidelity (reported separately) ---
+
+
+def color_fidelity(original: Path, rebuilt: Path) -> float:
+    """Mean of (bg match, text-color overlap, fill-color overlap) per slide; see importer/look.py."""
+    from pptx import Presentation
+
+    from slidemark.importer.look import color_similarity
+
+    return color_similarity(Presentation(str(original)), Presentation(str(rebuilt)))
+
+
 def roundtrip(original: Path, work: Path) -> tuple[Path | None, str]:
     """import -> build; returns the rebuilt path (None on failure) and the SlideMark text."""
     from slidemark.build import build
@@ -227,15 +239,22 @@ def main() -> int:
                     rows.append((script.stem, {"text": 0, "objects": 0, "layout": 0, "fidelity": 0.0}))
                     print(f"FAIL {script.stem}: empty import")
                     continue
-                rows.append((script.stem, score_pair(orig, rebuilt)))
+                sc = score_pair(orig, rebuilt)
+                sc["color"] = color_fidelity(orig, rebuilt)
+                rows.append((script.stem, sc))
             except Exception as e:
                 print(f"FAIL {script.stem}: {type(e).__name__}: {e}")
                 rows.append((script.stem, {"text": 0, "objects": 0, "layout": 0, "fidelity": 0.0}))
-    print(f"{'deck':22} {'text':>6} {'objects':>8} {'layout':>7} {'fidelity':>9}")
+    print(f"{'deck':22} {'text':>6} {'objects':>8} {'layout':>7} {'fidelity':>9} {'color':>6}")
     for name, s in rows:
-        print(f"{name:22} {s['text']:6.3f} {s['objects']:8.3f} {s['layout']:7.3f} {s['fidelity']:9.3f}")
+        c = s.get("color", 0)
+        print(
+            f"{name:22} {s['text']:6.3f} {s['objects']:8.3f} {s['layout']:7.3f} {s['fidelity']:9.3f} {c:6.3f}"
+        )
     overall = sum(s["fidelity"] for _, s in rows) / len(rows) if rows else 0.0
     print(f"overall fidelity {overall:.3f} over {len(rows)} decks")
+    color = sum(s.get("color", 0.0) for _, s in rows) / len(rows) if rows else 0.0
+    print(f"color fidelity {color:.3f} (separate metric: slide bg, text colors, fill colors)")
     if args.record:
         sha = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=ROOT
@@ -246,6 +265,7 @@ def main() -> int:
             "metric": "import_fidelity",
             "import_fidelity": round(overall, 3),
             "value": round(overall, 3),
+            "color_fidelity": round(color, 3),
             "decks": len(rows),
             "worst": sorted(((n, round(s["fidelity"], 3)) for n, s in rows), key=lambda x: x[1])[:3],
         }
