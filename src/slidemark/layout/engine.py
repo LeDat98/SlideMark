@@ -69,6 +69,8 @@ CHEVRON_PAD_PT = 4  # text padding inside a chevron (the preset's text rectangle
 CHEVRON_MIN_H = 0.7  # inches: a chevron row is its text height + padding, at least this tall ...
 CHEVRON_MAX_H = 1.3  # ... and at most this tall
 CHEVRON_VPAD = 0.17  # inches above and below the text of a chevron
+CHEVRON_MAX_ALONE = 2.0  # inches: a chevron row that is all the slide holds may be this tall ...
+CHEVRON_ALONE_SHARE = 0.28  # ... aiming at this share of the body height (a thin band looks unfinished)
 CODE_GROW = 1.25  # code text grows with the sparse-slide growth, up to this factor
 TABLE_GROW = 1.4  # rows of a table with spare room grow up to this factor (a row stays near its text)
 TABLE_FONT_GROW = 1.2  # table text grows with the sparse-slide growth, up to this factor
@@ -133,6 +135,7 @@ class _Ctx:
     text_only: bool = False  # the slide body is plain text only: its body text grows like box text
     head_grow: bool = False  # very sparse boxes: box headings grow with ``grow`` (up to ``GROW_HEAD``)
     grew: bool = False  # set when ``grow`` actually scaled some text
+    chev_grow: float = 1.0  # a chevron row alone on the slide: its text grows with ``grow``
     fill: float | None = None  # natural content height / grid height of the slide-level grid, if known
     expand: int = 0  # extra height (EMU) the capped rows of the slide-level grid may take
     arrange: str | None = None  # layout search: a grid token that replaces the rule-based arrangement
@@ -1255,7 +1258,18 @@ def _place_blocks(
     chev_eff: float | None = None  # one text size for the whole chevron row
     chev_h: int | None = None
     if "chevron" in flags:
-        chev_h = _chevron_row_h(ctx, [b for _, b in flow], min((r.w for r in cells), default=area.w), inherit)
+        alone = _chevron_alone(ctx, flow, extra, links)
+        ctx.chev_grow = 1.0
+        if alone and ctx.grow > 1.0 and ctx.scale >= 1.0:
+            ctx.chev_grow = ctx.grow
+            ctx.grew = True
+        chev_h = _chevron_row_h(
+            ctx,
+            [b for _, b in flow],
+            min((r.w for r in cells), default=area.w),
+            inherit,
+            area.h if alone else None,
+        )
         chev_eff = min(
             (
                 _chevron_eff(ctx, blk, _apply_box(ctx, blk, r, False), inherit, chev_h)
@@ -1370,7 +1384,7 @@ def _wide_diagram(b) -> bool:
 
 
 def _hug_tail(ctx: _Ctx, start: int, area: Rect, gap: int) -> None:
-    """A lone diagram followed by blocks (a callout): the blocks sit right below it, the pair is centered."""
+    """A lone diagram followed by blocks (a callout): the blocks sit right below it, both top-anchored."""
     items = ctx.out[start:]
     if len(items) < 2:
         return
@@ -1383,9 +1397,7 @@ def _hug_tail(ctx: _Ctx, start: int, area: Rect, gap: int) -> None:
     top = min(p.y for p in members)
     dbot = max(p.y + p.h for p in members)
     rtop = min(p.y for p in rest)
-    rbot = max(p.y + p.h for p in rest)
-    pair = (dbot - top) + gap + (rbot - rtop)
-    new_top = area.y + max(area.h - pair, 0) // 2
+    new_top = area.y
     for p in members:
         p.y += new_top - top
     for p in rest:
@@ -1458,9 +1470,27 @@ def _chevron_text_w(rect: Rect, st: Style, sh: Shape | None = None) -> int:
     return rect.w - 2 * round(CHEVRON_ADJ * min(rect.w, rect.h)) - 2 * _pad(st) - inset
 
 
-def _chevron_row_h(ctx: _Ctx, blocks: list, width: int, inherit: Style) -> int:
-    """Height of a chevron row: tallest text + padding, clamped to ``CHEVRON_MIN_H`` .. ``CHEVRON_MAX_H``."""
+def _chevron_alone(ctx: _Ctx, flow: list, extra: list, links) -> bool:
+    """A single chevron row is everything the slide holds (plain text boxes only, no tail, no connectors)."""
+    if ctx.depth != 0 or extra or links:
+        return False
+    return all(
+        isinstance(b, (Text, Shape))
+        or (isinstance(b, Container) and all(isinstance(ch, (Text, Shape)) for ch in b.children))
+        for _, b in flow
+    )
+
+
+def _chevron_row_h(ctx: _Ctx, blocks: list, width: int, inherit: Style, alone_h: int | None = None) -> int:
+    """Height of a chevron row: tallest text + padding, clamped to ``CHEVRON_MIN_H`` .. ``CHEVRON_MAX_H``.
+
+    A row alone on the slide (``alone_h`` = the body height) aims at ``CHEVRON_ALONE_SHARE`` of it, up to
+    ``CHEVRON_MAX_ALONE``.
+    """
     lo, hi = round(CHEVRON_MIN_H * EMU_PER_INCH), round(CHEVRON_MAX_H * EMU_PER_INCH)
+    if alone_h is not None:
+        hi = round(CHEVRON_MAX_ALONE * EMU_PER_INCH)
+        lo = max(lo, min(hi, round(CHEVRON_ALONE_SHARE * alone_h)))
     h = round(EMU_PER_INCH)
     for _ in range(3):  # the point depth depends on the height, the height on the wrapped text
         need = 0
@@ -1468,7 +1498,10 @@ def _chevron_row_h(ctx: _Ctx, blocks: list, width: int, inherit: Style) -> int:
             if not isinstance(blk, (Text, Shape, Container)):
                 continue
             sh, st, rect = _chevron_geom(ctx, blk, Rect(0, 0, width, h), inherit)
-            eff = measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
+            eff = (
+                measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
+                * ctx.chev_grow
+            )
             need = max(need, measure.paragraphs_height(sh.paragraphs, _chevron_text_w(rect, st, sh), st, eff))
         h = min(max(round(need / 0.8), round(need + 2 * CHEVRON_VPAD * EMU_PER_INCH), lo), hi)
     return h
@@ -1483,9 +1516,9 @@ def _chevron_eff(ctx: _Ctx, blk, rect: Rect, inherit: Style, hcap: int | None = 
     sh, st, rect = _chevron_geom(ctx, blk, rect, inherit, hcap)
     width = _chevron_text_w(rect, st, sh)
     base = st.font_size or 18
-    first = measure.effective_scale(base, ctx.scale, ctx.theme.min_font_size)
+    first = measure.effective_scale(base, ctx.scale, ctx.theme.min_font_size) * ctx.chev_grow
     for m in (1.0, 0.95, 0.9, 0.85, 0.8):
-        eff = measure.effective_scale(base, ctx.scale * m, ctx.theme.min_font_size)
+        eff = measure.effective_scale(base, ctx.scale * m, ctx.theme.min_font_size) * ctx.chev_grow
         wide = measure.paragraphs_height(sh.paragraphs, width, st, eff)
         narrow = measure.paragraphs_height(sh.paragraphs, round(width * 0.88), st, eff)
         if narrow <= wide * 1.001:
@@ -1498,7 +1531,7 @@ def _place_chevron(
 ) -> Rect:
     full = rect
     sh, st, rect = _chevron_geom(ctx, blk, rect, inherit, hcap)
-    eff = measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
+    eff = measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size) * ctx.chev_grow
     if eff_cap is not None:
         eff = min(eff, eff_cap)
     # centered text may use the middle 80% of the height

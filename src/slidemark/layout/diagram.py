@@ -25,6 +25,14 @@ CROSS_GAP, CROSS_GAP_MAX = 0.3, 0.8  # inches between nodes of one rank
 SIDE_STEP = 0.24  # inches between nested side routes (back edges)
 LABEL_OFF = 0.05  # inches between an edge and its label
 TOL = 1.01
+RANK_GK_MIN = 0.75  # arrows between ranks keep at least this share of the base gap
+STEP = round(0.04 * IN)  # node width search step
+LABEL_MIN_PT = 10  # edge labels never shrink below this (or their own base size when that is smaller)
+GROW_MAX = 1.6  # a diagram on a sparse slide grows its nodes up to this factor ...
+GROW_H_FILL = 0.85  # ... while it fills at most this share of the height it has
+_SQUEEZE = [round(0.95 - 0.05 * i, 2) for i in range(14)]  # own fit: 0.95 .. 0.3
+_GROW_STEPS_H = [1.5, 1.4, 1.3, 1.2, 1.1]  # height-only growth of the nodes
+_GROW_STEPS = [round(GROW_MAX - 0.1 * i, 2) for i in range(6)]  # 1.6 .. 1.1
 _WORD = re.compile(r"[^\s\u3000-\u9fff\uff00-\uffef]+|[\u3000-\u9fff\uff00-\uffef]")
 
 
@@ -89,6 +97,23 @@ class _Frame:
 
     def dims(self, w: int, h: int) -> tuple[int, int]:
         return (h, w) if self.t else (w, h)
+
+
+def _gaps(total: int, avail: int, mins: list[int], hi: int) -> list[int]:
+    """Gaps between tracks: equal (at most ``hi``) when there is room, each at least its own minimum."""
+    if not mins:
+        return []
+    room = avail - total
+    lo_t, hi_t = 0, max(hi, max(mins))
+    if sum(max(m, hi_t) for m in mins) <= room:
+        return [max(m, hi_t) for m in mins]
+    while lo_t < hi_t:  # largest common target whose gaps still fit
+        mid = (lo_t + hi_t + 1) // 2
+        if sum(max(m, mid) for m in mins) <= room:
+            lo_t = mid
+        else:
+            hi_t = mid - 1
+    return [max(m, lo_t) for m in mins]
 
 
 def _cx(r: Rect) -> int:
@@ -167,24 +192,109 @@ def place_diagram(ctx, c: Container, area: Rect, inherit: Style) -> bool:
     saved = ctx.depth
     ctx.depth += 1  # children of a box: sparse-slide growth applies to the node text
     try:
-        _place(ctx, E, c, area, inherit, pos, nr, nc)
+        _place(ctx, E, c, area, inherit, pos, nr, nc, saved == 0)
     finally:
         ctx.depth = saved
     return True
 
 
-def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: int) -> None:
+@dataclass
+class _Built:
+    """One complete diagram layout (real coordinates, before it is shifted into its area)."""
+
+    nodes: list[_Node]
+    rects: dict[int, Rect]
+    routes: list[tuple[int, _Route, bool]]
+    labels: dict[int, Rect]  # link index -> real rect
+    cap_eff: float
+    bad: list[tuple[int, int]]  # links that refer to a missing node
+    bx0: int
+    by0: int
+    bw: int
+    bh: int
+
+
+def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: int, top_level: bool) -> None:
     kids: list[Text] = c.children  # type: ignore[assignment]
-    n = len(kids)
     vertical, sgn = _orientation(c.links, pos)
     frame = _Frame(vertical, sgn)
+    cap_style = E._role_style(ctx, "caption").merged(Style(align="center", valign="middle", padding="2pt"))
+
+    def fits(b: _Built, tol: float = TOL) -> bool:
+        return b.bw <= area.w * tol and b.bh <= area.h * tol
+
+    # 1. natural size; on a slide that still fits at full size the diagram squeezes itself (font and node
+    #    size together) instead of shrinking the whole slide: the text under it keeps its size
+    def build(q: float = 1.0, sz: float = 1.0, body_pt: float = 1.0, szh: float = 1.0) -> _Built:
+        return _build(ctx, E, c, area, inherit, pos, nr, nc, frame, cap_style, kids, q, sz, body_pt, szh)
+
+    best = build()
+    qf = 1.0
+    if not fits(best):
+        for q in _SQUEEZE if ctx.scale >= 1.0 and ctx.grow <= 1.0 else ():
+            best, qf = build(q), q
+            if fits(best, 1.0):
+                break
+    if fits(best) and top_level and ctx.scale >= 1.0 and ctx.dense_k >= 1.0:
+        # 2. sparse slide: grow the nodes (and their text, up to the theme body size) while the diagram fits
+        body_pt = ctx.theme.sizes.get("body", 18)
+        done = False
+        for sz in _GROW_STEPS if qf >= 1.0 else ():
+            cand = build(sz=sz, body_pt=body_pt)
+            if fits(cand, 1.0) and cand.bh <= area.h * GROW_H_FILL:
+                best, done = cand, True
+                break
+        if not done:  # the width is the limit: taller nodes at the same text size
+            for szh in _GROW_STEPS_H:
+                cand = build(qf, szh=szh)
+                if fits(cand, 1.0) and cand.bh <= area.h * GROW_H_FILL:
+                    best = cand
+                    break
+    if not fits(best):
+        ctx.over.append("diagram")
+    for a, b in best.bad:
+        ctx.diag(
+            "link",
+            f"connector {a}>{b} refers to a node that does not exist",
+            "use node indices that exist in this diagram",
+        )
+    _emit(ctx, E, c, area, frame, cap_style, best)
+
+
+def _build(
+    ctx,
+    E,
+    c: Container,
+    area: Rect,
+    inherit: Style,
+    pos,
+    nr: int,
+    nc: int,
+    frame: _Frame,
+    cap_style: Style,
+    kids: list[Text],
+    q: float,
+    sz: float,
+    body_pt: float,
+    szh: float = 1.0,
+) -> _Built:
+    """Lay the flowchart out at squeeze ``q`` (<= 1) or node growth ``sz`` (>= 1; text up to body_pt)."""
+    n = len(kids)
+    vertical = not frame.t
+    sgn = -1 if frame.m else 1
     # ---- node styles
     nodes: list[_Node] = []
     ks: list[float] = []
+    scale = ctx.scale * q
     for el in kids:
         st = E._text_style(ctx, el, inherit)
         base = st.font_size or 18
-        eff = E._grown(ctx, el, measure.effective_scale(base, ctx.scale, ctx.theme.min_font_size))
+        eff = measure.effective_scale(base, scale, ctx.theme.min_font_size)
+        if q >= 1.0:
+            eff = E._grown(ctx, el, eff)
+        ks.append(eff if eff > 1.0 else max(min(scale, 1.0), 0.3))
+        if sz > 1.0:  # bigger nodes: the text follows, but never beyond the theme body size
+            eff *= max(1.0, min(sz, body_pt / max(base * eff, 1.0)))
         diamond = "decision" in el.classes
         pad = E._pad(st)
         if diamond:
@@ -212,13 +322,15 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
             default=0.0,
         )
         nodes.append(_Node(el, st, eff, diamond, em * unit, pad, ww=max(word_em, 1.0) * unit))
-        ks.append(eff if eff > 1.0 else max(min(ctx.scale, 1.0), 0.3))
-    k = max(ks)
-    gk = max(min(k, 1.0), 0.5)
-    # ---- edge labels (sizes first: they widen the gaps between ranks)
-    cap_style = E._role_style(ctx, "caption").merged(Style(align="center", valign="middle", padding="2pt"))
+    kb = max(ks)
+    k = kb * max(sz, 1.0)
+    gk = max(min(kb, 1.0), 0.5) * max(sz, 1.0)
+    # ---- edge labels (sizes first: they widen the gaps between ranks); never below LABEL_MIN_PT
     cap_base = cap_style.font_size or 12
-    cap_eff = measure.effective_scale(cap_base, ctx.scale, ctx.theme.min_font_size)
+    cap_eff = measure.effective_scale(cap_base, scale, ctx.theme.min_font_size)
+    cap_eff = max(cap_eff, min(1.0, LABEL_MIN_PT / cap_base))
+    if sz > 1.0:
+        cap_eff *= min(sz, 1.25)
     cap_pad = E._pad(cap_style)
     lab_dims: dict[int, tuple[int, int]] = {}
     for i, ln in enumerate(c.links):
@@ -238,7 +350,8 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
         r, cc = pos[i]
         return (r, cc) if vertical else (cc, r)
 
-    gap_rank = round(RANK_GAP * IN * gk)
+    gap0 = round(RANK_GAP * IN * max(gk, RANK_GK_MIN))
+    rank_min = [gap0] * max((nr if vertical else nc) - 1, 0)  # per gap between rank tracks (real index)
     n_side = 0
     side_label = 0
     for i, ln in enumerate(c.links):
@@ -259,14 +372,17 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
             continue
         if i in lab_dims:
             ext = lab_dims[i][1] if vertical else lab_dims[i][0]
-            gap_rank = max(gap_rank, ext + round(0.2 * IN) if straight else 2 * ext + round(0.1 * IN))
+            need = ext + round(0.2 * IN) if straight else 2 * ext + round(0.1 * IN)
+            for t in range(min(rs, rd), max(rs, rd)):  # only the gaps this connector crosses widen
+                rank_min[t] = max(rank_min[t], need)
     gap_cross = round(CROSS_GAP * IN * gk)
     reserve = (round(n_side * SIDE_STEP * IN * gk) + round(0.15 * IN) + side_label) if n_side else 0
-    gx_min, gy_min = (gap_cross, gap_rank) if vertical else (gap_rank, gap_cross)
+    x_min = [gap_cross] * (nc - 1) if vertical else rank_min
+    y_min = rank_min if vertical else [gap_cross] * (nr - 1)
     res_x, res_y = (reserve, 0) if vertical else (0, reserve)
     # ---- node sizes
-    min_w, min_h = round(MIN_W * IN * k), round(MIN_H * IN * k)
-    cap_w = max(round(0.6 * IN), (area.w - res_x - (nc - 1) * gx_min) // max(nc, 1))
+    min_w, min_h = round(MIN_W * IN * k), round(MIN_H * IN * k * szh)
+    cap_w = max(round(0.6 * IN), (area.w - res_x - sum(x_min)) // max(nc, 1))
     cap_w = min(cap_w, round(MAX_W * IN * k))
 
     def text_h(nd: _Node, width: int) -> float:
@@ -282,6 +398,13 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
         h = max(
             min_h, max(round(text_h(nd, w - 2 * nd.pad)) + 2 * nd.pad + round(0.08 * IN) for nd in rect_nodes)
         )
+        floor = max(min_w, max(round(nd.ww) + 2 * nd.pad + round(0.1 * IN) for nd in rect_nodes))
+        if w >= cap_w and w > floor:  # wrapped at the cap: the narrowest width with the same wrapping
+            text_need = max(text_h(nd, w - 2 * nd.pad) for nd in rect_nodes)
+            while w - STEP >= floor and (
+                max(text_h(nd, round((w - STEP - 2 * nd.pad) * 0.9)) for nd in rect_nodes) <= text_need
+            ):  # ... also when the renderer sets the text 10% wider than measured
+                w -= STEP
         for nd in rect_nodes:
             nd.w, nd.h = w, h
     if dia_nodes:
@@ -293,7 +416,7 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
         # the text area of a diamond is half its width: the longest word must fit there on one line
         w = max(w, max(2 * round(nd.ww * 1.1) + 4 * nd.pad + round(0.1 * IN) for nd in dia_nodes))
         h = max(
-            round(DIAMOND_MIN_H * IN * k),
+            round(DIAMOND_MIN_H * IN * k * szh),
             max(
                 2 * round(text_h(nd, w // 2 - 2 * nd.pad)) + 4 * nd.pad + round(0.1 * IN) for nd in dia_nodes
             ),
@@ -308,29 +431,16 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
         cw[cc] = max(cw[cc], nd.w)
         rh[r] = max(rh[r], nd.h)
 
-    def spread(total: int, avail: int, count: int, lo: int, hi: int) -> int:
-        if count <= 1:
-            return 0
-        return max(lo, min(hi, (avail - total) // (count - 1)))
-
-    gx = spread(
-        sum(cw),
-        area.w - res_x,
-        nc,
-        gx_min,
-        round((RANK_GAP_MAX if not vertical else CROSS_GAP_MAX) * IN * gk),
-    )
-    gy = spread(
-        sum(rh), area.h - res_y, nr, gy_min, round((RANK_GAP_MAX if vertical else CROSS_GAP_MAX) * IN * gk)
-    )
+    gx = _gaps(sum(cw), area.w - res_x, x_min, round((CROSS_GAP_MAX if vertical else RANK_GAP_MAX) * IN * gk))
+    gy = _gaps(sum(rh), area.h - res_y, y_min, round((RANK_GAP_MAX if vertical else CROSS_GAP_MAX) * IN * gk))
     xs, ys = [], []
     x = y = 0
-    for wv in cw:
+    for j, wv in enumerate(cw):
         xs.append(x)
-        x += wv + gx
-    for hv in rh:
+        x += wv + (gx[j] if j < len(gx) else 0)
+    for j, hv in enumerate(rh):
         ys.append(y)
-        y += hv + gy
+        y += hv + (gy[j] if j < len(gy) else 0)
     rects: dict[int, Rect] = {}
     for i, nd in enumerate(nodes):
         r, cc = pos[i]
@@ -338,14 +448,11 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
     # ---- connectors and labels in the frame
     frects = {i: frame.rect(r) for i, r in rects.items()}
     routes: list[tuple[int, _Route, bool]] = []  # (link index, route, glue boxes?)
+    bad: list[tuple[int, int]] = []
     side_k = 0
     for i, ln in enumerate(c.links):
         if ln.src not in frects or ln.dst not in frects or ln.src == ln.dst:
-            ctx.diag(
-                "link",
-                f"connector {ln.src}>{ln.dst} refers to a node that does not exist",
-                "use node indices that exist in this diagram",
-            )
+            bad.append((ln.src, ln.dst))
             continue
         a, b = frects[ln.src], frects[ln.dst]
         others = [r for j, r in frects.items() if j not in (ln.src, ln.dst)]
@@ -362,27 +469,30 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
         lines = [o.pts for j, o, _g in routes if j != i]
         taken = [r for _, r in placed_labels]
         placed_labels.append((i, _label_rect(rt, lw, lh, fnodes, taken, round(LABEL_OFF * IN), lines)))
-    # ---- bounding box, fit check, centering
+    # ---- bounding box
     all_real: list[Rect] = list(rects.values())
     for _i, rt, _g in routes:
         for p in rt.pts:
-            q = frame.unpt(p)
-            all_real.append(Rect(q[0], q[1], 0, 0))
+            q_ = frame.unpt(p)
+            all_real.append(Rect(q_[0], q_[1], 0, 0))
     label_real = {i: frame.unrect(r) for i, r in placed_labels}
     all_real += list(label_real.values())
     bx0, by0 = min(r.x for r in all_real), min(r.y for r in all_real)
     bx1, by1 = max(r.right for r in all_real), max(r.bottom for r in all_real)
-    bw, bh = bx1 - bx0, by1 - by0
-    if bw > area.w * TOL or bh > area.h * TOL:
-        ctx.over.append("diagram")
-    dx = area.x + max(area.w - bw, 0) // 2 - bx0
-    dy = area.y + max(area.h - bh, 0) // 2 - by0  # centered in the space it has
+    return _Built(nodes, rects, routes, label_real, cap_eff, bad, bx0, by0, bx1 - bx0, by1 - by0)
+
+
+def _emit(ctx, E, c: Container, area: Rect, frame: _Frame, cap_style: Style, b: _Built) -> None:
+    """Shift the layout into ``area`` (centered across, top-anchored along the page) and emit it."""
+    dx = area.x + max(area.w - b.bw, 0) // 2 - b.bx0
+    dy = area.y - b.by0  # top-anchored: the leftover stays below (the slide policy moves very sparse slides)
 
     def shift(r: Rect) -> Rect:
         return Rect(r.x + dx, r.y + dy, r.w, r.h)
 
+    rects, routes, label_real, nodes = b.rects, b.routes, b.labels, b.nodes
     # ---- emit: card, nodes, connectors, labels
-    card = Rect(bx0 + dx, by0 + dy, bw, bh)
+    card = Rect(b.bx0 + dx, b.by0 + dy, b.bw, b.bh)
     ctx.emit(c, card, E._card_style(ctx, c))
     for i, nd in enumerate(nodes):
         el = nd.el
@@ -435,7 +545,7 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
     for i, r in label_real.items():
         text = " ".join((c.links[i].label or "").split())
         el = Text(role="caption", paragraphs=[Paragraph(runs=[Run(text=text)])])
-        ctx.emit(el, shift(r), cap_style, cap_eff)
+        ctx.emit(el, shift(r), cap_style, b.cap_eff)
 
 
 # --------------------------------------------------------------------------- routing (frame coordinates)

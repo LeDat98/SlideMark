@@ -266,3 +266,63 @@ def test_wide_diagram_takes_full_width_with_text_below():
     assert max(n.x + n.w for n in ns) - min(n.x for n in ns) > 0.8 * W  # not squeezed into half the width
     para = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "body")
     assert para.y >= max(n.y + n.h for n in ns)  # the paragraph sits below the diagram
+
+
+def node_pt(p) -> float:
+    return (p.style.font_size or 0) * p.font_scale
+
+
+def test_sparse_diagram_grows_text_and_sits_under_the_title():
+    deck, theme, placed = check_clean(DEPLOY)
+    ns = nodes(placed)
+    body = theme.sizes["body"]
+    sizes = {round(node_pt(n), 1) for n in ns}
+    assert len(sizes) == 1  # one text size across the diagram (it was ~9.9 pt: the whole slide shrank)
+    pt = sizes.pop()
+    assert 14 <= pt <= body * 1.35
+    para = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "body")
+    assert node_pt(para) >= body  # the sentence below keeps the body size
+    assert all(node_pt(lab) >= 10 for lab in labels(placed))  # edge labels stay readable
+    title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
+    top = min(p.y for p in [*ns, *lines(placed), *labels(placed)])
+    assert top <= title.y + title.h + 0.6 * IN  # top-anchored under the title, not centered in the body
+    assert para.y - max(n.y + n.h for n in ns) <= 0.8 * IN  # the sentence follows right below
+
+
+def test_small_diagram_nodes_grow_but_stay_within_body_size():
+    deck, theme, placed = check_clean(
+        "# Review\n```mermaid\ngraph TD\nA[Draft] --> B[Review] --> C[Publish]\n```\n"
+    )
+    ns = nodes(placed)
+    assert max(node_pt(n) for n in ns) <= theme.sizes["body"] * 1.35
+    assert ns[0].w > 1.4 * IN * 1.2  # bigger than the natural minimum node
+    assert ns[0].w <= 1.4 * IN * 1.6 * 1.6 + 1  # ... but bounded (growth <= 1.6x)
+
+
+def test_dense_slide_diagram_does_not_grow():
+    deck = parse(DEPLOY)
+    deck.density = "dense"
+    theme = get_theme(deck.theme)
+    base = layout_slide(deck.slides[0], deck, theme, 0)
+    ns = nodes(base)
+    assert max(node_pt(n) for n in ns) <= theme.sizes["body"] * 1.25 + 0.01  # the dense text cap
+    assert max(n.h for n in ns) < 1.4 * IN  # no box growth on a dense slide
+    assert not [d for d in deck.diagnostics if d.rule == "overflow"]
+
+
+def test_chevron_only_slide_is_not_a_thin_band():
+    md = "# Timeline\n@4 chevron\n## 2023\nFounded\n## 2024\nSeed round\n## 2025\nGrowth\n## 2026\nSeries A\n"
+    deck, theme, placed = lay(md)
+    chev = [p for p in placed if isinstance(p.element, Shape) and p.element.shape == "chevron"]
+    assert len(chev) == 4
+    h = max(p.h for p in chev)
+    assert 1.2 * IN <= h <= 2.0 * IN + 1  # grown, bounded
+    assert all(p.font_scale >= 1.0 for p in chev)
+    assert not [d for d in deck.diagnostics if d.rule == "overflow"]
+
+
+def test_chevron_with_a_table_keeps_the_compact_row():
+    md = "# Process\n@3 chevron\n## A\nx\n## B\ny\n## C\nz\n@end\n\n| a | b |\n|---|---|\n| 1 | 2 |\n"
+    _deck, _theme, placed = lay(md)
+    chev = [p for p in placed if isinstance(p.element, Shape) and p.element.shape == "chevron"]
+    assert chev and max(p.h for p in chev) <= 1.3 * IN + 1
