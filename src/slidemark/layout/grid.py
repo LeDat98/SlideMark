@@ -156,7 +156,32 @@ def track_counts(weights: list[float], columns: int) -> list[int] | None:
     return out
 
 
-def cell_rects(spec: GridSpec, n: int, area: Rect, gap: int, columns: int = 12) -> list[Rect]:
+def row_heights(spec: GridSpec, area_h: int, gap: int, caps: list[int | None]) -> list[int]:
+    """Row heights: weighted share of ``area_h``, each row cut down to its cap (``None`` = no cap).
+
+    Height freed by capped rows goes to the uncapped rows (by weight); with no uncapped row it stays unused
+    below the grid (top-aligned grid).
+    """
+    nr = len(spec.rows)
+    avail = max(area_h - gap * (nr - 1), nr)
+    total = sum(spec.rows)
+    base = [avail * w / total for w in spec.rows]
+    out = list(base)
+    for i, cap in enumerate(caps[:nr]):
+        if cap is not None:
+            out[i] = min(base[i], cap)
+    free = [i for i in range(nr) if i >= len(caps) or caps[i] is None]
+    spare = sum(base) - sum(out)
+    if free and spare > 0:
+        fw = sum(spec.rows[i] for i in free)
+        for i in free:
+            out[i] += spare * spec.rows[i] / fw
+    return [round(h) for h in out]
+
+
+def cell_rects(
+    spec: GridSpec, n: int, area: Rect, gap: int, columns: int = 12, row_h: list[int] | None = None
+) -> list[Rect]:
     """Rect for each of ``n`` blocks in source order (areas map letters, otherwise row-major).
 
     Ratio and area grids snap their column edges to ``columns`` tracks so edges line up across rows and boxes.
@@ -181,8 +206,8 @@ def cell_rects(spec: GridSpec, n: int, area: Rect, gap: int, columns: int = 12) 
             xs.append((x, w))
             x += w + gap
     y = area.y
-    for wgt in spec.rows:
-        h = round(avail_h * wgt / sum(spec.rows))
+    for i, wgt in enumerate(spec.rows):
+        h = row_h[i] if row_h is not None else round(avail_h * wgt / sum(spec.rows))
         ys.append((y, h))
         y += h + gap
     out: list[Rect] = []

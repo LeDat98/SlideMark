@@ -216,7 +216,14 @@ def test_horizontal_links_between_grid_cells():
     ls = lines(placed)
     assert len(ls) == 2 and placed.index(ls[0]) > max(placed.index(c) for c in cs)  # on top
     assert ls[0].x == cs[0].x + cs[0].w and ls[0].x + ls[0].w == cs[1].x
-    assert ls[0].element.attrs == {"head": "arrow", "flip_h": False, "flip_v": False}
+    a0 = ls[0].element.attrs
+    assert (a0["head"], a0["flip_h"], a0["flip_v"], a0["elbow"], a0["route"]) == (
+        "arrow",
+        False,
+        False,
+        False,
+        "h",
+    )
     assert ls[1].element.attrs["head"] == "none"
     assert ls[0].y == cs[0].y + cs[0].h // 2 and ls[0].h == 0
     assert ls[0].w > 0.3 * 914400 * 0.9  # room for an arrow head

@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.enum.text import PP_ALIGN
+from pptx.oxml.ns import qn
 from pptx.util import Pt
 
 from slidemark.ir import Cell, Container, Deck, Link, Paragraph, Run, Slide, Table, Text
@@ -215,3 +217,46 @@ def test_components_deck_opens_in_libreoffice(tmp_path, theme):
     )
     _, out, _ = build(Deck(slides=[s]), tmp_path, theme)
     assert len(pptx_to_pngs(out, tmp_path / "png")) == 1
+
+
+def _org_slide():
+    return Slide(
+        title=T("t", "title"),
+        grid=".a./bcd",
+        elements=[box("a"), box("b"), box("c"), box("d")],
+        links=[Link(src=0, dst=1), Link(src=0, dst=2), Link(src=0, dst=3)],
+    )
+
+
+def test_org_chart_uses_elbow_connectors_glued_to_boxes(tmp_path):
+    prs, _, _ = build(Deck(slides=[_org_slide()]), tmp_path)
+    cx = connectors(prs)
+    assert len(cx) == 3
+    kinds = sorted(c._element.spPr.find(qn("a:prstGeom")).get("prst") for c in cx)
+    assert kinds == ["bentConnector3", "bentConnector3", "line"]
+    cards = {x.shape_id: x for x in prs.slides[0].shapes if x.name.startswith("Card")}
+    for c in cx:
+        st = c._element.find(".//" + qn("a:stCxn"))
+        en = c._element.find(".//" + qn("a:endCxn"))
+        assert st is not None and en is not None
+        assert int(st.get("id")) in cards and st.get("idx") == "2"  # parent bottom
+        assert int(en.get("id")) in cards and en.get("idx") == "0"  # child top
+    elbow = next(c for c in cx if c._element.spPr.find(qn("a:prstGeom")).get("prst") == "bentConnector3")
+    assert elbow._element.spPr.find(qn("a:xfrm")).get("rot") == "5400000"  # vertical-first route
+    assert "a:tailEnd" in elbow._element.xml
+
+
+def test_table_cells_are_centered_and_numbers_right_aligned(tmp_path):
+    def cell(t):
+        return Cell(paragraphs=[Paragraph(runs=[Run(text=t)])])
+
+    rows = [[cell("事業部"), cell("売上（億円）")], [cell("SaaS"), cell("38.2")], [cell("HW"), cell("7.3")]]
+    s = Slide(title=T("t", "title"), elements=[Table(rows=rows)])
+    prs, _, _ = build(Deck(slides=[s]), tmp_path)
+    tbl = next(x for x in prs.slides[0].shapes if x.has_table).table
+    for r in range(3):
+        for c in range(2):
+            assert tbl.cell(r, c)._tc.tcPr.get("anchor") == "ctr"
+    aligns = [tbl.cell(r, 1).text_frame.paragraphs[0].alignment for r in range(3)]
+    assert all(a == PP_ALIGN.RIGHT for a in aligns)
+    assert tbl.cell(1, 0).text_frame.paragraphs[0].alignment == PP_ALIGN.LEFT

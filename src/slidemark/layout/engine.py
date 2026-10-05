@@ -26,7 +26,8 @@ from ..theme import Theme
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import measure
 from .grid import Rect, auto_spec, cell_rects, parse_spec
-from .tables import column_widths, row_heights, table_grid
+from .grid import row_heights as grid_row_heights
+from .tables import column_widths, right_align_numbers, row_heights, table_grid
 
 _SIZE_KEY = {
     "title": "title",
@@ -54,6 +55,12 @@ _INHERIT_FIELDS = (
 _VISUALS = (Image, Chart, Table, Code)
 _TOL = 1.01
 CHEVRON_ADJ = 0.3  # chevron point depth / shorter side; the renderer sets the same adjustment
+TABLE_GROW = 1.6  # rows of a table with spare room grow up to this factor
+ROW_SLACK = 1.35  # a grid row is at most this much taller than its tallest content ...
+ROW_MIN = 0.35  # ... but never shorter than this share of the body height
+GROW_MAX = 1.25  # sparse boxes: body text grows up to this factor
+GROW_FILL = 0.7  # ... as long as the content fills at most this share of the grid
+KPI_MIN_H = 1.1  # inches
 DENSE_TIGHT = 0.7  # gap / padding factor on dense slides
 _SCALES = [round(1.0 - 0.05 * i, 2) for i in range(15)]  # 1.0 .. 0.3
 
@@ -69,6 +76,10 @@ class _Ctx:
     scale: float = 1.0
     dense_k: float = 1.0
     tight: float = 1.0  # gap / padding factor (dense slides)
+    grow: float = 1.0  # body text growth inside boxes (sparse grids), shared by all sibling boxes
+    depth: int = 0  # 0 = slide level, > 0 inside a box
+    grew: bool = False  # set when ``grow`` actually scaled some text
+    fill: float | None = None  # natural content height / grid height of the slide-level grid, if known
     out: list[Placed] = field(default_factory=list)
     over: list[str] = field(default_factory=list)
     diags: list[Diagnostic] = field(default_factory=list)
@@ -298,6 +309,15 @@ def _fit(ctx: _Ctx, need_fn, avail: int, base_size: float) -> float:
 # --------------------------------------------------------------------------- element placement
 
 
+def _grown(ctx: _Ctx, el, eff: float) -> float:
+    """Autofit scale ``eff`` times the sparse-grid growth for body text inside boxes."""
+    if ctx.grow > 1.0 and ctx.depth > 0 and ctx.scale >= 1.0 and isinstance(el, Text):
+        if el.role == "body" and "callout" not in el.classes:
+            ctx.grew = True
+            return eff * ctx.grow
+    return eff
+
+
 def _text_need(ctx: _Ctx, el: Text | Shape, style: Style, width: int, scale: float) -> float:
     pad = _pad(style)
     return measure.paragraphs_height(el.paragraphs, width - 2 * pad, style, scale) + 2 * pad
@@ -307,7 +327,7 @@ def _natural_height(ctx: _Ctx, el, width: int, inherit: Style) -> int | None:
     """Natural height for stackable elements, ``None`` for flexible ones."""
     if isinstance(el, Text):
         st = _text_style(ctx, el, inherit)
-        eff = measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
+        eff = _grown(ctx, el, measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size))
         return round(_text_need(ctx, el, st, width, eff))
     if isinstance(el, Code):
         st = _code_style(ctx, el)
@@ -352,7 +372,7 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
     st = _table_style(ctx, el)
     eff = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
     nrows, ncols, anchors = table_grid(el)
-    cw = column_widths(el, ncols, anchors, width)
+    cw = column_widths(el, ncols, anchors, width, (st.font_size or 14) * eff)
     rh = row_heights(el, anchors, cw, st, eff)
     return st, eff, anchors, cw, rh
 
@@ -362,10 +382,12 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         return
     if isinstance(el, (Text, Shape)):
         st = _text_style(ctx, el, inherit)
-        eff = measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size)
+        eff = _grown(ctx, el, measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size))
         need = _text_need(ctx, el, st, rect.w, eff)
         if need > rect.h * _TOL:
             ctx.over.append(_label(el))
+        if isinstance(el, Text) and "callout" in el.classes:
+            rect = Rect(rect.x, rect.y, rect.w, min(rect.h, round(need)))  # callouts never stretch
         ctx.emit(el, rect, st, eff)
     elif isinstance(el, Code):
         st = _code_style(ctx, el)
@@ -380,9 +402,14 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         total = sum(rh)
         if total > rect.h * _TOL:
             ctx.over.append(_label(el))
+        elif rect.h > total:  # spare room: rows grow up to TABLE_GROW, cell text stays centered
+            target = min(rect.h, round(total * TABLE_GROW))
+            rh = [round(h * target / total) for h in rh]
+            rh[-1] += target - sum(rh)
+            total = sum(rh)
         attrs = {**el.attrs, "_col_w": cw, "_row_h": rh}
         ctx.emit(
-            el.model_copy(update={"attrs": attrs}),
+            right_align_numbers(el).model_copy(update={"attrs": attrs}),
             Rect(rect.x, rect.y, rect.w, min(total, rect.h) if total > rect.h else total),
             st,
             eff,
@@ -422,6 +449,30 @@ def _card_style(ctx: _Ctx, c: Container) -> Style:
     return _tighten(ctx, Style().merged(base, *others, c.style))
 
 
+def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
+    """(heading element, merged style, autofit scale, band fill) of a box, or ``None`` without a heading."""
+    if c.title is None or not c.title.paragraphs:
+        return None
+    band = None if kpi else ctx.theme.heading_band
+    h_el = c.title if c.title.role == "heading" else c.title.model_copy(update={"role": "heading"})
+    hst = _text_style(ctx, h_el, Style())
+    if kpi:
+        body_size = ctx.theme.sizes.get("body", 18) * ctx.dense_k
+        hst = hst.merged(Style(align="center", color="muted", bold=False, font_size=body_size))
+    if band:
+        hst = hst.merged(
+            Style(
+                fill=band,
+                color=ctx.theme.heading_band_color,
+                bold=True,
+                valign="middle",
+                padding=f"{round(pad / EMU_PER_PT, 2)}pt",
+            )
+        )
+    eff = measure.effective_scale(hst.font_size or 18, ctx.scale, ctx.theme.min_font_size)
+    return h_el, hst, eff, band
+
+
 def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> None:
     style = _card_style(ctx, c)
     pad = _pad(style, 10 * EMU_PER_PT * ctx.tight)
@@ -430,24 +481,8 @@ def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> Non
     y = inner.y
     child_inherit = inherit.merged(_only_inheritable(style))
     kpi = "kpi" in c.classes
-    band = None if kpi else ctx.theme.heading_band
-    if c.title is not None and c.title.paragraphs:
-        h_el = c.title if c.title.role == "heading" else c.title.model_copy(update={"role": "heading"})
-        hst = _text_style(ctx, h_el, Style())
-        if kpi:
-            body_size = ctx.theme.sizes.get("body", 18) * ctx.dense_k
-            hst = hst.merged(Style(align="center", color="muted", bold=False, font_size=body_size))
-        if band:
-            hst = hst.merged(
-                Style(
-                    fill=band,
-                    color=ctx.theme.heading_band_color,
-                    bold=True,
-                    valign="middle",
-                    padding=f"{round(pad / EMU_PER_PT, 2)}pt",
-                )
-            )
-        eff = measure.effective_scale(hst.font_size or 18, ctx.scale, ctx.theme.min_font_size)
+    if parts := _heading_parts(ctx, c, pad, kpi):
+        h_el, hst, eff, band = parts
         if band:
             hh = round(_text_need(ctx, h_el, hst, rect.w, eff))
             if hh > rect.h * _TOL:
@@ -468,11 +503,56 @@ def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> Non
     children = c.children
     if kpi:
         children = _kpi_children(ctx, children, area.w)
-    if c.grid or any(n in ("flow", "chevron") for n in c.classes):
-        _place_blocks(ctx, children, area, child_inherit, c.grid, c.classes, gap, c, c.links)
-    else:
-        rects = _place_stack(ctx, children, area, child_inherit, gap, c, center=kpi and len(children) == 1)
-        _emit_links(ctx, c.links, rects)
+    saved = (ctx.depth, ctx.grow)
+    ctx.depth += 1
+    if kpi:
+        ctx.grow = 1.0
+    try:
+        if c.grid or any(n in ("flow", "chevron") for n in c.classes):
+            _place_blocks(ctx, children, area, child_inherit, c.grid, c.classes, gap, c, c.links)
+        else:
+            rects = _place_stack(
+                ctx, children, area, child_inherit, gap, c, center=kpi and len(children) == 1
+            )
+            _emit_links(ctx, c.links, rects)
+    finally:
+        ctx.depth, ctx.grow = saved
+
+
+def _box_nat(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None:
+    """Natural height of a ``##`` box (heading, children, padding); ``None`` if content is flexible."""
+    if c.grid or c.links or any(n in ("flow", "chevron") for n in c.classes):
+        return None
+    style = _card_style(ctx, c)
+    pad = _pad(style, 10 * EMU_PER_PT * ctx.tight)
+    kpi = "kpi" in c.classes
+    total = 2 * pad if c.children or c.title else 0
+    if parts := _heading_parts(ctx, c, pad, kpi):
+        h_el, hst, eff, band = parts
+        if band:
+            total = round(_text_need(ctx, h_el, hst, width, eff)) + round(pad * 0.5) + pad
+        else:
+            total += round(_text_need(ctx, h_el, hst, width - 2 * pad, eff)) + round(pad * 0.5)
+    children = c.children
+    if not children:
+        return total
+    if any(_is_abs(ch) for ch in children):
+        return None
+    inner_w = max(width - 2 * pad, 1)
+    if kpi:
+        children = _kpi_children(ctx, children, inner_w)
+    saved = (ctx.depth, ctx.grow)
+    ctx.depth += 1
+    if kpi:
+        ctx.grow = 1.0
+    try:
+        child_inherit = inherit.merged(_only_inheritable(style))
+        nat = [_natural_height(ctx, ch, inner_w, child_inherit) for ch in children]
+    finally:
+        ctx.depth, ctx.grow = saved
+    if any(n is None for n in nat):
+        return None
+    return total + sum(nat) + _gap(ctx, c.gap, inner_w, small=True) * (len(nat) - 1)
 
 
 def _kpi_children(ctx: _Ctx, children: list, width: int) -> list:
@@ -531,6 +611,13 @@ def _place_stack(
         flex_h = max((area.h - fixed) // nflex, int(0.8 * EMU_PER_INCH))
     elif center and len(flow) == 1:
         nat = [max(nat[0] or 0, area.h)]  # a lone block fills the area (its text is centered by its style)
+    else:  # spare room goes to tables (rows grow up to TABLE_GROW), everything else stays natural and on top
+        tabs = [k for k, (_i, ch) in enumerate(flow) if isinstance(ch, Table)]
+        spare = area.h - fixed
+        if tabs and spare > 0:
+            share = spare / len(tabs)
+            for k in tabs:
+                nat[k] = round((nat[k] or 0) + min(share, (nat[k] or 0) * (TABLE_GROW - 1)))
     y = area.y
     used = 0
     for (i, ch), n in zip(flow, nat, strict=True):
@@ -595,8 +682,51 @@ def _cy(r: Rect) -> int:
     return r.y + r.h // 2
 
 
+def _hits(p0: tuple[int, int], p1: tuple[int, int], r: Rect) -> bool:
+    """True when the axis-aligned segment p0-p1 passes through the interior of ``r``."""
+    x0, x1 = sorted((p0[0], p1[0]))
+    y0, y1 = sorted((p0[1], p1[1]))
+    return x1 > r.x and x0 < r.right and y1 > r.y and y0 < r.bottom
+
+
+def _bus(lo: int, hi: int, spans: list[tuple[int, int]], crosses) -> float:
+    """Position (as a fraction of lo..hi) of the middle segment of an elbow that avoids every obstacle.
+
+    ``spans`` are the free channels between obstacles (lo/hi coordinates along the main axis); ``crosses(c)``
+    tells whether a bus at coordinate ``c`` touches a third box. Falls back to the middle of lo..hi.
+    """
+    mid = (lo + hi) / 2
+    cands = [mid] + sorted(
+        ((a + b) / 2 for a, b in spans if lo < (a + b) / 2 < hi), key=lambda c: abs(c - mid)
+    )
+    for c in cands:
+        if not crosses(c):
+            return (c - lo) / (hi - lo) if hi != lo else 0.5
+    return 0.5
+
+
+def _channels(rects: list[Rect], axis: str, lo: int, hi: int) -> list[tuple[int, int]]:
+    """Free intervals along ``axis`` ("y" or "x") between the obstacle rects, clipped to lo..hi."""
+    iv = sorted((r.y, r.bottom) if axis == "y" else (r.x, r.right) for r in rects)
+    out: list[tuple[int, int]] = []
+    cur = lo
+    for a, b in iv:
+        if a > cur:
+            out.append((cur, min(a, hi)))
+        cur = max(cur, b)
+    if cur < hi:
+        out.append((cur, hi))
+    return [(a, b) for a, b in out if b > a]
+
+
 def _emit_links(ctx: _Ctx, links: list[Link], rects: dict[int, Rect]) -> None:
-    """Connectors between block rects, emitted after the blocks so they sit on top."""
+    """Connectors between block rects, emitted after the blocks so they sit on top.
+
+    Routing by relative position: a destination clearly below (or above) the source is reached from the
+    bottom-middle (top-middle) to the top-middle (bottom-middle); side by side blocks connect right-middle to
+    left-middle. Offset ends get an elbow (``bentConnector3``) whose middle segment runs in a free channel.
+    """
+    tol = round(0.03 * EMU_PER_INCH)
     for ln in links:
         a, b = rects.get(ln.src), rects.get(ln.dst)
         if a is None or b is None or ln.src == ln.dst:
@@ -606,28 +736,129 @@ def _emit_links(ctx: _Ctx, links: list[Link], rects: dict[int, Rect]) -> None:
                 "use block letters/numbers that exist in this grid, e.g. @abc a>b>c",
             )
             continue
-        v_overlap = min(a.bottom, b.bottom) - max(a.y, b.y)
-        h_overlap = min(a.right, b.right) - max(a.x, b.x)
-        if h_overlap > 0 and v_overlap > 0:
-            continue  # overlapping blocks (area spans): nothing sensible to draw
-        if v_overlap > 0:
-            horizontal = True
-        elif h_overlap > 0:
-            horizontal = False
-        else:
-            horizontal = abs(_cx(b) - _cx(a)) >= abs(_cy(b) - _cy(a))
-        if horizontal:
-            if _cx(b) >= _cx(a):
-                p0, p1 = (a.right, _cy(a)), (b.x, _cy(b))
+        others = [r for k, r in rects.items() if k not in (ln.src, ln.dst)]
+        route, adj = "", 0.5
+        if b.y >= a.bottom or a.y >= b.bottom:  # clearly below / above: vertical route
+            down = b.y >= a.bottom
+            p0 = (_cx(a), a.bottom if down else a.y)
+            p1 = (_cx(b), b.y if down else b.bottom)
+            route = "v"
+            if abs(p1[0] - p0[0]) > tol:
+                lo, hi = min(p0[1], p1[1]), max(p0[1], p1[1])
+
+                def crosses(c, p0=p0, p1=p1, others=others):
+                    pts = [p0, (p0[0], c), (p1[0], c), p1]
+                    return any(_hits(u, v, r) for r in others for u, v in zip(pts, pts[1:], strict=False))
+
+                f = _bus(lo, hi, _channels(others, "y", lo, hi), crosses)
+                adj = f if down else 1 - f
             else:
-                p0, p1 = (a.x, _cy(a)), (b.right, _cy(b))
-        elif _cy(b) >= _cy(a):
-            p0, p1 = (_cx(a), a.bottom), (_cx(b), b.y)
+                p1 = (p0[0], p1[1])
+        elif b.x >= a.right or a.x >= b.right:  # side by side: horizontal route
+            right = b.x >= a.right
+            p0 = (a.right if right else a.x, _cy(a))
+            p1 = (b.x if right else b.right, _cy(b))
+            route = "h"
+            if abs(p1[1] - p0[1]) > tol:
+                lo, hi = min(p0[0], p1[0]), max(p0[0], p1[0])
+
+                def crosses(c, p0=p0, p1=p1, others=others):
+                    pts = [p0, (c, p0[1]), (c, p1[1]), p1]
+                    return any(_hits(u, v, r) for r in others for u, v in zip(pts, pts[1:], strict=False))
+
+                f = _bus(lo, hi, _channels(others, "x", lo, hi), crosses)
+                adj = f if right else 1 - f
+            else:
+                p1 = (p1[0], p0[1])
         else:
-            p0, p1 = (_cx(a), a.y), (_cx(b), b.bottom)
-        attrs = {"head": "arrow" if ln.arrow else "none", "flip_h": p1[0] < p0[0], "flip_v": p1[1] < p0[1]}
+            continue  # overlapping blocks (area spans): nothing sensible to draw
+        elbow = (route == "v" and p0[0] != p1[0]) or (route == "h" and p0[1] != p1[1])
+        attrs = {
+            "head": "arrow" if ln.arrow else "none",
+            "flip_h": p1[0] < p0[0],
+            "flip_v": p1[1] < p0[1],
+            "elbow": elbow,
+            "route": route,
+            "adj": round(adj, 4),
+            "src_box": [a.x, a.y, a.w, a.h],
+            "dst_box": [b.x, b.y, b.w, b.h],
+        }
         rect = Rect(min(p0[0], p1[0]), min(p0[1], p1[1]), abs(p1[0] - p0[0]), abs(p1[1] - p0[1]))
         ctx.emit(Shape(shape="line", attrs=attrs), rect, Style(line="primary", line_width=1.5))
+
+
+def _cell_nat(ctx: _Ctx, blk, width: int, inherit: Style) -> tuple[int | None, str]:
+    """(natural height, kind) of a grid cell; kind is ``kpi``, ``table`` or ``other``."""
+    if isinstance(blk, Container):
+        return _box_nat(ctx, blk, width, inherit), "kpi" if "kpi" in blk.classes else "other"
+    if isinstance(blk, Table):
+        n = _natural_height(ctx, blk, width, inherit)
+        return (None if n is None else round(n * TABLE_GROW)), "table"
+    if isinstance(blk, (Text, Code)):
+        return _natural_height(ctx, blk, width, inherit), "other"
+    return None, "other"
+
+
+def _row_heights(
+    ctx: _Ctx, gs, flow: list, cells: list[Rect], grid_area: Rect, body: Rect, gap: int, inherit: Style
+) -> list[int] | None:
+    """Row heights of a slide-level grid: sparse rows do not stretch over the whole body.
+
+    A row is at most ``ROW_SLACK`` x its tallest natural content (at least ``ROW_MIN`` of the body height);
+    ``.kpi`` rows are exactly as tall as their cards, table rows as tall as the table grown by ``TABLE_GROW``.
+    Rows holding flexible content (charts, images, ...) keep their weighted share. Also records ``ctx.fill``.
+    """
+    nr = len(gs.rows)
+    nat: list[int | None] = [0] * nr
+    kinds: list[set[str]] = [set() for _ in range(nr)]
+    covered = [False] * nr
+    spans: list[tuple[int, int, int | None]] = []  # blocks spanning several rows: (first, last, natural)
+    for k, ((_i, blk), r) in enumerate(zip(flow, cells, strict=True)):
+        if gs.areas is not None:
+            if k not in gs.areas:
+                continue
+            r0, r1 = gs.areas[k][0], gs.areas[k][2]
+        else:
+            r0 = r1 = min(k // len(gs.cols), nr - 1)
+        n, kind = _cell_nat(ctx, blk, r.w, inherit)
+        if r1 > r0:
+            spans.append((r0, r1, n))
+            continue
+        covered[r0] = True
+        kinds[r0].add(kind)
+        nat[r0] = None if n is None or nat[r0] is None else max(nat[r0] or 0, n)
+    caps: list[int | None] = []
+    for row in range(nr):
+        n = nat[row]
+        if not covered[row] or n is None or n <= 0:
+            caps.append(None)
+        elif kinds[row] == {"kpi"}:
+            caps.append(max(n, round(KPI_MIN_H * EMU_PER_INCH)))
+        elif kinds[row] == {"table"}:
+            caps.append(n)
+        else:
+            caps.append(max(round(n * ROW_SLACK), round(ROW_MIN * body.h)))
+    extra_h = 0  # natural height that spanning blocks need beyond their rows
+    for r0, r1, n in spans:
+        rows = range(r0, r1 + 1)
+        if n is None or any(caps[r] is None for r in rows):
+            for r in rows:
+                caps[r] = None
+            nat = [None if r in rows else v for r, v in enumerate(nat)]
+            continue
+        have = sum(caps[r] or 0 for r in rows) + gap * (r1 - r0)
+        if have < n:  # the spanning block needs more room than its rows allow: leave them uncapped
+            for r in rows:
+                caps[r] = None
+            nat = [None if r in rows else v for r, v in enumerate(nat)]
+        else:
+            extra_h = max(extra_h, n - (sum(nat[r] or 0 for r in rows) + gap * (r1 - r0)))
+    if all(n is not None and n > 0 for n in nat):
+        total = sum(n for n in nat if n) + gap * (nr - 1) + max(extra_h, 0)
+        ctx.fill = total / max(grid_area.h, 1)
+    if all(c is None for c in caps):
+        return None
+    return grid_row_heights(gs, grid_area.h, gap, caps)
 
 
 def _place_blocks(
@@ -650,7 +881,24 @@ def _place_blocks(
     if not flow:
         _emit_links(ctx, links or [], rects)
         return
+    # slide level: callouts are never grid cells, they close the slide body as full-width rows
+    callouts: list[tuple[int, object]] = []
+    if ctx.depth == 0 and len(flow) > 1:
+        callouts = [(i, b) for i, b in flow if isinstance(b, Text) and "callout" in b.classes]
+        if len(callouts) == len(flow):
+            callouts = []
+        flow = [(i, b) for i, b in flow if (i, b) not in callouts]
     gs = parse_spec(grid, len(flow), classes)
+    # tables closing a row of boxes (a `.kpi` row, then a table) are not grid cells either
+    tables: list[tuple[int, object]] = []
+    if (gs is None or (gs.capacity is None and gs.areas is None and not gs.flags)) and len(flow) > 2:
+        k = len(flow)
+        while k > 0 and isinstance(flow[k - 1][1], Table):
+            k -= 1
+        if k >= 2 and all(isinstance(b, Container) for _, b in flow[:k]):
+            tables = flow[k:]
+            flow = flow[:k]
+            gs = parse_spec(grid, len(flow), classes)
     flags: set[str] = set()
     if gs is not None:
         for err in gs.errors:
@@ -666,6 +914,7 @@ def _place_blocks(
     if gs.capacity is not None and len(flow) > gs.capacity:
         extra = flow[gs.capacity :]
         flow = flow[: gs.capacity]
+    extra = sorted(extra + tables, key=lambda t: t[0]) + callouts
     if "flow" in flags:
         gap = max(gap, round(0.45 * EMU_PER_INCH))
     elif "chevron" in flags:
@@ -677,6 +926,15 @@ def _place_blocks(
     if extra:
         grid_area, tail_area = _split_grid_tail(ctx, area, gap, gs, flow, extra, inherit, flags)
     cells = cell_rects(gs, len(flow), grid_area, gap, ctx.theme.columns)
+    if "chevron" not in flags and ctx.depth == 0:
+        row_h = _row_heights(ctx, gs, flow, cells, grid_area, area, gap, inherit)
+        if row_h is not None:
+            cells = cell_rects(gs, len(flow), grid_area, gap, ctx.theme.columns, row_h)
+            used = sum(row_h) + gap * (len(row_h) - 1)
+            if tail_area is not None:  # the tail follows the (shortened) grid directly
+                tgap = tail_area.y - grid_area.bottom
+                ty = grid_area.y + used + tgap
+                tail_area = Rect(area.x, ty, area.w, max(area.bottom - ty, 0))
     for (i, blk), r in zip(flow, cells, strict=True):
         r = _apply_box(ctx, blk, r, False)
         rects[i] = r
@@ -1007,6 +1265,18 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             if not c2.over:
                 break
         assert final_ctx is not None
+        if final_ctx.scale >= 1.0 and not final_ctx.over and final_ctx.fill is not None:
+            # sparse grid of boxes: grow body text uniformly (all sibling boxes share one factor)
+            for g in (1.25, 1.2, 1.15, 1.1, 1.05):
+                if g > GROW_MAX:
+                    continue
+                c3 = _Ctx(deck, theme, slide, index, W, H, grow=g, dense_k=ctx.dense_k, tight=ctx.tight)
+                _place_blocks(
+                    c3, elements, body, slide_inherit, slide.grid, slide.classes, sgap, None, slide.links
+                )
+                if c3.grew and not c3.over and c3.fill is not None and c3.fill <= GROW_FILL:
+                    final_ctx = c3
+                    break
         ctx.diags += final_ctx.diags
         seen: set[str] = set()
         for lab in final_ctx.over:
