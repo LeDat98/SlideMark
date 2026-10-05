@@ -6,7 +6,8 @@ and does not flag for repair. The item is ``<sm:design xmlns:sm="urn:slidemark:d
     {"v": 1, "theme": "none", "tokens": {"colors.primary": "#7C5CFF"},
      "css": [["h1, h2", "color: #fff; font-size: 54pt"]],
      "slides": [{"id": 256, "css": [...], "html": "<div>..</div>", "title": "Launch", "cls": ["dark"],
-                 "el": [["Signal", "hero", "#intro"]]}]}
+                 "el": [["Signal", "hero", "#intro"]],
+                 "fences": [{"src": "<div>..</div>", "info": "{render=native}", "first": 1}]}]}
 
 ``el`` lists the ``##`` boxes of a slide that carry a class or id the design refers to (a token class, a css
 selector): ``[heading, name, ...]`` in document order, ``name`` being ``hero`` for ``.hero`` or ``#intro``.
@@ -176,6 +177,21 @@ def _boxes(elements: list[Any], names: set[str], out: list[list[str]]) -> None:
         _boxes(el.children, names, out)
 
 
+def _fences(elements: list[Any], out: list[dict[str, Any]], top: bool = True) -> None:
+    """Append ``{src, info, first}`` for each html fence kept as Raw (``first``: nothing before it)."""
+    for k, el in enumerate(elements):
+        t = getattr(el, "type", None)
+        if t == "raw" and getattr(el, "kind", "") == "html" and el.attrs.get("html_src"):
+            ent: dict[str, Any] = {"src": el.attrs["html_src"]}
+            if el.attrs.get("html_info"):
+                ent["info"] = el.attrs["html_info"]
+            if top and k == 0:
+                ent["first"] = 1
+            out.append(ent)
+        elif t == "container":
+            _fences(el.children, out, False)
+
+
 def design_payload(deck: Deck, slide_ids: list[int | None]) -> dict[str, Any]:
     """The JSON-able design source of ``deck``; ``{}`` when there is nothing worth storing."""
     data: dict[str, Any] = {}
@@ -196,6 +212,10 @@ def design_payload(deck: Deck, slide_ids: list[int | None]) -> dict[str, Any]:
             _boxes(sl.elements, names, els)
             if els:
                 ent["el"] = els
+        fences: list[dict[str, Any]] = []
+        _fences(sl.elements, fences)
+        if fences:
+            ent["fences"] = fences
         if sl.html is not None:
             ent["html"] = sl.html
             if sl.title is not None:

@@ -199,3 +199,31 @@ def test_template_theme_path_follows_the_imported_file(tmp_path):
     t, diags = import_pptx(a, tmp_path)
     assert t.startswith("theme: A.pptx")
     assert any(d.rule == "import-template" for d in diags)
+
+
+def test_html_fence_in_a_normal_slide_survives(tmp_path):
+    text = (EXAMPLES / "12-html-svg-math.md").read_text(encoding="utf-8")
+    a, b = tmp_path / "A.pptx", tmp_path / "B.pptx"
+    build(text, a, base_dir=EXAMPLES)
+    t1, _ = import_pptx(a, tmp_path)
+    assert "```html {render=native}" in t1
+    assert "border-left:6px solid #e08a00" in t1
+    assert "## Native" not in t1
+    build(t1, b, base_dir=tmp_path)
+    t2, _ = import_pptx(b, tmp_path)
+    assert t1 == t2
+
+
+def test_edited_html_fence_imports_shapes(tmp_path):
+    from pptx import Presentation
+
+    a, b = tmp_path / "A.pptx", tmp_path / "B.pptx"
+    build("# T\n```html {render=native}\n<div><h3>Alpha</h3><p>beta gamma</p></div>\n```\n", a)
+    prs = Presentation(a)
+    for sh in prs.slides[0].shapes:
+        if sh.has_text_frame and "Alpha" in sh.text_frame.text:
+            sh.text_frame.paragraphs[0].runs[0].text = "Omega"
+    prs.save(b)
+    t, diags = import_pptx(b)
+    assert "```html" not in t
+    assert any(d.rule == "import-html-edited" for d in diags)

@@ -81,6 +81,16 @@ class _Visible(HTMLParser):
         self.parts: list[str] = []
         self._skip = 0
 
+    @staticmethod
+    def text_of(html: str) -> list[str]:
+        p = _Visible()
+        try:
+            p.feed(html)
+            p.close()
+        except Exception:  # noqa: S110 - best effort on broken markup
+            pass
+        return p.parts
+
     def handle_starttag(self, tag, attrs):
         if tag in ("script", "style"):
             self._skip += 1
@@ -136,6 +146,102 @@ def html_slide_lines(ent: dict[str, Any], sd, notes: list[str]) -> list[str]:
     return lines + notes
 
 
+def _chars(text: str) -> Counter[str]:
+    """Letters and digits only: immune to how punctuation, tags and line breaks split words."""
+    return Counter(c for c in text.lower() if c.isalnum())
+
+
+def _item_words(it) -> Counter[str]:
+    if it.kind == "table":
+        return _chars(" ".join(q.plain for r in it.rows for c in r for q in c.paras))
+    return _chars(it.text or "")
+
+
+def _overlap(a, box) -> bool:
+    x0, y0, x1, y1 = box
+    return a.x < x1 and a.x + a.w > x0 and a.y < y1 and a.y + a.h > y0
+
+
+def claim_fences(ent: dict[str, Any] | None, sd, n: int, diags: list[Diagnostic]) -> list[dict[str, Any]]:
+    """Remove from ``sd`` the shapes that an unedited stored ```html fence produced; return those fences.
+
+    A fence is claimed when the text items of the slide cover exactly its visible words; the text-less shapes
+    (card fills, bars) inside their bounding box go with it. Otherwise the shapes stay (info diagnostic).
+    """
+    fences = [f for f in (ent or {}).get("fences") or [] if isinstance(f, dict) and f.get("src")]
+    won: list[dict[str, Any]] = []
+    for f in fences:
+        try:
+            need = _chars(" ".join(_Visible.text_of(f["src"])))
+            if not need:
+                continue
+            left = Counter(need)
+            hit = []
+            for it in sd.items:
+                if it.kind not in ("text", "table") or it.ph in (
+                    "title",
+                    "ctrTitle",
+                    "subTitle",
+                    "ftr",
+                    "sldNum",
+                ):
+                    continue
+                w = _item_words(it)
+                if w and not (w - left):
+                    left -= w
+                    hit.append(it)
+            if not hit or +left:
+                diags.append(edited_diag(n, "html block"))
+                continue
+            box = (
+                min(i.x for i in hit),
+                min(i.y for i in hit),
+                max(i.x + i.w for i in hit),
+                max(i.y + i.h for i in hit),
+            )
+            gone = {id(i) for i in hit}
+            for it in sd.items:
+                if (
+                    it.kind in ("shape", "line", "image")
+                    and not it.ph
+                    and not _item_words(it)
+                    and _overlap(it, box)
+                ):
+                    gone.add(id(it))
+            sd.items = [i for i in sd.items if id(i) not in gone]
+            won.append(f)
+        except Exception:  # noqa: S112 - best effort: keep the shapes
+            continue
+    return won
+
+
+def fence_lines(f: dict[str, Any]) -> list[str]:
+    src = str(f["src"])
+    ticks = "`" * max(3, max((len(m) + 1 for m in re.findall(r"`+", src)), default=0))
+    info = str(f.get("info") or "")
+    return [f"{ticks}html {info}".rstrip(), src.rstrip("\n"), ticks]
+
+
+def insert_fences(lines: list[str], won: list[dict[str, Any]], tail: int) -> list[str]:
+    """Put the claimed fences back: right after the heading (``first``) or before the ``tail`` notes lines."""
+    if not won:
+        return lines
+    head = 0
+    if lines and (lines[0].startswith("# ") or lines[0] == "---"):
+        head = 1
+        while head < len(lines) and lines[head].startswith("@"):
+            head += 1
+    end = len(lines) - tail
+    out = list(lines)
+    first = [fence_lines(f) for f in won if f.get("first")]
+    rest = [fence_lines(f) for f in won if not f.get("first")]
+    for blk in reversed(rest):
+        out[end:end] = blk
+    for blk in reversed(first):
+        out[head:head] = blk
+    return out
+
+
 def _key(text: str) -> str:
     return re.sub(r"[\W_]+", "", text).lower()
 
@@ -182,10 +288,10 @@ def match_slide(design: dict[str, Any], index: int, slide_id: int | None) -> dic
     )
 
 
-def edited_diag(n: int) -> Diagnostic:
+def edited_diag(n: int, what: str = "html slide") -> Diagnostic:
     return Diagnostic(
         level="info",
-        message="html slide was edited in PowerPoint; the edited shapes were imported, not the stored HTML",
+        message=f"{what} was edited in PowerPoint; the edited shapes were imported, not the stored HTML",
         slide=n,
         rule="import-html-edited",
         hint="re-write the slide as @html if the stored HTML should win",
