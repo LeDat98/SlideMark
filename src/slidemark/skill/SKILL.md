@@ -19,6 +19,8 @@ EOF
 `build` checks, fixes simple mistakes, builds, and ends with one facts line:
 `wrote deck.pptx: 5 slides 16:9, 1 chart, 1 table, notes on 1 slide, 0 warnings`.
 If it says 0 warnings and the counts match your brief, you are done: no render, no re-open, no other command.
+If you still want to see the slides, add `--png sheet.png` to the same command and look at that ONE image
+(all slides on one sheet), not at slide-by-slide renders.
 A warning names the slide, the line and the fix: edit `deck.md` once, run `slidemark build deck.md -o
 deck.pptx`. (No heredoc in your shell? Write `deck.md`, then build it, in the same turn.)
 
