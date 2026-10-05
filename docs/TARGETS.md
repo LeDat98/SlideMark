@@ -24,10 +24,10 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 - [x] Syntax tokens ≤ 35% of python-pptx on the corpus
 
 ## L2: Looks good by default (target: day 4)
-- [ ] Layout inferred for ≥ 90% of example slides (no `layout:` written) — `bench/layout_inference.py`: 65% (2026-10-05)
+- [x] Layout inferred for ≥ 90% of example slides (no `layout:` written) — `bench/layout_inference.py`: 100% (25/25, 2026-10-05)
 - [x] Autofit with real font metrics: 0 overflow on all examples; overflow diagnostic when below `min_font_size`
-- [ ] CJK correct: `<a:ea>` font set, full-width measurement, no broken line wrapping in JP examples
-- [ ] ≥ 3 polished themes (light, dark, `jp-business` dense)
+- [x] CJK correct: `<a:ea>` font set, full-width measurement, no broken line wrapping in JP examples (13 JP slides reviewed 2026-10-05)
+- [x] ≥ 3 polished themes (light, dark, `jp-business` dense): default, midnight (09), jp-business (02, 04–08)
 - [x] Golden image tests catch any visual regression (tests/test_golden.py)
 
 ## L3: Dense & rich (target: day 7, end of foundation)
@@ -40,7 +40,7 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 
 ## L4: Agent-native
 - [x] `slidemark docs`, `schema`, `skill install`; SKILL.md ≤ 1,500 tokens, each reference file ≤ 800
-- [ ] Lenient parser: Marp/Slidev/common-mistake variants accepted with warnings (fuzz: 0 crashes in 100k inputs)
+- [x] Lenient parser: Marp/Slidev/common-mistake variants accepted with warnings (fuzz: 0 crashes in 100k inputs; bench/fuzz_long.py seed 11, 2026-10-05)
 - [ ] Agent eval (≥ 20 tasks): first-pass `check` success ≥ 90%, mean fix rounds ≤ 0.3
 - [ ] Total agent tokens per deck (docs + output + fixes) ≤ 40% of a python-pptx agent on the same tasks
 
