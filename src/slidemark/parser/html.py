@@ -23,6 +23,7 @@ from ..ir import (
     Deck,
     Image,
     Link,
+    Media,
     Paragraph,
     Raw,
     Run,
@@ -32,6 +33,7 @@ from ..ir import (
     Table,
     Text,
 )
+from .attrs import media_kind
 from .ctx import Ctx
 from .inline import BADGE_COLORS, _finish
 from .mermaid import build_mermaid
@@ -571,6 +573,25 @@ class _Conv:
                 Image(src=src, alt=n.attrs.get("alt", ""), id=n.attrs.get("id") or None, line=self.at(n))
             )
             return
+        if tag in ("video", "audio"):
+            src = n.attrs.get("src") or next(
+                (c.attrs["src"] for c in n.elements() if c.tag == "source" and c.attrs.get("src")), ""
+            )
+            kind = media_kind(src)
+            if kind:
+                self.flush(sink)
+                media = Media(
+                    kind=kind,  # type: ignore[arg-type]
+                    src=src,
+                    alt=n.attrs.get("aria-label") or n.attrs.get("title") or n.attrs.get("alt", ""),
+                    poster=n.attrs.get("poster") or None,
+                    autoplay="autoplay" in n.attrs,
+                    loop="loop" in n.attrs,
+                    id=n.attrs.get("id") or None,
+                    line=self.at(n),
+                )
+                sink.elements.append(media)
+                return
         if tag in RAW_TAGS:
             self.fallback(n, sink, "is not converted")
             return

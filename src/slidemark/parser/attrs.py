@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..ir import Box, Chart, ElementBase, Image, Style, Table
+from ..ir import Box, Chart, ElementBase, Image, Media, Style, Table
 from .ctx import Ctx, closest
 from .tabular import apply_chart_kv, apply_table_kv
 
@@ -15,9 +16,21 @@ _TOKEN = re.compile(
     r"""\s*(?:\.(?P<cls>[\w-]+)
         |\#(?P<id>[\w-]+)
         |(?P<key>[A-Za-z][\w-]*)=(?P<val>"[^"]*"|'[^']*'|[^\s"'{}]+)
-        |(?P<bare>bold|italic)(?![\w-]))""",
+        |(?P<bare>bold|italic|autoplay|loop)(?![\w-]))""",
     re.X,
 )
+MEDIA_EXT = {
+    **dict.fromkeys((".mp4", ".m4v", ".mov", ".wmv", ".avi", ".webm"), "video"),
+    **dict.fromkeys((".mp3", ".m4a", ".wav", ".aac", ".wma"), "audio"),
+}
+
+
+def media_kind(src: str) -> str | None:
+    """'video' / 'audio' when the path (ignoring ?query and #fragment) has a media extension."""
+    path = src.split("?", 1)[0].split("#", 1)[0]
+    return MEDIA_EXT.get(os.path.splitext(path)[1].lower())
+
+
 TRAILING = re.compile(r"\s*\{([^{}]*)\}\s*$")
 STANDALONE = re.compile(r"^\{([^{}]*)\}[ \t]*$")
 
@@ -88,6 +101,7 @@ def _float(v: str) -> float | None:
 VALID_KEYS = (
     *("x", "y", "w", "h", "size", "color", "fill", "line", "font", "align", "valign", "bold", "italic"),
     *("radius", "opacity", "pad", "fit", "bg", "t", "hidden", "gap", "id", "icon"),
+    *("poster", "autoplay", "loop"),
 )
 # keep in sync with slidemark.icons (tests/test_icons.py checks it)
 ICON_NAMES = (
@@ -174,6 +188,14 @@ def apply_attrs(
                 el.fit = v  # type: ignore[assignment]
             else:
                 ctx.warn(f"bad fit '{v}'", line, "bad-attr", "use fit=contain|cover|stretch")
+        elif k in ("autoplay", "loop") and isinstance(el, Media):
+            b = _bool(v)
+            if b is None:
+                ctx.warn(f"bad {k} '{v}'", line, "bad-attr", f"use {k} or {k}=false")
+            else:
+                setattr(el, k, b)
+        elif k == "poster" and isinstance(el, Media):
+            el.poster = v
         elif k == "icon":
             if v in ICON_NAMES:
                 el.attrs["icon"] = v

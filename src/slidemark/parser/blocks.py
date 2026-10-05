@@ -8,8 +8,8 @@ from urllib.parse import unquote
 
 from markdown_it.token import Token
 
-from ..ir import Cell, Chart, Code, Image, Paragraph, Raw, Run, Series, Style, Table, Text
-from .attrs import Attrs, apply_attrs, parse_attr_body
+from ..ir import Cell, Chart, Code, Image, Media, Paragraph, Raw, Run, Series, Style, Table, Text
+from .attrs import Attrs, apply_attrs, media_kind, parse_attr_body
 from .ctx import Ctx, closest
 from .html import html_blocks
 from .inline import MD, ImageRef, inline_items, inline_runs
@@ -345,7 +345,12 @@ class _Builder:
                 "write ![what the image shows](path); alt text is used for accessibility",
             )
         ref.attrs = attrs
-        el = Image(src=_local_src(ref.src), alt=alt)
+        kind = media_kind(ref.src)
+        el: Image | Media = (
+            Media(kind=kind, src=_local_src(ref.src), alt=alt)  # type: ignore[arg-type]
+            if kind
+            else Image(src=_local_src(ref.src), alt=alt)
+        )
         self.flush()
         self.take(el, line)
         if ref.attrs is not None:
