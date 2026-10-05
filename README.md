@@ -32,7 +32,7 @@ Cú pháp đầy đủ: [docs/SYNTAX.md](docs/SYNTAX.md).
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-05 · commit `097eef4` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-05 · commit `d4c846d` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -57,6 +57,42 @@ Nguồn: [`examples/03-vi-report.md`](examples/03-vi-report.md)
 ![03-vi-report slide 1](docs/gallery/03-vi-report/slide-01.png)
 ![03-vi-report slide 2](docs/gallery/03-vi-report/slide-02.png)
 ![03-vi-report slide 3](docs/gallery/03-vi-report/slide-03.png)
+
+### Tiếng Nhật: KPI, badge, bảng kết quả, mũi tên nối
+
+Nguồn: [`examples/04-jp-kpi.md`](examples/04-jp-kpi.md)
+
+![04-jp-kpi slide 1](docs/gallery/04-jp-kpi/slide-01.png)
+![04-jp-kpi slide 2](docs/gallery/04-jp-kpi/slide-02.png)
+
+### Tiếng Nhật: quy trình chevron + bảng, luồng phê duyệt
+
+Nguồn: [`examples/05-jp-process.md`](examples/05-jp-process.md)
+
+![05-jp-process slide 1](docs/gallery/05-jp-process/slide-01.png)
+![05-jp-process slide 2](docs/gallery/05-jp-process/slide-02.png)
+
+### Tiếng Nhật: biểu đồ thị trường, bảng so sánh đối thủ
+
+Nguồn: [`examples/06-jp-market.md`](examples/06-jp-market.md)
+
+![06-jp-market slide 1](docs/gallery/06-jp-market/slide-01.png)
+![06-jp-market slide 2](docs/gallery/06-jp-market/slide-02.png)
+
+### Tiếng Nhật: sơ đồ tổ chức, ma trận rủi ro
+
+Nguồn: [`examples/07-jp-org.md`](examples/07-jp-org.md)
+
+![07-jp-org slide 1](docs/gallery/07-jp-org/slide-01.png)
+![07-jp-org slide 2](docs/gallery/07-jp-org/slide-02.png)
+
+### Tiếng Nhật: kế hoạch trung hạn, lộ trình
+
+Nguồn: [`examples/08-jp-roadmap.md`](examples/08-jp-roadmap.md)
+
+![08-jp-roadmap slide 1](docs/gallery/08-jp-roadmap/slide-01.png)
+![08-jp-roadmap slide 2](docs/gallery/08-jp-roadmap/slide-02.png)
+![08-jp-roadmap slide 3](docs/gallery/08-jp-roadmap/slide-03.png)
 <!-- gallery:end -->
 
 ## Tài liệu
