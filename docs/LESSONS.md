@@ -97,3 +97,5 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [import] A stored `theme:` path is relative to the original build directory → when the deck has its own masters, import uses the imported .pptx itself as the template.
 - [layout] `@free` slides must skip cover inference (`_infer_cover`), or a title + text free slide becomes a cover. Text-first fill cannot beat the CJK wrap guard on dense slides (one line already spans the card).
 - [fuzz] `bench/fuzz_long.py` now mixes CSS fences and `@html` slides and lays out with `deck_theme` (tokens applied): 20k inputs, 0 crashes.
+- [layout] Short-CJK dense cards cannot grow text (wrap guard) → paragraph spacing (`layout.room_gap_max_dense`) is the lever; shorter cards only move the empty band outside them.
+- [env] Worktree subagents that install only `.[dev]` see `tests/test_design_roundtrip.py` html cases fail (no Playwright) → tell them `.[dev,html]`.
