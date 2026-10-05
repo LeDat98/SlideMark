@@ -298,3 +298,9 @@ open to new names), presets as YAML (`src/slidemark/presets/*.yaml`), `theme: no
 - **Wave 2 B: CSS native mappings** (DF3): new `Style` fields rendered (per-side borders, letter-spacing,
   line-height, text-transform, rotation …).
 - **Orchestrator:** SKILL.md tokens section, brand-look examples, gallery review, docs.
+- **Wave 3 B: CSS matching + native rendering** (layout/css.py, render): selectors → merged styles, every CSS
+  Style field drawn natively, table cell CSS, slide backgrounds; lint judges merged colors only.
+- **Wave 3 A: `@html` slides, deck.html, shared CSS vars, htmlnative fidelity** (gradients, shadows, rotation,
+  ellipses, pill badges, simple inline SVG native) on `bench/html_corpus` (baseline native 0.633, 19/30 ≥ 0.9).
+- **Wave 4 (DF6):** 20 brand-brief eval tasks (`bench/tasks/101-120`, Sonnet, SKILL.md only) → `bench/brand_eval.py`.
+- Open defect (gallery): sparse box slides on non-dense decks leave a 35–40% empty band (13-brand-aurora slide 2).
