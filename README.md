@@ -47,7 +47,7 @@ slidemark skill install      # cài skill cho Claude Code
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-05 · commit `216b149` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-05 · commit `8d0e87e` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -108,6 +108,16 @@ Nguồn: [`examples/08-jp-roadmap.md`](examples/08-jp-roadmap.md)
 ![08-jp-roadmap slide 1](docs/gallery/08-jp-roadmap/slide-01.png)
 ![08-jp-roadmap slide 2](docs/gallery/08-jp-roadmap/slide-02.png)
 ![08-jp-roadmap slide 3](docs/gallery/08-jp-roadmap/slide-03.png)
+
+### Theme tối (midnight): KPI, biểu đồ, Mermaid, công thức, code
+
+Nguồn: [`examples/09-midnight-tech.md`](examples/09-midnight-tech.md)
+
+![09-midnight-tech slide 1](docs/gallery/09-midnight-tech/slide-01.png)
+![09-midnight-tech slide 2](docs/gallery/09-midnight-tech/slide-02.png)
+![09-midnight-tech slide 3](docs/gallery/09-midnight-tech/slide-03.png)
+![09-midnight-tech slide 4](docs/gallery/09-midnight-tech/slide-04.png)
+![09-midnight-tech slide 5](docs/gallery/09-midnight-tech/slide-05.png)
 <!-- gallery:end -->
 
 ## Tài liệu
