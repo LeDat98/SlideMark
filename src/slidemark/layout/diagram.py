@@ -8,6 +8,7 @@ picture transposed or mirrored, so one routing code serves all four directions.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from ..ir import Container, Paragraph, Run, Shape, Style, Text
@@ -24,6 +25,7 @@ CROSS_GAP, CROSS_GAP_MAX = 0.3, 0.8  # inches between nodes of one rank
 SIDE_STEP = 0.24  # inches between nested side routes (back edges)
 LABEL_OFF = 0.05  # inches between an edge and its label
 TOL = 1.01
+_WORD = re.compile(r"[^\s\u3000-\u9fff\uff00-\uffef]+|[\u3000-\u9fff\uff00-\uffef]")
 
 
 @dataclass
@@ -34,6 +36,7 @@ class _Node:
     diamond: bool
     tw: float  # natural single-line text width, EMU
     pad: int
+    ww: float = 0.0  # width of the longest unbreakable word, EMU
     w: int = 0
     h: int = 0
 
@@ -194,20 +197,21 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
             (measure.text_em(p.plain, bold=bold or any(r.bold for r in p.runs)) for p in el.paragraphs),
             default=1.0,
         )
-        nodes.append(
-            _Node(
-                el,
-                st,
-                eff,
-                diamond,
-                em
-                * base
-                * eff
-                * EMU_PER_PT
-                * (1.06 if any(measure.is_cjk(ch) for p in el.paragraphs for ch in p.plain) else 1.16),
-                pad,
-            )
+        unit = (
+            base
+            * eff
+            * EMU_PER_PT
+            * (1.06 if any(measure.is_cjk(ch) for p in el.paragraphs for ch in p.plain) else 1.16)
         )
+        word_em = max(
+            (
+                measure.text_em(w, bold=bold or any(r.bold for r in p.runs))
+                for p in el.paragraphs
+                for w in _WORD.findall(p.plain)
+            ),
+            default=0.0,
+        )
+        nodes.append(_Node(el, st, eff, diamond, em * unit, pad, ww=max(word_em, 1.0) * unit))
         ks.append(eff if eff > 1.0 else max(min(ctx.scale, 1.0), 0.3))
     k = max(ks)
     gk = max(min(k, 1.0), 0.5)
@@ -272,6 +276,9 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
     dia_nodes = [nd for nd in nodes if nd.diamond]
     if rect_nodes:
         w = max(min_w, min(cap_w, max(round(nd.tw) + 2 * nd.pad + round(0.1 * IN) for nd in rect_nodes)))
+        w = max(
+            w, max(round(nd.ww) + 2 * nd.pad + round(0.1 * IN) for nd in rect_nodes)
+        )  # never break a word
         h = max(
             min_h, max(round(text_h(nd, w - 2 * nd.pad)) + 2 * nd.pad + round(0.08 * IN) for nd in rect_nodes)
         )
@@ -283,6 +290,8 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
             round(DIAMOND_MIN_W * IN * k),
             min(cap_d, max(2 * round(nd.tw) + 4 * nd.pad + round(0.2 * IN) for nd in dia_nodes)),
         )
+        # the text area of a diamond is half its width: the longest word must fit there on one line
+        w = max(w, max(2 * round(nd.ww * 1.1) + 4 * nd.pad + round(0.1 * IN) for nd in dia_nodes))
         h = max(
             round(DIAMOND_MIN_H * IN * k),
             max(
@@ -367,7 +376,7 @@ def _place(ctx, E, c: Container, area: Rect, inherit: Style, pos, nr: int, nc: i
     if bw > area.w * TOL or bh > area.h * TOL:
         ctx.over.append("diagram")
     dx = area.x + max(area.w - bw, 0) // 2 - bx0
-    dy = area.y - by0
+    dy = area.y + max(area.h - bh, 0) // 2 - by0  # centered in the space it has
 
     def shift(r: Rect) -> Rect:
         return Rect(r.x + dx, r.y + dy, r.w, r.h)

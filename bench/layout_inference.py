@@ -16,6 +16,7 @@ import subprocess
 from pathlib import Path
 
 from slidemark.layout import layout_slide
+from slidemark.layout.grid import strip_grid_tokens
 from slidemark.parser import parse
 from slidemark.theme import get_theme
 
@@ -36,11 +37,12 @@ def main() -> int:
         theme = get_theme(deck.theme)
         for i, s in enumerate(deck.slides):
             total += 1
-            if not s.grid:
+            stripped = strip_grid_tokens(s.grid)
+            if stripped == s.grid:  # no grid token (flow, connectors, ... are content)
                 inferred += 1
                 continue
             with_grid = boxes(s, deck, theme, i)
-            grid, s.grid = s.grid, None
+            grid, s.grid = s.grid, stripped
             same = boxes(s, deck, theme, i) == with_grid
             s.grid = grid
             inferred += same

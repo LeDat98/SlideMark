@@ -118,12 +118,14 @@ def parse_spec(spec: str | None, n_blocks: int, classes: list[str] | None = None
     return gs
 
 
-def auto_spec(n: int, *, text_visual: bool = False, short: bool = False) -> GridSpec:
+def auto_spec(
+    n: int, *, text_visual: bool = False, short: bool = False, wide_visual: bool = False
+) -> GridSpec:
     """Default arrangement by block count (docs/SYNTAX.md table)."""
     if n <= 1:
         return GridSpec([1.0], [1.0])
     if text_visual and n == 2:
-        return GridSpec([2.0, 3.0], [1.0])
+        return GridSpec([1.0, 2.0] if wide_visual else [2.0, 3.0], [1.0])
     if n == 4 and short:
         cols = 4
     elif n == 4:
@@ -221,3 +223,60 @@ def cell_rects(
         x0, y0 = xs[c0][0], ys[r0][0]
         out.append(Rect(x0, y0, xs[c1][0] + xs[c1][1] - x0, ys[r1][0] + ys[r1][1] - y0))
     return out
+
+
+def strip_grid_tokens(spec: str | None) -> str | None:
+    """``spec`` without its grid token (``N``, ``CxR``, ``a:b``, areas); flow, links and the rest stay."""
+    kept: list[str] = []
+    dropped = False
+    for tok in (spec or "").split():
+        low = tok.lower()
+        is_grid = (
+            _N.match(low) or _CXR.match(low) or _RATIO.match(low) or (_AREAS.match(low) and _areas_ok(low))
+        )
+        if not dropped and low not in FLAGS and is_grid:
+            dropped = True
+            continue
+        kept.append(tok)
+    return " ".join(kept) or None
+
+
+def tree_areas(ids: list[int], edges: list[tuple[int, int]]) -> str | None:
+    """Layered area spec (``.a./bcd``) for blocks ``ids`` joined as a tree from one root, else ``None``.
+
+    ``edges`` are (parent, child) pairs of block ids. Letters follow the position of an id in ``ids``. Every
+    id must be reachable from the single root, have one parent, and the root needs >= 2 children somewhere.
+    """
+    if len(ids) < 3 or len(ids) > 26 or not edges:
+        return None
+    parent: dict[int, int] = {}
+    kids: dict[int, list[int]] = {i: [] for i in ids}
+    for a, b in edges:
+        if a not in kids or b not in kids or a == b or b in parent:
+            return None
+        parent[b] = a
+        kids[a].append(b)
+    roots = [i for i in ids if i not in parent]
+    if len(roots) != 1 or max(len(v) for v in kids.values()) < 2:
+        return None
+    layers: list[list[int]] = [roots]
+    seen = set(roots)
+    while True:
+        nxt = [c for p in layers[-1] for c in kids[p]]
+        if not nxt:
+            break
+        if any(c in seen for c in nxt):
+            return None
+        seen.update(nxt)
+        layers.append(nxt)
+    if len(seen) != len(ids):
+        return None  # a cycle or a block outside the tree
+    wmax = max(len(layer) for layer in layers)
+    span = 2 if any((wmax - len(layer)) % 2 for layer in layers) else 1
+    width = wmax * span
+    rows = []
+    for layer in layers:
+        pad = (width - len(layer) * span) // 2
+        cells = "".join(chr(97 + ids.index(i)) * span for i in layer)
+        rows.append("." * pad + cells + "." * pad)
+    return "/".join(rows)

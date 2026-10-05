@@ -277,6 +277,12 @@ def test_table_row_heights_in_attrs():
     assert tp.h == sum(tp.element.attrs["_row_h"])
 
 
+def test_empty_table_never_raises():
+    placed, deck = lay(Slide(title=T("t", "title"), elements=[Table(rows=[])]))
+    assert not any(isinstance(p.element, Table) for p in placed)
+    assert not [d for d in deck.diagnostics if d.rule == "layout-error"]
+
+
 def test_dense_theme_is_smaller():
     s = Slide(title=T("t", "title"), elements=[T("body")])
     jp, _ = lay(s, theme="jp-business")

@@ -34,7 +34,6 @@ E --> D
 > [!tip] 92% of receipts post without a human
 
 # Pricing model
-@1:1
 ```math
 \text{LTV} = \frac{\text{ARPA} \times m}{c}
 ```
