@@ -292,6 +292,9 @@ class Slide(Model):
     classes: list[str] = Field(default_factory=list)
     attrs: dict[str, Any] = Field(default_factory=dict)
     css: list[CssRule] = Field(default_factory=list)  # ```css fences inside this slide: this slide only
+    # `@html` slide or a `<section>` of a deck.html: the whole slide is this HTML (laid out by Chromium at the
+    # slide size, converted to native shapes). `title` is still set (outline, import); nothing else is drawn
+    html: str | None = None
     line: int | None = None
 
 

@@ -339,6 +339,27 @@ Units: `px` (= 0.75 pt), `pt`, `em` (× the element's font size), `%` for opacit
 `var(--primary)`. Any other property, selector or value gives a one-line diagnostic and is never silently
 dropped.
 
+## HTML slides
+
+`@html` on a slide makes the whole slide HTML: write the slide's HTML (with `<style>` if you like) in one
+` ```html ` fence under the title. Chromium lays it out at the slide size (1280×720 px for 16:9) and SlideMark
+converts it to native, editable shapes (text, rectangles, gradients, shadows, borders, tables, lists, inline
+SVG); only what PowerPoint cannot draw becomes a picture, with a diagnostic naming the element.
+
+````markdown
+# Launch
+@html
+```html
+<div style="height:100%;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;padding:96px">
+  <h1 style="font-size:72px;margin:0">Meet Aurora</h1>
+</div>
+```
+````
+
+`slidemark build deck.html` builds a whole HTML deck: one `<section>` per slide, a shared `<style>` in
+`<head>`. Theme tokens are CSS custom properties in every HTML slide (`var(--primary)`, `var(--font-body)`,
+`var(--size-body)`), so HTML slides and SlideMark slides of one deck share one design.
+
 ## Other fences
 
 | Fence | Result |
