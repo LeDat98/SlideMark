@@ -31,7 +31,7 @@ def valid_grid(c: Container) -> None:
 
 def test_td_chain_is_rows():
     c, deck = diagram("graph TD\nA-->B-->C")
-    assert isinstance(c, Container) and c.classes == ["diagram"]
+    assert isinstance(c, Container) and c.classes == ["diagram", "plain"]
     assert c.grid == "a/b/c"
     assert names(c) == ["A", "B", "C"]
     assert edges(c) == [("A", "B"), ("B", "C")]
