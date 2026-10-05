@@ -11,8 +11,9 @@ import yaml
 from ..ir import Container, Deck, Paragraph, Run, Slide, Text
 from .attrs import STANDALONE, AtSpec, Attrs, apply_attrs, parse_at, parse_attr_body, split_trailing_attrs
 from .blocks import convert
-from .ctx import Ctx
+from .ctx import Ctx, closest
 from .inline import inline_runs
+from .lenient import Rec, normalize
 
 FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 H1_RE = re.compile(r"^#(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
@@ -21,6 +22,16 @@ HR_RE = re.compile(r"^-{3,}[ \t]*$")
 KV_RE = re.compile(r"^([A-Za-z_][\w-]*)[ \t]*:[ \t]*(.*?)[ \t]*$")
 HEADER_KEYS = ("theme", "size", "lang", "title", "author", "footer", "num", "density")
 SHORT_LINE = 60
+MARP_IGNORED = (
+    "header",
+    "style",
+    "headingdivider",
+    "backgroundcolor",
+    "backgroundimage",
+    "color",
+    "math",
+    "class",
+)
 
 
 # --------------------------------------------------------------------------- lines and fences
@@ -85,13 +96,32 @@ def _set_header(deck: Deck, key: str, value: str, ctx: Ctx, line: int) -> None:
             deck.density = value  # type: ignore[assignment]
         else:
             ctx.warn(f"bad density '{value}'", line, "bad-header", "use density: normal or density: dense")
+    elif k == "marp":
+        ctx.warn(
+            "Marp header 'marp: true' ignored",
+            line,
+            "marp-syntax",
+            "remove it; SlideMark needs no mode switch",
+        )
+    elif k == "paginate":
+        deck.slide_number = value.lower() in ("on", "true", "yes", "1")
+        ctx.warn("Marp 'paginate' header", line, "marp-syntax", "use 'num: on'")
+    elif k in MARP_IGNORED:
+        ctx.warn(
+            f"Marp header '{key}' ignored",
+            line,
+            "marp-syntax",
+            "set theme and slide classes with 'theme:' and '@' lines",
+        )
     else:
         deck.attrs[key] = value
+        near = closest(key, HEADER_KEYS)
+        hint = f"did you mean '{near}'? " if near else ""
         ctx.warn(
             f"unknown header key '{key}'",
             line,
             "unknown-header",
-            f"known keys: {', '.join(HEADER_KEYS)}; kept in deck.attrs",
+            f"{hint}known keys: {', '.join(HEADER_KEYS)}; kept in deck.attrs",
         )
 
 
@@ -172,7 +202,7 @@ def split_slides(lines: list[str], inside: list[bool], start: int) -> list[Chunk
 
 @dataclass
 class Item:
-    kind: str  # md | at | h2 | h3 | foot
+    kind: str  # md | at | end | h2 | h3 | foot
     line: int
     text: str = ""
     lines: list[str] = field(default_factory=list)
@@ -205,6 +235,10 @@ def _scan_body(lines: list[str], inside: list[bool], c: Chunk, ctx: Ctx) -> tupl
             rest = [text[3:].strip()] + lines[i + 1 : c.end]
             notes = "\n".join(rest).strip()
             break
+        if text.strip().lower() == "@end":
+            flush()
+            items.append(Item("end", i + 1))
+            continue
         if text.startswith("@"):
             flush()
             items.append(Item("at", i + 1, text=text[1:].strip()))
@@ -347,7 +381,9 @@ def _merge_text(blocks: list[Text], role: str) -> Text:
     return Text(role=role, paragraphs=paras, line=first.line, style=first.style, classes=first.classes)  # type: ignore[arg-type]
 
 
-def parse_slide(chunk: Chunk, lines: list[str], inside: list[bool], ctx: Ctx, index: int) -> Slide:
+def parse_slide(
+    chunk: Chunk, lines: list[str], inside: list[bool], ctx: Ctx, index: int, recs: list[Rec] | None = None
+) -> Slide:
     slide = Slide(line=(chunk.title_idx if chunk.title_idx is not None else chunk.start) + 1)
     title_attrs: Attrs | None = None
     if chunk.title_idx is not None:
@@ -360,13 +396,24 @@ def parse_slide(chunk: Chunk, lines: list[str], inside: list[bool], ctx: Ctx, in
             )
         else:
             ctx.warn("empty slide title", chunk.title_idx + 1, "empty-title", "write '# Title' with text")
+    extra_notes: list[str] = []
+    lead_ats: list[Item] = []
+    for r in recs or []:
+        if r.kind == "diag":
+            ctx.add(r.level, r.value, r.idx + 1, r.rule, r.hint)
+        elif r.kind == "note":
+            extra_notes.append(r.value)
+        elif r.kind == "at":
+            lead_ats.append(Item("at", r.idx + 1, text=r.value))
     items, notes = _scan_body(lines, inside, chunk, ctx)
-    slide.notes = notes or None
+    items = lead_ats + items
+    slide.notes = "\n".join([*extra_notes, *([notes] if notes else [])]) or None
 
     top_ats: list[Item] = []
     top: list[Item] = []
     boxes: list[tuple[Item, list[Item], list[Item]]] = []  # h2, content, at lines
     order: list[Any] = []  # ("top", [items]) | ("box", idx) in source order
+    in_box = False
     for it in items:
         if it.kind == "foot":
             ft = Text(role="footnote", paragraphs=[Paragraph(runs=inline_runs(it.text))], line=it.line)
@@ -374,10 +421,22 @@ def parse_slide(chunk: Chunk, lines: list[str], inside: list[bool], ctx: Ctx, in
         elif it.kind == "h2":
             boxes.append((it, [], []))
             order.append(("box", len(boxes) - 1))
+            in_box = True
+        elif it.kind == "end":
+            if in_box:
+                in_box = False
+            else:
+                ctx.add(
+                    "info",
+                    "'@end' outside a box",
+                    it.line,
+                    "end-outside-box",
+                    "remove it, or put it after the '## ' box it closes",
+                )
         elif it.kind == "at":
-            (boxes[-1][2] if boxes else top_ats).append(it)
+            (boxes[-1][2] if in_box else top_ats).append(it)
         else:
-            if not boxes:
+            if not in_box:
                 top.append(it)
                 if not order or order[-1][0] != "top":
                     order.append(("top", []))
@@ -496,13 +555,22 @@ def parse_deck(text: str) -> Deck:
     else:
         inside, _ = fence_map(lines)
     start = parse_header(lines, inside, deck, ctx)
+    recs = normalize(lines, inside, start, deck)
     chunks = split_slides(lines, inside, start)
     if not chunks:
         ctx.warn("no slides found", None, "no-slides", "start a slide with '# Title'")
+    by_chunk: dict[int, list[Rec]] = {}
+    for r in recs:
+        # a record belongs to the first slide that ends after its line (blank separator slides are dropped)
+        k = next((ci for ci, c in enumerate(chunks) if c.end > r.idx), len(chunks) - 1)
+        if k >= 0:
+            by_chunk.setdefault(k, []).append(r)
+        elif r.kind == "diag":
+            ctx.add(r.level, r.value, r.idx + 1, r.rule, r.hint)
     for idx, chunk in enumerate(chunks):
         ctx.slide = idx + 1
         try:
-            deck.slides.append(parse_slide(chunk, lines, inside, ctx, idx))
+            deck.slides.append(parse_slide(chunk, lines, inside, ctx, idx, by_chunk.get(idx)))
         except Exception as e:  # never raise on bad input
             ctx.error(
                 f"internal error: {type(e).__name__}: {e}",

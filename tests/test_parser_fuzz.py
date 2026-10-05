@@ -1,8 +1,12 @@
+import contextlib
+import io
+import tempfile
 from pathlib import Path
 
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from slidemark.cli import main
 from slidemark.ir import Deck
 from slidemark.parser import parse
 
@@ -53,6 +57,64 @@ FRAGMENTS = [
     "http://x",
     "#5",
     "$$",
+    "@end",
+    "\n@end\n",
+    "@chevorn",
+    "@bgg=1",
+    "@2X2",
+    "{colour=red .dnager}",
+    "marp: true",
+    "paginate: true",
+    "<!--",
+    "-->",
+    "<!-- _class: lead -->",
+    "<!-- paginate: true -->",
+    "<!-- note -->",
+    "Note: ",
+    "::right::",
+    "layout: cover",
+    "class: x",
+    "* ",
+    "<br>",
+    "![w:200](a.png)",
+    "![w:1 h:2 bg](a.png){w=3}",
+    "\n---\nlayout: cover\n---\n",
+    "\n###",
+]
+
+
+LENIENT = [
+    "---",
+    "# T",
+    "## B",
+    "### H",
+    "@end",
+    "@3 flow",
+    "@bgg=#fff",
+    "marp: true",
+    "paginate: true",
+    "layout: cover",
+    "class: lead x",
+    "<!-- _class: lead -->",
+    "<!-- paginate: true -->",
+    "<!-- a note",
+    "-->",
+    "<!--",
+    "Note: say hi",
+    "::right::",
+    "* item",
+    "- item",
+    "text<br>more<br/>",
+    "![w:200 h:10%](a.png)",
+    "![bg](a.png){w=1}",
+    "| a | b |",
+    "|-|-|",
+    "```",
+    "```column",
+    "???",
+    "> q",
+    "※ n",
+    "日本語<br>テキスト",
 ]
 
 
@@ -96,3 +158,25 @@ def test_mutated_corpus_never_crashes(which, mutations):
 def test_syntax_doc_never_crashes():
     if SYNTAX.exists():
         check(SYNTAX.read_text(encoding="utf-8"))
+
+
+@settings(max_examples=300, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(st.lists(st.sampled_from(LENIENT), max_size=40).map("\n".join))
+def test_lenient_line_mixes_never_crash(text):
+    check(text)
+
+
+_TMP = Path(tempfile.mkdtemp(prefix="slidemark-fuzz-"))
+
+
+@settings(max_examples=150, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(st.one_of(st.text(), st.lists(st.sampled_from(LENIENT + FRAGMENTS), max_size=40).map("\n".join)))
+def test_cli_check_never_tracebacks(text):
+    f = _TMP / "fuzz.md"
+    f.write_text(text, encoding="utf-8")
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        code = main(["check", str(f)])
+        code_json = main(["check", str(f), "--format", "json"])
+    assert code in (0, 1) and code_json in (0, 1)
+    assert "Traceback" not in out.getvalue() + err.getvalue()

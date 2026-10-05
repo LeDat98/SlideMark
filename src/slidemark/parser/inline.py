@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -12,6 +13,7 @@ from ..ir import Run
 from .attrs import Attrs, parse_attr_body, split_trailing_attrs  # noqa: F401
 
 _SOFT = "\x00soft\x00"
+BR_SPLIT = re.compile(r"<br[ \t]*/?>", re.I)
 
 
 # --------------------------------------------------------------------------- custom inline rules
@@ -174,7 +176,11 @@ def inline_items(children: list[Token] | None, allow_images: bool = False) -> li
         t = kids[i]
         ty = t.type
         if ty == "text":
-            run(t.content)
+            for k, part in enumerate(BR_SPLIT.split(t.content)):
+                if k:
+                    run("\n")  # <br> is a line break
+                if part:
+                    run(part)
         elif ty == "code_inline":
             run(t.content, code=True)
         elif ty == "softbreak":

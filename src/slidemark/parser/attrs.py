@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..ir import Box, ElementBase, Image, Style
-from .ctx import Ctx
+from .ctx import Ctx, closest
 
 _TOKEN = re.compile(
     r"""\s*(?:\.(?P<cls>[\w-]+)
@@ -84,6 +84,23 @@ def _float(v: str) -> float | None:
         return None
 
 
+VALID_KEYS = (
+    *("x", "y", "w", "h", "size", "color", "fill", "line", "font", "align", "valign", "bold", "italic"),
+    *("radius", "opacity", "pad", "fit", "bg", "t", "hidden", "gap", "id"),
+)
+KNOWN_CLASSES = (
+    "primary",
+    "accent",
+    "danger",
+    "success",
+    "muted",
+    "plain",
+    "kpi",
+    "card",
+    "dense",
+    "dark",
+    "light",
+)
 _BOX = ("x", "y", "w", "h")
 _ALIGN = ("left", "center", "right", "justify")
 _VALIGN = ("top", "middle", "bottom")
@@ -99,6 +116,9 @@ def apply_attrs(
     for c in a.classes:
         if c not in el.classes:
             el.classes.append(c)
+        near = closest(c, KNOWN_CLASSES, 0.75)
+        if near and c not in KNOWN_CLASSES:
+            ctx.warn(f"unknown class '.{c}'", line, "unknown-attr", f"did you mean '.{near}'?")
     box: dict[str, Any] = {}
     style: dict[str, Any] = {}
     for k, v in a.kv.items():
@@ -143,6 +163,9 @@ def apply_attrs(
                 ctx.warn(f"bad fit '{v}'", line, "bad-attr", "use fit=contain|cover|stretch")
         else:
             sink[k] = v
+            near = closest(k, VALID_KEYS, 0.7) if sink is el.attrs else None
+            if near:
+                ctx.warn(f"unknown attribute '{k}'", line, "unknown-attr", f"did you mean '{near}='?")
     if box:
         merged = el.box.model_dump() if el.box else {}
         merged.update(box)
@@ -155,6 +178,8 @@ def apply_attrs(
 
 LAYOUT_WORDS = ("cover", "section", "blank", "center")
 FLAGS = ("flow", "chevron")
+AT_KEYS = ("bg", "t", "id", "gap")
+KNOWN_WORDS = (*LAYOUT_WORDS, *FLAGS, "hidden", "dense", "dark", "light", "plain")
 _N = re.compile(r"^\d+$")
 _CXR = re.compile(r"^\d+x\d+$")
 _RATIO = re.compile(r"^\d+(?:\.\d+)?(?::\d+(?:\.\d+)?)+$")
@@ -193,6 +218,9 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
                 spec.gap = _length(v)
             else:
                 spec.attrs[k] = v
+                near = closest(k, AT_KEYS, 0.5)
+                hint = f"did you mean '{near}='?" if near else f"valid keys: {', '.join(AT_KEYS)}"
+                ctx.warn(f"unknown '@' key '{k}'", line, "unknown-token", hint)
         elif tok in LAYOUT_WORDS:
             spec.layout = tok
         elif tok == "hidden":
@@ -216,4 +244,14 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
                 spec.grid = tok
         else:
             spec.classes.append(tok)
+            near = closest(tok, KNOWN_WORDS, 0.75)
+            if near and tok not in KNOWN_WORDS:
+                ctx.warn(f"unknown '@' token '{tok}'", line, "unknown-token", f"did you mean '{near}'?")
+            elif tok[0].isdigit() or "/" in tok:
+                ctx.warn(
+                    f"cannot read grid '{tok}'",
+                    line,
+                    "bad-grid",
+                    "grids look like 3, 2x2, 1:2 or aab/aac (lowercase letters, same row length)",
+                )
     return spec
