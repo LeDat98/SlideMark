@@ -109,7 +109,7 @@ class LayoutTokens(BaseModel):
     room_free: float = 0.35  # a card with more than this share of its inner height free spreads paragraphs
     room_use: float = 0.6  # ... using this share of the free height
     room_gap_max: float = 0.6  # ... up to this space-before (em) per paragraph
-    room_gap_max_dense: float = 1.2  # ... dense slides
+    room_gap_max_dense: float = 2.0  # ... dense slides
     slide_peer_step: float = 1.12  # slide-level text is at most this much smaller than the box text beside it
     grow_fill: float = 0.85  # growth stops when the content would fill more than this share of the grid
     grow_box_fill: float = 0.92  # ... or more than this share of a box
