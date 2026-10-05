@@ -1,7 +1,7 @@
 # Design: your own look
 
-SlideMark has no fixed look. A theme is only a preset of design tokens; any deck can change every token.
-Pick a preset (`default`, `midnight`, `jp-business`) or start from `theme: none` and declare the design:
+A theme is only a preset of design tokens. Pick a preset (`default`, `midnight`, `jp-business`) or start
+from `theme: none` and declare the design:
 
 ```markdown
 theme: none
@@ -32,11 +32,25 @@ Lines (header only, before the first `#`):
   - box heading band: `heading.band=primary`, `heading.color=accent`
   - tables: `table.header.fill=primary` `table.header.color=#FFFFFF`
   - charts: `palette=primary,accent,#FF5A1F`
-  - spacing: `gap=12pt` `margin_x=0.6in` `layout.top_gap=0.3in`; `layout.grow=off` keeps your sizes
+  - spacing: `gap=12pt` `margin_x=0.6in`; `layout.grow=off` keeps your sizes
   - your own class: `hero.fill=#FF5A1F hero.color=#FFFFFF` then `## Title {.hero}`
 
-`slidemark tokens` lists every token and its value (`slidemark tokens deck.md` for your deck). A theme
-file `brand.yaml` holds the same tokens (`colors: {primary: "#7C5CFF"}`) and is used with `theme: ./brand.yaml`.
+`slidemark tokens [deck.md]` lists every token. A YAML file of the same tokens works as `theme: ./brand.yaml`.
 
-Tips: keep text/background contrast high (`check` warns), use 2–3 brand colors plus neutrals, and set
-`surface`/`border` when you change `bg` so cards match a dark background.
+CSS fence (header = whole deck, inside a slide = that slide), for looks tokens cannot say:
+
+````markdown
+```css
+h1 { text-transform: uppercase; letter-spacing: 2pt }
+.box > h2 { border-bottom: 2px solid #FF6B6B }
+tr:nth-child(even) td { background: #FAFAFA }
+```
+````
+
+Selectors: `slide` `slide.cover` `h1` `h2` `p` `li` `.lead` `.conclusion` `.footnote` `.box` `.kpi` `table` `th`
+`td` `tr` `code` `img` `.chart`, your `{.class}` / `{#id}`. Use usual CSS properties; unsupported ones warn.
+
+Whole-slide HTML: `@html` under the title, then one ` ```html ` fence (absolute positioning, flex/grid,
+gradients, shadows, inline SVG all become editable shapes). `var(--primary)` etc. read your tokens.
+
+Tips: keep contrast high (`check` warns); with a dark `bg` also set `surface` and `border`.
