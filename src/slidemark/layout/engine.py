@@ -2019,22 +2019,30 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
         body_pt0 = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"])
         has_diagram = any(isinstance(e, Container) and "diagram" in e.classes for e in elements)
         steps = max(0, round((ctx.lt.balance_grow - 1.0) / 0.05)) if ctx.lt.grow and not has_diagram else 0
-        # text and cards grow together, smallest text first, until the empty band is small enough
-        # (the wrap guard refuses new wrapped CJK lines; Latin text may wrap more)
+        # text first: grow it (cards follow at most ``balance_text_air`` x their natural height) until the
+        # empty band is small enough; only then stretch the cards. The wrap guard refuses new wrapped CJK
+        # lines; Latin text may wrap more.
+        best_g = fin.grow
         for f in [1.0] + [round(1.0 + 0.05 * i, 2) for i in range(1, steps + 1)]:
             g = round(fin.grow * f, 2)
             if g > fin.grow and g * body_pt0 > ctx.lt.balance_max_pt:
                 break
-            c = run(body, grow=g, expand=fin.expand, lone_air=ctx.lt.balance_air, grow_base=fin.grow)
+            c = run(body, grow=g, expand=fin.expand, lone_air=ctx.lt.balance_text_air, grow_base=fin.grow)
             if c.over or not c.out:
                 if f > 1.0:
                     break  # bigger text only overflows more
                 continue
+            best_g = g
             if _bottom(c) > _bottom(fin):
                 fin = c
                 left = body.bottom - _bottom(fin)
             if left <= ctx.lt.balance_left * body.h:
                 break
+        if left > ctx.lt.balance_left * body.h:  # text cannot grow any more: stretch the cards
+            c = run(body, grow=best_g, expand=fin.expand, lone_air=ctx.lt.balance_air, grow_base=fin.grow)
+            if not c.over and c.out and _bottom(c) > _bottom(fin):
+                fin = c
+                left = body.bottom - _bottom(fin)
         dy = round((left - ctx.lt.balance_left * body.h) * ctx.lt.balance_shift)
         if dy > 0:  # what is still empty is split: part above the block, the rest below
             c = run(

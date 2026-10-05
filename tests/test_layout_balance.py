@@ -60,3 +60,17 @@ def test_dense_two_box_slide_loses_most_of_its_band():  # 11-jp-consulting slide
     cards = _cards(items)
     assert len(cards) == 2 and len({c.y for c in cards}) == 1
     assert _band(items, h) <= 0.15  # was ~35% of the body
+
+
+def test_text_grows_before_cards_stretch():  # 13-brand-aurora slide 2: cards were ~3x their text
+    import sys
+
+    sys.path.insert(0, str(ROOT / "bench"))
+    from whitespace import card_fills
+
+    items, h = _slide("13-brand-aurora", 2)
+    fills = [f for _t, f in card_fills(items)]
+    assert fills and max(fills) >= 0.5 and sum(fills) / len(fills) >= 0.38
+    assert _band(items, h) <= 0.22
+    body = [p for p in items if getattr(p.element, "role", None) == "body"]
+    assert min(p.font_scale for p in body) >= 1.4  # text grew first

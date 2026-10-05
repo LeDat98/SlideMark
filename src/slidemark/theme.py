@@ -79,6 +79,7 @@ class LayoutTokens(BaseModel):
     balance_air: float = (
         1.9  # normal density: a lone row of boxes may grow to this multiple of its height (0 = off)
     )
+    balance_text_air: float = 1.3  # ... while its text still grows, cards stay within this multiple
     balance_max_pt: float = 36  # ... but body text never beyond this size (pt)
     balance_grow: float = 1.9  # ... its text may also grow by up to this factor (no new wrapped lines)
     balance_row: float = 0.85  # ... but never beyond this share of the body
