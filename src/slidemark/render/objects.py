@@ -55,6 +55,13 @@ def _cell_border(tcPr, color: str, width: int = 6350) -> None:
         tcPr.insert(i, ln)
 
 
+def _mix(a: str, b: str, t: float) -> str:
+    """Blend two RRGGBB colors: ``t`` = share of ``b``."""
+    return "".join(
+        f"{round(int(a[i : i + 2], 16) * (1 - t) + int(b[i : i + 2], 16) * t):02X}" for i in (0, 2, 4)
+    )
+
+
 def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     t: Table = pl.element  # type: ignore[assignment]
     theme = rc.theme
@@ -76,12 +83,16 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         tbl.rows[i].height = Emu(int(h))
     border = hex6(theme, theme.table_border)
     body_fill = theme.table_body_fill
+    zebra = "zebra" in t.classes or flag(t.attrs.get("zebra"))
+    zebra_fill = theme.table_zebra_fill or "#" + _mix(hex6(theme, body_fill), hex6(theme, "surface"), 0.6)
     # fill every grid cell first (merged-away cells included) so nothing falls back to a default style
     for r in range(nrows):
         for c in range(ncols):
             cell = tbl.cell(r, c)
             hdr = r < t.header_rows
             fill = theme.table_header_fill if hdr else ("surface" if c < t.header_cols else body_fill)
+            if zebra and not hdr and c >= t.header_cols and (r - t.header_rows) % 2 == 1:
+                fill = zebra_fill
             cell.fill.solid()
             cell.fill.fore_color.rgb = rgb(theme, fill)
             _cell_border(cell._tc.get_or_add_tcPr(), border)

@@ -125,6 +125,8 @@ def _format_run(rc: RenderCtx, r, run: Run, style: Style, size_pt: float, text: 
 
 def _set_bullet(para, p: Paragraph, size_pt: float) -> None:
     pPr = para._p.get_or_add_pPr()
+    pPr.set("eaLnBrk", "1")  # kinsoku line breaking, no hanging punctuation: matches layout.measure
+    pPr.set("hangingPunct", "0")
     if p.marker:
         marL, indent = measure.list_indent(size_pt, p.level)
         pPr.set("marL", str(marL))

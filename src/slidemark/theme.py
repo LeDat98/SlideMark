@@ -71,6 +71,7 @@ class Theme(BaseModel):
     table_header_color: str = "fg"
     table_body_fill: str = "bg"
     table_border: str = "border"
+    table_zebra_fill: str | None = None  # alternate body row fill for `.zebra` tables (None = derived)
     dense_scale: float = 0.8  # body/table/code size factor for `density: dense` / `.dense` slides
     palette: list[str] = Field(
         default_factory=lambda: ["primary", "secondary", "accent", "danger", "success", "muted"]
