@@ -98,6 +98,8 @@ def inline(
                 body = f"**{body}**"
             if accent and r.color == accent and not r.badge:
                 body = f"=={body}=="
+            elif r.color and not r.badge and (cname := (classes or {}).get(r.color)) in ("success", "danger"):
+                body = f"[{body}]{{.{cname}}}"
         if r.badge:
             cls = (classes or {}).get(r.badge, "")
             body = f"[{body}]{{.badge{(' .' + cls) if cls else ''}}}"

@@ -6,6 +6,7 @@ import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import cmp_to_key
 
 from ..ir import Diagnostic
 from .emit import chart_lines, detect_lang, one_line, table_lines, text_lines
@@ -163,9 +164,10 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
         if it.role:
             continue
         small = it.max_size is not None and it.max_size <= 12
+        label = data.connectors >= 2 and len(it.text) <= 20  # a short text on a diagram: an edge label
         if it.kind == "text" and (
             it.name.lower().startswith("footnote")
-            or (not it.fill and not it.line and it.y >= 0.8 * H and it.h <= 0.12 * H and small)
+            or (not it.fill and not it.line and it.y >= 0.8 * H and it.h <= 0.12 * H and small and not label)
         ):
             it.role = "footnote"
     for it in pool:
@@ -549,6 +551,31 @@ def _units(widths: list[float]) -> list[int]:
     return [x // g for x in u]
 
 
+def stretch_visuals(blocks: list[Block]) -> None:
+    """Pictures, diagrams and charts are centred in their cell: one beside a taller block takes its row."""
+    for v in blocks:
+        if v.kind not in ("fence", "image", "chart", "math"):
+            continue
+        for s in blocks:
+            if (
+                s is not v
+                and (v.x + v.w / 2 <= s.x or v.x + v.w / 2 >= s.x + s.w)
+                and s.y <= v.y
+                and s.y + s.h >= v.y + v.h
+                and s.h > 1.3 * v.h
+            ):
+                v.y, v.h = s.y, s.h
+                break
+
+
+def _reading_order(a: Block, b: Block) -> int:
+    """Top to bottom; blocks sharing most of their vertical span go left to right."""
+    ov = min(a.y + a.h, b.y + b.h) - max(a.y, b.y)
+    if ov > 0.5 * min(a.h, b.h):
+        return (a.x > b.x) - (a.x < b.x)
+    return (a.y > b.y) - (a.y < b.y)
+
+
 def split_row_groups(blocks: list[Block], W: int, H: int) -> list[list[Block]] | None:
     """Rows of boxes with different column counts are row groups (``@end`` + a new ``@`` line each)."""
     if len(blocks) < 3 or any(b.kind != "box" for b in blocks):
@@ -826,7 +853,7 @@ def build_slide(
         blocks = [b for b in blocks if not any(b is u for u in dia.used)]
         fence = ["```mermaid", *dia.lines, "```"]
         blocks.append(Block("fence", round(x), round(y), round(w), round(h), lines=fence))
-        blocks.sort(key=lambda b: (b.y, b.x))
+        blocks.sort(key=cmp_to_key(_reading_order))
         data.conns = []
         data.connectors = 0
     top, inner, lost = find_links(blocks, data.conns, data.items)
@@ -862,6 +889,7 @@ def build_slide(
         data.conns = []
         lost = 0
     gdiag: list[str] = []
+    stretch_visuals(blocks)
     groups = None if (top or inner) else split_row_groups(blocks, deck.width, deck.height)
     group_tokens: list[list[str]] = []
     arrow_items = [i for i in pool if i.kind == "shape" and i.prst and "rrow" in i.prst]
