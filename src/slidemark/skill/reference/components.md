@@ -53,6 +53,8 @@ Badges work anywhere in text, including bullets and table cells (`影響: [高]{
 
 **Badges** — `[NEW]{.badge}`, color with a class: `.success .danger .accent .muted`.
 
+**Icons** — `icon=name` on any box heading: `## 品質 {icon=shield}`, `## 売上 {.kpi icon=yen}` (`slidemark docs icons`).
+
 **Box colors** — `## 課題 {.danger}` colors the box border; `{.plain}` removes the card.
 
 **Lead / conclusion / footnotes** — `>` first = key message under the title, `>` last = bar at the bottom,

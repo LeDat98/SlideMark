@@ -38,12 +38,13 @@ num: on
 
 - Header lines `key: value` before the first `#` (all optional): `theme` (`default`, `midnight`,
   `jp-business`, or a .pptx/.potx template path), `lang` (`ja` sets Japanese fonts and line breaking), `size` (`16:9`, `4:3`, `A4`), `footer`, `num: on`, `density: dense`.
-- `# Title` starts a slide. A title with ≤ 2 short lines and nothing else becomes a cover (first slide) or a
+- Cover: `# Deck title` + one subtitle line (+ an optional date line) as the first slide. `# Title` starts a slide. A title with ≤ 2 short lines and nothing else becomes a cover (first slide) or a
   section divider; force it with `@cover` / `@section`.
 - `## Heading` makes a box. Boxes are arranged automatically (2 → columns, 3 → columns, 4 → 2×2, …).
 - `>` right after the title = lead message; `>` as the last line = conclusion bar; `※ text` = footnote.
 - `??? ` starts speaker notes.
 - `@end` closes the current box, so a following table/chart belongs to the slide (full-width row below).
+  An `@` line after `@end` starts a new row group (e.g. a `@2 flow` row, `@end`, then a `@2` row of KPI boxes).
 
 ## Layout: one `@` line
 

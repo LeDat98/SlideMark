@@ -36,5 +36,15 @@ Category labels are always text (years stay `2024`). Scatter: first row = x valu
 
 Options: `widths` (ratios), `align` (`l` `c` `r` per column), `header=N` (header rows, 0 = none), `hcol=N`
 (header columns), `.zebra`. Numeric columns are right-aligned automatically. A ` ```table ` fence takes CSV
-(first row = header) with the same options. Schedules: one row per task, `●` in month columns, `<` to
-extend a bar over the next month.
+(first row = header) with the same options. Highlight a row's key cells with `==x==` or a badge; there is no row-level style.
+
+Schedule (`<` extends the ● cell to the right):
+
+```markdown
+| タスク | 担当 | 10月 | 11月 | 12月 |
+|-|-|-|-|-|
+| 要件定義 | 佐藤 | ● | < | |
+| 開発 | 開発部 | | ● | < |
+```
+
+One chart has one value axis: put values with different units (ms vs GB) in two charts side by side.
