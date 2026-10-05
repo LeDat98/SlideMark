@@ -102,3 +102,10 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] Roomy/balance floors skipped any slide with a tail (callout under a flow row) → use the grid area as reference when the tail is text. A lone html block hugs the top of its box → wrap its source in a `100vh` flex column (`layout.html_fit`, `{fit=off}`).
 - [import] Foreign decks: derived look tokens (`importer/look.py`) must win a trial build (a dominant-text-color guess misfired on SlideMark decks: roundtrip 113 → 98 without the check); strict majority for bg; skip radii that vary per card.
 - [layout] Stretching a lone HTML block to the body made 70%-empty cards → `layout.html_fit` is opt-in (default off).
+- [html] HTML zoom must re-measure at the narrower viewport (scaling a z=1 measurement keeps the old wrapping). `data:` URIs with `;utf8,` params were dropped → svg+xml allowed, non-base64 payloads percent-decoded.
+- [html] html/body had no height → `height:100%` in an `@html` slide resolved to content height (bento grid filled half the slide); the page wrapper now sets `html,body{height:100%}`.
+- [layout] Stretched paragraph gaps counted as fill in `bench/whitespace.py`: hugging cards left mean fill flat → judge by images and the card-tail metric. Dense decks cap grown text (`dense_roomy_body`) so type stays one size across slides.
+- [import] Box color classes ride on the card border color (`.danger` → border = danger) and `.muted` on body text color → read `a:ln` color in the importer, or the classes silently vanish (examples/16 round trip).
+- [tokens] A dark brand `bg` without `muted` kept the preset grey (2.5:1 lead lines, eval 137) → muted is derived from fg/bg when the grey fails 4.5:1 and the deck did not declare it.
+- [env] Two processes running `soffice` at once: one gets "source file could not be loaded" / no PDF → retry once; subagents in worktrees may get compound `cd … &&` Bash commands refused.
+- [bench] Content alone is 25% of the q3 python-pptx file, so "syntax ≤ 20%" is below the floor there; agent-written python-pptx decks are ~2,700 tokens (SlideMark 6%) → `bench/token_floor.py`.
