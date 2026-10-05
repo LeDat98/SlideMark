@@ -140,6 +140,15 @@ class LayoutTokens(BaseModel):
     )
     center_beside: bool = True  # a card as tall as the chart / image beside it centers its content vertically
     hug_cards: bool = True  # cards are as tall as their content (row_slack_hug)
+    # --- sparse step: a slide whose content fills less than sparse_fill of the body takes ONE step up
+    sparse_fill: float = (
+        0.55  # content fills less than this share of the body: the slide sets the deck's step
+    )
+    sparse_fill_soft: float = 0.65  # ... below this share it takes the deck's step when that fits
+    sparse_step: float = 1.25  # text, paddings, chevrons and table text of such a slide grow by this factor
+    sparse_step_min: float = 1.15  # ... or this one when the larger step overflows / wraps more lines
+    sparse_max_pt: float = 20  # ... but body text never beyond this size (pt)
+    sparse_para_gap: float = 0.6  # paragraph gap (em) of a card at the sparse step
 
 
 class RenderTokens(BaseModel):
