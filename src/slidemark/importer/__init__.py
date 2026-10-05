@@ -141,8 +141,17 @@ def _import(prs, out_dir, diags: list[Diagnostic]) -> tuple[str, list[Diagnostic
     diags.extend(ctx.diags)
     footer, footers = _footers(datas, H)
     colors = {k: v.lstrip("#").upper() for k, v in theme.colors.items()}
+    from ..units import to_emu
+
     deck = DeckInfo(
-        width=W, height=H, accent=accent, colors=colors, footers=footers, sections=read_sections(prs)
+        width=W,
+        height=H,
+        accent=accent,
+        colors=colors,
+        footers=footers,
+        sections=read_sections(prs),
+        margin_x=to_emu(theme.margin_x),
+        gap=to_emu(theme.gap),
     )
     classes = {}
     for cname in ("success", "danger", "muted", "accent"):

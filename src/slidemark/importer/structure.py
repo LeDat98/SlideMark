@@ -26,6 +26,8 @@ class DeckInfo:
     colors: dict[str, str] = field(default_factory=dict)  # name -> RRGGBB
     footers: set[str] = field(default_factory=set)
     sections: list[tuple[str, list[int]]] = field(default_factory=list)  # PowerPoint sections (name, slide numbers)
+    margin_x: int = 0  # theme side margin and column gap (EMU); 0 = unknown
+    gap: int = 0
 
 
 @dataclass
@@ -241,7 +243,7 @@ def _is_code(it: Item) -> bool:
     )
 
 
-def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
+def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = None) -> list[Block]:
     W, H = deck.width, deck.height
     slide_area = W * H
     cands = [
@@ -334,13 +336,17 @@ def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
             head, extra = [it.paras[0]], it.paras[1:]
         else:
             k0 = real[0]
+            top = it.y  # an icon at the card's top edge pushes the heading down
+            for ic in icons or ():
+                if it.x <= ic.cx <= it.x + it.w and it.y <= ic.cy <= it.y + 0.4 * it.h:
+                    top = max(top, ic.y + ic.h)
             if (
                 k0.kind == "text"
                 and not kids.get(k0.uid)
                 and len(k0.paras) == 1
                 and not k0.paras[0].marker
                 and not (k0.role or "").startswith("callout")
-                and k0.y - it.y <= 0.3 * it.h
+                and k0.y - top <= 0.3 * it.h
             ):
                 head, body = k0.paras, real[1:]
         blocks: list[Block] = []
@@ -544,7 +550,7 @@ def _units(widths: list[float]) -> list[int]:
 
 
 def plan_grid(
-    blocks: list[Block], W: int, H: int, diags: list[str]
+    blocks: list[Block], W: int, H: int, diags: list[str], margin: int = 0, gap: int = 0
 ) -> tuple[list[str], list[Block], list[Block]]:
     """(tokens of the ``@`` line, grid blocks in source order, extras stacked full width below)."""
     if not blocks:
@@ -616,18 +622,27 @@ def plan_grid(
     n = len(grid)
     chev = all(b.kind == "box" and b.chevron for b in grid)
     full_cells = single and n == C * R
+    ncols = n
+    if equal and margin and C == n and abs(x0 - margin) <= tolx:
+        # columns left empty at the right (``@3`` with two boxes): the column width tells the count
+        avg = sum(cw) / len(cw)
+        total = round((W - 2 * margin + gap) / (avg + gap)) if avg + gap > 0 else n
+        if total > n and abs((W - 2 * margin + gap) / total - gap - avg) <= 0.03 * avg:
+            ncols = total
     if R == 1 and single:
         if chev:
-            return [str(n), "chevron"], ordered, extras
+            return [str(ncols), "chevron"], ordered, extras
         if not equal:
             return [":".join(map(str, _units(cw)))], ordered, extras
-        if not extras and n in (2, 3):
+        if not extras and n in (2, 3) and ncols == n:
             return [], ordered, extras
-        return [str(n)], ordered, extras
+        return [str(ncols)], ordered, extras
     if full_cells and equal:
         if not extras and (C, R) == (3, 2):
             return [], ordered, extras
         return [f"{C}x{R}"], ordered, extras
+    if single and equal and C >= 2 and R >= 2 and all(cells.get((i // C, i % C)) == seen[i] for i in range(n)):
+        return [str(C)], ordered, extras  # N columns, blocks wrap row by row, the last row may be short
     if (
         single
         and not extras
@@ -777,8 +792,9 @@ def build_slide(
     fold_into_tables(data)
     title, pool = classify(data, deck)
     by_role = {r: [i for i in data.items if i.role == r] for r in ("lead", "conclusion", "footnote")}
-    blocks = make_blocks(pool, deck)
-    _attach_icons([i for i in data.items if i.role == "icon"], blocks)
+    icons = [i for i in data.items if i.role == "icon"]
+    blocks = make_blocks(pool, deck, icons)
+    _attach_icons(icons, blocks)
     arrows = sum(1 for i in pool if i.kind == "shape" and i.prst and "rrow" in i.prst)
     notes: list[str] = []
     dia = recover_diagram(blocks, data.conns, data.items)
@@ -823,7 +839,7 @@ def build_slide(
         data.conns = []
         lost = 0
     gdiag: list[str] = []
-    tokens, grid, extras = plan_grid(blocks, deck.width, deck.height, gdiag)
+    tokens, grid, extras = plan_grid(blocks, deck.width, deck.height, gdiag, deck.margin_x, deck.gap)
     for g in gdiag:
         diags.append(
             Diagnostic(level="info", message=g, slide=n, rule="import-layout", hint="check the arrangement")
