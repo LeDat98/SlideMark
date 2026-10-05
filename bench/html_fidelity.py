@@ -114,10 +114,17 @@ def main() -> int:
     summary["value"] = summary["native"]
     summary["worst"] = [[x["slide"], x["native"]] for x in sorted(rows, key=lambda x: x["native"])[:5]]
     print(json.dumps(summary, ensure_ascii=False))
+    base = json.loads((ROOT / "bench" / "BASELINE.json").read_text(encoding="utf-8")).get("html_fidelity", {})
+    tol = 1.05  # LibreOffice rendering jitter
+    worse = summary["native"] < base.get("native", 0) or (
+        summary["diff"] is not None and summary["diff"] > base.get("diff", 1) * tol
+    )
+    if worse and not args.files:
+        print(f"REGRESSION vs bench/BASELINE.json html_fidelity {base} (the diff may only go down)")
     if args.record:
         with (ROOT / "bench" / "history.jsonl").open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(summary, ensure_ascii=False) + "\n")
-    return 0
+    return 1 if worse and not args.files else 0
 
 
 if __name__ == "__main__":
