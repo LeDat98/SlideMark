@@ -2117,14 +2117,16 @@ _KATAKANA = re.compile(r"[\u30a0-\u30ff\u31f0-\u31ff\uff66-\uff9f]+")
 
 
 def _longest_word_em(paragraphs: list[Paragraph]) -> float:
-    """Width (em, bold) of the longest unbreakable word: a space-separated word or a katakana run."""
+    """Width (em) of the longest unbreakable word (space-separated or a katakana run), bold where bold."""
     best = 0.0
     for p in paragraphs:
-        for chunk in p.plain.split():
-            if measure.has_cjk(chunk):
-                best = max(best, *(measure.text_em(r, bold=True) for r in _KATAKANA.findall(chunk)), 0.0)
-            else:
-                best = max(best, measure.text_em(chunk, bold=True))
+        for run in p.runs:
+            bold = bool(run.bold or run.highlight)
+            for chunk in run.text.split():
+                if measure.has_cjk(chunk):
+                    best = max(best, *(measure.text_em(r, bold=bold) for r in _KATAKANA.findall(chunk)), 0.0)
+                else:
+                    best = max(best, measure.text_em(chunk, bold=bold))
     return best
 
 
@@ -2176,13 +2178,18 @@ def _chevron_word_cap(
 
 
 def _chevron_head_cap(ctx: _Ctx, flow: list, cells: list[Rect], h: int, inherit: Style) -> float | None:
-    """Text scale at which every bold heading line ("Tháng 11") fits one line, or ``None`` when no limit.
+    """Text scale at which every bold heading ("Tháng 11") fits ``chevron_head_lines`` lines, or ``None``.
 
-    Rows of >= ``chevron_head_min_steps`` chevrons only. A heading that needs more than the allowed shrink
-    (down to ``chevron_head_min_scale`` x the base size) is left to wrap: shrinking would not save it.
+    Rows of >= ``chevron_head_min_steps`` chevrons only. A heading stays on one line when that costs at
+    most ``1 - chevron_head_keep`` of the size; otherwise it wraps at a space (never inside a word) and the
+    text shrinks only when the allowed lines still do not fit (down to ``chevron_head_min_scale``; below
+    that shrinking would not save it and the heading is left to wrap).
     """
-    if len(flow) < ctx.lt.chevron_head_min_steps:
+    lt = ctx.lt
+    if len(flow) < lt.chevron_head_min_steps:
         return None
+    lines_max = max(int(lt.chevron_head_lines), 1)
+    top = max(ctx.chev_grow, 1.0)
     cap: float | None = None
     for (_i, blk), r in zip(flow, cells, strict=True):
         if not isinstance(blk, (Text, Shape, Container)):
@@ -2191,13 +2198,23 @@ def _chevron_head_cap(ctx: _Ctx, flow: list, cells: list[Rect], h: int, inherit:
         paras = sh.paragraphs
         if len(paras) < 2 or not paras[0].runs or not all(run.bold for run in paras[0].runs):
             continue
-        em = max(measure.text_em(paras[0].plain, bold=True), 0.0)
-        if em <= 0:
-            continue
         size = max(st.font_size or 18, 1.0)
-        avail = _chevron_text_w(rect, st, sh, _cadj(ctx)) / EMU_PER_PT
-        fit = avail / (em * size * ctx.lt.chevron_head_slack)
-        if fit < ctx.lt.chevron_head_min_scale:
+        avail = _chevron_text_w(rect, st, sh, _cadj(ctx)) / EMU_PER_PT / lt.chevron_head_slack
+        segs = measure.para_segments(paras[0], True)
+
+        def largest(limit: int, floor: float, segs=segs, avail=avail, size=size, st=st) -> float | None:
+            s_ = top
+            while s_ >= floor - 1e-9:
+                if measure.count_lines(segs, avail, size * s_, st.font) <= limit:
+                    return s_
+                s_ = round(s_ - 0.05 * top, 3)
+            return None
+
+        keep = lt.chevron_head_keep if lines_max > 1 else lt.chevron_head_min_scale
+        fit = largest(1, keep * top)
+        if fit is None and lines_max > 1:
+            fit = largest(lines_max, lt.chevron_head_min_scale * top)
+        if fit is None:
             continue
         cap = fit if cap is None else min(cap, fit)
     return cap
@@ -2229,7 +2246,8 @@ def _chevron_row_h(ctx: _Ctx, blocks: list, width: int, inherit: Style, alone_h:
     """
     lo, hi = _emu(ctx.lt.chevron_min_h), _emu(ctx.lt.chevron_max_h)
     if alone_h is not None:
-        hi = _emu(ctx.lt.chevron_max_alone_sparse if ctx.chev_air else ctx.lt.chevron_max_alone)
+        many = len(blocks) >= ctx.lt.chevron_head_min_steps  # narrow chevrons wrap into many lines: go tall
+        hi = _emu(ctx.lt.chevron_max_alone_sparse if ctx.chev_air or many else ctx.lt.chevron_max_alone)
         share = ctx.lt.chevron_alone_share_sparse if ctx.chev_air else ctx.lt.chevron_alone_share
         lo = max(lo, min(hi, round(share * alone_h)))
     h = round(EMU_PER_INCH)
@@ -2775,7 +2793,13 @@ def _sparse_step(ctx: _Ctx, fc: _Ctx, run, body: Rect, stepped: list[float]) -> 
 
 
 def _grow_head(
-    ctx: _Ctx, fin: _Ctx, head: list[Placed], tail: list[Placed], body: Rect, inner_w: int
+    ctx: _Ctx,
+    fin: _Ctx,
+    head: list[Placed],
+    tail: list[Placed],
+    body: Rect,
+    inner_w: int,
+    reserved: tuple[Style, int] | None = None,
 ) -> None:
     """A sparse slide's lead and footnotes follow its grown body text (no extra layout pass).
 
@@ -2814,7 +2838,9 @@ def _grow_head(
         and p.style.font_size
         and not _explicit_size(ctx, p.element)
     ]
-    if li is None and not fis:
+    if li is not None:
+        reserved = None  # a real lead: no empty slot
+    if li is None and reserved is None and not fis:
         return
     content_bottom = _content_bottom(fin.out)
     for t in (1.0, 0.6, 0.3):
@@ -2827,6 +2853,9 @@ def _grow_head(
             h = round(_text_need(ctx, p.element, st, inner_w, 1.0))
             if h <= round(H * 0.18):
                 new_lead, dlead = (st, h), max(h - p.h, 0)
+        elif reserved is not None and lk > 1.0 and reserved[0].font_size:
+            st = reserved[0].merged(fast_style(font_size=reserved[0].font_size * lk))
+            dlead = max(round(_text_need(ctx, _text_el("lead", "x"), st, inner_w, 1.0)) - reserved[1], 0)
         new_foot: dict[int, tuple[Style, int]] = {}
         dfoot = 0
         if fis and fk > 1.0:
@@ -2837,13 +2866,14 @@ def _grow_head(
             dfoot = sum(h for _st, h in new_foot.values()) - sum(tail[i].h for i in fis)
             if sum(h for _st, h in new_foot.values()) > round(H * lt.footnote_max):
                 new_foot, dfoot = {}, 0
-        if new_lead is None and not new_foot:
+        if new_lead is None and not dlead and not new_foot:
             continue
         if content_bottom + dlead + max(dfoot, 0) > body.bottom:
             continue
         if new_lead is not None:
             p = head[li]
             head[li] = p.model_copy(update={"style": new_lead[0], "h": new_lead[1]})
+        if dlead:
             fin.out = [q.model_copy(update={"y": q.y + dlead}) for q in fin.out]
         if new_foot:
             end = max(tail[i].y + tail[i].h for i in fis)
@@ -3069,6 +3099,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
 
     head: list[Placed] = []
     tail: list[Placed] = []
+    reserved: tuple[Style, int] | None = None  # style and height of the empty lead slot kept for the body y
 
     def put(dst: list[Placed], el, rect: Rect, style: Style, fs: float = 1.0):
         dst.append(
@@ -3170,6 +3201,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         ):  # most slides of the deck have a lead line: keep its slot so the body starts at the same y
             st = _styled(ctx, _text_el("lead", "x"), _role_style(ctx, "lead"))
             h = round(_text_need(ctx, _text_el("lead", "x"), st, inner_w, 1.0))
+            reserved = (st, h)
             head_bottom = y + (sg // 2 if y == My else 0) + h
         y_top = y if head_bottom is None else head_bottom + _emu(ctx.lt.top_gap)
         body = None
@@ -3370,7 +3402,9 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             and not final_ctx.over
             and (final_ctx.completed or final_ctx.step > 1.0)
         ):
-            _grow_head(ctx, final_ctx, head, tail, body, inner_w)  # dense decks keep their size ratios
+            _grow_head(
+                ctx, final_ctx, head, tail, body, inner_w, reserved
+            )  # dense decks keep their size ratios
         ctx.diags += final_ctx.diags
         seen: set[str] = set()
         for lab in final_ctx.over:
