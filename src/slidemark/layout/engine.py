@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from .. import icons
 from ..ir import (
@@ -65,10 +65,12 @@ CHEVRON_ADJ = 0.3  # chevron point depth / shorter side; the renderer sets the s
 CHEVRON_PAD_PT = 4  # text padding inside a chevron (the preset's text rectangle already clears the points)
 CHEVRON_H = 0.45  # chevron height / width (room for 3 lines of text between the point paddings)
 CODE_GROW = 1.25  # code text grows with the sparse-slide growth, up to this factor
-TABLE_GROW = 2.2  # rows of a table with spare room grow up to this factor
+TABLE_GROW = 1.4  # rows of a table with spare room grow up to this factor (a row stays near its text)
 TABLE_FONT_GROW = 1.2  # table text grows with the sparse-slide growth, up to this factor
 ROW_SLACK = 1.35  # a grid row is at most this much taller than its tallest content ...
-ROW_MIN = 0.35  # ... but never shorter than this share of the body height
+ROW_MIN_TAIL = 0.12  # ... when blocks (a chart, a table) follow the grid: the row hugs its content
+STACK_MIN = 0.4  # stacked boxes beside a tall block: each gets at least this share of the natural total
+ROW_MIN = 0.3  # ... but never shorter than this share of the body height (0.12 when blocks follow the grid)
 GROW_SMALL = (
     1.35  # sparse slides: text grows up to this factor when the theme body size is <= GROW_SMALL_PT ...
 )
@@ -84,9 +86,11 @@ SPARSE_LINES = 2
 SPARSE_LINE_EM = 22  # a "short" line
 GROW_FILL = 0.85  # growth stops when the content would fill more than this share of the grid
 GROW_BOX_FILL = 0.92  # ... or more than this share of a box
-LEFT_KEEP = 0.2  # rows of a sparse slide expand until at most this share of the body is left over ...
-LEFT_ABOVE = 1 / 3  # ... and that leftover is split: this share above the block, the rest below
+LEFT_KEEP = 0.12  # rows of a sparse slide expand until at most this share of the body is left over ...
+LEFT_ABOVE_TABLE = 0.2  # slides without boxes (a table, a chart) stay closer to the top
+LEFT_ABOVE = 0.35  # ... and that leftover is split: this share above the block, the rest below
 MATH_GROW = 1.6  # an equation alone in its cell is this much larger than body text
+TOP_GAP = 0.25  # inches between the title band (or lead) and the body, the same on every slide
 KPI_MIN_H = 1.1  # inches
 SHORT_EM = 30  # boxes with at most this much text (in em) are "short": four of them stay in one row
 DENSE_TIGHT = 0.7  # gap / padding factor on dense slides
@@ -757,6 +761,13 @@ def _place_stack(
 
 
 def _chevron_shape(blk) -> Shape:
+    """A chevron carries centered lines: list markers would hang off centered text, so they are dropped."""
+    shape = _chevron_shape_raw(blk)
+    plain = [p.model_copy(update={"marker": None, "level": 0}) if p.marker else p for p in shape.paragraphs]
+    return shape.model_copy(update={"paragraphs": plain})
+
+
+def _chevron_shape_raw(blk) -> Shape:
     paras: list[Paragraph] = []
     if isinstance(blk, Container):
         if blk.title is not None:
@@ -996,7 +1007,15 @@ def _cell_nat(ctx: _Ctx, blk, width: int, inherit: Style) -> tuple[int | None, s
 
 
 def _row_heights(
-    ctx: _Ctx, gs, flow: list, cells: list[Rect], grid_area: Rect, body: Rect, gap: int, inherit: Style
+    ctx: _Ctx,
+    gs,
+    flow: list,
+    cells: list[Rect],
+    grid_area: Rect,
+    body: Rect,
+    gap: int,
+    inherit: Style,
+    has_tail: bool = False,
 ) -> list[int] | None:
     """Row heights of a slide-level grid: sparse rows do not stretch over the whole body.
 
@@ -1009,6 +1028,7 @@ def _row_heights(
     kinds: list[set[str]] = [set() for _ in range(nr)]
     covered = [False] * nr
     spans: list[tuple[int, int, int | None]] = []  # blocks spanning several rows: (first, last, natural)
+    stacked: set[int] = set()  # rows beside a flexible block that spans them (a column of stacked boxes)
     for k, ((_i, blk), r) in enumerate(zip(flow, cells, strict=True)):
         if gs.areas is not None:
             if k not in gs.areas:
@@ -1033,11 +1053,16 @@ def _row_heights(
         elif kinds[row] == {"table"}:
             caps.append(n)
         else:
-            caps.append(max(round(n * ROW_SLACK), round(ROW_MIN * body.h)))
+            caps.append(max(round(n * ROW_SLACK), round((ROW_MIN_TAIL if has_tail else ROW_MIN) * body.h)))
     extra_h = 0  # natural height that spanning blocks need beyond their rows
     for r0, r1, n in spans:
         rows = range(r0, r1 + 1)
         if n is None or any(caps[r] is None for r in rows):
+            if n is None and all(caps[r] is not None for r in rows):
+                stacked.update(rows)  # keep the natural heights: they set the rows' shares below
+                for r in rows:
+                    caps[r] = None
+                continue
             for r in rows:
                 caps[r] = None
             nat = [None if r in rows else v for r, v in enumerate(nat)]
@@ -1049,12 +1074,16 @@ def _row_heights(
             nat = [None if r in rows else v for r, v in enumerate(nat)]
         else:
             extra_h = max(extra_h, n - (sum(nat[r] or 0 for r in rows) + gap * (r1 - r0)))
-    if all(n is not None and n > 0 for n in nat):
+    if all(n is not None and n > 0 for n in nat) and not stacked:
         total = sum(n for n in nat if n) + gap * (nr - 1) + max(extra_h, 0)
         ctx.fill = total / max(grid_area.h, 1)
-    if all(c is None for c in caps):
+    if all(c is None for c in caps) and not stacked:
         return None
-    if ctx.expand > 0:  # sparse slide: spread extra height over the capped rows that are not kpi / table rows
+    if stacked and all(n for n in nat):  # boxes stacked beside a tall block share its height by content
+        tot = sum(nat)  # type: ignore[arg-type]
+        w = [max(n or 0, STACK_MIN * tot) for n in nat]
+        return grid_row_heights(replace(gs, rows=[float(x) for x in w]), grid_area.h, gap, caps)
+    if ctx.expand > 0 and nr >= 2:  # sparse slide: spread extra height over the capped rows (not kpi / table)
         rows = [r for r in range(nr) if caps[r] is not None and "other" in kinds[r]]
         tot = sum(caps[r] or 0 for r in rows)
         for r in rows:
@@ -1129,7 +1158,7 @@ def _place_blocks(
         grid_area, tail_area = _split_grid_tail(ctx, area, gap, gs, flow, extra, inherit, flags)
     cells = cell_rects(gs, len(flow), grid_area, gap, ctx.theme.columns)
     if "chevron" not in flags and ctx.depth == 0:
-        row_h = _row_heights(ctx, gs, flow, cells, grid_area, area, gap, inherit)
+        row_h = _row_heights(ctx, gs, flow, cells, grid_area, area, gap, inherit, tail_area is not None)
         if row_h is not None:
             cells = cell_rects(gs, len(flow), grid_area, gap, ctx.theme.columns, row_h)
             used = sum(row_h) + gap * (len(row_h) - 1)
@@ -1386,7 +1415,8 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
         if not c.over and c.out:
             fin = c
             left = body.bottom - _bottom(fin)
-    dy = round(left * LEFT_ABOVE)
+    above = LEFT_ABOVE if any(isinstance(e, Container) for e in elements) else LEFT_ABOVE_TABLE
+    dy = round(left * above)
     if dy > 0:
         c = run(Rect(body.x, body.y + dy, body.w, body.h - dy), grow=fin.grow, expand=fin.expand)
         if not c.over and c.out:
@@ -1495,6 +1525,9 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         y_top = 0
     else:
         y = My
+        head_bottom: int | None = (
+            None  # bottom of the title band / title / lead: the body starts TOP_GAP below
+        )
         if kind != "blank" and slide.title:
             tr_h = to_emu(theme.title_height)
             st = _role_style(ctx, "title")
@@ -1508,9 +1541,11 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 )
                 r = Rect(Mx, 0, inner_w, tr_h + My // 2)
                 y = tr_h + My // 2 + sg
+                head_bottom = r.bottom
             else:
                 r = Rect(Mx, My, inner_w, tr_h)
                 y = My + tr_h
+                head_bottom = y
             st = st.merged(slide.title.style)
             put(head, slide.title, r, st, fit_text(slide.title, r, st))
         for role, el in (("subtitle", slide.subtitle), ("lead", slide.lead)):
@@ -1527,7 +1562,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             r = Rect(Mx, y + (sg // 2 if y == My else 0), inner_w, h)
             put(head, el, r, st, eff)
             y = r.bottom + sg // 2
-        y_top = y
+            head_bottom = r.bottom
+        y_top = y if head_bottom is None else head_bottom + round(TOP_GAP * EMU_PER_INCH)
         body = None
 
     # bottom stack (cover/blank get no footer row)
