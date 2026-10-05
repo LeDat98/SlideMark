@@ -13,6 +13,7 @@ from ..ir import Run
 from .attrs import Attrs, parse_attr_body, split_trailing_attrs  # noqa: F401
 
 _SOFT = "\x00soft\x00"
+BADGE_COLORS = ("primary", "accent", "danger", "success", "muted")
 BR_SPLIT = re.compile(r"<br[ \t]*/?>", re.I)
 
 
@@ -149,6 +150,8 @@ def inline_items(children: list[Token] | None, allow_images: bool = False) -> li
     bold = italic = strike = mark = sub = sup = 0
     links: list[str | None] = []
     colors: list[str | None] = []
+    badges: list[str] = []
+    span_kinds: list[bool] = []
 
     def flush() -> None:
         if buf:
@@ -156,15 +159,19 @@ def inline_items(children: list[Token] | None, allow_images: bool = False) -> li
             buf.clear()
 
     def run(text: str, **extra: Any) -> None:
+        color = next((c for c in reversed(colors) if c), "accent" if mark else None)
+        if badges:
+            extra["highlight"] = badges[-1]
+            color = "bg"
         buf.append(
             Run(
                 text=text,
-                bold=bold > 0,
+                bold=bold > 0 or bool(badges),
                 italic=italic > 0,
                 strike=strike > 0,
                 sub=sub > 0,
                 sup=sup > 0,
-                color=next((c for c in reversed(colors) if c), "accent" if mark else None),
+                color=color,
                 link=links[-1] if links else None,
                 **extra,
             )
@@ -218,10 +225,16 @@ def inline_items(children: list[Token] | None, allow_images: bool = False) -> li
                 links.pop()
         elif ty == "span_open":
             a: Attrs = (t.meta or {}).get("attrs") or Attrs()
-            colors.append(a.kv.get("color") or (a.classes[0] if a.classes else None))
+            is_badge = "badge" in a.classes
+            colors.append(None if is_badge else a.kv.get("color") or (a.classes[0] if a.classes else None))
+            if is_badge:
+                badges.append(next((c for c in a.classes if c in BADGE_COLORS), "primary"))
+            span_kinds.append(is_badge)
         elif ty == "span_close":
             if colors:
                 colors.pop()
+            if span_kinds and span_kinds.pop() and badges:
+                badges.pop()
         elif ty == "image":
             alt = t.content or ""
             if allow_images:

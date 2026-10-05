@@ -8,8 +8,17 @@ from typing import Any
 
 import yaml
 
-from ..ir import Container, Deck, Paragraph, Run, Slide, Text
-from .attrs import STANDALONE, AtSpec, Attrs, apply_attrs, parse_at, parse_attr_body, split_trailing_attrs
+from ..ir import Container, Deck, Link, Paragraph, Run, Slide, Text
+from .attrs import (
+    STANDALONE,
+    AtSpec,
+    Attrs,
+    RawLink,
+    apply_attrs,
+    parse_at,
+    parse_attr_body,
+    split_trailing_attrs,
+)
 from .blocks import convert
 from .ctx import Ctx, closest
 from .inline import inline_runs
@@ -283,13 +292,34 @@ def _heading_text(text: str, line: int, ctx: Ctx) -> tuple[Text, Attrs | None]:
     return t, attrs
 
 
-def _build_flat(items: list[Item], ctx: Ctx) -> list[Any]:
+def _kpi_text(els: list[Any]) -> list[Any]:
+    """Merge adjacent body texts into one Text (one paragraph per source line, no list markers)."""
+    out: list[Any] = []
+    for el in els:
+        if isinstance(el, Text) and el.role == "body":
+            for p in el.paragraphs:
+                p.marker = None
+            if out and isinstance(out[-1], Text) and out[-1].role == "body":
+                out[-1].paragraphs.extend(el.paragraphs)
+                continue
+        out.append(el)
+    return out
+
+
+def _build_flat(items: list[Item], ctx: Ctx, kpi: bool = False) -> list[Any]:
     out: list[Any] = []
     carry: Attrs | None = None
     for it in items:
         if it.kind == "md":
-            els, carry = convert(it.lines, it.line, ctx, it.pending or carry)
-            out.extend(els)
+            if kpi and not any(FENCE_RE.match(x) for x in it.lines):
+                pend = it.pending or carry
+                for k, x in enumerate(it.lines):
+                    els, pend = convert([x], it.line + k, ctx, pend)
+                    out.extend(els)
+                carry = pend
+            else:
+                els, carry = convert(it.lines, it.line, ctx, it.pending or carry)
+                out.extend(els)
         elif it.kind == "h3":
             t, attrs = _heading_text(it.text, it.line, ctx)
             for a in (it.pending or carry, attrs):
@@ -297,7 +327,7 @@ def _build_flat(items: list[Item], ctx: Ctx) -> list[Any]:
                     apply_attrs(t, a, ctx, it.line)
             carry = None
             out.append(t)
-    return out
+    return _kpi_text(out) if kpi else out
 
 
 def _apply_at_container(box: Container, spec: AtSpec) -> None:
@@ -329,6 +359,7 @@ def _merge_specs(specs: list[AtSpec], ctx: Ctx, lines: list[int]) -> AtSpec:
         out.background = s.background or out.background
         out.transition = s.transition or out.transition
         out.hidden = out.hidden or s.hidden
+        out.links += s.links
     return out
 
 
@@ -339,9 +370,12 @@ def _build_box(h2: Item, content: list[Item], ats: list[Item], ctx: Ctx) -> Cont
         apply_attrs(box, attrs, ctx, h2.line)
     if h2.pending is not None:
         apply_attrs(box, h2.pending, ctx, h2.line)
+    kpi = "kpi" in box.classes
     if ats:
         spec = _merge_specs([parse_at(a.text, ctx, a.line) for a in ats], ctx, [a.line for a in ats])
         _apply_at_container(box, spec)
+        if spec.links:
+            ctx.box_links.append((box, spec.links))
         pre: list[Item] = []
         groups: list[tuple[Item, list[Item]]] = []
         for it in content:
@@ -351,7 +385,7 @@ def _build_box(h2: Item, content: list[Item], ats: list[Item], ctx: Ctx) -> Cont
                 groups[-1][1].append(it)
             else:
                 pre.append(it)
-        box.children.extend(_build_flat(pre, ctx))
+        box.children.extend(_build_flat(pre, ctx, kpi))
         for h3, sub in groups:
             st, sattrs = _heading_text(h3.text, h3.line, ctx)
             nested = Container(title=st if h3.text.strip() else None, line=h3.line)
@@ -361,7 +395,7 @@ def _build_box(h2: Item, content: list[Item], ats: list[Item], ctx: Ctx) -> Cont
             nested.children.extend(_build_flat(sub, ctx))
             box.children.append(nested)
     else:
-        box.children.extend(_build_flat(content, ctx))
+        box.children.extend(_build_flat(content, ctx, kpi))
     return box
 
 
@@ -384,6 +418,7 @@ def _merge_text(blocks: list[Text], role: str) -> Text:
 def parse_slide(
     chunk: Chunk, lines: list[str], inside: list[bool], ctx: Ctx, index: int, recs: list[Rec] | None = None
 ) -> Slide:
+    ctx.box_links = []
     slide = Slide(line=(chunk.title_idx if chunk.title_idx is not None else chunk.start) + 1)
     title_attrs: Attrs | None = None
     if chunk.title_idx is not None:
@@ -409,6 +444,7 @@ def parse_slide(
     items = lead_ats + items
     slide.notes = "\n".join([*extra_notes, *([notes] if notes else [])]) or None
 
+    slide_links: list[RawLink] = []
     top_ats: list[Item] = []
     top: list[Item] = []
     boxes: list[tuple[Item, list[Item], list[Item]]] = []  # h2, content, at lines
@@ -465,6 +501,7 @@ def parse_slide(
         slide.background = spec.background
         slide.transition = spec.transition
         slide.hidden = spec.hidden
+        slide_links = spec.links
     if title_attrs is not None:
         kv = dict(title_attrs.kv)
         for key, attr in (("bg", "background"), ("t", "transition")):
@@ -481,7 +518,35 @@ def parse_slide(
 
     _lead_and_conclusion(slide)
     _infer_cover(slide, index)
+    slide.links = _resolve_links(slide_links, len(slide.elements), "slide", ctx)
+    for box, raw in ctx.box_links:
+        box.links = _resolve_links(raw, len(box.children), "box", ctx)
+    ctx.box_links = []
     return slide
+
+
+def _resolve_links(raw: list[RawLink], n: int, owner: str, ctx: Ctx) -> list[Link]:
+    """Keep the connectors whose ends are existing, distinct blocks; warn about the rest."""
+    out: list[Link] = []
+    for r in raw:
+        if r.src == r.dst:
+            ctx.warn(
+                f"connector '{r.token}' joins a block to itself",
+                r.line,
+                "bad-link",
+                "link two different blocks, e.g. a>b",
+            )
+        elif not (0 <= r.src < n and 0 <= r.dst < n):
+            use = f"use letters a..{chr(96 + min(n, 26))}" if n else "add blocks before linking"
+            ctx.warn(
+                f"connector '{r.token}' points outside the {owner}",
+                r.line,
+                "bad-link",
+                f"{owner} has {n} block{'s' if n != 1 else ''}: {use}",
+            )
+        else:
+            out.append(Link(src=r.src, dst=r.dst, arrow=r.arrow))
+    return out
 
 
 def _lead_and_conclusion(slide: Slide) -> None:
@@ -509,7 +574,9 @@ def _infer_cover(slide: Slide, index: int) -> None:
     if slide.title is None or slide.layout in ("blank", "center"):
         return
     els = slide.elements
-    if not els or not all(isinstance(e, Text) and e.role == "body" for e in els):
+    if not els or not all(
+        isinstance(e, Text) and e.role == "body" and "callout" not in e.classes for e in els
+    ):
         return
     texts: list[Text] = els  # type: ignore[assignment]
     paras = [p for t in texts for p in t.paragraphs]
