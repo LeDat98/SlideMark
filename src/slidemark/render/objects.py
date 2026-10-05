@@ -8,6 +8,7 @@ from lxml import etree
 from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.dml.color import RGBColor
 from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION
+from pptx.enum.dml import MSO_LINE
 from pptx.enum.text import MSO_ANCHOR
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
@@ -17,10 +18,12 @@ from pygments.token import Comment, Keyword, Name, Number, Operator, String
 
 from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Series, Style, Table
 from ..layout import measure
+from ..layout.css import border_spec, cell_insets
 from ..layout.tables import column_widths, table_grid
 from ..theme import DEFAULT_SIZES, Theme
-from .text import fill_text
-from .util import RenderCtx, hex6, rgb
+from .effects import apply_fill, apply_shadow
+from .text import _ANCHOR, fill_text
+from .util import RenderCtx, emu, hex6, rgb
 
 CHART_TYPES = {
     "bar": XL_CHART_TYPE.BAR_CLUSTERED,
@@ -47,7 +50,7 @@ def flag(v, default: bool = False) -> bool:
 # --------------------------------------------------------------------------- table
 
 
-def _cell_border(tcPr, color: str, width: int = 6350) -> None:
+def _cell_border(tcPr, color: str, width: int = 6350, dash: str | None = None) -> None:
     for i, tag in enumerate(("a:lnL", "a:lnR", "a:lnT", "a:lnB")):
         ln = etree.Element(qn(tag))
         ln.set("w", str(width))
@@ -55,7 +58,97 @@ def _cell_border(tcPr, color: str, width: int = 6350) -> None:
         ln.set("cmpd", "sng")
         sf = etree.SubElement(ln, qn("a:solidFill"))
         etree.SubElement(sf, qn("a:srgbClr")).set("val", color)
+        if dash in _DASH_VAL:
+            etree.SubElement(ln, qn("a:prstDash")).set("val", _DASH_VAL[dash])
         tcPr.insert(i, ln)
+
+
+_DASH_VAL = {"dash": "dash", "dot": "sysDot"}
+_FILL_TAGS = ("a:noFill", "a:solidFill", "a:gradFill", "a:blipFill", "a:pattFill", "a:grpFill")
+
+
+def _cell_side(tcPr, side: str, spec: tuple[float, str, str] | None, theme: Theme) -> None:
+    """Replace one border of a cell (``a:lnL`` / ``lnR`` / ``lnT`` / ``lnB``); ``spec`` None = no line."""
+    tag = {"left": "a:lnL", "right": "a:lnR", "top": "a:lnT", "bottom": "a:lnB"}[side]
+    old = tcPr.find(qn(tag))
+    ln = etree.Element(qn(tag))
+    if spec is None:
+        ln.set("w", "0")
+        etree.SubElement(ln, qn("a:noFill"))
+    else:
+        width, dash, color = spec
+        ln.set("w", str(round(width * 12700)))
+        ln.set("cap", "flat")
+        ln.set("cmpd", "sng")
+        sf = etree.SubElement(ln, qn("a:solidFill"))
+        etree.SubElement(sf, qn("a:srgbClr")).set("val", hex6(theme, color))
+        if dash in _DASH_VAL:
+            etree.SubElement(ln, qn("a:prstDash")).set("val", _DASH_VAL[dash])
+    if old is not None:
+        old.addprevious(ln)
+        tcPr.remove(old)
+    else:
+        tcPr.insert(0, ln)
+
+
+def _cell_borders(rc: RenderCtx, tcPr, st: Style | None) -> None:
+    """CSS borders of one cell: the uniform ``border`` first, then per-side ``border-*`` over it."""
+    if st is None:
+        return
+    uniform = None
+    if st.line or st.line_width is not None or st.line_dash:
+        if st.line_width is not None and st.line_width <= 0:
+            for side in ("left", "right", "top", "bottom"):
+                _cell_side(tcPr, side, None, rc.theme)
+        else:
+            uniform = (
+                st.line_width if st.line_width is not None else 0.5,
+                st.line_dash or "solid",
+                st.line or rc.theme.table_border,
+            )
+            for side in ("left", "right", "top", "bottom"):
+                _cell_side(tcPr, side, uniform, rc.theme)
+    for side in ("left", "right", "top", "bottom"):
+        v = getattr(st, f"border_{side}")
+        if v is not None:
+            _cell_side(tcPr, side, border_spec(v), rc.theme)
+
+
+def _cell_fill(rc: RenderCtx, cell, st: Style) -> None:
+    """Cell background from a (CSS) style: solid, #RRGGBBAA, opacity or a gradient."""
+    if st.fill and st.fill.lower().startswith("url("):
+        rc.diag(
+            "css-unsupported",
+            "a background image on a table cell is not drawn",
+            "use a color or gradient for table cells",
+        )
+        return
+    tmp = etree.Element(qn("a:spPr"))
+    tcPr = cell._tc.get_or_add_tcPr()
+    if not apply_fill(rc, tmp, st):
+        for tag in _FILL_TAGS:
+            for old in tcPr.findall(qn(tag)):
+                tcPr.remove(old)
+        anchor = (
+            tcPr.find(qn("a:headers"))
+            if tcPr.find(qn("a:headers")) is not None
+            else tcPr.find(qn("a:extLst"))
+        )
+        nofill = etree.Element(qn("a:noFill"))
+        anchor.addprevious(nofill) if anchor is not None else tcPr.append(nofill)
+        return
+    new = tmp[0]
+    for tag in _FILL_TAGS:
+        for old in tcPr.findall(qn(tag)):
+            tcPr.remove(old)
+    last = None
+    for child in tcPr:
+        if etree.QName(child).localname in ("lnL", "lnR", "lnT", "lnB", "lnTlToBr", "lnBlToTr", "cell3D"):
+            last = child
+    if last is not None:
+        last.addnext(new)
+    else:
+        tcPr.insert(0, new)
 
 
 def _mix(a: str, b: str, t: float) -> str:
@@ -85,9 +178,17 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     for i, h in enumerate(rh[:nrows]):
         tbl.rows[i].height = Emu(int(h))
     border = hex6(theme, theme.table_border)
-    body_fill = theme.table_body_fill
+    body_fill = pl.style.fill or theme.table_body_fill  # CSS `table { background }` = the body cell fill
+    t_border = None
+    if pl.style.line or pl.style.line_width is not None:  # CSS `table { border }`: every cell border
+        t_border = (
+            pl.style.line_width if pl.style.line_width is not None else 0.5,
+            pl.style.line_dash or "solid",
+        )
+        border = hex6(theme, pl.style.line or theme.table_border)
     zebra = "zebra" in t.classes or flag(t.attrs.get("zebra"))
     zebra_fill = theme.table_zebra_fill or "#" + _mix(hex6(theme, body_fill), hex6(theme, "surface"), 0.6)
+    fill_of: dict[tuple[int, int], str] = {}
     # fill every grid cell first (merged-away cells included) so nothing falls back to a default style
     for r in range(nrows):
         for c in range(ncols):
@@ -96,9 +197,21 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             fill = theme.table_header_fill if hdr else ("surface" if c < t.header_cols else body_fill)
             if zebra and not hdr and c >= t.header_cols and (r - t.header_rows) % 2 == 1:
                 fill = zebra_fill
+            fill_of[(r, c)] = fill
             cell.fill.solid()
-            cell.fill.fore_color.rgb = rgb(theme, fill)
-            _cell_border(cell._tc.get_or_add_tcPr(), border)
+            cell.fill.fore_color.rgb = (
+                rgb(theme, fill)
+                if not fill.lower().startswith(("linear", "radial"))
+                else rgb(theme, "surface")
+            )
+            _cell_border(
+                cell._tc.get_or_add_tcPr(),
+                border,
+                round(t_border[0] * 12700) if t_border else 6350,
+                t_border[1] if t_border else None,
+            )
+            if fill.lower().startswith(("linear", "radial")):
+                _cell_fill(rc, cell, Style(fill=fill))
     for r, c, ct in anchors:
         cell = tbl.cell(r, c)
         rs = min(max(ct.rowspan, 1), nrows - r)
@@ -121,9 +234,11 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         elif c < t.header_cols:
             st = st.merged(Style(bold=True))
         st = st.merged(ct.style)
-        if ct.style and ct.style.fill:
-            cell.fill.solid()
-            cell.fill.fore_color.rgb = rgb(theme, ct.style.fill)
+        if ct.style and (ct.style.fill or ct.style.opacity is not None):
+            _cell_fill(rc, cell, Style(fill=ct.style.fill or fill_of[(r, c)], opacity=ct.style.opacity))
+        for rr in range(r, r + rs):  # a merged cell: the covered cells share its borders
+            for cc in range(c, c + cs):
+                _cell_borders(rc, tbl.cell(rr, cc)._tc.get_or_add_tcPr(), ct.style)
         fill_text(
             rc,
             cell.text_frame,
@@ -132,9 +247,10 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             pl.font_scale,
             inset=0,
         )
-        cell.vertical_anchor = MSO_ANCHOR.MIDDLE
-        cell.margin_left = cell.margin_right = Emu(measure.cell_pad()[0])
-        cell.margin_top = cell.margin_bottom = Emu(measure.cell_pad()[1])
+        cell.vertical_anchor = _ANCHOR.get(st.valign or "middle", MSO_ANCHOR.MIDDLE)
+        cl, ctp, cr, cb = cell_insets(ct.style, *measure.cell_pad())
+        cell.margin_left, cell.margin_right = Emu(cl), Emu(cr)
+        cell.margin_top, cell.margin_bottom = Emu(ctp), Emu(cb)
 
 
 # --------------------------------------------------------------------------- chart
@@ -416,6 +532,32 @@ def resolve_image(rc: RenderCtx, src: str) -> Path | None:
     return p if p.is_file() else None
 
 
+def _style_picture(rc: RenderCtx, pic, st: Style, w: int, h: int) -> None:
+    """CSS on a picture: border (``line``), ``border-radius``, ``box-shadow`` and ``opacity``."""
+    spPr = pic._element.spPr
+    if st.radius:
+        geom = spPr.find(qn("a:prstGeom"))
+        if geom is not None:
+            geom.set("prst", "roundRect")
+            av = geom.find(qn("a:avLst"))
+            if av is None:
+                av = etree.SubElement(geom, qn("a:avLst"))
+            gd = etree.SubElement(av, qn("a:gd"))
+            gd.set("name", "adj")
+            gd.set("fmla", f"val {round(min(emu(st.radius) / max(min(w, h), 1), 0.5) * 100000)}")
+    if st.line and (st.line_width is None or st.line_width > 0):
+        pic.line.color.rgb = rgb(rc.theme, st.line)
+        pic.line.width = Pt(st.line_width if st.line_width is not None else rc.theme.render.line_width)
+        if st.line_dash in ("dash", "dot"):
+            pic.line.dash_style = MSO_LINE.DASH if st.line_dash == "dash" else MSO_LINE.ROUND_DOT
+    if st.shadow:
+        apply_shadow(rc, spPr, st, w, h)
+    if st.opacity is not None and 0 <= st.opacity < 1:
+        blip = pic._element.find(".//" + qn("a:blip"))
+        if blip is not None:
+            etree.SubElement(blip, qn("a:alphaModFix")).set("amt", str(round(st.opacity * 100000)))
+
+
 def add_image(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
     """Add the picture; returns False when the image cannot be used (caller draws a placeholder)."""
     im: Image = pl.element  # type: ignore[assignment]
@@ -453,6 +595,7 @@ def add_image(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
             pic.crop_top = pic.crop_bottom = crop[1]
         pic.name = name
         pic._element.nvPicPr.cNvPr.set("descr", im.alt or "")
+        _style_picture(rc, pic, pl.style, w, h)
         return True
     except Exception as e:
         rc.diag(

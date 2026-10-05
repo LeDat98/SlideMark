@@ -11,8 +11,9 @@ from pptx.util import Emu, Pt
 
 from ..ir import Paragraph, Run, Style
 from ..layout import measure
+from ..layout.css import insets, transform_text
 from ..theme import Theme
-from .util import RenderCtx, emu, hex6, rgb
+from .util import RenderCtx, hex6, rgb
 
 _RPR_ORDER = [
     "ln",
@@ -92,7 +93,9 @@ def _contrast(hex_color: str, theme: Theme | None = None) -> str:
     return tok.ink_dark if 0.299 * r + 0.587 * g + 0.114 * b > 160 else tok.ink_light
 
 
-def _format_run(rc: RenderCtx, r, run: Run, style: Style, size_pt: float, text: str) -> None:
+def _format_run(
+    rc: RenderCtx, r, run: Run, style: Style, size_pt: float, text: str, scale: float = 1.0
+) -> None:
     theme = rc.theme
     f = r.font
     f.size = Pt(size_pt)
@@ -100,15 +103,20 @@ def _format_run(rc: RenderCtx, r, run: Run, style: Style, size_pt: float, text: 
     italic = bool(run.italic or style.italic)
     f.bold = True if bold else None
     f.italic = True if italic else None
-    if run.underline:
+    if run.underline or style.underline:
         f.underline = True
     color = run.color or style.color
     if run.highlight and not run.color:  # badge: readable text on the highlight
         color = _contrast(hex6(theme, run.highlight, theme.render.highlight), theme)
     f.color.rgb = rgb(theme, color, "fg")
     rpr = r._r.get_or_add_rPr()
-    if run.strike:
+    if style.opacity is not None and 0 <= style.opacity < 1 and not style.fill:
+        clr = rpr.find(qn("a:solidFill")).find(qn("a:srgbClr"))  # CSS opacity on text without a fill
+        etree.SubElement(clr, qn("a:alpha")).set("val", str(round(style.opacity * 100000)))
+    if run.strike or style.strike:
         rpr.set("strike", "sngStrike")
+    if style.letter_spacing:
+        rpr.set("spc", str(round(style.letter_spacing * scale * 100)))  # 1/100 pt
     if run.sup:
         rpr.set("baseline", "30000")
     elif run.sub:
@@ -176,8 +184,11 @@ def fill_text(
     gap = measure.para_gap() if gap_em is None else gap_em
     tf.word_wrap = True
     tf.auto_size = MSO_AUTO_SIZE.NONE
-    pad = inset if inset is not None else emu(style.padding, default=0) if style.padding is not None else 0
-    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = Emu(pad)
+    if inset is not None:
+        pl = pt = pr = pb = inset
+    else:  # padding + per-side padding_* + per-side border widths (CSS box model)
+        pl, pt, pr, pb = insets(style)
+    tf.margin_left, tf.margin_top, tf.margin_right, tf.margin_bottom = (Emu(pl), Emu(pt), Emu(pr), Emu(pb))
     tf.vertical_anchor = _ANCHOR.get(style.valign or "top", MSO_ANCHOR.TOP)
     paras = paragraphs or [Paragraph()]
     for i, p in enumerate(paras):
@@ -198,11 +209,12 @@ def fill_text(
                     para.add_line_break()
                 if seg == "" and len(segs) > 1:
                     continue
+                seg = transform_text(seg, pst.text_transform)
                 r = para.add_run()
                 # badge: padding keeps bold CJK glyphs inside the highlight (LibreOffice clips them otherwise)
                 pad = _BADGE_PAD if run.highlight and measure.has_cjk(seg) else ""
                 r.text = f"{pad}{seg}{pad}"
-                _format_run(rc, r, run, pst, size, seg)
+                _format_run(rc, r, run, pst, size, seg, scale)
                 first_text = first_text or seg
                 if field == "slide_number":
                     fld = r._r

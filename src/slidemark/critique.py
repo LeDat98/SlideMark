@@ -26,9 +26,9 @@ import math
 import re
 
 from .ir import Container, Deck, Diagnostic, Placed, Text
-from .layout import measure
+from .layout import css, measure
 from .theme import Theme
-from .units import EMU_PER_PT, slide_size, to_emu
+from .units import EMU_PER_PT, slide_size
 
 SPARSE_FILL = 0.30
 WALL_LINES = 8
@@ -61,13 +61,9 @@ def _inside(a: Placed, b: Placed) -> bool:
     return a.x >= b.x - t and a.y >= b.y - t and a.x + a.w <= b.x + b.w + t and a.y + a.h <= b.y + b.h + t
 
 
-def _pad(p: Placed) -> int:
-    if p.style.padding is None:
-        return 0
-    try:
-        return to_emu(p.style.padding)
-    except ValueError:
-        return 0
+def _pad(p: Placed) -> tuple[int, int]:
+    """(horizontal, vertical) total insets of a placed item, CSS per-side padding and borders included."""
+    return css.inset_hv(p.style)
 
 
 def _text(p: Placed) -> str:
@@ -83,23 +79,27 @@ def _natural_height(p: Placed, scale: float | None = None) -> float:
     paras = getattr(p.element, "paragraphs", None)
     if not paras:
         return p.h
-    pad = _pad(p)
+    ph, pv = _pad(p)
     s = p.font_scale if scale is None else scale
-    return (
-        measure.paragraphs_height(paras, p.w - 2 * pad, p.style, s, gap=measure.element_gap(p.element))
-        + 2 * pad
-    )
+    return measure.paragraphs_height(paras, p.w - ph, p.style, s, gap=measure.element_gap(p.element)) + pv
 
 
 def _lines(p: Placed, theme: Theme, scale: float | None = None) -> int:
-    pad = _pad(p)
+    ph, _pv = _pad(p)
     size = _size(p, theme) if scale is None else (p.style.font_size or theme.sizes.get("body", 18)) * scale
-    width_pt = (p.w - 2 * pad) / EMU_PER_PT
+    width_pt = (p.w - ph) / EMU_PER_PT
     total = 0
     for para in p.element.paragraphs:
         bold = bool((para.style and para.style.bold) or p.style.bold)
         indent = measure.list_indent(size, para.level)[0] / EMU_PER_PT if para.marker else 0
-        total += measure.count_lines(measure.para_segments(para, bold), width_pt - indent, size, p.style.font)
+        spc, tf = measure.text_spacing(p.style, para)
+        total += measure.count_lines(
+            measure.para_segments(para, bold, transform=tf),
+            width_pt - indent,
+            size,
+            p.style.font,
+            spc * (scale or p.font_scale),
+        )
     return total
 
 

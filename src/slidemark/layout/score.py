@@ -18,8 +18,8 @@ from dataclasses import dataclass
 
 from ..ir import Chart, Container, Image, Media, Placed, Text
 from ..theme import DEFAULT_SIZES, Theme
-from ..units import EMU_PER_PT, to_emu
-from . import measure
+from ..units import EMU_PER_PT
+from . import css, measure
 from .grid import Rect
 
 HARD_OVER = 1000.0  # per overflowing block
@@ -52,25 +52,18 @@ class Score:
         return self.total < other.total
 
 
-def _pad(p: Placed) -> int:
-    if p.style.padding is None:
-        return 0
-    try:
-        return to_emu(p.style.padding)
-    except ValueError:
-        return 0
+def _pad(p: Placed) -> tuple[int, int]:
+    """(horizontal, vertical) total insets of a placed item, CSS per-side padding and borders included."""
+    return css.inset_hv(p.style)
 
 
 def _natural(p: Placed, scale: float | None = None) -> float:
     paras = getattr(p.element, "paragraphs", None)
     if not paras:
         return p.h
-    pad = _pad(p)
+    ph, pv = _pad(p)
     s = p.font_scale if scale is None else scale
-    return (
-        measure.paragraphs_height(paras, p.w - 2 * pad, p.style, s, gap=measure.element_gap(p.element))
-        + 2 * pad
-    )
+    return measure.paragraphs_height(paras, p.w - ph, p.style, s, gap=measure.element_gap(p.element)) + pv
 
 
 def _inside(a: Placed, b: Placed) -> bool:
@@ -103,7 +96,7 @@ def _width_fill(c: Placed, inner: list[Placed]) -> float | None:
         if not paras:
             continue
         size = (p.style.font_size or 18) * p.font_scale
-        avail_em = max(p.w - 2 * _pad(p), 1) / EMU_PER_PT / max(size, 1)
+        avail_em = max(p.w - _pad(p)[0], 1) / EMU_PER_PT / max(size, 1)
         longest = max(measure.text_em(q.plain) for q in paras)
         best = max(best or 0.0, min(1.0, longest / avail_em))
     return best

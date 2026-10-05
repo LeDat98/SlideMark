@@ -13,8 +13,10 @@ Rules (all warnings, cheap to read for an agent):
 
 from __future__ import annotations
 
+import re
+
 from .ir import Container, Deck, Diagnostic, Image, Media, Placed, Shape, Text
-from .layout import measure
+from .layout import css, measure
 from .theme import Theme
 from .units import EMU_PER_PT, slide_size
 
@@ -22,14 +24,83 @@ _TOL = int(EMU_PER_PT)  # 1pt slack for rounding
 _OVERFLOW_TOL = 1.08  # measurement is an estimate: report only clear overflows
 
 
-def _hex(color: str | None, theme: Theme) -> tuple[float, float, float] | None:
-    c = theme.color(color)
-    if not c or not c.startswith("#") or len(c) != 7:
-        return None
+RGB = tuple[float, float, float]
+_GRADIENT = re.compile(r"^\s*(?:repeating-)?(?:linear|radial)-gradient\(", re.I)
+_RGBFN = re.compile(r"rgba?\(\s*([\d.]+%?)[\s,]+([\d.]+%?)[\s,]+([\d.]+%?)(?:[\s,/]+([\d.]+%?))?\s*\)", re.I)
+
+
+def _rgba(color: str | None, theme: Theme) -> tuple[RGB, float] | None:
+    """(rgb 0..1, alpha) of a theme color name, #hex (3-8 digits) or rgb()/rgba(); None if unknown."""
+    c = (theme.color(color) if color else None) or ""
+    c = c.strip()
     try:
-        return tuple(int(c[i : i + 2], 16) / 255 for i in (1, 3, 5))  # type: ignore[return-value]
+        if c.startswith("#"):
+            h = c[1:]
+            if len(h) in (3, 4):
+                h = "".join(ch * 2 for ch in h)
+            if len(h) not in (6, 8):
+                return None
+            rgb = tuple(int(h[i : i + 2], 16) / 255 for i in (0, 2, 4))
+            return rgb, (int(h[6:8], 16) / 255 if len(h) == 8 else 1.0)  # type: ignore[return-value]
+        if m := _RGBFN.fullmatch(c):
+
+            def ch(v: str) -> float:
+                return min(max(float(v[:-1]) * 2.55 if v.endswith("%") else float(v), 0), 255) / 255
+
+            a = m.group(4)
+            alpha = (float(a[:-1]) / 100 if a.endswith("%") else float(a)) if a else 1.0
+            return (ch(m.group(1)), ch(m.group(2)), ch(m.group(3))), min(max(alpha, 0.0), 1.0)
     except ValueError:
         return None
+    return None
+
+
+def _hex(color: str | None, theme: Theme) -> RGB | None:
+    got = _rgba(color, theme)
+    return got[0] if got else None
+
+
+def _top_commas(text: str) -> list[str]:
+    out, depth, cur = [], 0, []
+    for ch in text:
+        depth += (ch == "(") - (ch == ")")
+        if ch == "," and depth == 0:
+            out.append("".join(cur).strip())
+            cur = []
+        else:
+            cur.append(ch)
+    out.append("".join(cur).strip())
+    return [p for p in out if p]
+
+
+def _blend(top: tuple[RGB, float], behind: RGB | None) -> RGB:
+    rgb, a = top
+    if a >= 1.0 or behind is None:
+        return rgb
+    return tuple(r * a + b * (1 - a) for r, b in zip(rgb, behind, strict=True))  # type: ignore[return-value]
+
+
+def _backs(fill: str | None, theme: Theme, behind: RGB | None) -> list[RGB]:
+    """Colors a fill puts behind text: one for a solid color, one per gradient stop (alpha blended over
+    ``behind``). Empty when it cannot be judged (an image, an unknown value) or the fill is transparent."""
+    if not fill:
+        return []
+    if _GRADIENT.match(fill):
+        inner = fill.strip()[fill.index("(") + 1 :].rstrip().removesuffix(")")
+        stops = []
+        for part in _top_commas(inner):
+            if re.match(
+                r"^(-?[\d.]+(deg|rad|turn|grad)|to\s|circle|ellipse|closest|farthest|at\s)", part, re.I
+            ):
+                continue
+            got = _rgba(re.sub(r"\s+-?[\d.]+(%|px|pt)$", "", part), theme)
+            if got:
+                stops.append(_blend(got, behind))
+        return stops
+    got = _rgba(fill, theme)
+    if got is None or got[1] <= 0:
+        return []
+    return [_blend(got, behind)]
 
 
 def _luminance(rgb: tuple[float, float, float]) -> float:
@@ -83,15 +154,23 @@ def _is_band(p: Placed) -> bool:
     return isinstance(el, Shape) and not el.paragraphs and el.shape in ("rect", "rounded-rect")
 
 
-def _backdrop(items: list[Placed], i: int, bg: tuple[float, float, float] | None, theme: Theme):
-    """Fill color directly behind item ``i``: the topmost earlier filled item containing its center."""
+def _is_image(fill: str | None, theme: Theme) -> bool:
+    """A fill that is neither a color nor a gradient (``url(...)``, a picture path): not judgeable."""
+    return bool(fill) and not _GRADIENT.match(fill or "") and _rgba(fill, theme) is None
+
+
+def _backdrop(items: list[Placed], i: int, bg: list[RGB], theme: Theme) -> list[RGB]:
+    """Colors directly behind item ``i``: the topmost earlier filled item containing its center (a gradient
+    gives one color per stop), else the slide background."""
     p = items[i]
     cx, cy = p.x + p.w // 2, p.y + p.h // 2
     for q in reversed(items[:i]):
         if q.style.fill and q.x <= cx <= q.x + q.w and q.y <= cy <= q.y + q.h:
-            rgb = _hex(q.style.fill, theme)
-            if rgb:
-                return rgb
+            if _is_image(q.style.fill, theme):
+                return []  # a picture behind the text: no verdict
+            got = _backs(q.style.fill, theme, bg[0] if bg else None)
+            if got:
+                return got
     return bg
 
 
@@ -107,10 +186,15 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
         line = getattr(p.element, "line", None) if p else None
         out.append(Diagnostic(level="warning", message=msg, slide=index + 1, line=line, rule=rule, hint=hint))
 
-    bg = None
-    if slide and slide.background and slide.background.startswith("#"):
-        bg = _hex(slide.background, theme)
-    bg = bg or _hex("bg", theme)
+    base = _hex("bg", theme)
+    bg: list[RGB] = []
+    if slide:
+        fill = slide.background or css.slide_style(deck, slide, index).fill
+        bg = _backs(fill, theme, base)
+        if _is_image(fill, theme):
+            base = None  # a picture background: no verdict for text straight on it
+    if not bg and base:
+        bg = [base]
 
     for i, p in enumerate(items):
         el = p.element
@@ -139,19 +223,10 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
             )
         # overflow (text frames only; shapes like chevrons carry short labels)
         if isinstance(el, Text) and p.h > 0:
-            pad = 0
-            if p.style.padding is not None:
-                try:
-                    from .units import to_emu
-
-                    pad = to_emu(p.style.padding)
-                except ValueError:
-                    pad = 0
+            ph, pv = css.inset_hv(p.style)
             need = (
-                measure.paragraphs_height(
-                    paras, p.w - 2 * pad, p.style, p.font_scale, gap=measure.element_gap(el)
-                )
-                + 2 * pad
+                measure.paragraphs_height(paras, p.w - ph, p.style, p.font_scale, gap=measure.element_gap(el))
+                + pv
             )
             if need > p.h * _OVERFLOW_TOL + _TOL:
                 warn(
@@ -161,11 +236,23 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
                     p,
                 )
         # contrast
-        fg = _hex(p.style.color or "fg", theme)
-        back = _hex(p.style.fill, theme) if p.style.fill else _backdrop(items, i, bg, theme)
-        if fg and back:
-            ratio = contrast_ratio(fg, back)
-            if ratio < 3.0:
+        # Judged on the actual merged colors (CSS included). A gradient is checked against every stop and
+        # reported only when the text fails on all of them or on their average; custom colors are never odd.
+        fg_c = _rgba(p.style.color or "fg", theme)
+        backdrop = _backdrop(items, i, bg, theme)
+        backs = _backs(p.style.fill, theme, backdrop[0] if backdrop else None) or backdrop
+        if _is_image(p.style.fill, theme):
+            backs = []  # a picture fill cannot be judged
+        if fg_c and backs:
+            alpha = fg_c[1] * (p.style.opacity if p.style.fill is None and p.style.opacity is not None else 1)
+            ratios = [contrast_ratio(_blend((fg_c[0], alpha), b), b) for b in backs]
+            ratio = min(ratios)
+            bad = all(r < 3.0 for r in ratios)
+            if len(backs) > 1:
+                mean = tuple(sum(b[k] for b in backs) / len(backs) for k in range(3))
+                ratio = contrast_ratio(_blend((fg_c[0], alpha), mean), mean)  # type: ignore[arg-type]
+                bad = bad or ratio < 3.0
+            if bad:
                 warn(
                     "contrast",
                     f"{_label(p)} has low contrast {ratio:.1f}:1",

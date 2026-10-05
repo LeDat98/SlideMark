@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import re
 import uuid
+from math import cos, radians, sin
 from pathlib import Path
 
 from lxml import etree
 from pptx import Presentation
+from pptx.enum.dml import MSO_LINE
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE, MSO_SHAPE_TYPE
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.ns import qn
@@ -30,18 +32,19 @@ from ..ir import (
     Text,
 )
 from ..layout import measure
+from ..layout.css import has_side_borders, side_borders, slide_style
 from ..template import clone_footer, open_template, pick_layout
 from ..theme import DEFAULT_SIZES, Theme
 from ..units import slide_size
 from .anim import build_timing
-from .effects import apply_fill, apply_shadow
+from .effects import apply_fill, apply_shadow, cover_crop, set_picture
 from .htmlimg import add_html_image, add_html_native, close_html
 from .icons import add_icon
 from .math import add_math
 from .media import add_media, finish_timing
 from .objects import add_chart, add_image, add_table, code_paragraphs, resolve_image
 from .text import fill_text, insert_rpr_child
-from .util import RenderCtx, emu, rgb
+from .util import RenderCtx, emu, is_gradient, parse_color, rgb
 
 __all__ = ["render"]
 
@@ -212,20 +215,25 @@ def _native_footer(rc: RenderCtx, s, pl: Placed) -> bool:
 
 
 def _background(rc: RenderCtx, prs, s, slide: Slide) -> None:
+    """Slide background: ``Slide.background``, else CSS ``slide { background }`` (color, gradient, url)."""
     bg = slide.background
+    if not bg:
+        css_fill = slide_style(rc.deck, slide, rc.slide_index).fill
+        bg = css_fill if css_fill and parse_color(rc.theme, css_fill)[1] != 0 else None
     if rc.template and not bg:
         return  # keep the template's own background
     theme = rc.theme
     fill = s.background.fill
-    if bg and bg.lower().startswith("linear-gradient"):
-        cols = re.findall(r"#[0-9a-fA-F]{3,6}|\b[a-z]+\b(?=\s*[,)])", bg)
-        ang = re.search(r"(-?\d+)deg", bg)
-        cols = [c for c in cols if c.lower() not in ("linear", "gradient", "deg")]
-        if len(cols) >= 2:
-            fill.gradient()
-            fill.gradient_angle = float(ang.group(1)) if ang else 90.0
-            fill.gradient_stops[0].color.rgb = rgb(theme, cols[0])
-            fill.gradient_stops[1].color.rgb = rgb(theme, cols[-1])
+    if bg and (m := re.fullmatch(r"\s*url\(\s*(.*?)\s*\)\s*", bg, re.I | re.S)):
+        bg = m.group(1).strip("\"'")
+    if bg and is_gradient(bg):
+        fill.solid()
+        tmp = etree.Element(qn("a:spPr"))
+        if apply_fill(rc, tmp, Style(fill=bg)):
+            bgpr = s._element.find(qn("p:cSld")).find(qn("p:bg")).find(qn("p:bgPr"))
+            for old in bgpr.findall(qn("a:solidFill")):
+                old.addprevious(tmp[0])
+                bgpr.remove(old)
             return
     if bg and (resolve_image(rc, bg) is not None or re.search(r"\.(png|jpe?g|gif|bmp)$", bg, re.I)):
         fill.solid()
@@ -378,20 +386,117 @@ def _name(pl: Placed, counters: dict[str, int]) -> str:
     return f"{base} {counters[base]}"
 
 
+_DASH = {"dash": MSO_LINE.DASH, "dot": MSO_LINE.ROUND_DOT}
+
+
+def _line(rc: RenderCtx, line, spec: tuple[float, str, str]) -> None:
+    width, dash, color = spec
+    line.color.rgb = rgb(rc.theme, color)
+    line.width = Pt(width)
+    if dash in _DASH:
+        line.dash_style = _DASH[dash]
+
+
+def _border_plan(rc: RenderCtx, st: Style):
+    """(closed outline of the shape or None, per-side lines to draw or None).
+
+    Without per-side borders this is the old ``line`` / ``line_width``. With them, sides that differ from the
+    uniform line are drawn as separate lines on top of it; if a side is removed (``border-left: none``) the
+    outline goes and every remaining side is drawn as a line."""
+    dw = rc.theme.render.line_width
+    uniform = None
+    if st.line and (st.line_width is None or st.line_width > 0):
+        uniform = (st.line_width if st.line_width is not None else dw, st.line_dash or "solid", st.line)
+    if not has_side_borders(st):
+        return uniform, None
+    sides = side_borders(st, dw)
+    diff = {k: v for k, v in sides.items() if v != uniform}
+    if not diff:
+        return uniform, None
+    if uniform is not None and all(v is not None for v in diff.values()):
+        return uniform, diff
+    return None, {k: v for k, v in sides.items() if v is not None}
+
+
+def _picture_fill(rc: RenderCtx, shp, st: Style, pl: Placed | None) -> bool:
+    """``background: url(path)`` as a native picture fill (cover); False (with a diagnostic) when unusable."""
+    m = re.fullmatch(r"\s*url\(\s*(.*?)\s*\)\s*", st.fill or "", re.I | re.S)
+    src = m.group(1).strip("\"'") if m else ""
+    path = resolve_image(rc, src) if src else None
+    if path is None:
+        rc.diag(
+            "image-missing",
+            f"background image not found: {src or st.fill}",
+            "check the path, relative to the .md file; the shape has no fill",
+        )
+        return False
+    try:
+        from PIL import Image as PILImage
+
+        with PILImage.open(path) as pil:
+            iw, ih = pil.size
+        _part, rid = shp.part.get_or_add_image_part(str(path))
+        crop = cover_crop(iw, ih, pl.w if pl else 0, pl.h if pl else 0)
+        op = st.opacity if st.opacity is not None and 0 <= st.opacity < 1 else None
+        set_picture(shp._element.spPr, rid, crop, op)
+        return True
+    except Exception as e:
+        rc.diag(
+            "image-unreadable",
+            f"cannot read background image {src}: {type(e).__name__}",
+            "use PNG, JPEG or GIF",
+        )
+        return False
+
+
 def _style_shape(rc: RenderCtx, shp, st: Style, pl: Placed | None = None) -> None:
-    theme = rc.theme
     spPr = shp._element.spPr
-    if not apply_fill(rc, spPr, st):
+    if st.fill and st.fill.lower().startswith("url("):
+        if not _picture_fill(rc, shp, st, pl):
+            shp.fill.background()
+    elif not apply_fill(rc, spPr, st):
         shp.fill.background()
-    if st.line:
-        shp.line.color.rgb = rgb(theme, st.line)
-        shp.line.width = Pt(st.line_width if st.line_width is not None else theme.render.line_width)
+    outline, _sides = _border_plan(rc, st)
+    if outline:
+        _line(rc, shp.line, outline)
     else:
         shp.line.fill.background()
     if st.shadow:
         apply_shadow(rc, spPr, st, pl.w if pl else 0, pl.h if pl else 0)
     else:
         shp.shadow.inherit = False
+
+
+def _turn(x: int, y: int, center: tuple[float, float], deg: float) -> tuple[int, int]:
+    """Point (x, y) rotated clockwise by ``deg`` about ``center``."""
+    rad = radians(deg)
+    dx, dy = x - center[0], y - center[1]
+    return round(center[0] + dx * cos(rad) - dy * sin(rad)), round(center[1] + dx * sin(rad) + dy * cos(rad))
+
+
+def _side_lines(rc: RenderCtx, slide, pl: Placed, st: Style, name: str) -> None:
+    """Per-side borders (``border-bottom: 2px solid #0DD``) as thin straight lines on the edges of ``pl``."""
+    _outline, sides = _border_plan(rc, st)
+    for side, spec in (sides or {}).items():
+        w = max(round(spec[0] * 12700), 1)
+        half = w // 2
+        if side == "top":
+            x0, y0, x1, y1 = pl.x, pl.y + half, pl.x + pl.w, pl.y + half
+        elif side == "bottom":
+            x0, y0, x1, y1 = pl.x, pl.y + pl.h - half, pl.x + pl.w, pl.y + pl.h - half
+        elif side == "left":
+            x0, y0, x1, y1 = pl.x + half, pl.y, pl.x + half, pl.y + pl.h
+        else:
+            x0, y0, x1, y1 = pl.x + pl.w - half, pl.y, pl.x + pl.w - half, pl.y + pl.h
+        if st.rotation:  # the item is rotated about its center: so are its edges
+            c = (pl.x + pl.w / 2, pl.y + pl.h / 2)
+            (x0, y0), (x1, y1) = _turn(x0, y0, c, st.rotation), _turn(x1, y1, c, st.rotation)
+        cx = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Emu(x0), Emu(y0), Emu(x1), Emu(y1))
+        cx.name = f"{name} border {side}"
+        style_el = cx._element.find(qn("p:style"))
+        if style_el is not None:
+            cx._element.remove(style_el)
+        _line(rc, cx.line, spec)
 
 
 def _round(shp, st: Style, pl: Placed) -> None:
@@ -414,6 +519,28 @@ def _autoshape(rc: RenderCtx, slide, pl: Placed, kind, name: str):
 
 
 def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_placeholder: bool) -> None:
+    """Draw ``pl``; then its per-side borders (CSS) and its rotation (``transform: rotate()``)."""
+    before = len(s.shapes)
+    _render_item0(rc, s, pl, counters, use_placeholder)
+    el = pl.element
+    st = pl.style
+    if has_side_borders(st) and isinstance(el, (Container, Text, Shape, Code)):
+        first = list(s.shapes)[before:]
+        _side_lines(rc, s, pl, st, first[0].name if first else _name(pl, {}))
+    if st.rotation:
+        for shp in list(s.shapes)[before:]:
+            tag = etree.QName(shp._element).localname
+            if tag == "graphicFrame":
+                rc.diag(
+                    "css-unsupported",
+                    f"rotate() on a {el.type} is not drawn (PowerPoint cannot rotate tables and charts)",
+                    "remove the transform from tables and charts",
+                )
+            elif tag != "cxnSp":
+                shp.rotation = st.rotation % 360
+
+
+def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_placeholder: bool) -> None:
     el = pl.element
     st = pl.style
     name = _name(pl, counters)
@@ -483,7 +610,7 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
         if not add_media(rc, s, pl, name):
             _placeholder(rc, s, pl, name, f"[{el.kind}: {el.alt or el.src}]")
     elif isinstance(el, Code):
-        shp = _autoshape(rc, s, pl, MSO_SHAPE.RECTANGLE, name)
+        shp = _autoshape(rc, s, pl, MSO_SHAPE.ROUNDED_RECTANGLE if st.radius else MSO_SHAPE.RECTANGLE, name)
         fill_text(
             rc,
             shp.text_frame,

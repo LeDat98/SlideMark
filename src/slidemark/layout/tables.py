@@ -6,7 +6,7 @@ import re
 
 from ..ir import Cell, Style, Table
 from ..units import EMU_PER_PT, to_emu
-from . import measure
+from . import css, measure
 
 
 def table_grid(t: Table) -> tuple[int, int, list[tuple[int, int, Cell]]]:
@@ -57,7 +57,11 @@ def _measured_em(
         if cell.colspan != 1:
             continue
         bold = r < t.header_rows or c < t.header_cols
-        n = max((measure.text_em(p.plain, bold=bold) for p in cell.paragraphs), default=0.0)
+        tf = cell.style.text_transform if cell.style else None
+        n = max(
+            (measure.text_em(css.transform_text(p.plain, tf), bold=bold) for p in cell.paragraphs),
+            default=0.0,
+        )
         weights[c] = max(weights[c], min(n, 30.0))
         mins[c] = max(mins[c], *(_min_em(p.plain) for p in cell.paragraphs), 0.0)
     pad_em = 2 * measure.cell_pad()[0] / EMU_PER_PT / max(size_pt, 1.0)
@@ -232,10 +236,12 @@ def row_heights(
     for r, c, cell in anchors:
         if cell.rowspan > 1:
             continue
-        w = sum(widths[c : c + max(cell.colspan, 1)]) - 2 * measure.cell_pad()[0]
+        px, py = measure.cell_pad()
+        cl, ct, cr, cb = css.cell_insets(cell.style, px, py)
+        w = sum(widths[c : c + max(cell.colspan, 1)]) - cl - cr
         st = base.merged(cell.style)
         if r < t.header_rows or c < t.header_cols:
             st = st.merged(Style(bold=True))
-        need = measure.paragraphs_height(cell.paragraphs, w, st, scale) + 2 * measure.cell_pad()[1]
+        need = measure.paragraphs_height(cell.paragraphs, w, st, scale) + ct + cb
         heights[r] = max(heights[r], round(need))
     return heights

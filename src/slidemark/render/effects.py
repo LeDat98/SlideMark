@@ -178,10 +178,44 @@ def apply_fill(rc: RenderCtx, spPr, st: Style) -> bool:
             "write linear-gradient(135deg, #7C5CFF, #00D1B2) or radial-gradient(#fff, #000)",
         )
     hex_, alpha = parse_color(rc.theme, st.fill)
+    if alpha == 0:  # `background: none` / transparent: no fill at all
+        return False
     if opacity is not None:
         alpha = (1.0 if alpha is None else alpha) * opacity
     set_solid(spPr, hex_, alpha)
     return True
+
+
+def set_picture(
+    spPr, rid: str, crop: tuple[float, float, float, float] | None, opacity: float | None
+) -> None:
+    """``a:blipFill`` (stretched picture) for image relationship ``rid``; ``crop`` = (l, t, r, b) shares."""
+    _strip_fills(spPr)
+    fill = etree.Element(qn("a:blipFill"))
+    fill.set("rotWithShape", "1")
+    blip = etree.SubElement(fill, qn("a:blip"))
+    blip.set(qn("r:embed"), rid)
+    if opacity is not None:
+        etree.SubElement(blip, qn("a:alphaModFix")).set("amt", str(round(opacity * 100000)))
+    if crop and any(crop):
+        src = etree.SubElement(fill, qn("a:srcRect"))
+        for name, v in zip("ltrb", crop, strict=True):
+            if v:
+                src.set(name, str(round(v * 100000)))
+    etree.SubElement(etree.SubElement(fill, qn("a:stretch")), qn("a:fillRect"))
+    _insert(spPr, fill, _AFTER_FILL)
+
+
+def cover_crop(img_w: int, img_h: int, w: int, h: int) -> tuple[float, float, float, float]:
+    """(l, t, r, b) shares that make an ``img_w`` x ``img_h`` picture cover a ``w`` x ``h`` box."""
+    if not (img_w and img_h and w and h):
+        return 0.0, 0.0, 0.0, 0.0
+    ia, ba = img_w / img_h, w / h
+    if ia > ba:
+        c = (1 - ba / ia) / 2
+        return c, 0.0, c, 0.0
+    c = (1 - ia / ba) / 2
+    return 0.0, c, 0.0, c
 
 
 def parse_shadow(
