@@ -8,14 +8,15 @@ Practical patterns that cut tokens and retries. Budget: keep this file under ~1,
    Write an `@` line only when the automatic result is wrong.
 3. ✅ **Complex layouts in one line:** `@aab/aac` = a tall box on the left two-thirds and two stacked boxes on the right.
 4. ✅ **Charts and tables as CSV** (` ```column ` + `,Q1,Q2` / `2025,10,12`), not YAML/JSON.
-   Measured: the full deck costs 30% of the python-pptx tokens; a dense JP deck costs 58% of the equivalent HTML.
+   Measured: the deck source is 15–30% of the equivalent python-pptx script (file size, not agent run cost).
 5. ✅ **Lead and conclusion for free:** `>` right after the title = key message; `>` at the end = bottom bar.
 6. ⏳ **Don't set positions** (`{x= y= w= h=}`) unless needed; they cost tokens and make slides fragile.
 7. ✅ **Fix only the broken slide.** Diagnostics name the slide and line.
 8. ✅ **Close a row of boxes with `@end`** before a slide-level table/chart; otherwise it lands inside the last
    box. `check` flags it as `missing-end`. A closing `>` needs no `@end` (it is always the conclusion).
 9. ✅ **Org charts and approval flows need no shapes:** `@.a./bcd a>b a>c a>d` or `@3 a>b b>c` (connectors).
-10. ✅ **SKILL.md alone is enough:** ≈ 910 tokens; eval run 4 wrote 20/20 clean decks without reading any reference page.
+10. ✅ **SKILL.md is the only document** (≈ 2,800 tokens since 2026-10-05 run 5): when reference pages were offered, 3/3
+    pilot agents fetched 4–6 of them first, each fetch a full model call (`docs/AGENT_COST.md`).
 11. ✅ **Agents get it right from SKILL.md alone:** eval run 2 (Sonnet, 20 tasks, docs only) = 90% first-pass clean,
     ~158 tokens per deck. The two misses: `align=` letter count ≠ columns; a second `@` grid (now row groups).
 12. ✅ **Free-form HTML still gives editable slides:** a ```` ```html {render=native} ```` fence with CSS grid/flex cards
@@ -26,3 +27,4 @@ Practical patterns that cut tokens and retries. Budget: keep this file under ~1,
 - With a dark `bg`, set `surface` and `border` too, or cards keep the light neutral defaults (seen in eval decks).
 - Gradient cards need a text color that passes on every stop: lint checks each stop (`hero.fill` teal end failed 2.6:1 in examples/13).
 - Tables as a ```` ```table ```` CSV fence instead of GFM pipes: −7.1% tokens on the 66 eval decks with tables, merges (`<` `^`) and badges intact (run 4, `bench/token_floor.py`).
+- Model calls decide agent cost, not file size: one extra call re-reads the whole context (6–12k units). Write and build in one call (`slidemark build - -o deck.pptx --save deck.md <<'EOF'`), stop at 0 warnings (`docs/AGENT_COST.md`).

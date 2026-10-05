@@ -26,3 +26,8 @@ Replace the q3-only wording of the L7 token gate with two measurable bars:
 - agent-written decks: SlideMark ≤ 20% of the python-pptx answer for the same task (now 6% on 20 tasks), and
 - markup ≤ 10% of python-pptx markup on the corpus (q3 now 6%).
 Until then the gate stays unchecked in `docs/TARGETS.md`.
+
+**Correction (2026-10-06, `docs/AGENT_COST.md`):** the "6%" for eval tasks 01–20 is wrong. All 20 python-pptx
+answers repeat the same 12 helper functions (2,159 tokens, 80% of each file). Counted once the ratio is 24%; with
+the helpers as a library 29% (9–53% per task); with equal visible text 30.5%. These are file sizes, not agent
+cost: real agent runs cost 112% of python-pptx in the 2026-10-06 pilot. Agent cost is measured by the AC gates.
