@@ -78,6 +78,10 @@ TABLE_GROW_ROOMY = 2.0  # ... and rows up to this factor when a quarter of the b
 TREE_SLACK_ROOMY = 1.3  # org-tree boxes may be this much taller than their content on such slides
 ROOMY_LEFT = 0.25  # share of the body left empty (top-anchored) that triggers the roomy pass
 ROOMY_GROW = 1.2  # ... which also grows box / tree text by up to this factor on top of the sparse growth
+ROOMY_ROW = 0.62  # ... and a lone row of boxes reaches this share of the body height (consulting decks rarely
+# leave half a slide blank)
+ROOMY_ROW_AIR = 1.9  # ... but never taller than this multiple of the natural height (no half-empty cards)
+PEER_STEP = 1.12  # table text is at most this much smaller than the box body text on the same slide
 BESIDE_MIN = 0.5  # a box beside a chart / image takes its natural height, at least this share of the visual
 BESIDE_FILL = 0.6  # ... a shorter one grows by this share of the way to that minimum
 BESIDE_SLACK = 1.12  # ... headroom over the natural height (grown text keeps some air)
@@ -446,11 +450,29 @@ def _table_grow(ctx: _Ctx) -> float:
     return TABLE_GROW_ROOMY if ctx.roomy else TABLE_GROW
 
 
+def _has_box_text(ctx: _Ctx) -> bool:
+    """The slide holds a box with body text (it grows with the sparse-slide growth)."""
+    if "chevron" in (ctx.slide.grid or "") or "chevron" in ctx.slide.classes:  # chevron text: own size
+        return False
+    return any(
+        isinstance(e, Container)
+        and not {"kpi", "chevron", "diagram"} & set(e.classes)
+        and "chevron" not in (e.grid or "")
+        and any(isinstance(ch, Text) and ch.role == "body" for ch in e.children)
+        for e in ctx.slide.elements
+    )
+
+
 def _table_geom(ctx: _Ctx, el: Table, width: int):
     st = _table_style(ctx, el)
     eff = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
     if ctx.grow > 1.0 and ctx.scale >= 1.0:  # sparse slide: table text grows too (less than box text)
-        eff *= min(ctx.grow, TABLE_FONT_GROW)
+        t = min(ctx.grow, TABLE_FONT_GROW)
+        if _has_box_text(ctx):  # ... but stays within one step of the box text on the same slide
+            body = ctx.theme.sizes.get("body", 18) * ctx.dense_k * ctx.grow
+            want = body / PEER_STEP / max(st.font_size or 14, 1) / max(eff, 1e-6)
+            t = max(t, min(want, ctx.grow * 1.1))
+        eff *= t
         ctx.grew = True
     nrows, ncols, anchors = table_grid(el)
     size = (st.font_size or 14) * eff
@@ -1115,6 +1137,8 @@ def _row_heights(
         else:
             lone = nr == 1 and not has_tail and ctx.dense_k < 1.0
             floor = ROW_MIN_TAIL if has_tail else (ROW_MIN_DENSE if lone else ROW_MIN)
+            if ctx.roomy and nr == 1 and not has_tail and ctx.grow > ctx.grow_base:
+                floor = max(floor, min(ROOMY_ROW * body.h, ROOMY_ROW_AIR * n) / body.h)  # fill stays >= ~50%
             caps.append(max(round(n * ROW_SLACK), round(floor * body.h)))
     extra_h = 0  # natural height that spanning blocks need beyond their rows
     for r0, r1, n in spans:
@@ -1150,8 +1174,12 @@ def _row_heights(
     ):  # sparse slide: spread extra height over the capped rows (not kpi / table)
         rows = [r for r in range(nr) if caps[r] is not None and "other" in kinds[r]]
         tot = sum(caps[r] or 0 for r in rows)
+        airy = ctx.roomy and ctx.grow > ctx.grow_base  # grown text: rows keep a card fill of about 50%
         for r in rows:
-            caps[r] = (caps[r] or 0) + round(ctx.expand * (caps[r] or 0) / max(tot, 1))
+            grown = (caps[r] or 0) + round(ctx.expand * (caps[r] or 0) / max(tot, 1))
+            if airy and nat[r]:
+                grown = min(grown, max(caps[r] or 0, round(ROOMY_ROW_AIR * (nat[r] or 0))))
+            caps[r] = grown
     return grid_row_heights(gs, grid_area.h, gap, caps)
 
 
@@ -1631,6 +1659,7 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
     if fin.scale < 1.0 or fin.over or not any(isinstance(e, (Container, Table)) for e in elements):
         return fin
     left = body.bottom - _bottom(fin)
+    left0 = left
     keep = round(LEFT_KEEP * body.h)
     if left > keep:
         c = run(body, grow=fin.grow, expand=left - keep)
@@ -1638,11 +1667,27 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
             fin = c
             left = body.bottom - _bottom(fin)
     small_theme = ctx.theme.sizes.get("body", 18) <= GROW_SMALL_PT  # consulting themes (jp-business: 11pt)
-    if left >= ROOMY_LEFT * body.h and (
+    if max(left, left0) >= ROOMY_LEFT * body.h and (
         fin.dense_k < 1.0 or small_theme
-    ):  # a quarter of the body stays empty
+    ):  # a quarter of the body stays empty (before the rows expanded)
+        expanded = fin.expand > 0
         for f in (ROOMY_GROW, 1.15, 1.1, 1.05, 1.0):  # tables / trees take more height, text grows a little
-            c = run(body, grow=round(fin.grow * f, 2), expand=fin.expand, roomy=True, grow_base=fin.grow)
+            g = round(fin.grow * f, 2)
+            if expanded:  # text first: grow it, then spread what is left over the rows
+                c = run(body, grow=g, expand=0, roomy=True, grow_base=fin.grow)
+                if c.over or not c.out:
+                    continue
+                rest = body.bottom - _bottom(c) - keep
+                if rest > 0:
+                    c2 = run(body, grow=g, expand=rest, roomy=True, grow_base=fin.grow)
+                    if not c2.over and c2.out:
+                        c = c2
+                if g > fin.grow or _bottom(c) > _bottom(fin):
+                    fin = c
+                    left = body.bottom - _bottom(fin)
+                    break
+                continue
+            c = run(body, grow=g, expand=fin.expand, roomy=True, grow_base=fin.grow)
             if not c.over and c.out and _bottom(c) > _bottom(fin):
                 fin = c
                 left = body.bottom - _bottom(fin)
