@@ -17,6 +17,8 @@ CORPUS = [
 SYNTAX = Path(__file__).parent.parent / "docs" / "SYNTAX.md"
 
 FRAGMENTS = [
+    "# T\n@2 flow\n## a\n- x\n## b\n- y\n@end\n@2 dense bg=#fff\n## c\n1\n## d\n2\n@end\n@3 a>b\n> q\n",
+    "@end\n@end\n@2\n@end\n@a>b\n@4 chevron\n",
     "```column {legend=sideways labels=maybe fmt= min=x max=1e999 colors=red,#zz axis=2 titel=x}",
     "```pie {colors=primary,#abc,#12345G legend=none labels=percent}",
     "```table {widths=3:x:-1 align=lxr header=-2 hcol=99}",

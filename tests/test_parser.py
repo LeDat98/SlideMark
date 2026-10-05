@@ -234,9 +234,9 @@ def test_equals_with_spaces_is_not_mark():
     assert runs(d.slides[0].elements[0])[0].text == "a == b == c"
 
 
-def test_cjk_soft_break_joins_without_space():
+def test_soft_break_starts_new_paragraph():
     d = parse("# A\n@blank\n日本語の\nテキスト\n")
-    assert d.slides[0].elements[0].paragraphs[0].plain == "日本語のテキスト"
+    assert [p.plain for p in d.slides[0].elements[0].paragraphs] == ["日本語の", "テキスト"]
 
 
 # --------------------------------------------------------------------------- images
