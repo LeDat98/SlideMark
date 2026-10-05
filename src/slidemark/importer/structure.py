@@ -106,7 +106,12 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
             or nm == "background"
             or nm.endswith(" accent")
             or (it.kind == "text" and it.y >= 0.85 * H and _norm(it.text) in deck.footers)
-            or (it.kind in ("shape", "line") and not it.fill and not it.line)
+            or (
+                it.kind in ("shape", "line")
+                and not it.fill
+                and not it.line
+                and not (it.kind == "shape" and nm.startswith("card "))  # transparent css card
+            )
             or (it.kind != "image" and it.area == 0 and not it.text)
         ):
             it.role = "decor"
@@ -252,11 +257,12 @@ def _is_code(it: Item) -> bool:
 def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = None) -> list[Block]:
     W, H = deck.width, deck.height
     slide_area = W * H
+    # a transparent card (css: background none, border-top only) still groups its heading and text
     cands = [
         i
         for i in pool
         if i.kind in ("text", "shape")
-        and (i.fill or i.line)
+        and (i.fill or i.line or (i.kind == "shape" and i.name.startswith("Card ")))
         and 0.004 * slide_area <= i.area <= 0.85 * slide_area
         and not (i.role or "").startswith("callout")
     ]

@@ -140,3 +140,13 @@ def test_html_slide_and_design_come_back(tmp_path):
     assert d0.slides[4].html == d1.slides[4].html
     assert {r.selector for r in d0.css} == {r.selector for r in d1.css}
     assert [r.style.width for r in d0.css] == [r.style.width for r in d1.css]
+
+
+def test_transparent_border_top_cards_stay_boxes(tmp_path):
+    text = (
+        "```css\n.box { background: transparent; border: none; border-top: 3px solid #1D1A16 }\n```\n\n"
+        "# T\n## Market size {.kpi}\n$4.8B\nup 12%\n## Share {.kpi}\n41%\nof sales\n"
+    )
+    t1 = _roundtrip(tmp_path, text)
+    assert "## Market size {.kpi}" in t1 and "## Share {.kpi}" in t1
+    assert "- **$4.8B**" not in t1
