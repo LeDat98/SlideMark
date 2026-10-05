@@ -222,7 +222,7 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
                 p,
             )
         # overflow (text frames only; shapes like chevrons carry short labels)
-        if isinstance(el, Text) and p.h > 0:
+        if isinstance(el, Text) and p.h > 0 and el.attrs.get("measured") != "html":  # Chromium measured it
             ph, pv = css.inset_hv(p.style)
             need = (
                 measure.paragraphs_height(paras, p.w - ph, p.style, p.font_scale, gap=measure.element_gap(el))

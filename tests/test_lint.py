@@ -8,7 +8,7 @@ from slidemark.ir import Deck, Image, Paragraph, Placed, Run, Slide, Style, Text
 from slidemark.layout import layout_slide
 from slidemark.lint import contrast_ratio, lint, lint_slide
 from slidemark.parser import parse
-from slidemark.template import resolve_theme
+from slidemark.template import deck_theme
 from slidemark.theme import get_theme
 
 TH = get_theme("default")
@@ -101,7 +101,7 @@ def test_explicit_boxes_collide_end_to_end():
 def test_examples_are_clean():
     for md in sorted(EXAMPLES.glob("*.md")):
         deck = parse(md.read_text(encoding="utf-8"))
-        th, _ = resolve_theme(deck.theme, md.parent)
+        th, _ = deck_theme(deck, md.parent)
         placed = [layout_slide(s, deck, th, i) for i, s in enumerate(deck.slides)]
         bad = [
             str(d) for d in lint(deck, placed, th) if d.rule in ("off-slide", "overlap", "contrast", "alt")

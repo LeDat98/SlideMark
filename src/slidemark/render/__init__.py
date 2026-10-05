@@ -576,6 +576,8 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             field=field,
             gap_em=float(gap) if isinstance(gap, (int, float)) else None,
         )
+        if el.attrs.get("nowrap"):  # one line measured by Chromium: a wider substitute font must not wrap it
+            tf.word_wrap = False
         if "callout" in el.classes and st.line and not use_placeholder:
             _accent_bar(rc, s, pl, name)
     elif isinstance(el, Shape) and el.shape == "line":
