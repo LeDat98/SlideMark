@@ -5,7 +5,8 @@ Rules (all warnings, cheap to read for an agent):
 - ``overflow``: text needs more height than its box, even at the autofit scale.
 - ``off-slide``: an item extends past the slide edge.
 - ``overlap``: two items overlap (one fully inside another, e.g. a heading in its card, is fine).
-- ``contrast``: text color vs the fill behind it is below WCAG 3:1.
+- ``contrast``: the drawn text color (paragraph, run, badge ink) vs the fill behind it is below WCAG 3:1;
+  the hint names the token to change and a passing value.
 - ``tiny-text``: text renders below the theme's minimum font size.
 - ``alt``: an image without alt text.
 - ``connector-crosses``: a connector runs through a block that is not one of its ends.
@@ -15,6 +16,8 @@ from __future__ import annotations
 
 import re
 
+from .contrast import nearest_passing
+from .contrast import ratio as _ratio
 from .ir import Container, Deck, Diagnostic, Image, Media, Placed, Shape, Text
 from .layout import css, measure
 from .theme import Theme
@@ -114,6 +117,125 @@ def _luminance(rgb: tuple[float, float, float]) -> float:
 def contrast_ratio(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
     la, lb = sorted((_luminance(a), _luminance(b)), reverse=True)
     return (la + 0.05) / (lb + 0.05)
+
+
+def _hexs(rgb: tuple[float, float, float]) -> str:
+    return "#" + "".join(f"{round(min(max(v, 0.0), 1.0) * 255):02X}" for v in rgb)
+
+
+# Text role -> the selector of its color token (`style: <selector>.color=#RRGGBB`)
+_COLOR_SELECTOR = {
+    "title": "title",
+    "heading": "heading",
+    "lead": "lead",
+    "conclusion": "conclusion",
+    "subtitle": "subtitle",
+    "footnote": "footnote",
+    "caption": "footnote",
+    "body": "p",
+    "quote": "p",
+}
+
+
+def _in_class(items: list[Placed], i: int, name: str) -> bool:
+    """True when item ``i`` sits inside a container with class ``name`` (e.g. the KPI card)."""
+    p = items[i]
+    cx, cy = p.x + p.w // 2, p.y + p.h // 2
+    return any(
+        isinstance(q.element, Container)
+        and name in q.element.classes
+        and q.x <= cx <= q.x + q.w
+        and q.y <= cy <= q.y + q.h
+        for q in items[:i]
+    )
+
+
+def _fix_hint(
+    items: list[Placed],
+    i: int,
+    p: Placed,
+    run,
+    color: str | None,
+    backs: list[RGB],
+    theme: Theme,
+    size: float,
+    base: str | None,
+) -> str:
+    """One-line, paste-ready fix: names the token to change and a value that passes."""
+    el = p.element
+    need = theme.need_for(size)
+    back_hex = [_hexs(b) for b in backs]
+    band = bool(theme.title_band) and isinstance(el, Text) and el.role in ("title", "subtitle")
+    band = band and theme.hexval(theme.title_band) == back_hex[0]
+    on_fill = (
+        bool(run.highlight) or band or (p.style.fill is not None and _hex(p.style.fill, theme) is not None)
+    )
+    if on_fill:
+        fill = run.highlight or (theme.title_band if band else p.style.fill)
+        fh = back_hex[0] if len(back_hex) == 1 else (theme.hexval(fill) or back_hex[0])
+        cands = theme.ink_candidates()
+        ink = max(cands, key=lambda c: min(_ratio(c, h) for h in back_hex))
+        ink = next((c for c in cands if min(_ratio(c, h) for h in back_hex) >= need), ink)
+        name = fill if fill in theme.colors else "fill"
+        label = f"text on {name} {fh}"
+    else:
+        ch = theme.hexval(color) or _hexs(_hex("fg", theme) or (0, 0, 0))
+        ink = nearest_passing(ch, back_hex, need)
+        label = f"set the color to {ink} (passes {need:g}:1 on {back_hex[0]})"
+    if run.highlight:
+        token = "badge.color"
+    elif run.color:
+        return f"{label}: change the run's color to {{color={ink}}}"
+    elif isinstance(el, Text) and base in ("muted", "fg") and not on_fill:
+        token = f"colors.{base}"  # one shared color: fix it once for every role, at the stricter 4.5:1
+        ink = nearest_passing(theme.hexval(color) or ink, back_hex, theme.render.contrast_min)
+        label = f"set the color to {ink} (passes {theme.render.contrast_min:g}:1 on {back_hex[0]})"
+    elif _in_class(items, i, "kpi"):
+        token = "kpi.color"
+    elif band:
+        token = "title.band.color"
+    elif isinstance(el, Text) and el.role in ("footnote", "caption", "subtitle", "quote"):
+        token = "p.color"  # no per-role color token
+    elif isinstance(el, Text):
+        sel = _COLOR_SELECTOR.get(el.role, "p")
+        token = f"{sel}.band.color" if p.style.fill and sel in ("title", "heading") else f"{sel}.color"
+    else:
+        return f"{label}: add {{color={ink}}} to this block"
+    return f"{label}: style: {token}={ink}"
+
+
+def _contrast_findings(
+    items: list[Placed], i: int, p: Placed, backs: list[RGB], theme: Theme
+) -> list[tuple[str, str]]:
+    """(message, hint) per distinct drawn color of the text item that is unreadable (< 3:1) on its back."""
+    out: list[tuple[str, str]] = []
+    seen: set[tuple[str | None, str | None]] = set()
+    for q in p.element.paragraphs:  # type: ignore[attr-defined]
+        pst = p.style.merged(q.style) if q.style else p.style
+        size = (pst.font_size or theme.sizes.get("body", 18)) * p.font_scale
+        for r in q.runs:
+            if not r.text.strip():
+                continue
+            col = theme.run_color(r.color, r.highlight, pst.color or "fg", size, p.style.fill)
+            if (col, r.highlight) in seen:
+                continue
+            seen.add((col, r.highlight))
+            use = _backs(r.highlight, theme, None) if r.highlight else backs
+            fg_c = _rgba(col, theme)
+            if not fg_c or not use:
+                continue
+            alpha = fg_c[1] * (p.style.opacity if p.style.fill is None and p.style.opacity is not None else 1)
+            ratios = [contrast_ratio(_blend((fg_c[0], alpha), b), b) for b in use]
+            ratio = min(ratios)
+            bad = all(x < 3.0 for x in ratios)
+            if len(use) > 1:
+                mean = tuple(sum(b[k] for b in use) / len(use) for k in range(3))
+                ratio = contrast_ratio(_blend((fg_c[0], alpha), mean), mean)  # type: ignore[arg-type]
+                bad = bad or ratio < 3.0
+            if bad:
+                hint = _fix_hint(items, i, p, r, col, use, theme, size, pst.color)
+                out.append((f"{_label(p)} has low contrast {ratio:.1f}:1", hint))
+    return out
 
 
 def _label(p: Placed) -> str:
@@ -240,29 +362,15 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
                     p,
                 )
         # contrast
-        # Judged on the actual merged colors (CSS included). A gradient is checked against every stop and
-        # reported only when the text fails on all of them or on their average; custom colors are never odd.
-        fg_c = _rgba(p.style.color or "fg", theme)
+        # Judged on the colors actually drawn (CSS, paragraph and run colors, badge ink: `Theme.run_color`).
+        # A gradient is checked against every stop and reported only when the text fails on all of them or
+        # on their average; custom colors are never odd, only unreadable ones are reported.
         backdrop = _backdrop(items, i, bg, theme)
         backs = _backs(p.style.fill, theme, backdrop[0] if backdrop else None) or backdrop
         if _is_image(p.style.fill, theme):
             backs = []  # a picture fill cannot be judged
-        if fg_c and backs:
-            alpha = fg_c[1] * (p.style.opacity if p.style.fill is None and p.style.opacity is not None else 1)
-            ratios = [contrast_ratio(_blend((fg_c[0], alpha), b), b) for b in backs]
-            ratio = min(ratios)
-            bad = all(r < 3.0 for r in ratios)
-            if len(backs) > 1:
-                mean = tuple(sum(b[k] for b in backs) / len(backs) for k in range(3))
-                ratio = contrast_ratio(_blend((fg_c[0], alpha), mean), mean)  # type: ignore[arg-type]
-                bad = bad or ratio < 3.0
-            if bad:
-                warn(
-                    "contrast",
-                    f"{_label(p)} has low contrast {ratio:.1f}:1",
-                    "use a darker text color or a lighter fill (need >= 3:1)",
-                    p,
-                )
+        for msg, hint in _contrast_findings(items, i, p, backs, theme):
+            warn("contrast", msg, hint, p)
 
     # overlap between items that are not nested in each other
     free = slide is not None and slide.layout == "free"
