@@ -32,6 +32,9 @@ dev = [
 [project.scripts]
 slidemark = "slidemark.cli:main"
 
+[tool.hatch.build.targets.sdist]
+exclude = [".hypothesis", ".claude", "docs/gallery", "bench/answers", "out", "tests/golden"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/slidemark"]
 

@@ -225,4 +225,4 @@ the header disables them; `[text](#id)` / `[text](#5)` jumps; `@hidden`.
 
 ## Day 7 status
 - [ ] A+B: build animations, transitions, sections, jumps
-- [ ] Orchestrator: packaging, changelog
+- [x] Orchestrator: packaging, changelog
