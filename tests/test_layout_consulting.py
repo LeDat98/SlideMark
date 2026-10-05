@@ -116,3 +116,111 @@ def test_table_rows_are_capped_near_text_height():
     (tp,) = of(placed, Table)
     size = (tp.style.font_size or 12) * tp.font_scale
     assert max(tp.element.attrs["_row_h"]) <= (1.8 * size * 1.2 + 7.3) * 12700
+
+
+# ---- top anchoring, chevron / tree heights, table column widths (review pass 2)
+
+
+def _body_top(placed):
+    t = _title(placed)
+    skip = {"title", "lead", "subtitle"}
+    return min(
+        p.y
+        for p in placed
+        if p.y >= t.y + t.h - 1
+        and p.h > 0
+        and not (isinstance(p.element, Text) and p.element.role in skip)
+        and not (isinstance(p.element, Shape) and p.element.id == "band")
+    )
+
+
+def test_non_sparse_slide_is_top_anchored_at_title_gap():
+    from slidemark.units import EMU_PER_INCH
+
+    kpis = [
+        Container(title=T(f"k{i}", "heading"), classes=["kpi"], children=[T("1.0\n2.0")]) for i in range(3)
+    ]
+    rows = [[cell("a"), cell("b")]] + [[cell("x"), cell("1")] for _ in range(3)]
+    s = Slide(title=T("t", "title"), lead=T("lead", "lead"), grid="3", elements=[*kpis, Table(rows=rows)])
+    placed, _ = lay(s, "jp-business")
+    lead = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "lead")
+    assert _body_top(placed) - (lead.y + lead.h) == round(0.25 * EMU_PER_INCH)
+
+
+def test_dense_two_boxes_slide_is_top_anchored_and_fuller():
+    s = Slide(
+        title=T("t", "title"),
+        lead=T("lead", "lead"),
+        grid="2",
+        elements=[box("a", "one", "two", "three"), box("b", "one", "two", "three", "four")],
+        classes=["dense"],
+    )
+    placed, _ = lay(s, "jp-business")
+    lead = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "lead")
+    assert _body_top(placed) - (lead.y + lead.h) == round(0.25 * 914400)
+    cs = cards(placed)
+    assert cs[0].h >= 0.4 * H * 0.6  # not shrunk to its text
+
+
+def test_very_sparse_slide_may_shift_by_at_most_a_third_of_the_leftover():
+    s = Slide(title=T("t", "title"), grid="3", elements=[box("a", "x"), box("b", "x"), box("c", "x")])
+    placed, _ = lay(s, "default")
+    gap = _body_top(placed) - (_title(placed).y + _title(placed).h)
+    assert gap > round(0.25 * 914400)  # shifted down ...
+    assert gap < 0.25 * 914400 + 0.34 * H  # ... but never by more than a third of the body
+
+
+def test_chevron_row_height_is_text_plus_padding():
+    boxes = [Container(title=T(f"S{i}", "heading"), children=[T("short")]) for i in range(3)]
+    s = Slide(title=T("t", "title"), grid="chevron", elements=boxes)
+    placed, _ = lay(s, "jp-business")
+    chev = [p for p in placed if isinstance(p.element, Shape) and p.element.shape == "chevron"]
+    assert len(chev) == 3
+    assert 0.7 * 914400 - 1 <= chev[0].h <= 1.3 * 914400 + 1
+    size = (chev[0].style.font_size or 0) * chev[0].font_scale
+    assert size >= 11  # at least the theme body size
+
+
+def test_chevron_text_is_not_smaller_than_the_table_below():
+    boxes = [Container(title=T(f"S{i}", "heading"), children=[T("short")]) for i in range(3)]
+    rows = [[cell("a"), cell("b")]] + [[cell("x"), cell("1")] for _ in range(3)]
+    s = Slide(title=T("t", "title"), grid="chevron", elements=[*boxes, Table(rows=rows)])
+    placed, _ = lay(s, "jp-business")
+    chev = next(p for p in placed if isinstance(p.element, Shape) and p.element.shape == "chevron")
+    (tp,) = of(placed, Table)
+    assert chev.style.font_size * chev.font_scale >= tp.style.font_size * tp.font_scale - 0.01
+    assert chev.h <= 1.3 * 914400 + 1
+
+
+def test_org_tree_boxes_hug_their_text():
+    from slidemark.ir import Link
+
+    kids = [box(n, "x") for n in "abcd"]
+    s = Slide(
+        title=T("t", "title"),
+        grid=None,
+        elements=kids,
+        links=[Link(src=0, dst=1), Link(src=1, dst=2), Link(src=1, dst=3)],
+    )
+    placed, _ = lay(s, "jp-business")
+    cs = cards(placed)
+    assert len(cs) == 4
+    assert max(c.h for c in cs) < 0.2 * H  # one heading + one line, not 30% of the body
+    ys = sorted({c.y for c in cs})
+    assert len(ys) == 3
+    gap = ys[1] - (ys[0] + cs[0].h)
+    assert 0.3 * 914400 <= gap <= 0.55 * 914400
+
+
+def test_numeric_columns_stay_close_to_content_width():
+    from slidemark.layout.tables import column_widths, table_grid
+
+    rows = [[cell("Region"), cell("Revenue"), cell("Growth")]] + [
+        [cell("APAC region long"), cell("8.2M"), cell("+48%")] for _ in range(3)
+    ]
+    t = Table(rows=rows)
+    _, nc, anchors = table_grid(t)
+    w = column_widths(t, nc, anchors, 12000000, 11.0)
+    assert sum(w) == 12000000
+    assert w[0] > w[1] and w[0] > w[2]  # the text column takes the larger share of the spare width
+    assert w[1] >= 0.9 * 914400 * 0.5  # "Revenue" never wraps mid-word
