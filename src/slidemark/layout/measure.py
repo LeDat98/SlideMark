@@ -116,6 +116,11 @@ def is_cjk(ch: str) -> bool:
     return unicodedata.east_asian_width(ch) in ("W", "F")
 
 
+def is_katakana(ch: str) -> bool:
+    """Full-width katakana letters and the long vowel mark (not the middle dot, which is a break point)."""
+    return "\u30a1" <= ch <= "\u30fa" or ch in "\u30fc\u30fd\u30fe" or "\u31f0" <= ch <= "\u31ff"
+
+
 def has_cjk(text: str) -> bool:
     return any(is_cjk(c) for c in text)
 
@@ -199,6 +204,11 @@ def _units(
                 units.append((0.0, 0.0, "", True, ""))
             elif ch in " \t":
                 st["sp"] += _char_em(" ", kind, key)
+            elif is_katakana(ch):  # a katakana run is one word: never cut inside it unless it is too long
+                if st["sp"] or (st["word"] and not is_katakana(st["word"][-1])):
+                    flush()
+                st["word"] += ch
+                st["w"] += _char_em(ch, kind, key)
             elif is_cjk(ch) or ch in NO_START or ch in NO_END:
                 if is_cjk(ch):
                     flush()
@@ -209,7 +219,7 @@ def _units(
                     st["word"] += ch
                     st["w"] += _char_em(ch, kind, key)
             else:
-                if st["sp"]:
+                if st["sp"] or (st["word"] and is_katakana(st["word"][-1])):
                     flush()
                 st["word"] += ch
                 st["w"] += _char_em(ch, kind, key)

@@ -729,7 +729,7 @@ def parse_slide(
         slide.grid, slide_links = None, []
         slide.layout = slide.layout or "blank"
         slide.html = html_src
-    _infer_cover(slide, index)
+    _infer_cover(slide, index, ctx)
     slide.links = _resolve_links(slide_links, len(slide.elements), "slide", ctx, slide, slide.elements)
     for box, raw in ctx.box_links:
         box.links = _resolve_links(raw, len(box.children), "box", ctx, box, box.children)
@@ -870,27 +870,65 @@ def _as_role(t: Text, role: str) -> Text:
     return t
 
 
-def _infer_cover(slide: Slide, index: int) -> None:
+def _cover_lines(els: list[Any]) -> tuple[list[Text], list[Container]] | None:
+    """Body texts of a cover with every plain-text ``##`` box flattened into subtitle lines.
+
+    ``None`` when some block is neither body text nor a ``##`` box that holds only body text.
+    """
+    out: list[Text] = []
+    boxes: list[Container] = []
+    for e in els:
+        if isinstance(e, Text) and e.role == "body" and "callout" not in e.classes:
+            out.append(e)
+        elif (
+            isinstance(e, Container)
+            and e.title is not None
+            and e.grid is None
+            and not e.links
+            and not {"kpi", "flow", "chevron", "diagram"} & set(e.classes)
+            and all(
+                isinstance(c, Text) and c.role == "body" and "callout" not in c.classes for c in e.children
+            )
+        ):
+            boxes.append(e)
+            out.append(e.title)
+            out.extend(e.children)  # type: ignore[arg-type]
+        else:
+            return None
+    return out, boxes
+
+
+def _infer_cover(slide: Slide, index: int, ctx: Ctx | None = None) -> None:
     if slide.title is None or slide.layout in ("blank", "center", "free"):
         return
     els = slide.elements
-    if not els or not all(
-        isinstance(e, Text) and e.role == "body" and "callout" not in e.classes for e in els
-    ):
+    if not els:
         return
-    texts: list[Text] = els  # type: ignore[assignment]
-    paras = [p for t in texts for p in t.paragraphs]
+    got = _cover_lines(els)
+    if got is None:
+        return
+    texts, boxes = got
     explicit = slide.layout in ("cover", "section")
     if not explicit:
+        paras = [p for t in texts for p in t.paragraphs]
         short = (
             len(paras) <= 2
             and all(p.marker is None and len(p.plain) <= SHORT_LINE for p in paras)
             and slide.lead is None
             and slide.conclusion is None
             and slide.grid is None
+            and (not boxes or any(isinstance(e, Text) for e in els))  # a lone `## x` stays a card
         )
         if not short:
             return
+    if boxes and ctx is not None:
+        ctx.add(
+            "info",
+            "'## ' on a cover or section slide is a subtitle line, not a box",
+            boxes[0].line,
+            "cover-heading",
+            "write the line without '## ' (use '## ' boxes on content slides)",
+        )
     slide.subtitle = _merge_text(texts, "subtitle")
     slide.elements = []
     if slide.layout is None:

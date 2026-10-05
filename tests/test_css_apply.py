@@ -774,8 +774,10 @@ def test_contrast_gradient_is_checked_per_stop(tmp_path):
 
 
 def test_contrast_follows_the_css_slide_background(tmp_path):
-    dark_bg = HEAD + css("slide {background: #000000}") + "# T\n- one\n- two\n"
-    assert "contrast" in lint_rules(dark_bg, tmp_path)  # default dark text on black
+    dark_bg = HEAD + css("slide {background: #000000}\nh1, p {color: #222222}") + "# T\n- one\n- two\n"
+    assert "contrast" in lint_rules(dark_bg, tmp_path)  # declared dark text on black
+    auto = HEAD + css("slide {background: #000000}") + "# T\n- one\n- two\n"
+    assert "contrast" not in lint_rules(auto, tmp_path)  # undeclared: the ink flips by itself
     fixed = HEAD + css("slide {background: #000000; color: #FFFFFF}") + "# T\n- one\n- two\n"
     assert "contrast" not in lint_rules(fixed, tmp_path)
     grad = HEAD + css("slide {background: linear-gradient(135deg, #000000, #112233); color: #FFFFFF}")
