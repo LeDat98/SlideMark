@@ -17,7 +17,7 @@ EOF
 ```
 
 `build` checks, fixes simple mistakes, builds, and ends with one facts line:
-`wrote deck.pptx: 5 slides 16:9, 1 chart, 1 table, notes on 1 slide, 0 warnings`.
+`wrote deck.pptx: 5 slides 16:9, 1 chart, 1 table, notes on 1 slide, 0 warnings (checked: fit, overlap, …)`.
 With your own design it also prints `look: bg #…, primary #…; fonts …` (the colours and fonts it applied).
 If it says 0 warnings and the counts match your brief, you are done: no render, no re-open, no other command.
 If you still want to see the slides, add `--png sheet.png` to the same command and look at that ONE image

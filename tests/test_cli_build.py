@@ -101,7 +101,7 @@ def test_facts_line(tmp_path, capsys):
     last = capsys.readouterr().out.strip().splitlines()[-1]
     assert last.startswith("wrote ") and "3 slides 16:9" in last
     assert "1 chart" in last and "1 table" in last and "notes on 1 slide" in last
-    assert "image" not in last and last.endswith("0 warnings")
+    assert "image" not in last and "0 warnings (checked:" in last
 
 
 def test_errors_exit_1_and_are_counted(tmp_path, capsys):

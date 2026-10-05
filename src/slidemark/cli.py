@@ -248,7 +248,10 @@ def _facts(deck: Deck, out: Path) -> str:
     if n_err:
         bits.append(f"{n_err} error{'s' if n_err != 1 else ''}")
     bits.append(f"{n_warn} warning{'s' if n_warn != 1 else ''}")
-    return f"wrote {out}: " + ", ".join(bits)
+    line = f"wrote {out}: " + ", ".join(bits)
+    if not n_warn and not n_err:  # say what "0 warnings" covers, so an agent need not render to check
+        line += " (checked: fit, overlap, contrast, text size, word breaks)"
+    return line
 
 
 def _look_line(deck: Deck) -> str | None:
