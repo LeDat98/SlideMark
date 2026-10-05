@@ -11,7 +11,7 @@ from ..ir import Diagnostic
 from .emit import chart_lines, one_line, table_lines, text_lines
 from .links import find_links, recover_diagram
 from .links import tokens as link_tokens
-from .read import Item, ParaT, SlideData
+from .read import Item, ParaT, RunT, SlideData
 
 CHEVRONS = ("chevron", "homePlate", "pentagon")
 STACKABLE = ("table", "callout", "text", "code")
@@ -53,6 +53,35 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+def fold_into_tables(data: SlideData) -> None:
+    """Text drawn on top of an empty table cell (status pills, tags) becomes that cell's text."""
+    for t in [i for i in data.items if i.kind == "table" and i.col_w and i.row_h]:
+        xs = [t.x]
+        for w in t.col_w:
+            xs.append(xs[-1] + w)
+        ys = [t.y]
+        for h in t.row_h:
+            ys.append(ys[-1] + h)
+        for it in list(data.items):
+            if it.kind != "text" or it.ph or it.role:
+                continue
+            c = next((k for k in range(len(t.col_w)) if xs[k] <= it.cx < xs[k + 1]), None)
+            r = next((k for k in range(len(t.row_h)) if ys[k] <= it.cy < ys[k + 1]), None)
+            if c is None or r is None or r >= len(t.rows) or c >= len(t.rows[r]):
+                continue
+            cell = t.rows[r][c]
+            if (
+                cell.paras
+                or cell.hmerge
+                or cell.vmerge
+                or it.w > 1.05 * t.col_w[c]
+                or it.h > 1.05 * t.row_h[r]
+            ):
+                continue
+            cell.paras = it.paras
+            data.items.remove(it)
+
+
 def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
     """Set ``role`` on special items; returns (title item, pool of content items)."""
     W, H = deck.width, deck.height
@@ -78,8 +107,27 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
     live = [i for i in items if i.role is None]
     title = next((i for i in live if i.kind == "text" and i.ph in ("title", "ctrTitle")), None)
     if title is None:
+
+        def in_card(i: Item) -> bool:
+            return any(
+                c is not i
+                and c.fill
+                and c.kind in ("shape", "text")
+                and c.area > i.area
+                and c.w < 0.9 * W
+                and c.x <= i.cx <= c.x + c.w
+                and c.y <= i.cy <= c.y + c.h
+                for c in items
+            )
+
         top = [
-            i for i in live if i.kind == "text" and i.y < 0.3 * H and len(i.paras) <= 2 and len(i.text) <= 120
+            i
+            for i in live
+            if i.kind == "text"
+            and i.y < 0.3 * H
+            and len(i.paras) <= 2
+            and len(i.text) <= 120
+            and not in_card(i)
         ]
         if top:
             title = max(top, key=lambda i: (i.max_size or 0, -i.y))
@@ -272,7 +320,8 @@ def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
             and not _is_code(it)
             and _heading_like(it.paras)
         ):
-            return [Block("box", it.x, it.y, it.w, it.h, item=it, heading=[it.paras[0]], paras=it.paras[1:])]
+            rest = Block("text", it.x, it.y, it.w, it.h, paras=it.paras[1:])
+            return [Block("box", it.x, it.y, it.w, it.h, item=it, heading=[it.paras[0]], children=[rest])]
         return [leaf_text(it)]
 
     def container(it: Item, real: list[Item], nested: bool) -> list[Block]:
@@ -308,6 +357,109 @@ def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
         if it.uid in parent:
             continue
         out.extend(make(it, False))
+    return _group_columns(_merge_cards(out, deck), deck)
+
+
+def _group_columns(blocks: list[Block], deck: DeckInfo) -> list[Block]:
+    """Loose texts stacked at the same left edge, side by side with similar stacks (numbered steps drawn
+    as a circle, a title and a description), become one ``##`` box per column."""
+    W, H = deck.width, deck.height
+    loose = [
+        b for b in blocks if b.kind == "text" and b.item is not None and b.item.paras and not b.item.role
+    ]
+    cols: list[list[Block]] = []
+    for b in sorted(loose, key=lambda b: b.x):
+        if cols and abs(cols[-1][0].x - b.x) <= 0.02 * W:
+            cols[-1].append(b)
+        else:
+            cols.append([b])
+    good: list[list[Block]] = []
+    for c in cols:
+        c = sorted(c, key=lambda b: b.y)
+        if len(c) not in (2, 3) or any(
+            b.y - (a.y + a.h) > min(0.12 * H, 0.4 * min(a.h, b.h)) for a, b in zip(c, c[1:], strict=False)
+        ):
+            continue
+        if any(p.marker for b in c[:-1] for p in b.paras):
+            continue
+        good.append(c)
+    if len(good) < 2 or len(good) != len(cols) or len({len(c) for c in good}) != 1:
+        return blocks
+    out = [b for b in blocks if not any(b is m for c in good for m in c)]
+    for c in good:
+        first = c[0].paras[0]
+        rest = list(c[0].paras[1:])
+        idx = 1
+        if len(first.plain.strip()) <= 3 and len(c[0].paras) == 1:
+            nxt = c[1].paras
+            head = ParaT(runs=[*first.runs, RunT(" "), *nxt[0].runs], size=nxt[0].size)
+            rest, idx = list(nxt[1:]), 2
+        else:
+            head = first
+        body = [*rest, *[p for b in c[idx:] for p in b.paras]]
+        x0, y0 = min(b.x for b in c), min(b.y for b in c)
+        x1, y1 = max(b.x + b.w for b in c), max(b.y + b.h for b in c)
+        kids = [Block("text", x0, y0, x1 - x0, y1 - y0, paras=body)] if body else []
+        out.append(Block("box", x0, y0, x1 - x0, y1 - y0, heading=[head], children=kids))
+    out.sort(key=lambda b: (b.y, b.x))
+    return out
+
+
+def _merge_cards(blocks: list[Block], deck: DeckInfo) -> list[Block]:
+    """A card drawn as a header shape with a body shape right below it (same width, other fill) is one box."""
+    tolx, toly = 0.01 * deck.width, 0.02 * deck.height
+    out = list(blocks)
+    changed = True
+    while changed:
+        changed = False
+        for a in out:
+            ia = a.item
+            if a.kind not in ("box", "text") or ia is None or not ia.fill or a.chevron or not ia.paras:
+                continue
+            if a.kind == "text" and (
+                len(ia.paras) > 3
+                or any(p.marker for p in ia.paras)
+                or not (ia.paras[0].all_bold or _heading_like(ia.paras))
+            ):
+                continue
+            if a.kind == "box" and (len(a.children) != 1 or a.children[0].kind != "text" or a.sub):
+                continue
+            for b in out:
+                ib = b.item
+                if (
+                    b is a
+                    or b.kind != "text"
+                    or ib is None
+                    or not ib.fill
+                    or ib.fill == ia.fill
+                    or ib.role
+                    or abs(b.x - a.x) > tolx
+                    or abs(b.w - a.w) > tolx
+                    or abs(b.y - (a.y + a.h)) > toly
+                    or b.h < 0.5 * a.h
+                    or _is_code(ib)
+                ):
+                    continue
+                if a.kind == "text":
+                    head, extra = [ia.paras[0]], ia.paras[1:]
+                else:
+                    head, extra = a.heading or [], a.children[0].paras
+                body = [*extra, *b.paras]
+                merged = Block(
+                    "box",
+                    a.x,
+                    a.y,
+                    a.w,
+                    b.y + b.h - a.y,
+                    item=ia,
+                    heading=head,
+                    children=[Block("text", b.x, b.y, b.w, b.h, paras=body)],
+                )
+                out = [merged if x is a else x for x in out if x is not b]
+                changed = True
+                break
+            if changed:
+                break
     return out
 
 
@@ -582,6 +734,7 @@ def build_slide(
     classes: dict[str, str],
     info: dict | None = None,
 ) -> list[str]:
+    fold_into_tables(data)
     title, pool = classify(data, deck)
     by_role = {r: [i for i in data.items if i.role == r] for r in ("lead", "conclusion", "footnote")}
     blocks = make_blocks(pool, deck)

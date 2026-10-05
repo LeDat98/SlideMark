@@ -86,6 +86,8 @@ class Item:
     uid: int = 0
     radius: float | None = None  # corner radius in pt of a rounded rectangle
     sid: int = 0  # shape id in the slide (what ``a:stCxn``/``a:endCxn`` point at)
+    col_w: list[int] = field(default_factory=list)  # table: column widths (EMU)
+    row_h: list[int] = field(default_factory=list)  # table: row heights (EMU)
 
     @property
     def cx(self) -> float:
@@ -648,7 +650,15 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
                         )
                     )
                 rows.append(row)
-            data.items.append(_new(ctx, "table", box, sid=sh.shape_id, name=name, rows=rows))
+            tit = _new(ctx, "table", box, sid=sh.shape_id, name=name, rows=rows)
+            try:
+                sx = box[2] / (sum(c.width for c in sh.table.columns) or 1)
+                sy = box[3] / (sum(r.height for r in sh.table.rows) or 1)
+                tit.col_w = [round(c.width * sx) for c in sh.table.columns]
+                tit.row_h = [round(r.height * sy) for r in sh.table.rows]
+            except Exception:
+                pass
+            data.items.append(tit)
         elif sh.has_chart:
             ch = read_chart(sh, ctx)
             if ch is not None:
