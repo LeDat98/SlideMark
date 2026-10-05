@@ -311,10 +311,11 @@ open to new names), presets as YAML (`src/slidemark/presets/*.yaml`), `theme: no
 - [x] W2 A CSS parser (34 properties); W3 B CSS matching + native render; W3 A `@html`, deck.html, htmlnative fidelity 0.63 → 1.00
 - [x] W4 A token value validation + shorthands; B unknown-font metrics, radial position, Latin badges, sparse balance
 - [x] W5 A design round trip (customXml part); B sparse slides (bar penalty, text + card growth); W6 A round-trip fixes
-- [ ] W6 B `@free` slides + text-first fill; W7 A html fence source on import (running at wrap-up time: see the log)
+- [x] W6 B `@free` slides + text-first fill; W7 A html fence source on import, B dense paragraph spacing, A element tokens
+- [x] W8 B sparse flow/html/table slides; A foreign import derives look tokens (color fidelity 0.47 → 0.85)
 
 ## Leftovers for the next run
-- [ ] Sparse cards: emptiness moved inside cards on some slides (13 s2, 11 s9): grow text first (W6 B if not merged)
-- [ ] Round trip: 48-jp-meeting-minutes text-order, 73-vi-launch-mermaid geometry (pre-existing)
+- [ ] Sparse cards: some cards still ~50% empty (05 s2, 11 s9, 12 s1 html); consider content-width cards
+- [ ] Round trip: 1 deck left (114/115)
 - [ ] Owner: open a design deck (gradients, shadows, customXml design part) in real PowerPoint: repair check
 - [ ] L3 consulting-grade judgement; L7 tokens ≤ 20% of python-pptx (syntax design pass)

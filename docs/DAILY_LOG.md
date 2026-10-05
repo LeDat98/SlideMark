@@ -50,10 +50,15 @@ Run goal:
 - Problems: a parallel owner session pushed to main (merged); I pushed one red commit (pipe hid pytest's exit code), fixed in minutes.
 - Next: L3 consulting judgement (slide 9 fill), PowerPoint spot check of media/SVG/animation XML (owner), PyPI token (owner).
 
-## 2026-10-05 (run 3, manual, design freedom, 07:40 UTC–)
+## 2026-10-05 (run 3, manual, design freedom, 07:40–10:40 UTC)
 Run goal:
 - [x] DF1 no hard-coded design: layout/render constants → `theme.layout`/`theme.render` tokens, presets as YAML, `theme: none`, literal-scanner test
 - [x] DF2 inline tokens: `colors:`/`fonts:`/`sizes:`/`style:` header lines → `Deck.tokens`, `slidemark tokens`, SKILL.md
 - [x] DF3 CSS fence: 34 properties native, selector matching, diagnostics
 - [x] Extended: DF4 HTML fidelity (30-slide corpus), DF5 `@html`/deck.html + design round trip, DF6 brand eval (20 tasks)
 - [x] Examples with agent-designed looks (13 dark brand, 14 terracotta, 15 HTML + tokens) next to dense JP; gallery reviewed
+- Done: 8 waves, 17 Sonnet coding subagents + 2 eval agents; all 6 DF gates; also `@free`, element tokens (`style: h1.letter-spacing=2pt`), foreign import keeps the look as tokens, sparse-slide fill.
+- Metrics: tests 1232 passed; q3 155 tokens = 30% of python-pptx (unchanged); markup vs HTML 13–28% (unchanged); design paths: tokens 35%, CSS 38% of the same slide in HTML.
+- HTML corpus native 0.63 → 1.00 (30/30), diff 0.0111; brand eval 95% first pass ×2 runs, 0 shared palettes; round trip 97.3% → 99.1%; color fidelity of foreign imports 0.47 → 0.85; SKILL.md 895 tokens (agent gate 0.387).
+- Problems: the brief of task 115 forces a 2.8:1 title color (lint is right); stretched layouts can move emptiness inside cards (fixed text-first; `html_fit` made opt-in).
+- Next: real PowerPoint check of gradients/shadows/customXml (owner), L3 consulting judgement, L7 tokens ≤ 20%.

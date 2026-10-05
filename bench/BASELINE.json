@@ -1,5 +1,5 @@
 {
   "tolerance": 0.03,
   "slidemark_tokens": {"q3-review": 155, "jp-dense": 482, "jp-kpi": 551},
-  "html_fidelity": {"native": 1.0, "diff": 0.0116}
+  "html_fidelity": {"native": 1.0, "diff": 0.0111}
 }
