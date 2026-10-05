@@ -33,7 +33,7 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 ## L3: Dense & rich (target: day 7, end of foundation)
 - [ ] Dense JP slide set (≥ 8 slides: 3–4 column boxes, KPI tables, process arrows, lead line, ※ footnotes,
       source line, 10–12pt) built from Markdown only, judged "consulting-grade" in review
-- [ ] Components: cards, callouts, KPI, steps/chevrons, badges, connectors, icons, 12-column grid
+- [x] Components: cards, callouts, KPI, steps/chevrons, badges, connectors, icons, 12-column grid
 - [x] All 10 chart kinds native with labels/legend/number formats; OMML math (OMML verified in XML; LibreOffice shows the fallback)
 - [x] `check` linter: overflow, off-slide, overlap, low contrast, missing alt → one-line JSON diagnostics
 - [ ] Syntax tokens ≤ 30% of python-pptx; dense slide ≤ 40% of the equivalent HTML (30% ✓; dense 58–60% ✗: content text dominates)

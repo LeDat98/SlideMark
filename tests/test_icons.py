@@ -311,3 +311,10 @@ def test_elbow_from_diamond_is_glued_to_both_nodes(tmp_path):
         assert st is not None and en is not None
         assert ids[int(st.get("id"))].auto_shape_type is not None
         assert (st.get("idx"), en.get("idx")) == ("2", "0")  # bottom-middle -> top-middle
+
+
+def test_parser_icon_names_in_sync():
+    from slidemark.icons import names
+    from slidemark.parser.attrs import ICON_NAMES
+
+    assert set(names()) == set(ICON_NAMES)
