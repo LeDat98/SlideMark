@@ -47,7 +47,7 @@ slidemark skill install      # cài skill cho Claude Code
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-05 · commit `638a783` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-05 · commit `2fd77ea` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -162,6 +162,14 @@ Nguồn: [`examples/13-brand-aurora.md`](examples/13-brand-aurora.md)
 Nguồn: [`examples/14-brand-terracotta.md`](examples/14-brand-terracotta.md)
 
 ![14-brand-terracotta slide 1](docs/gallery/14-brand-terracotta/slide-01.png)
+
+### Slide HTML toàn trang (@html) + slide SlideMark dùng chung token
+
+Nguồn: [`examples/15-html-mixed.md`](examples/15-html-mixed.md)
+
+![15-html-mixed slide 1](docs/gallery/15-html-mixed/slide-01.png)
+![15-html-mixed slide 2](docs/gallery/15-html-mixed/slide-02.png)
+![15-html-mixed slide 3](docs/gallery/15-html-mixed/slide-03.png)
 <!-- gallery:end -->
 
 ## Tài liệu

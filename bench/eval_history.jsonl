@@ -4,3 +4,4 @@
 {"date": "2026-10-05T03:12:50+00:00", "commit": "07a770c", "answers": "run-4-sonnet", "tasks": 20, "first_pass_rate": 1.0, "mean_warnings": 0.0, "mean_tokens": 152.2, "skill_tokens": 909, "python_pptx_tokens": 2704.3, "agent_token_ratio": 0.392}
 {"date": "2026-10-05T05:21:29+00:00", "commit": "fc1b013", "answers": "run-5-sonnet", "tasks": 80, "first_pass_rate": 0.988, "mean_warnings": 0.05, "mean_tokens": 165.8}
 {"date": "2026-10-05T07:03:29+00:00", "commit": "c5e5be2", "answers": "run-5-sonnet", "tasks": 80, "first_pass_rate": 1.0, "mean_warnings": 0.0, "mean_tokens": 165.8}
+{"date": "2026-10-05T08:47:15+00:00", "metric": "brand_eval", "run": "run-6-brand", "tasks": 20, "first_pass": 0.95, "shared_palettes": [], "value": 0.95}
