@@ -298,7 +298,8 @@ def _scan_body(lines: list[str], inside: list[bool], c: Chunk, ctx: Ctx) -> tupl
             continue
         if text.startswith("※") or re.match(r"^\^[ \t]", text):
             flush()
-            items.append(Item("foot", i + 1, text=text[1:].strip()))
+            # `※` is part of a Japanese footnote's text (agents copy it from the brief); `^ ` is only a marker
+            items.append(Item("foot", i + 1, text=text.strip() if text.startswith("※") else text[1:].strip()))
             continue
         m = HN_RE.match(text)
         if m:

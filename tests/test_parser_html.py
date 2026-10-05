@@ -64,7 +64,7 @@ def test_dense_details():
     assert s1.grid == "aab/aac"
     assert len([e for e in s1.elements if isinstance(e, Container)]) == 3
     assert s1.elements[0].children[1].type == "chart"
-    assert s1.footnotes[0].paragraphs[0].plain.startswith("出所")
+    assert s1.footnotes[0].paragraphs[0].plain.startswith("※ 出所")
     mark = s1.elements[0].children[0].paragraphs[2].runs
     assert any(r.text == "2.1%" and r.color == "accent" for r in mark)
     assert s2.grid == "4" and s2.classes == ["chevron"]
@@ -146,7 +146,7 @@ def test_callout_badge_note_and_cover():
     )
     assert s.elements[0].classes == ["callout", "tip"]
     assert s.elements[1].paragraphs[0].runs[-1].highlight == "danger"
-    assert [plain(f) for f in s.footnotes] == ["src", "other"]
+    assert [plain(f) for f in s.footnotes] == ["※ src", "※ other"]
 
 
 def test_chart_and_bad_chart_data():

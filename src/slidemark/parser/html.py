@@ -520,10 +520,7 @@ class _Conv:
 
     def footnote(self, n: Node) -> None:
         t = self.text_of(n, "footnote")
-        if t.paragraphs and t.paragraphs[0].runs:
-            r = t.paragraphs[0].runs[0]
-            r.text = r.text.lstrip("※ 　")
-        if t.paragraphs:
+        if t.paragraphs:  # a leading ※ stays: it is part of the text, as in Markdown
             self.footnotes.append(t)
 
     # -- walk

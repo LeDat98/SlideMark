@@ -83,7 +83,7 @@ def test_small_bottom_text_is_a_footnote(tmp_path):
     _text(s, 0.6, 1.8, 12, 3, ["- one", "- two"], size=18)
     _text(s, 0.6, 6.95, 12, 0.35, "Source: internal survey", size=10)
     text = _import(prs, tmp_path)
-    assert "※ Source: internal survey" in text
+    assert "^ Source: internal survey" in text  # a footnote without its own ※ keeps no ※
 
 
 def test_box_body_paragraphs_survive(tmp_path):

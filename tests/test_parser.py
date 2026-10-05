@@ -157,7 +157,7 @@ def test_lead_conclusion_quote():
     assert s.lead.paragraphs[0].plain == "lead" and s.lead.role == "lead"
     assert s.conclusion.paragraphs[0].plain == "conclusion"
     assert [e.role for e in s.elements] == ["body", "quote", "body"]
-    assert s.footnotes[0].role == "footnote" and s.footnotes[0].paragraphs[0].plain == "source"
+    assert s.footnotes[0].role == "footnote" and s.footnotes[0].paragraphs[0].plain == "※ source"
 
 
 def test_conclusion_inside_last_box():
@@ -167,8 +167,9 @@ def test_conclusion_inside_last_box():
 
 
 def test_footnote_markers():
+    # ※ is text, ^ is only a marker
     d = parse("# A\ntext\n※ one\n^ two\n")
-    assert [f.paragraphs[0].plain for f in d.slides[0].footnotes] == ["one", "two"]
+    assert [f.paragraphs[0].plain for f in d.slides[0].footnotes] == ["※ one", "two"]
 
 
 def test_attrs_on_heading_and_before_block():

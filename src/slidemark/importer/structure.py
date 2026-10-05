@@ -1122,8 +1122,10 @@ def build_slide(
     for it in sorted(by_role["footnote"], key=lambda i: (i.y, i.x)):
         for p in it.paras:
             txt = one_line([p], accent=deck.accent, classes=classes, implied=deck.implied.get("footnote"))
-            if txt:
-                lines.append("※ " + txt)
+            if txt.startswith("&#8251;"):
+                lines.append("※" + txt[len("&#8251;") :])
+            elif txt:
+                lines.append(txt if txt.startswith("※") else "^ " + txt)
     if by_role["conclusion"]:
         txt = one_line(
             by_role["conclusion"][0].paras,
