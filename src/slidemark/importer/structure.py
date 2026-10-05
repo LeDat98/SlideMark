@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 
 from ..ir import Diagnostic
 from .emit import chart_lines, one_line, table_lines, text_lines
+from .links import find_links, recover_diagram
+from .links import tokens as link_tokens
 from .read import Item, ParaT, SlideData
 
 CHEVRONS = ("chevron", "homePlate", "pentagon")
@@ -40,6 +42,8 @@ class Block:
     chevron: bool = False
     callout: str = "note"
     icon: str | None = None
+    lines: list[str] = field(default_factory=list)  # kind "fence": the fence lines (a recovered diagram)
+    links: list[str] = field(default_factory=list)  # box: link tokens between its children
 
 
 # --------------------------------------------------------------------------- classification
@@ -527,6 +531,8 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
         return [("table", lines)] if lines else []
     if b.kind == "chart":
         return [("fence", chart_lines(b.item.chart))]
+    if b.kind == "fence":
+        return [("fence", b.lines)]
     if b.kind == "image":
         out.img_n += 1
         blob, ext = b.item.img
@@ -545,7 +551,7 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     if kpi:
         lines = [one_line([p], accent=acc, classes=cls, plain_bold=True) for p in b.children[0].paras]
         return [("meta", [head, *[ln for ln in lines if ln]])]
-    chunks.append(("meta", [head]))
+    chunks.append(("meta", [head, "@" + " ".join(b.links)] if b.links else [head]))
     for ch in b.children:
         chunks.extend(("itext" if k == "text" else k, ln) for k, ln in emit_block(ch, out))
     return chunks
@@ -582,8 +588,18 @@ def build_slide(
     _attach_icons([i for i in data.items if i.role == "icon"], blocks)
     arrows = sum(1 for i in pool if i.kind == "shape" and i.prst and "rrow" in i.prst)
     notes: list[str] = []
+    dia = recover_diagram(blocks, data.conns, data.items)
+    if dia is not None:
+        x, y, w, h = dia.box
+        blocks = [b for b in blocks if not any(b is u for u in dia.used)]
+        fence = ["```mermaid", *dia.lines, "```"]
+        blocks.append(Block("fence", round(x), round(y), round(w), round(h), lines=fence))
+        blocks.sort(key=lambda b: (b.y, b.x))
+        data.conns = []
+        data.connectors = 0
+    top, inner, lost = find_links(blocks, data.conns, data.items)
     texts = [b for b in blocks if b.kind == "text"]
-    if data.connectors >= 2 and len(texts) >= 3:  # a diagram: keep its labels as a list
+    if data.connectors >= 2 and len(texts) >= 3 and not top:  # a diagram: keep its labels as a list
         texts.sort(key=lambda b: (round(b.y / (0.05 * deck.height)), b.x))
         paras = [
             ParaT(runs=p.runs, marker="bullet", size=p.size)
@@ -611,17 +627,20 @@ def build_slide(
             )
         )
         data.connectors = 0
+        data.conns = []
+        lost = 0
     gdiag: list[str] = []
     tokens, grid, extras = plan_grid(blocks, deck.width, deck.height, gdiag)
     for g in gdiag:
         diags.append(
             Diagnostic(level="info", message=g, slide=n, rule="import-layout", hint="check the arrangement")
         )
-    if data.connectors:
+    lost = lost if data.conns else data.connectors
+    if lost:
         diags.append(
             Diagnostic(
                 level="info",
-                message=f"{data.connectors} connector(s) dropped",
+                message=f"{lost} connector(s) dropped",
                 slide=n,
                 rule="import-skipped",
                 hint="add arrows back with '@' tokens such as a>b if they matter",
@@ -643,14 +662,21 @@ def build_slide(
     if info is not None:
         info["tokens"] = [t for t in tokens if t != "blank"]
         info["at"] = None
+    seq = [*grid, *extras]
+    links = link_tokens(top, seq, drop_next="flow" in tokens)
+    for b in seq:
+        if b.kind == "box" and id(b) in inner:
+            b.links = link_tokens(inner[id(b)], b.children)
+    if info is not None:
+        info["links"] = links
     if data.hidden:
         tokens = [*tokens, "hidden"]
+    tokens = [*[t for t in tokens if t != "hidden"], *links, *[t for t in tokens if t == "hidden"]]
     if tokens:
         if info is not None:
             info["at"] = len(lines)
         lines.append("@" + " ".join(tokens))
     chunks: list[tuple[str, list[str]]] = []
-    seq = [*grid, *extras]
     for i, b in enumerate(seq):
         chunks.extend(emit_block(b, out))
         if b.kind == "box":
