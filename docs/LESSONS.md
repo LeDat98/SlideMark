@@ -81,3 +81,8 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [process] `pytest -q | tail -1 && git commit` commits even when tests fail (the pipe's exit code is tail's) → check the summary line, or use `set -o pipefail`. Pushed one red commit this way (fixed minutes later).
 - [layout] Boxes sharing a grid row or stacked column share one paragraph gap (the minimum); lint, critique, score and whitespace all measure with `measure.element_gap()`.
 - [layout] On a lone-row slide the card height cap (ROOMY_ROW_AIR) moves fill more than font growth does.
+- [tokens] Never shallow-copy nested theme dicts before a trial mutation: a rejected token leaked into the shared data and the final validate raised → `copy.deepcopy` per token.
+- [parser] Header `style:` collides with the Marp CSS key → `style: |` / `style: >` stay Marp (ignored); `style: k=v` is tokens.
+- [layout] Layout tokens reach `measure` through a process-wide `measure.set_tokens(theme.layout)`: lint, critique and render must call it too, or they measure with another deck's tokens.
+- [render] `spPr` children are fill → `ln` → `effectLst`; `shape.shadow.inherit=False` already writes an empty `effectLst`, replace it instead of appending a second one.
+- [css] Python `round()` is half-to-even: `rgba(0,0,0,.3)` gives alpha `4C`, not `4D`. CSS fences are blanked in place (not deleted) so line numbers stay valid.

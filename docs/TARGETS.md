@@ -19,8 +19,8 @@ Token ratios are measured against the python-pptx baseline of the same deck (`be
 
 ## DF: Design freedom (TOP PRIORITY since 2026-10-05, owner): spec in `docs/DESIGN_FREEDOM.md`
 Never limit the agent's design ability: mechanisms, not looks. These gates come before any remaining L3–L7 work.
-- [ ] DF1 No hard-coded design: test fails on color literals / fixed pt sizes in `layout/` + `render/`; presets are YAML data; `theme: none` is driven only by declared tokens
-- [ ] DF2 Inline tokens: every `Theme` field settable from header lines (`colors:`, `fonts:`, `sizes:`, `style:`), a theme file, or preset + overrides; `slidemark tokens`; in SKILL.md within budget
+- [x] DF1 No hard-coded design: test fails on color literals / fixed pt sizes in `layout/` + `render/`; presets are YAML data; `theme: none` is driven only by declared tokens (2026-10-05 run 3: `tests/test_no_hardcoded.py`, `presets/*.yaml`, ~60 `layout.*`/`render.*` tokens)
+- [x] DF2 Inline tokens: every `Theme` field settable from header lines (`colors:`, `fonts:`, `sizes:`, `style:`), a theme file, or preset + overrides; `slidemark tokens`; in SKILL.md within budget (SKILL.md 942 tokens, `slidemark docs design`)
 - [ ] DF3 CSS fence: selectors for every SlideMark element + custom classes/ids; ≥ 30 CSS properties mapped natively (gradients, shadows, per-side borders, letter-spacing, line-height, rotation…); unmapped → diagnostic
 - [ ] DF4 HTML fidelity: ≥ 30 agent-designed HTML slides; ≥ 90% of visible elements native + editable; gradients/shadows/rotation/inline SVG native; mean Chromium-vs-pptx perceptual diff recorded and only goes down
 - [ ] DF5 Whole-deck HTML (`build deck.html`, `@html` slides) and mixed decks sharing tokens; import round trip
