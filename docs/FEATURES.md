@@ -19,3 +19,14 @@ LibreOffice · D6 gallery looks right · D7 lint rule · D8 bench no regression.
 | Code highlighting | x | x | x | x | x | | | |
 | Speaker notes | x | x | x | x | x | | | |
 | mermaid / math / html (Raw) | x | x | x | x | x | | | |
+| `@end` box terminator, missing-end hint | x | x | x | x | x | | | |
+| Extra blocks below a grid (full-width rows) | x | | x | x | x | | | |
+| `.kpi` boxes | x | x | x | x | x | | | |
+| Callouts `> [!note]` | x | x | x | x | x | | | |
+| Badges `[x]{.badge}` | x | x | x | x | x | | | |
+| Connectors `@ a>b` | x | x | x | x | x | | | |
+| Box heading band (jp-business) | | | | x | x | | | |
+| Chart options (legend, labels, fmt, min/max, colors, axis) | x | x | x | | | | | |
+| Table options (widths, align, header, hcol) | x | x | x | | | | | |
+| CSV edge cases (quotes, %, full-width, ▲) | x | x | x | | | | | |
+| `check` linter (overflow, off-slide, overlap, contrast, tiny-text, alt) | | | | | | | x | |
