@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
-from ..ir import Deck
+from ..ir import CssRule, Deck, Style
 from .ctx import Ctx
 
 TOKEN_GROUPS = ("colors", "fonts", "sizes", "style")
@@ -58,9 +59,81 @@ def _split_key(pair: str) -> tuple[str, str | None]:
     return key.strip(), (_unquote(val) if eq else None)
 
 
+_CSS_ELEMENTS = {"slide", "h1", "h2", "p", "li", "table", "th", "td", "code", "img"}
+_PT_PROPS = {
+    "border-radius",
+    "border-width",
+    "letter-spacing",
+    "font-size",
+    "gap",
+    "padding",
+    "padding-top",
+    "padding-right",
+    "padding-bottom",
+    "padding-left",
+    "margin",
+}
+_CSS_CLASSES = {"lead", "conclusion", "footnote", "subtitle", "box", "kpi", "chart"}
+
+
+def _style_css_key(key: str) -> tuple[str, str] | None:
+    """``h1.letter-spacing`` -> (selector ``h1``, css property); None when the key is not an element style."""
+    from .css import SUPPORTED
+
+    head, dot, rest = key.strip().partition(".")
+    head = head.lower()
+    if not dot or (head not in _CSS_ELEMENTS and head not in _CSS_CLASSES):
+        return None
+    prop = rest.strip().lower().replace("_", "-")
+    if prop not in SUPPORTED:
+        return None
+    return (head if head in _CSS_ELEMENTS else "." + head), prop
+
+
+def _style_css(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int) -> bool:
+    """Route ``style:`` keys like ``h1.letter-spacing=2pt`` into a deck-level CSS rule (True = handled)."""
+    from ..theme import Theme, canonical_token
+
+    if group != "style":
+        return False
+    hit = _style_css_key(key)
+    if hit is None:
+        return False
+    sel, prop = hit
+    if prop in _PT_PROPS and re.fullmatch(r"[+-]?(\d+\.?\d*|\.\d+)", value.strip()):
+        value = value.strip() + "pt"  # bare numbers are pt in tokens (css needs a unit)
+    path, _ = canonical_token(group, key)
+    if path is not None and (sel[0] == "." or path in Theme.model_fields):
+        return False  # existing meanings win: class tokens (card.fill, kpi.color) and Theme fields
+    deck.attrs.setdefault("_style_css", {}).setdefault(sel, []).append((prop, value, line))
+    return True
+
+
+def style_css_rules(deck: Deck, ctx: Ctx) -> list[CssRule]:
+    """Rules from ``style: h1.x=y`` keys, one per selector (declarations merged). Never raises."""
+    from .css import known_color_names, parse_declarations
+
+    src = deck.attrs.pop("_style_css", {})
+    names = known_color_names(deck)
+    rules: list[CssRule] = []
+    for sel, decls in src.items():
+        merged: dict[str, tuple[str, int]] = {}
+        for prop, value, line in decls:
+            merged[prop] = (value, line)
+        style = Style()
+        for prop, (value, line) in merged.items():
+            st, _ = parse_declarations(f"{prop}: {value}", line, ctx, names)
+            style = style.model_copy(update={k: v for k, v in st.model_dump().items() if v is not None})
+        if any(v is not None for v in style.model_dump().values()):
+            rules.append(CssRule(selector=sel, style=style, line=min(ln for _, ln in merged.values())))
+    return rules
+
+
 def set_token(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int) -> None:
     from ..theme import TokenValueError, canonical_token, normalize_token
 
+    if _style_css(deck, group, key, value, ctx, line):
+        return
     path, hint = canonical_token(group, key)
     if path is None:
         ctx.warn(f"unknown token '{key}' in {group}:", line, "unknown-token", hint.replace("\n", " "))

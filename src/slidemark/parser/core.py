@@ -26,7 +26,14 @@ from .css import extract_fences, parse_css
 from .ctx import Ctx, closest
 from .inline import inline_runs
 from .lenient import Rec, normalize
-from .tokens import THEME_MAPS, TOKEN_GROUPS, finish_tokens, parse_token_line, parse_token_map
+from .tokens import (
+    THEME_MAPS,
+    TOKEN_GROUPS,
+    finish_tokens,
+    parse_token_line,
+    parse_token_map,
+    style_css_rules,
+)
 
 FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 H1_RE = re.compile(r"^#(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
@@ -926,6 +933,7 @@ def parse_deck(text: str) -> Deck:
     first_line = (
         min((c.title_idx if c.title_idx is not None else c.start) for c in chunks) if chunks else None
     )
+    deck.css += style_css_rules(deck, ctx)  # before header fences: a fence wins
     slide_css: dict[int, list[tuple[int, str]]] = {}
     for fi, body in css_fences:
         if first_line is None or fi < first_line:

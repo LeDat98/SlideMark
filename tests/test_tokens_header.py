@@ -155,3 +155,53 @@ def test_font_list_keeps_first_family_with_info():
     deck = parse('theme: none\nfonts: heading="Didot, Georgia"\n\n# T\n- a\n- b\n')
     assert deck.tokens["fonts.heading"] == "Didot"
     assert [d.rule for d in deck.diagnostics] == ["font-list"]
+
+
+def test_style_element_css_rules():
+    d = parse("style: h1.letter-spacing=2pt h1.text_transform=uppercase th.background=#123456\n\n# T\n")
+    by = {r.selector: r.style for r in d.css}
+    assert by["h1"].letter_spacing == 2 and by["h1"].text_transform == "upper"
+    assert len([r for r in d.css if r.selector == "h1"]) == 1
+    assert by["th"].fill == "#123456"
+    assert not d.tokens and not d.diagnostics
+
+
+def test_style_element_css_class_heads_and_precedence():
+    d = parse(
+        "style: box.border-radius=14 kpi.color=#FF0000 table.header.fill=primary title.band=none\n# T\n"
+    )
+    assert [r.selector for r in d.css] == [".box"]
+    assert d.tokens["classes.kpi.color"] == "#FF0000"
+    assert d.css[0].style.radius == 14
+    assert d.tokens["table_header_fill"] == "primary" and d.tokens["title_band"] == "none"
+
+
+def test_style_element_css_fence_after_and_bad_property():
+    d = parse("style: h1.color=#111111\n```css\nh1 { color: #222222 }\n```\n# T\n")
+    assert [r.selector for r in d.css] == ["h1", "h1"]
+    assert d.css[1].style.color == "#222222"
+    bad = parse("style: h1.colour=red h1.letter-spacing=wide\n# T\n")
+    assert len([x for x in bad.diagnostics if x.level != "info"]) == 2
+
+
+def test_style_element_css_builds_pptx(tmp_path):
+    out = tmp_path / "a.pptx"
+    build("style: h1.letter-spacing=2pt h1.text-transform=uppercase\n\n# Hello\n\ntext\n", out)
+    prs = Presentation(str(out))
+    runs = [
+        r
+        for sh in prs.slides[0].shapes
+        if sh.has_text_frame
+        for p in sh.text_frame.paragraphs
+        for r in p.runs
+    ]
+    hello = [r for r in runs if r.text == "HELLO"]
+    assert hello and hello[0]._r.rPr.get("spc") == "200"
+
+
+@pytest.mark.parametrize(
+    "junk", ["h1.=", "h1.color=", ".color=red", "box.=x", "p.padding=(((", 'slide.gap="', "h1.h1.color=red"]
+)
+def test_style_element_css_fuzz(junk):
+    d = parse(f"style: {junk}\n\n# T\n")
+    assert d.slides
