@@ -100,6 +100,14 @@ FRAGMENTS = [
     "[x]{.badge}",
     "[x]{.badge .danger}",
     "## K {.kpi}",
+    '\ncolors: primary=#7C5CFF bg="#000\n',
+    '\nfonts: heading="Noto Sans JP\n',
+    "\nstyle: card.fill=linear-gradient(135deg, #7C5CFF, #00D1B2\n",
+    "\nstyle: card.shadow='0 8 24 #0005 title.band==primary ))((\n",
+    "\nsizes: body=x =9 =\n",
+    '\n---\ncolors: {bg: "#000"}\nstyle: {card.fill: [1, 2]}\nclasses: {card: {radius: 14}}\n---\n',
+    "\n---\nclasses: x\nlayout: {a: {b: {c: d}}}\nrender: [1]\n---\n",
+    "\ncolors:\nstyle:\nfonts: =\n",
 ]
 
 
@@ -342,3 +350,18 @@ def test_html_random_text_never_crashes(text):
 def test_html_corpus_never_crashes():
     for p in sorted((Path(__file__).parent.parent / "bench" / "corpus").glob("*/html.html")):
         check_html(p.read_text(encoding="utf-8"))
+
+
+@settings(max_examples=150, deadline=None)
+@given(
+    st.lists(
+        st.tuples(
+            st.sampled_from(["colors", "fonts", "sizes", "style", "Style"]),
+            st.text(alphabet="abc.-_=\"'()[]{}, #0123456789 日", max_size=40),
+        ),
+        max_size=6,
+    )
+)
+def test_token_header_lines_never_raise(lines):
+    text = "\n".join(f"{g}: {v}" for g, v in lines) + "\n\n# T\n- x\n"
+    assert isinstance(parse(text), Deck)
