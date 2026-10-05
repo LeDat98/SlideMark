@@ -74,3 +74,12 @@ Run goal:
 - Metrics: tests 1403 passed; q3 155 tokens = 30% of python-pptx (unchanged); markup vs HTML 13–28% (unchanged); fuzz 5k 0 crashes; XSD 1k 0 invalid.
 - Problems: one lint-red push (`commit -am` swept a file, fixed in minutes); a parallel owner commit moved CI to daily (push once per wave now).
 - Next: L3 two-card/decision slides and right panels still half empty (content-bound; needs a design rule the reviewers agree on); badge pills; katakana wraps in chevrons.
+
+## 2026-10-05 (run 5, routine, agent cost, 17:45 UTC–)
+Run goal (`docs/AGENT_COST.md`; DF1–DF6 already passed):
+- [ ] WP1 AC gates + `bench/agent_cost.py` + acceptance script + 9 briefs
+- [ ] WP2 SKILL.md as the only document (budget ≤ 3,000 tokens)
+- [ ] WP3 one command: `build` lints, fixes, prints facts; stdin + `--save`; contact sheet; docs switch
+- [ ] WP4 four silent defects (cover with `##`, list after KPI row, table width, chevron word wrap)
+- [ ] WP5 one-edit contrast warning; WP6 brand deck from `colors:` + `fonts:`
+- [ ] Smoke test: 3 briefs × skill-only with fresh subagents, calls and cost recorded

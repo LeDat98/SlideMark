@@ -367,3 +367,20 @@ HTML corpus, L7 token research). Design freedom stays the rule: fixes are mechan
       text panels beside charts (16 s3, 11 s3) half empty; badges are tight run highlights; 16 s9 header vs merged body
 - [ ] Katakana words still break inside chevrons in LibreOffice (needs a `\v` break or inset correction in render)
 - [ ] Owner: real PowerPoint repair check (gradients, shadows, customXml design part, media); PyPI token; decide the L7 token gate (`docs/TOKEN_FLOOR.md`)
+
+## Run 2026-10-05 (run 5, agent cost, 17:45 UTC) work packages
+Goal: `docs/AGENT_COST.md` work packages 1–6 in order; design freedom stays a constraint (derive, never hard-code).
+- **Orchestrator (WP1):** AC gates in TARGETS.md; `bench/agent_cost.py` (transcript → calls, output, cost, cost
+  above start, images, docs attempts); `bench/agent_accept.py` (required strings, slide count, 16:9, native charts/
+  tables, notes); first brief set `bench/briefs/` (9 briefs: 3/5/10 slides × EN default / JA dense / VI brand).
+- **Orchestrator (WP2):** SKILL.md as the only document: fold in the reference pages agents fetched, drop the docs
+  pointer, one-command recipe first, one example per deck shape; `tests/test_skill.py` budget ≤ 3,000 tokens.
+- **Wave 1 A (WP3): one command** (`cli.py`, `preview.py`, `tests/test_cli*.py`): `build` = parse + safe fixes +
+  lint + build + facts line; `build -` reads stdin, `--save deck.md`; identical warnings grouped with a count;
+  `--png sheet.png` contact sheet; `SLIDEMARK_NO_DOCS=1` disables `docs` (eval switch).
+- **Wave 1 B (WP4): four silent defects** (`layout/`, `lint.py`, `critique.py`): `# T` + `## sub` alone = cover;
+  list after a KPI row gets body size and fills; a full-width table spans the content width like the conclusion
+  bar; chevron text box uses the chevron interior so Vietnamese/katakana words never break. Golden/regression tests.
+- **Wave 2 (WP5, WP6):** one-edit contrast warning (token + nearest passing shade, contrast-safe derived defaults);
+  brand deck from `colors:` + `fonts:` alone (title band, table header, chart palette, KPI colour derived).
+- **Then:** smoke test 3 briefs × `skill-only` × 1 with fresh subagents outside the repo; record in bench history.

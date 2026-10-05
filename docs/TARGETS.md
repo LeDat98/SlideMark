@@ -26,6 +26,16 @@ Never limit the agent's design ability: mechanisms, not looks. These gates come 
 - [x] DF5 Whole-deck HTML (`build deck.html`, `@html` slides) and mixed decks sharing tokens; import round trip (2026-10-05 run 3: design source in a customXml part, `bench/roundtrip.py` design round trip 3/3 stable)
 - [x] DF6 Design-freedom eval: 20 brand-brief tasks, ≥ 90% first-pass clean, each deck follows its own brief (no shared palette unless asked), images reviewed (run-6-brand: 19/20 = 95% first pass, 0 shared palettes, all 20 decks reviewed by the orchestrator)
 
+## AC: Agent cost (owner, 2026-10-06): spec in `docs/AGENT_COST.md`
+The product metric is the cost of the agent run that ends with an accepted deck: model calls first, output tokens
+(thinking included) second, input tokens third. Source-size ratios are a regression guard only.
+- [ ] AC1 Harness: `bench/agent_cost.py` reads subagent transcripts and prints calls, output, cost, cost above start, images viewed, docs attempts
+- [ ] AC2 SKILL only: with reference pages unavailable ≥ 90% accepted over ≥ 27 runs (9 briefs × 3); with them available median 0 lookups
+- [ ] AC3 Calls: median ≤ 4 model calls from brief to hand-back, p90 ≤ 6
+- [ ] AC4 Cost: median cost above common start ≤ 35% of the python-pptx arm, ≤ 30% on briefs of ≥ 5 slides
+- [ ] AC5 Output: median output tokens (thinking included) ≤ 30% of the python-pptx arm
+- [ ] AC6 Trust: median 0 images viewed per run; reviewer-found defects in zero-warning decks ≤ 0.02 per slide
+
 ## L1: Works (target: day 2)
 - [x] Title, text, nested lists, inline styles, images, tables with merges, code, charts, notes → native objects
 - [x] Every example deck opens in LibreOffice without errors; `ruff` + `pytest` green in CI (CI green since run 7)
@@ -51,7 +61,7 @@ Never limit the agent's design ability: mechanisms, not looks. These gates come 
 - [x] `slidemark docs`, `schema`, `skill install`; SKILL.md ≤ 1,500 tokens, each reference file ≤ 800
 - [x] Lenient parser: Marp/Slidev/common-mistake variants accepted with warnings (fuzz: 0 crashes in 100k inputs; bench/fuzz_long.py seed 11, 2026-10-05)
 - [x] Agent eval (≥ 20 tasks): first-pass `check` success ≥ 90%, mean fix rounds ≤ 0.3 (run-2-sonnet: 20 tasks, 90%, 0.1 warnings/task, docs only; fix rounds proxied by warnings)
-- [x] Total agent tokens per deck (docs + output + fixes) ≤ 40% of a python-pptx agent on the same tasks (run-4: (SKILL.md 909 + deck 152) / python-pptx 2,704 = 0.39, 20/20 first pass, no reference pages read)
+- [ ] Total agent tokens per deck (docs + output + fixes) ≤ 40% of a python-pptx agent on the same tasks (re-opened 2026-10-06: the old check divided file sizes; real agent runs cost 112% of python-pptx → measured by the AC gates)
 
 ## L5: Full PowerPoint
 - [x] HTML → native shapes (Chromium measurement) with image fallback; Mermaid → native shapes (`slidemark.htmlnative`: grid/flex cards, runs, lists, tables → native, canvas/svg/gradients → image; 2026-10-05)
@@ -68,7 +78,7 @@ Never limit the agent's design ability: mechanisms, not looks. These gates come 
 ## L7: Breakthrough
 - [ ] Blind review: agent-made decks preferred or tied against professional human decks in ≥ 50% of pairs
 - [x] Vision self-review loop: `preview` + automatic design critique fixes layout issues without human input (run 4: `slidemark review --fix [--png]`: trial-built source edits incl. slide split, dense, ink swap, title→lead, pixel contrast; `bench/selfreview.py`: 27/30 synthetic broken decks end warning-free, mean score 96.1 → 99.1, examples untouched)
-- [ ] Tokens near the floor: syntax ≤ 20% of python-pptx; ≥ 95% of tasks need only SKILL.md (no reference reads) (run 4: q3 content floor alone is 25% → unreachable on q3; agent-written decks 6% of python-pptx answers, 99% of 100 tasks pass from SKILL.md only; owner decision proposed in `docs/TOKEN_FLOOR.md`)
+- [ ] Tokens near the floor: syntax ≤ 20% of python-pptx; ≥ 95% of tasks need only SKILL.md (no reference reads; restated 2026-10-06: measured as AC2 with reference pages available, median 0 lookups) (run 4: q3 content floor alone is 25% → unreachable on q3; agent-written decks 6% of python-pptx answers, 99% of 100 tasks pass from SKILL.md only; owner decision proposed in `docs/TOKEN_FLOOR.md`)
 - [x] Agent eval first-pass success ≥ 98% across ≥ 100 tasks, including dense JP and HTML-heavy decks (100 tasks: run-4 01–20 20/20 + run-5 21–100 79/80 = 99%; jp 34/34, html 17/17, hard 10/10; Sonnet, SKILL.md only, 2026-10-05)
 - [ ] Lossless round-trip of any deck the library produced (`bench/roundtrip.py`: 117/117 = 100% on 17 examples + 100 eval answers incl. CSS/HTML-designed decks, design source round trip 4/4, 2026-10-05 run 4); real-world `.pptx` import ≥ 95% fidelity (`bench/import_fidelity.py` on 19 agent-written python-pptx decks: 0.975, lenient metric; color fidelity 0.847 via derived look tokens; true real-world decks still needed)
 - [ ] Every presentation feature of PowerPoint reachable from text; nothing requires opening PowerPoint to fix
