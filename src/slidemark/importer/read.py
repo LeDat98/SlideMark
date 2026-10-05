@@ -472,8 +472,11 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
             nf = va.tick_labels.number_format
             if nf and nf != "General":
                 fmt = nf
-        if va.minimum_scale is not None:
-            opts["min"] = f"{va.minimum_scale:g}"
+        zero_base = kind in ("column", "bar", "stacked-column", "stacked-bar", "area") and all(
+            v is None or v >= 0 for _, vals in data for v in vals
+        )
+        if va.minimum_scale is not None and not (zero_base and va.minimum_scale == 0):
+            opts["min"] = f"{va.minimum_scale:g}"  # a zero base on bars is the build default
         if va.maximum_scale is not None:
             opts["max"] = f"{va.maximum_scale:g}"
     except Exception:

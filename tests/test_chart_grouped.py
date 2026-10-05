@@ -34,3 +34,27 @@ def test_render_uses_thousands_format(tmp_path):
     assert list(chart.plots[0].series[0].values) == [2100.0, 12600.0]
     assert chart.plots[0].data_labels.number_format == "#,##0"
     assert chart.value_axis.tick_labels.number_format == "#,##0"
+
+
+def test_bar_axes_start_at_zero(tmp_path):
+    src = tmp_path / "z.md"
+    src.write_text(
+        "# T\n```column\n,a,b\nX,3.6,3.9\n```\n\n# L\n```line\n,a,b\nX,3.6,3.9\n```\n"
+        "\n# M\n```column {min=3}\n,a,b\nX,3.6,3.9\n```\n",
+        encoding="utf-8",
+    )
+    build(src, tmp_path / "z.pptx")
+    slides = Presentation(tmp_path / "z.pptx").slides
+    axes = [next(s.chart for s in sl.shapes if s.has_chart).value_axis for sl in slides]
+    assert axes[0].minimum_scale == 0
+    assert axes[1].minimum_scale is None  # lines may zoom
+    assert axes[2].minimum_scale == 3  # explicit min wins
+
+
+def test_zero_base_does_not_come_back_as_min(tmp_path):
+    from slidemark.importer import import_pptx
+
+    src = tmp_path / "z.md"
+    src.write_text("# T\n```column\n,a,b\nX,3.6,3.9\n```\n", encoding="utf-8")
+    build(src, tmp_path / "z.pptx")
+    assert "min=" not in import_pptx(tmp_path / "z.pptx")[0]

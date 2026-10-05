@@ -247,6 +247,14 @@ def _num(v) -> float | None:
     return f if f == f and abs(f) != float("inf") else None
 
 
+_ZERO_BASE = ("column", "bar", "stacked-column", "stacked-bar", "area")
+
+
+def _all_nonneg(ch: Chart) -> bool:
+    vals = [v for s in ch.series for v in s.values if v is not None]
+    return bool(vals) and min(vals) >= 0
+
+
 def _chart_font(chart, theme, face: str, size_pt: float, color) -> None:
     """Chart-wide text: size, color, latin + East Asian typeface."""
     f = chart.font
@@ -539,6 +547,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 va.tick_labels.number_format = nf
                 va.tick_labels.number_format_is_linked = False
         lo, hi = _num(opts.get("min")), _num(opts.get("max"))
+        if lo is None and kind in _ZERO_BASE and _all_nonneg(ch):
+            lo = 0.0  # bars start at zero: an auto axis from 3.45 would exaggerate 3.6 vs 3.9
         if lo is not None:
             va.minimum_scale = lo
         if hi is not None:
