@@ -242,6 +242,8 @@ def _connector_crossings(items: list[Placed]) -> list[tuple[Placed, Placed]]:
             continue
         pts = _polyline(p)
         for q in blocks:
+            if _inside(p, q):  # the connector's own parent box (links between a box's children)
+                continue
             r = (q.x + inset, q.y + inset, q.w - 2 * inset, q.h - 2 * inset)
             if any(_seg_hits(u, v, r) for u, v in zip(pts, pts[1:], strict=False)):
                 out.append((p, q))
