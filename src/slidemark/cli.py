@@ -158,15 +158,23 @@ def cmd_preview(args: argparse.Namespace) -> int:
     from .build import build
 
     src = Path(args.input)
-    if _read(args.input) is None:
+    is_pptx = src.suffix.lower() == ".pptx"
+    if is_pptx and not src.is_file():
+        print(f"error: cannot read {args.input}: no such file", file=sys.stderr)
+        return 2
+    if not is_pptx and _read(args.input) is None:
         return 2
     out_dir = Path(args.output) if args.output else src.with_suffix("").parent / (src.stem + "-preview")
+    deck = Deck()
     try:
-        with tempfile.TemporaryDirectory(prefix="slidemark-") as tmp:
-            pptx = Path(tmp) / (src.stem + ".pptx")
-            deck = build(src, pptx)
-            _print_diagnostics(deck)
-            pngs = pptx_to_pngs(pptx, out_dir)
+        if is_pptx:  # already a deck: render it as it is
+            pngs = pptx_to_pngs(src, out_dir)
+        else:
+            with tempfile.TemporaryDirectory(prefix="slidemark-") as tmp:
+                pptx = Path(tmp) / (src.stem + ".pptx")
+                deck = build(src, pptx)
+                _print_diagnostics(deck)
+                pngs = pptx_to_pngs(pptx, out_dir)
     except NotImplementedError:
         print("error: layout/render are not available in this build yet", file=sys.stderr)
         return 2
@@ -259,7 +267,7 @@ def make_parser() -> argparse.ArgumentParser:
     im.set_defaults(func=cmd_import)
 
     v = sub.add_parser("preview", help="render slides to PNG images (needs LibreOffice)")
-    v.add_argument("input")
+    v.add_argument("input", help=".md, .json, .html or .pptx")
     v.add_argument("-o", "--output", help="output directory for slide-NN.png")
     v.set_defaults(func=cmd_preview)
 

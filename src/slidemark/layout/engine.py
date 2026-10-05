@@ -16,6 +16,7 @@ from ..ir import (
     Diagnostic,
     Image,
     Link,
+    Media,
     Paragraph,
     Placed,
     Raw,
@@ -56,7 +57,7 @@ _INHERIT_FIELDS = (
     "font",
     "font_ea",
 )
-_VISUALS = (Image, Chart, Table, Code)
+_VISUALS = (Image, Media, Chart, Table, Code)
 _TOL = 1.01
 ICON_HEAD = 1.2  # icon side / heading font size (icon left of the heading text)
 ICON_KPI = 2.0  # icon side / label font size (icon above a kpi number)
@@ -468,7 +469,7 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
             font=t.fonts.body, font_ea=t.fonts.ea, font_size=t.sizes.get("table", 14), color="fg"
         ).merged(el.style)
         ctx.emit(el, rect, st)
-    elif isinstance(el, Image):
+    elif isinstance(el, (Image, Media)):
         ctx.emit(el, rect, Style().merged(*_class_styles(ctx, el), el.style))
     elif isinstance(el, Raw):
         t = ctx.theme
@@ -800,7 +801,7 @@ def _weight(b) -> int:
 
 
 def _has_visual(b) -> bool:
-    if isinstance(b, (Chart, Table, Image)):
+    if isinstance(b, (Chart, Table, Image, Media)):
         return True
     return isinstance(b, Container) and any(_has_visual(c) for c in b.children)
 

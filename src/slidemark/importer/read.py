@@ -618,8 +618,17 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
         )
         data.items.append(it)
     elif tag == "pic":
-        if el.xpath(".//*[local-name()='videoFile' or local-name()='audioFile']"):
-            ctx.skip(f"media {name!r}", "media cannot be imported")
+        links = el.xpath(".//*[local-name()='videoFile' or local-name()='audioFile']/@*[local-name()='link']")
+        if links:  # movie/sound: the media part becomes ![alt](images/N-k.mp4), like pictures
+            try:
+                part = sh.part.related_part(links[0])
+                blob, ext = part.blob, part.partname.ext.lstrip(".")
+            except Exception:
+                ctx.skip(f"media {name!r}", "media part could not be read")
+                return
+            data.items.append(
+                _new(ctx, "image", box, sid=sh.shape_id, name=name, img=(blob, ext), alt=_alt(el, name))
+            )
             return
         img = sh.image
         it = _new(ctx, "image", box, sid=sh.shape_id, name=name, img=(img.blob, img.ext), alt=_alt(el, name))

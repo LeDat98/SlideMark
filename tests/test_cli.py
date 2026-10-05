@@ -169,3 +169,22 @@ def test_help_lists_new_commands(capsys):
     main(["--help"])
     out = capsys.readouterr().out
     assert all(c in out for c in ("docs", "schema", "skill"))
+
+
+def test_preview_accepts_a_pptx(tmp_path, capsys):
+    from .helpers import needs_soffice  # noqa: F401
+
+    if __import__("shutil").which("soffice") is None:
+        pytest.skip("LibreOffice not installed")
+    md = tmp_path / "a.md"
+    md.write_text("# A\n- x\n", encoding="utf-8")
+    pptx = tmp_path / "a.pptx"
+    assert main(["build", str(md), "-o", str(pptx)]) == 0
+    capsys.readouterr()
+    assert main(["preview", str(pptx), "-o", str(tmp_path / "png")]) == 0
+    assert (tmp_path / "png" / "slide-01.png").stat().st_size > 0
+
+
+def test_preview_missing_pptx_is_a_clear_error(tmp_path, capsys):
+    assert main(["preview", str(tmp_path / "nope.pptx")]) == 2
+    assert capsys.readouterr().err.startswith("error")

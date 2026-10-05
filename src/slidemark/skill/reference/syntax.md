@@ -34,5 +34,7 @@ before a block. Keys: `x y w h` (`%`, `in`, `cm`, `mm`, `pt`, `px`; bare = pt), 
 `align`, `valign`, `bold`, `radius`, `pad`, `fit`. Classes: `.primary .accent .danger .success .muted`
 (colors), `.plain` (box without card), `.kpi`, `.zebra` (tables), `.badge` (inline).
 
+**Media.** `![alt](a.mp4){poster=p.png autoplay loop}` embeds video (.mp4 .mov .webm …) or audio (.mp3 .wav …).
+
 **Inline:** `**b**` `*i*` `~~s~~` `` `code` `` `==accent==` `[x]{.danger}` `[x]{.badge}` `H~2~O` `x^2^`
 `[t](url)` `[t](#5)`. Lists: `-` and `1.`, nest with two spaces.

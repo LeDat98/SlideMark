@@ -20,6 +20,7 @@ from ..ir import (
     Deck,
     Diagnostic,
     Image,
+    Media,
     Placed,
     Raw,
     Shape,
@@ -36,6 +37,7 @@ from .anim import build_timing
 from .htmlimg import add_html_image, close_html
 from .icons import add_icon
 from .math import add_math
+from .media import add_media, finish_timing
 from .objects import add_chart, add_image, add_table, code_paragraphs, resolve_image
 from .text import fill_text, insert_rpr_child
 from .util import RenderCtx, emu, rgb
@@ -183,6 +185,7 @@ def _render_slide(rc: RenderCtx, prs, slide: Slide, items: list[Placed]):
         _timing(s, slide, items, shape_ids)
     except Exception as e:  # animations are optional: keep the slide static
         rc.diag("anim", f"build animation skipped: {type(e).__name__}: {e}", "report a bug", "warning")
+    finish_timing(rc, s)
     return s
 
 
@@ -364,6 +367,7 @@ def _name(pl: Placed, counters: dict[str, int]) -> str:
             "table": "Table",
             "chart": "Chart",
             "image": "Image",
+            "media": "Media",
             "code": "Code",
             "raw": "Raw",
             "shape": "Shape",
@@ -467,6 +471,9 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
     elif isinstance(el, Image):
         if not add_image(rc, s, pl, name):
             _placeholder(rc, s, pl, name, f"[image: {el.alt or el.src}]")
+    elif isinstance(el, Media):
+        if not add_media(rc, s, pl, name):
+            _placeholder(rc, s, pl, name, f"[{el.kind}: {el.alt or el.src}]")
     elif isinstance(el, Code):
         shp = _autoshape(rc, s, pl, MSO_SHAPE.RECTANGLE, name)
         fill_text(rc, shp.text_frame, code_paragraphs(el), st, pl.font_scale, para_gap=False)

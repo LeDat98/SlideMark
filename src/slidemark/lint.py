@@ -13,7 +13,7 @@ Rules (all warnings, cheap to read for an agent):
 
 from __future__ import annotations
 
-from .ir import Container, Deck, Diagnostic, Image, Placed, Shape, Text
+from .ir import Container, Deck, Diagnostic, Image, Media, Placed, Shape, Text
 from .layout import measure
 from .theme import Theme
 from .units import EMU_PER_PT, slide_size
@@ -52,8 +52,8 @@ def _label(p: Placed) -> str:
         text = " ".join(q.plain for q in paras).strip()
         if text:
             return f"'{text[:24]}…'" if len(text) > 24 else f"'{text}'"
-    if isinstance(el, Image):
-        return f"image {el.src}"
+    if isinstance(el, (Image, Media)):
+        return f"{el.type} {el.src}"
     return el.type
 
 
@@ -123,8 +123,9 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
                 p,
             )
         # alt text
-        if isinstance(el, Image) and not el.alt.strip():
-            warn("alt", f"image {el.src} has no alt text", "write ![what it shows](path)", p)
+        if isinstance(el, (Image, Media)) and not el.alt.strip():
+            what = "image" if isinstance(el, Image) else el.kind
+            warn("alt", f"{what} {el.src} has no alt text", "write ![what it shows](path)", p)
         paras = getattr(el, "paragraphs", None)
         if not paras or not any(q.plain.strip() for q in paras):
             continue
