@@ -120,81 +120,92 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def cmd_review(args: argparse.Namespace) -> int:
-    """Parse, lay out, lint and critique a deck; print diagnostics and a score. Never fails a build."""
-    from .parser import parse
+    """Parse, lay out, lint and critique a deck; print diagnostics and a score. Never fails a build.
+
+    With ``--fix`` it also edits the source (``selfreview``): mechanical fixes, density splits, declared
+    low-contrast colors, long titles, and (with ``--png``) rendered-pixel contrast; prints before/after.
+    """
+    from .selfreview import analyze, render_pngs, self_review
 
     text = _read(args.input)
     if text is None:
         return 2
-    if _is_json(args.input):
-        from .jsonio import load_deck
-
-        deck = load_deck(text)
+    if args.output and not args.fix:
+        print("error: -o needs --fix", file=sys.stderr)
+        return 2
+    base = Path(args.input).resolve().parent
+    png_dir = Path(args.png) if args.png else None
+    fixed: list = []
+    before_score = None
+    rounds = 0
+    if args.fix and not _is_json(args.input):
+        res = self_review(text, base, png_dir=png_dir)
+        fixed, rounds, before_score = res.fixed, res.rounds, res.before.score
+        dest = Path(args.output) if args.output else Path(args.input)
+        if res.changed or args.output:
+            try:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(res.text, encoding="utf-8", newline="")
+            except OSError as e:
+                print(f"error: cannot write {dest}: {e}", file=sys.stderr)
+                return 2
+        ana = res.after
+        text = res.text
     else:
-        deck = parse(text)
-    diags = list(deck.diagnostics)
-    if not _has_errors(deck):
-        try:
-            from .critique import critique
-            from .layout import layout_slide
-            from .lint import lint
-            from .template import deck_theme, template_size
+        if args.fix:
+            print("note: --fix applies to Markdown decks only", file=sys.stderr)
+        if png_dir is not None and not _is_json(args.input):
+            from .selfreview import _full
 
-            deck.attrs.setdefault("base_dir", str(Path(args.input).resolve().parent))
-            theme, tdiags = deck_theme(deck, deck.attrs["base_dir"])
-            diags.extend(tdiags)
-            if size := template_size(theme):
-                deck.size = size
-            placed = [layout_slide(s, deck, theme, i) for i, s in enumerate(deck.slides)]
-            seen = {(d.rule, d.slide) for d in diags}
-            diags.extend(d for d in lint(deck, placed, theme) if (d.rule, d.slide) not in seen)
-            diags.extend(critique(deck, placed, theme))
-        except NotImplementedError:
-            pass
-        except Exception as e:
-            diags.append(
-                Diagnostic(
-                    level="warning",
-                    message=f"review failed: {type(e).__name__}: {e}",
-                    rule="check-layout",
-                    hint="report this deck as a bug; the diagnostics above are still valid",
-                )
-            )
-    from .critique import review_score
-
-    score = review_score(diags, len(deck.slides))
+            ana = _full(text, base, png_dir)
+        else:
+            ana = analyze(text, base, is_json=_is_json(args.input))
+    diags = ana.diags
     if args.format == "json":
-        _say(json.dumps({"score": score, "diagnostics": [d.model_dump() for d in diags]}, ensure_ascii=False))
+        payload: dict = {"score": ana.score, "diagnostics": [d.model_dump() for d in diags]}
+        if args.fix:
+            payload |= {
+                "score_before": before_score,
+                "rounds": rounds,
+                "fixed": [f.model_dump() for f in fixed],
+            }
+        _say(json.dumps(payload, ensure_ascii=False))
     else:
+        for f in fixed:
+            _say(str(f))
         for d in diags:
             _say(str(d))
-        print(f"score: {score}/100")
-    if args.png and not _has_errors(deck):
-        _review_png(args)
+        if before_score is not None and fixed:
+            print(f"score: {before_score} -> {ana.score}/100 ({rounds} round{'s' if rounds != 1 else ''})")
+        else:
+            print(f"score: {ana.score}/100")
+    if png_dir is not None and not any(d.level == "error" for d in diags):
+        _review_png(args, text, base, render_pngs)
     return 0
 
 
-def _review_png(args: argparse.Namespace) -> None:
+def _review_png(args: argparse.Namespace, text: str, base: Path, render) -> None:
+    """Leave the final slide-NN.png files in ``--png DIR`` (the loop may have rendered a rejected trial)."""
     try:
-        import tempfile
-
-        from .build import build
-        from .preview import have_soffice, pptx_to_pngs
+        from .preview import have_soffice
 
         if not have_soffice():
             print("note: --png skipped: LibreOffice (soffice) not found", file=sys.stderr)
             return
-        src = Path(args.input)
-        with tempfile.TemporaryDirectory(prefix="slidemark-") as tmp:
-            pptx = Path(tmp) / (src.stem + ".pptx")
-            if _is_json(args.input):
-                from .jsonio import build_deck, load_deck
+        if _is_json(args.input):
+            import tempfile
 
-                build_deck(load_deck(src), pptx, src.resolve().parent)
-            else:
-                build(src, pptx)
-            for p in pptx_to_pngs(pptx, Path(args.png)):
-                print(p, file=sys.stderr)
+            from .jsonio import build_deck, load_deck
+            from .preview import pptx_to_pngs
+
+            with tempfile.TemporaryDirectory(prefix="slidemark-") as tmp:
+                pptx = Path(tmp) / "deck.pptx"
+                build_deck(load_deck(text), pptx, base)
+                pngs = pptx_to_pngs(pptx, Path(args.png))
+        else:
+            pngs = render(text, base, Path(args.png))
+        for p in pngs:
+            print(p, file=sys.stderr)
     except Exception as e:
         print(f"note: --png failed: {type(e).__name__}: {e}", file=sys.stderr)
 
@@ -424,7 +435,18 @@ def make_parser() -> argparse.ArgumentParser:
     r = sub.add_parser("review", help="design critique: check + layout/design rules + score (never fails)")
     r.add_argument("input")
     r.add_argument("--format", choices=["text", "json"], default="text")
-    r.add_argument("--png", metavar="DIR", help="also write slide-NN.png previews here (needs LibreOffice)")
+    r.add_argument(
+        "--png",
+        metavar="DIR",
+        help="also write slide-NN.png previews here and check contrast on the rendered pixels (LibreOffice)",
+    )
+    r.add_argument(
+        "--fix",
+        action="store_true",
+        help="self-review loop (max 3 rounds): fix the source (dense/overflowing slides are split, failing "
+        "declared colors swapped, long titles moved into the lead), then print before/after score",
+    )
+    r.add_argument("-o", "--output", help="with --fix: write the fixed deck here, leave the input alone")
     r.set_defaults(func=cmd_review)
 
     im = sub.add_parser("import", help="convert a .pptx to SlideMark text (stdout, or -o file + images/)")

@@ -27,7 +27,7 @@
 
 `slidemark review deck.md [--format json] [--png DIR]` adds `design-*` rules (info/warning, never fails) and
 `score: N/100`: `sparse-box`, `wall-of-text`, `too-many-blocks`, `unbalanced`, `empty-band`, `no-message`,
-`inconsistent-boxes`, `long-title`. Apply the hint to the source; `--png` writes previews to look at.
+`inconsistent-boxes`, `long-title`. Apply the hint to the source; `--png` writes previews to look at. `--fix`: `slidemark docs review`.
 
 `check --fix deck.md [-o out.md]` rewrites mechanical problems (`@end`, did-you-mean typos, extra grid token,
 empty alt, unclosed fence, `* ` bullets, `Note:`/`<!-- -->` notes, Marp class), re-checks and prints `fixed L14
