@@ -6,9 +6,10 @@ import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import cmp_to_key
 
 from ..ir import Diagnostic
-from .emit import chart_lines, one_line, table_lines, text_lines
+from .emit import chart_lines, detect_lang, one_line, table_lines, text_lines
 from .links import find_links, recover_diagram
 from .links import tokens as link_tokens
 from .read import Item, ParaT, RunT, SlideData
@@ -25,6 +26,11 @@ class DeckInfo:
     accent: str | None = None  # RRGGBB of the theme accent (emphasis color)
     colors: dict[str, str] = field(default_factory=dict)  # name -> RRGGBB
     footers: set[str] = field(default_factory=set)
+    sections: list[tuple[str, list[int]]] = field(
+        default_factory=list
+    )  # PowerPoint sections (name, slide numbers)
+    margin_x: int = 0  # theme side margin and column gap (EMU); 0 = unknown
+    gap: int = 0
 
 
 @dataclass
@@ -160,9 +166,10 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
         if it.role:
             continue
         small = it.max_size is not None and it.max_size <= 12
+        label = data.connectors >= 2 and len(it.text) <= 20  # a short text on a diagram: an edge label
         if it.kind == "text" and (
             it.name.lower().startswith("footnote")
-            or (not it.fill and not it.line and it.y >= 0.8 * H and it.h <= 0.12 * H and small)
+            or (not it.fill and not it.line and it.y >= 0.8 * H and it.h <= 0.12 * H and small and not label)
         ):
             it.role = "footnote"
     for it in pool:
@@ -240,7 +247,7 @@ def _is_code(it: Item) -> bool:
     )
 
 
-def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
+def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = None) -> list[Block]:
     W, H = deck.width, deck.height
     slide_area = W * H
     cands = [
@@ -289,7 +296,7 @@ def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
         return Block(kind, it.x, it.y, it.w, it.h, item=it, paras=it.paras)
 
     def make(it: Item, nested: bool) -> list[Block]:
-        if it.kind == "table" or it.kind == "chart" or it.kind == "image":
+        if it.kind in ("table", "chart", "image", "math"):
             return [Block(it.kind, it.x, it.y, it.w, it.h, item=it)]
         if (it.role or "").startswith("callout"):
             return [Block("callout", it.x, it.y, it.w, it.h, item=it, paras=it.paras, callout=it.role[8:])]
@@ -333,19 +340,24 @@ def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
             head, extra = [it.paras[0]], it.paras[1:]
         else:
             k0 = real[0]
+            top = it.y  # an icon at the card's top edge pushes the heading down
+            for ic in icons or ():
+                if it.x <= ic.cx <= it.x + it.w and it.y <= ic.cy <= it.y + 0.4 * it.h:
+                    top = max(top, ic.y + ic.h)
             if (
                 k0.kind == "text"
                 and not kids.get(k0.uid)
                 and len(k0.paras) == 1
                 and not k0.paras[0].marker
                 and not (k0.role or "").startswith("callout")
-                and k0.y - it.y <= 0.3 * it.h
+                and k0.y - top <= 0.3 * it.h
             ):
                 head, body = k0.paras, real[1:]
         blocks: list[Block] = []
         for k in body:
             blocks.extend(make(k, True))
         blocks.sort(key=lambda b: (b.y, b.x))
+        blocks = fold_subheads(blocks, W, H)
         if head is None:
             return blocks
         if extra:
@@ -358,6 +370,35 @@ def make_blocks(pool: list[Item], deck: DeckInfo) -> list[Block]:
             continue
         out.extend(make(it, False))
     return _group_columns(_merge_cards(out, deck), deck)
+
+
+def fold_subheads(blocks: list[Block], W: int, H: int) -> list[Block]:
+    """A bold one-line text right above a text block at the same left edge is a ``###`` heading
+    (a sub-box without fill)."""
+    out: list[Block] = []
+    i = 0
+    while i < len(blocks):
+        b = blocks[i]
+        nxt = blocks[i + 1] if i + 1 < len(blocks) else None
+        if (
+            nxt is not None
+            and b.kind == "text"
+            and nxt.kind == "text"
+            and len(b.paras) == 1
+            and not b.paras[0].marker
+            and b.paras[0].all_bold
+            and not (b.item and b.item.role)
+            and abs(nxt.x - b.x) <= 0.02 * W
+            and -0.01 * H <= nxt.y - (b.y + b.h) <= 0.04 * H
+        ):
+            x0, y0 = min(b.x, nxt.x), b.y
+            x1, y1 = max(b.x + b.w, nxt.x + nxt.w), max(b.y + b.h, nxt.y + nxt.h)
+            out.append(Block("box", x0, y0, x1 - x0, y1 - y0, heading=b.paras, children=[nxt], sub=True))
+            i += 2
+            continue
+        out.append(b)
+        i += 1
+    return out
 
 
 def _group_columns(blocks: list[Block], deck: DeckInfo) -> list[Block]:
@@ -512,8 +553,56 @@ def _units(widths: list[float]) -> list[int]:
     return [x // g for x in u]
 
 
+def stretch_visuals(blocks: list[Block]) -> None:
+    """Pictures, diagrams and charts are centred in their cell: one beside a taller block takes its row."""
+    for v in blocks:
+        if v.kind not in ("fence", "image", "chart", "math"):
+            continue
+        for s in blocks:
+            if (
+                s is not v
+                and (v.x + v.w / 2 <= s.x or v.x + v.w / 2 >= s.x + s.w)
+                and s.y <= v.y
+                and s.y + s.h >= v.y + v.h
+                and s.h > 1.3 * v.h
+            ):
+                v.y, v.h = s.y, s.h
+                break
+
+
+def _reading_order(a: Block, b: Block) -> int:
+    """Top to bottom; blocks sharing most of their vertical span go left to right."""
+    ov = min(a.y + a.h, b.y + b.h) - max(a.y, b.y)
+    if ov > 0.5 * min(a.h, b.h):
+        return (a.x > b.x) - (a.x < b.x)
+    return (a.y > b.y) - (a.y < b.y)
+
+
+def split_row_groups(blocks: list[Block], W: int, H: int) -> list[list[Block]] | None:
+    """Rows of boxes with different column counts are row groups (``@end`` + a new ``@`` line each)."""
+    if len(blocks) < 3 or any(b.kind != "box" for b in blocks):
+        return None
+    toly = 0.03 * H
+    ys = _clusters([b.y for b in blocks], toly)
+    if len(ys) < 2:
+        return None
+    rows: list[list[Block]] = [[] for _ in ys]
+    for b in blocks:
+        rows[_nearest(ys, b.y)].append(b)
+    for r in rows:
+        r.sort(key=lambda b: b.x)
+        if max(b.w for b in r) > 1.12 * min(b.w for b in r) and not all(b.chevron for b in r):
+            return None
+    for a, b in zip(rows, rows[1:], strict=False):
+        if max(x.y + x.h for x in a) > min(x.y for x in b) + toly:
+            return None  # a box spans several rows: one grid
+    if len({len(r) for r in rows}) == 1:
+        return None  # same count per row: a plain grid
+    return rows
+
+
 def plan_grid(
-    blocks: list[Block], W: int, H: int, diags: list[str]
+    blocks: list[Block], W: int, H: int, diags: list[str], margin: int = 0, gap: int = 0
 ) -> tuple[list[str], list[Block], list[Block]]:
     """(tokens of the ``@`` line, grid blocks in source order, extras stacked full width below)."""
     if not blocks:
@@ -585,18 +674,33 @@ def plan_grid(
     n = len(grid)
     chev = all(b.kind == "box" and b.chevron for b in grid)
     full_cells = single and n == C * R
+    ncols = n
+    if equal and margin and C == n and abs(x0 - margin) <= tolx:
+        # columns left empty at the right (``@3`` with two boxes): the column width tells the count
+        avg = sum(cw) / len(cw)
+        total = round((W - 2 * margin + gap) / (avg + gap)) if avg + gap > 0 else n
+        if total > n and abs((W - 2 * margin + gap) / total - gap - avg) <= 0.03 * avg:
+            ncols = total
     if R == 1 and single:
         if chev:
-            return [str(n), "chevron"], ordered, extras
+            return [str(ncols), "chevron"], ordered, extras
         if not equal:
             return [":".join(map(str, _units(cw)))], ordered, extras
-        if not extras and n in (2, 3):
+        if not extras and n in (2, 3) and ncols == n:
             return [], ordered, extras
-        return [str(n)], ordered, extras
+        return [str(ncols)], ordered, extras
     if full_cells and equal:
         if not extras and (C, R) == (3, 2):
             return [], ordered, extras
         return [f"{C}x{R}"], ordered, extras
+    if (
+        single
+        and equal
+        and C >= 2
+        and R >= 2
+        and all(cells.get((i // C, i % C)) == seen[i] for i in range(n))
+    ):
+        return [str(C)], ordered, extras  # N columns, blocks wrap row by row, the last row may be short
     if (
         single
         and not extras
@@ -641,15 +745,82 @@ def _kpi(b: Block) -> bool:
     if len(b.children) != 1 or b.children[0].kind != "text":
         return False
     ps = b.children[0].paras
-    if not 2 <= len(ps) <= 3 or any(p.marker for p in ps):
+    if not 1 <= len(ps) <= 3 or any(p.marker for p in ps):
         return False
-    s0, s1 = ps[0].size, ps[1].size
+    s0 = ps[0].size
+    if len(ps) == 1:  # a lone value: big next to the heading
+        s1 = b.heading[0].size if b.heading else None
+    else:
+        s1 = ps[1].size
     return bool(s0 and s1 and s0 >= 1.5 * s1)
 
 
 def _head(paras: list[ParaT], out: Out) -> str:
     txt = one_line(paras, plain_bold=True, accent=None, classes=out.classes)
     return txt[:-1] + "\\}" if txt.endswith("}") else txt
+
+
+def _table_align(rows) -> str | None:
+    """``lrrl`` when the body columns are aligned differently from the automatic rule (figures right)."""
+    from ..layout.tables import NUMERIC_SHARE, is_numeric
+
+    ncols = max((len(r) for r in rows), default=0)
+    if ncols < 2 or len(rows) < 2:
+        return None
+    letters, differs = [], False
+    for c in range(ncols):
+        body = [
+            row[c]
+            for row in rows[1:]
+            if c < len(row)
+            and not row[c].hmerge
+            and not row[c].vmerge
+            and any(p.plain.strip() for p in row[c].paras)
+        ]
+        if not body:
+            letters.append("l")
+            continue
+        algs = [(cell.paras[0].align or "l") for cell in body]
+        mode = max(set(algs), key=algs.count)
+        let = {"l": "l", "ctr": "c", "r": "r"}.get(mode, "l")
+        texts = ["".join(p.plain for p in cell.paras).strip() for cell in body]
+        auto = "r" if sum(is_numeric(t) for t in texts) >= NUMERIC_SHARE * len(texts) else "l"
+        letters.append(let)
+        differs = differs or let != auto
+    return "".join(letters) if differs else None
+
+
+def _fit_attr(it: Item) -> str:
+    """``{fit=cover}`` for a cropped picture, ``{fit=stretch}`` when the box aspect differs from the image."""
+    if it.cropped:
+        return "{fit=cover}"
+    try:
+        import io
+
+        from PIL import Image as PILImage
+
+        with PILImage.open(io.BytesIO(it.img[0])) as im:
+            iw, ih = im.size
+        if iw and ih and it.w and it.h and abs((it.w / it.h) / (iw / ih) - 1) > 0.04:
+            return "{fit=stretch}"
+    except Exception:
+        pass
+    return ""
+
+
+def _narrow_cols(b: Block, out: Out) -> int | None:
+    """One block narrower than its box: the box's own ``@N`` line made N columns and it took the first."""
+    if len(b.children) != 1 or b.children[0].kind == "box":
+        return None
+    c = b.children[0]
+    pad = c.x - b.x
+    inner = b.w - 2 * pad
+    g = out.deck.gap / 2
+    if 0 <= pad <= 0.03 * out.deck.width and inner > 0 and g > 0 and c.w < 0.85 * inner:
+        ncol = round((inner + g) / (c.w + g))
+        if 2 <= ncol <= 4 and abs((inner - (ncol - 1) * g) / ncol - c.w) <= 0.06 * c.w:
+            return ncol
+    return None
 
 
 def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
@@ -660,7 +831,7 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     if b.kind == "code":
         text = "\n".join("".join(r.text.replace("\n", "\n") for r in p.runs) for p in b.paras)
         fence = "```" if "```" not in text else "````"
-        return [("fence", [fence, *text.split("\n"), fence])]
+        return [("fence", [fence + (detect_lang(b.paras) or ""), *text.split("\n"), fence])]
     if b.kind == "callout":
         lines = [one_line([p], accent=acc, classes=cls) for p in b.paras]
         lines = [ln for ln in lines if ln]
@@ -680,17 +851,29 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
                     hint="< and ^ cannot be combined in one cell; check the table",
                 )
             )
+        align = _table_align(b.item.rows)
+        if align and lines:
+            lines = ["{align=" + align + "}", *lines]
         return [("table", lines)] if lines else []
     if b.kind == "chart":
         return [("fence", chart_lines(b.item.chart))]
     if b.kind == "fence":
         return [("fence", b.lines)]
+    if b.kind == "math":
+        return [("fence", ["```math", *(b.item.latex or "").split("\n"), "```"])]
     if b.kind == "image":
         out.img_n += 1
+        if b.item.missing is not None:  # placeholder of an absent file: write a reference that stays absent
+            kind, label = b.item.missing
+            label = label.replace("[", "(").replace("]", ")").replace("\n", " ")
+            if re.fullmatch(r"[^\s()]+\.(png|jpe?g|gif|svg|webp|mp4|mov|webm|mp3|wav|m4a)", label, re.I):
+                return [("image", [f"![]({label})"])]
+            ext = {"image": "png", "video": "mp4", "audio": "mp3"}[kind]
+            return [("image", [f"![{label}](images/{out.slide_no}-{out.img_n}.{ext})"])]
         blob, ext = b.item.img
         ref = out.save_image(out.slide_no, out.img_n, blob, ext)
         alt = (b.item.alt or b.item.name or "image").replace("[", "(").replace("]", ")").replace("\n", " ")
-        return [("image", [f"![{alt}]({ref})"])]
+        return [("image", [f"![{alt}]({ref})" + _fit_attr(b.item)])]
     # box
     mark = "###" if b.sub else "##"
     chunks: list[tuple[str, list[str]]] = []
@@ -702,8 +885,19 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
         return [("meta", [head, *content])]
     if kpi:
         lines = [one_line([p], accent=acc, classes=cls, plain_bold=True) for p in b.children[0].paras]
-        return [("meta", [head, *[ln for ln in lines if ln]])]
-    chunks.append(("meta", [head, "@" + " ".join(b.links)] if b.links else [head]))
+        narrow = _narrow_cols(b, out)
+        return [("meta", [head, *[ln for ln in lines if ln], *([f"@{narrow}"] if narrow else [])])]
+    toks = list(b.links)
+    kids = [c for c in b.children if c.kind == "box"]
+    if kids and all(c.chevron and c.sub for c in kids) and len(kids) == len(b.children):
+        if len(kids) == 1:  # one chevron: its text, then the box's own ``@chevron`` line
+            k = kids[0]
+            lines = text_lines([*(k.heading or []), *k.paras], accent=acc, classes=cls)
+            return [("meta", [head]), ("text", lines), ("meta", ["@chevron"])]
+        toks = ["chevron", *toks]  # sub-boxes drawn as chevrons: the box's own ``@`` line says so
+    if not toks and (ncol := _narrow_cols(b, out)):
+        toks = [str(ncol)]
+    chunks.append(("meta", [head, "@" + " ".join(toks)] if toks else [head]))
     for ch in b.children:
         chunks.extend(("itext" if k == "text" else k, ln) for k, ln in emit_block(ch, out))
     return chunks
@@ -737,8 +931,9 @@ def build_slide(
     fold_into_tables(data)
     title, pool = classify(data, deck)
     by_role = {r: [i for i in data.items if i.role == r] for r in ("lead", "conclusion", "footnote")}
-    blocks = make_blocks(pool, deck)
-    _attach_icons([i for i in data.items if i.role == "icon"], blocks)
+    icons = [i for i in data.items if i.role == "icon"]
+    blocks = make_blocks(pool, deck, icons)
+    _attach_icons(icons, blocks)
     arrows = sum(1 for i in pool if i.kind == "shape" and i.prst and "rrow" in i.prst)
     notes: list[str] = []
     dia = recover_diagram(blocks, data.conns, data.items)
@@ -747,7 +942,7 @@ def build_slide(
         blocks = [b for b in blocks if not any(b is u for u in dia.used)]
         fence = ["```mermaid", *dia.lines, "```"]
         blocks.append(Block("fence", round(x), round(y), round(w), round(h), lines=fence))
-        blocks.sort(key=lambda b: (b.y, b.x))
+        blocks.sort(key=cmp_to_key(_reading_order))
         data.conns = []
         data.connectors = 0
     top, inner, lost = find_links(blocks, data.conns, data.items)
@@ -783,7 +978,26 @@ def build_slide(
         data.conns = []
         lost = 0
     gdiag: list[str] = []
-    tokens, grid, extras = plan_grid(blocks, deck.width, deck.height, gdiag)
+    stretch_visuals(blocks)
+    groups = None if (top or inner) else split_row_groups(blocks, deck.width, deck.height)
+    group_tokens: list[list[str]] = []
+    arrow_items = [i for i in pool if i.kind == "shape" and i.prst and "rrow" in i.prst]
+    if groups:
+        grid, extras = [], []
+        for g in groups:
+            tk, gr, ex = plan_grid(g, deck.width, deck.height, gdiag, deck.margin_x, deck.gap)
+            tk = tk or [str(len(gr))]
+            top_y, bot_y = min(b.y for b in g), max(b.y + b.h for b in g)
+            nar = sum(
+                1 for a in arrow_items if top_y - 0.03 * deck.height <= a.cy <= bot_y + 0.03 * deck.height
+            )
+            if nar and "chevron" not in tk and len(gr) > 1 and nar >= len(gr) - 1:
+                tk = [*tk, "flow"]
+            group_tokens.append(tk)
+            grid += gr
+        tokens = group_tokens[0]
+    else:
+        tokens, grid, extras = plan_grid(blocks, deck.width, deck.height, gdiag, deck.margin_x, deck.gap)
     for g in gdiag:
         diags.append(
             Diagnostic(level="info", message=g, slide=n, rule="import-layout", hint="check the arrangement")
@@ -810,10 +1024,11 @@ def build_slide(
     lead = by_role["lead"]
     if lead:
         lines.append("> " + one_line(lead[0].paras, accent=deck.accent, classes=classes))
-    if arrows and tokens and tokens[0].isdigit() and len(grid) > 1 and arrows >= len(grid) - 1:
+    n_boxes = sum(1 for b in grid if b.kind == "box")
+    if not groups and arrows and "chevron" not in tokens and n_boxes > 1 and arrows >= n_boxes - 1:
         tokens.append("flow")
     if info is not None:
-        info["tokens"] = [t for t in tokens if t != "blank"]
+        info["tokens"] = [] if groups else [t for t in tokens if t != "blank"]
         info["at"] = None
     seq = [*grid, *extras]
     links = link_tokens(top, seq, drop_next="flow" in tokens)
@@ -822,15 +1037,54 @@ def build_slide(
             b.links = link_tokens(inner[id(b)], b.children)
     if info is not None:
         info["links"] = links
+    extra: list[str] = []
+    title_only = (
+        title is not None
+        and all(b.kind == "text" for b in blocks)
+        and sum(len(b.paras) for b in blocks) + len(by_role["lead"]) <= 2
+        and not any(p.marker for b in blocks for p in b.paras)
+        and not by_role["conclusion"]
+        and not by_role["footnote"]
+        and not arrows
+        and not data.conns
+    )
+    if title_only:
+        footer_row = any(
+            i.role == "decor"
+            and (i.ph in ("ftr", "sldNum") or i.has_slidenum or i.name.lower() in ("footer", "slide number"))
+            for i in data.items
+        )
+        starts = {nums[0] for _, nums in deck.sections if nums}
+        if n == 1 and (footer_row or len(deck.sections) == 1):
+            extra.append("section")
+        elif n > 1 and deck.sections and n not in starts:
+            extra.append("cover")
+    if data.transition:
+        extra.append("t=" + data.transition)
+    if data.build:
+        extra.append("build")
     if data.hidden:
-        tokens = [*tokens, "hidden"]
-    tokens = [*[t for t in tokens if t != "hidden"], *links, *[t for t in tokens if t == "hidden"]]
+        extra.append("hidden")
+    if info is not None:
+        info["extra"] = extra
+        info["title_only"] = title_only
+    tokens = [*tokens, *links, *extra]
+    if info is not None:
+        info["pos"] = len(lines)
     if tokens:
         if info is not None:
             info["at"] = len(lines)
         lines.append("@" + " ".join(tokens))
     chunks: list[tuple[str, list[str]]] = []
+    starts: dict[int, list[str]] = {}
+    if groups:
+        pos = 0
+        for g, tk in zip(groups, group_tokens, strict=True):
+            starts[pos] = tk
+            pos += len(g)
     for i, b in enumerate(seq):
+        if i in starts and i > 0:
+            chunks.append(("meta", ["@end", "@" + " ".join(starts[i])]))
         chunks.extend(emit_block(b, out))
         if b.kind == "box":
             nxt = seq[i + 1] if i + 1 < len(seq) else None
