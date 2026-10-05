@@ -74,6 +74,7 @@ class Theme(BaseModel):
     table_zebra_fill: str | None = None  # alternate body row fill for `.zebra` tables (None = derived)
     heading_band: str | None = None  # fill of a full-width band behind `##` box headings (None = plain)
     heading_band_color: str = "bg"  # heading text color on the band
+    template: str | None = None  # path of a user .pptx/.potx used as the base presentation (masters, layouts)
     columns: int = 12  # layout track grid: ratio/area columns snap to multiples of width/columns
     dense_scale: float = 0.8  # body/table/code size factor for `density: dense` / `.dense` slides
     palette: list[str] = Field(
