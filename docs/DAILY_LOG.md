@@ -62,3 +62,10 @@ Run goal:
 - HTML corpus native 0.63 → 1.00 (30/30), diff 0.0111; brand eval 95% first pass ×2 runs, 0 shared palettes; round trip 97.3% → 99.1%; color fidelity of foreign imports 0.47 → 0.85; SKILL.md 895 tokens (agent gate 0.387).
 - Problems: the brief of task 115 forces a 2.8:1 title color (lint is right); stretched layouts can move emptiness inside cards (fixed text-first; `html_fit` made opt-in).
 - Next: real PowerPoint check of gradients/shadows/customXml (owner), L3 consulting judgement, L7 tokens ≤ 20%.
+
+## 2026-10-05 (run 4, chained manual, 10:55 UTC–)
+Run goal:
+- [ ] L3: consulting-grade dense JP set (≥ 8 slides) + sparse cards (05 s2, 11 s9) + small HTML grid text (12 s1)
+- [ ] Larger HTML corpus (30 → 45, harder) with fidelity kept ≥ 0.9 per slide
+- [ ] Harder brand-eval briefs (121–140) run and reviewed
+- [ ] L7 token research: content floor vs python-pptx, report + proposal

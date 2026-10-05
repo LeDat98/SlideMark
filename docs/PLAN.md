@@ -319,3 +319,16 @@ open to new names), presets as YAML (`src/slidemark/presets/*.yaml`), `theme: no
 - [ ] Round trip: 1 deck left (114/115)
 - [ ] Owner: open a design deck (gradients, shadows, customXml design part) in real PowerPoint: repair check
 - [ ] L3 consulting-grade judgement; L7 tokens ≤ 20% of python-pptx (syntax design pass)
+
+## Run 2026-10-05 (run 4, chained, 10:55 UTC) work packages
+Goal: close L3 (consulting-grade dense JP set), then the best-value open gates (harder brand briefs, larger
+HTML corpus, L7 token research). Design freedom stays the rule: fixes are mechanisms/tokens, never looks.
+- **Wave 1 A: HTML text zoom + harder HTML corpus** (`htmlnative.py`, `bench/html_corpus/`, `bench/html_fidelity.py`,
+  `tests/test_htmlnative*.py`): an HTML block whose content is much smaller than its box renders at a narrower
+  viewport (zoom ≤ `layout.html_zoom_max`, opt-out `{zoom=1}`) so default 16px text is not 12pt in a large box;
+  corpus 30 → 45 harder slides (dense JP, nested flex, tables in cards, SVG icons, absolute positioning).
+- **Wave 1 B: sparse cards v3** (`layout/`, `render/`): no card interior < 60% filled on 05 s2, 11 s9 and the other
+  examples (measure with `bench/whitespace.py`); paragraph gaps never larger than ~1 line; leftover goes to a
+  balanced band, not inside cards. New knobs are `layout.*` tokens.
+- **Orchestrator:** consulting-grade dense JP set (examples/16, ≥ 8 slides) reviewed slide by slide; L7 token
+  floor research (content-only floor of q3 vs python-pptx); harder brand briefs (`bench/tasks/121-140`).
