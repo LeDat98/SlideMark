@@ -14,7 +14,7 @@ from ..ir import Cell, Paragraph, Placed, Shape, Style, Table, fast_style
 from ..theme import Theme
 from ..units import EMU_PER_PT
 from . import css, measure
-from .tables import _DASHES, column_widths, compact_header, table_grid
+from .tables import _DASHES, _para_em, column_widths, compact_header, table_grid
 
 _BAR_MAX = 0.92  # a bar never takes more than this share of its row
 _MARKS = _DASHES | {"―"}  # "no value" placeholders: no bar
@@ -97,6 +97,149 @@ def _fit_bar(paras: list[Paragraph], style: Style, w: int, h: int, band: int, sc
         k = max(k * 0.95, lowest * scale)
 
 
+_EVEN_ROUNDS = 8  # pin-and-redistribute passes of ``even_columns`` (each pass pins at least one column)
+
+
+def _one_line(paras: list[Paragraph], style: Style, scale: float, bold: bool) -> Callable[[int], bool]:
+    """``f(inner width)``: every paragraph fits one line, badges counted with their padding (the plain height
+    measure does not see a badge pushed onto its own line)."""
+    head = measure.tokens().badge_headroom  # fallback fonts run wider; badges more so
+    em = (
+        max(
+            (_para_em(p, bold, style.text_transform)[0] * (head if any(r.highlight for r in p.runs) else 1.0))
+            for p in paras
+        )
+        if paras
+        else 0.0
+    )
+    size = (style.font_size or 14) * scale * EMU_PER_PT
+    return lambda w: em * size <= w
+
+
+def _split(total: int, n: int) -> list[int]:
+    q, r = divmod(total, n)
+    return [q + (1 if i < r else 0) for i in range(n)]
+
+
+def _min_total(ok: Callable[[int], bool], hi: int) -> int:
+    """Smallest width (EMU, within 1pt) at which ``ok`` holds, given that it holds at ``hi``."""
+    lo, hi = 0, max(hi, 1)
+    while hi - lo > EMU_PER_PT:
+        mid = (lo + hi) // 2
+        lo, hi = (lo, mid) if ok(mid) else (mid, hi)
+    return hi
+
+
+def even_columns(
+    pl: Placed,
+    style: Style,
+    theme: Theme,
+    pad_pt: float,
+    bar_ratio: float,
+) -> Placed:
+    """``pl`` with equal period columns: label column(s) and total width stay, the rest is split evenly.
+
+    Runs after every growth pass, so no later step re-grows text into the new columns. Every cell must still
+    be as good as it was: a table cell keeps its text height (no new wrap), a bar keeps its text size. A
+    column that cannot take its equal share is pinned to the width it needs and the others share the rest; if
+    even that fails the widths stay. ``widths=`` of the author always wins."""
+    t = pl.element
+    nrows, ncols, anchors = table_grid(t)
+    first = max(t.header_cols, 1)
+    if t.col_widths or ncols - first < 2:
+        return pl
+    cw, rh = table_boxes(pl)
+    cw = [int(w) for w in cw[:ncols]]
+    rest = sum(cw[first:])
+    n = ncols - first
+    if rest <= 0 or n * EMU_PER_PT > rest:
+        return pl
+    pad = round(pad_pt * EMU_PER_PT)
+    bars = {id(c): (r, c0, c) for r, c0, c in bar_cells(t, anchors)}
+    ys = [0]
+    for h in rh[:nrows]:
+        ys.append(ys[-1] + int(h))
+    # one check per cell group (c0, c1): ok(total width of the columns) says whether the cell is still fine
+    groups: dict[tuple[int, int], list[Callable[[int], bool]]] = {}
+    px, py = measure.cell_pad()
+    for r, c0, cell in anchors:
+        if c0 < first:
+            continue
+        c1 = min(c0 + max(cell.colspan, 1), ncols)
+        old = sum(cw[c0:c1])
+        if id(cell) in bars:
+            r1 = min(r + max(cell.rowspan, 1), nrows)
+            band = ys[r1] - ys[r]
+            paras = _bar_paragraphs(cell, theme, style)
+
+            def fit(w: int, paras=paras, band=band):
+                return _fit_bar(paras, style, w - 2 * pad, round(band * bar_ratio), band, pl.font_scale, 0.0)
+
+            _, k0, ok0 = fit(old)
+            ph = css.inset_hv(style)[0]
+            line = _one_line(paras, style, k0, False)
+            was1 = line(old - 2 * pad - ph)
+
+            def check(w: int, fit=fit, k0=k0, ok0=ok0, line=line, was1=was1, ph=ph) -> bool:
+                _, k, ok = fit(w)
+                return k >= k0 - 1e-6 and (ok or not ok0) and (line(w - 2 * pad - ph) or not was1)
+
+        else:
+            cl, ct, cr, cb = css.cell_insets(cell.style, px, py)
+            st = pl.style.merged(cell.style)
+            if r < t.header_rows or c0 < t.header_cols:
+                st = st.merged(fast_style(bold=True))
+
+            def need(w: int, cell=cell, st=st, ins=(cl, ct, cr, cb)) -> float:
+                return measure.paragraphs_height(cell.paragraphs, w - ins[0] - ins[2], st, pl.font_scale)
+
+            n0 = need(old)
+            line = _one_line(cell.paragraphs, st, pl.font_scale, st.bold is True)
+            was1 = line(old - cl - cr)
+
+            def check(w: int, need=need, n0=n0, line=line, was1=was1, ins=(cl, cr)) -> bool:
+                return need(w) <= n0 + 1 and (line(w - ins[0] - ins[1]) or not was1)
+
+        groups.setdefault((c0, c1), []).append(check)
+
+    def violated(widths: list[int]) -> list[tuple[int, int]]:
+        return [g for g, fs in groups.items() if not all(f(sum(widths[g[0] : g[1]])) for f in fs)]
+
+    pinned: dict[int, int] = {}
+    widths = list(cw)
+    for _ in range(_EVEN_ROUNDS):
+        free = [c for c in range(first, ncols) if c not in pinned]
+        if not free:
+            return pl
+        share = _split(rest - sum(pinned.values()), len(free))
+        if min(share) <= 0:
+            return pl
+        widths = cw[:first] + [0] * n
+        for c, w in pinned.items():
+            widths[c] = w
+        for c, w in zip(free, share, strict=True):
+            widths[c] = w
+        bad = violated(widths)
+        if not bad:
+            break
+        for c0, c1 in bad:
+            fs = groups[(c0, c1)]
+            old = sum(cw[c0:c1])
+            need = _min_total(lambda w, fs=fs: all(f(w) for f in fs), old)
+            cols = [c for c in range(c0, c1) if c not in pinned]
+            if not cols:
+                continue
+            each = (need - sum(widths[c] for c in range(c0, c1) if c in pinned)) // len(cols) + 1
+            for c in cols:
+                pinned[c] = max(each, 1)
+    else:
+        return pl
+    if violated(widths) or sum(widths) != sum(cw) or widths == cw:
+        return pl
+    attrs = {**t.attrs, "_col_w": widths}
+    return pl.model_copy(update={"element": t.model_copy(update={"attrs": attrs})})
+
+
 def expand_gantt(
     out: list[Placed],
     theme: Theme,
@@ -116,6 +259,10 @@ def expand_gantt(
             res.append(pl)
             continue
         nrows, ncols, anchors = table_grid(t)
+        style = style_for(pl)
+        if measure.tokens().gantt_even:
+            pl = even_columns(pl, style, theme, pad_pt, bar_ratio)
+            t = pl.element
         cw, rh = table_boxes(pl)
         xs = [pl.x]
         for w in cw[:ncols]:
@@ -124,7 +271,6 @@ def expand_gantt(
         for h in rh[:nrows]:
             ys.append(ys[-1] + int(h))
         pad = round(pad_pt * EMU_PER_PT)
-        style = style_for(pl)
         bars: list[Placed] = []
         emptied: set[int] = set()
         for r, c, cell in bar_cells(t, anchors):

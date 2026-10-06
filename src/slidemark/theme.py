@@ -342,6 +342,7 @@ class LayoutTokens(BaseModel):
     )
     gantt_pad: float = 3.0  # pt: a `.gantt` bar is inset this much from its cell range (left / right)
     gantt_bar: float = 0.66  # a `.gantt` bar is this share of its row high, centered in the row
+    gantt_even: bool = True  # `.gantt` period columns get equal widths (label column kept) when text fits
     # --- stretched tables and badges (vfill / render)
     table_comfort_em: float = (
         2.7  # a table whose rows end up taller than this x text grows its text (0 = off) ...
@@ -359,6 +360,9 @@ class LayoutTokens(BaseModel):
     table_box_max: float = 1.0  # ... and within this x the box text of the slide (0 = no limit)
     table_fit: bool = (
         True  # a table beside a taller chart / image, or the last block above a footnote, fills to there
+    )
+    table_fit_row_max_em: float = (
+        7.0  # a table fitted to a taller chart / image beside it: body rows <= this x text (bottoms line up)
     )
     badge_pad: int = 2  # a badge run of Latin text gets this many no-break spaces on each side
     badge_pad_cjk: int = 1  # ... of CJK text this many full-width spaces

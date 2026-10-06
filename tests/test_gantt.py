@@ -190,3 +190,81 @@ def test_badge_in_same_color_bar_is_a_tinted_pill(tmp_path):
     assert hl not in ("FFFFFF", fill) and ratio(hl, fill) > 1.5  # a tint, not white and not the bar color
     assert ratio(ink, hl) >= 4.5
     assert pills["完了"][0] != hl  # a success badge keeps its own color
+
+
+EVEN = """# Plan
+
+{.gantt header=2}
+| 施策 | 2027 | < | 2028 | < |
+|-|-|-|-|-|
+| ^ | 上期 | 下期 | 上期 | 下期 |
+| IoT | 搭載 | 全機種 | 後付け | < |
+| AI | 試行 | PoC | 本番 | < |
+"""
+
+
+def _widths(md: str, theme: str = "default") -> list[int]:
+    table, _, _ = _parts(md, theme)
+    return table_boxes(table)[0]
+
+
+def test_even_period_columns_when_text_fits():
+    cw = _widths(EVEN)
+    assert max(cw[1:]) - min(cw[1:]) <= 1
+    assert cw[0] > cw[1] * 0.4  # the label column keeps its own width
+    table, _, _ = _parts(EVEN)
+    assert sum(cw) == table.w
+
+
+def test_even_columns_keep_label_width_and_total():
+    off = parse("style: layout.gantt_even=off\n\n" + EVEN)
+    placed = layout_slide(off.slides[0], off, get_theme("default"), 0)
+    t_off = next(p for p in placed if isinstance(p.element, Table))
+    cw_off = table_boxes(t_off)[0]
+    cw = _widths(EVEN)
+    # label column and total are the same whether or not the period columns are evened
+    assert sum(cw) == sum(cw_off)
+
+
+def test_user_widths_win():
+    cw = _widths(EVEN.replace("{.gantt header=2}", "{.gantt header=2 widths=3:1:1:1:4}"))
+    assert cw[4] > 3 * cw[2]
+
+
+def test_tight_bars_keep_their_text_size_and_unwrap():
+    # a long badge bar in one column and a short one elsewhere: nearest feasible widths, nothing overflows
+    md = EVEN.replace("搭載", "新機種へ搭載 [開始]{.badge}")
+    table, bars, deck = _parts(md)
+    cw = table_boxes(table)[0]
+    assert cw[1] > cw[2]  # the wide bar keeps what it needs ...
+    assert not [d for d in deck.diagnostics if d.rule == "gantt-text"]
+    assert all(abs(b.font_scale - table.font_scale) < 1e-6 for b in bars)
+    assert sum(cw) == table.w
+
+
+def test_even_columns_survive_the_render(tmp_path):
+    out = tmp_path / "g.pptx"
+    build(EVEN, out)
+    tbl = next(s for s in Presentation(out).slides[0].shapes if s.has_table).table
+    ws = [c.width for c in tbl.columns]
+    assert max(ws[1:]) - min(ws[1:]) <= 1
+
+
+def test_16_strategy_gantt_has_no_overflow():
+    from pathlib import Path
+
+    md = Path(__file__).parent.parent.joinpath("examples/16-jp-strategy.md").read_text(encoding="utf-8")
+    deck = parse(md)
+    from slidemark.template import deck_theme
+
+    theme, _ = deck_theme(deck, "examples")
+    n = next(
+        i
+        for i, s in enumerate(deck.slides)
+        if any(isinstance(e, Table) and "gantt" in e.classes for e in s.elements)
+    )
+    placed = layout_slide(deck.slides[n], deck, theme, n)
+    table = next(p for p in placed if isinstance(p.element, Table))
+    cw = table_boxes(table)[0]
+    assert sum(cw) == table.w
+    assert not [d for d in deck.diagnostics if d.rule == "gantt-text"]
