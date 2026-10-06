@@ -16,7 +16,7 @@ from .test_layout_l3_fill import EX, cards, inside, lay
 
 @pytest.mark.parametrize(("name", "n"), [("16-jp-strategy.md", 10), ("11-jp-consulting.md", 9)])
 def test_decision_cards_share_one_capped_rhythm_and_a_head_pad(name, n):
-    placed, _, theme = lay(name, n)
+    placed, _, theme = lay(name, n, cards_to_bar=False)
     cs = cards(placed)
     assert len(cs) == 2
     mains = [inside(placed, c)[0] for c in cs]

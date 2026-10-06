@@ -51,7 +51,7 @@ def tail(p, card) -> int:
 
 @pytest.mark.parametrize(("name", "n"), [("16-jp-strategy.md", 10), ("11-jp-consulting.md", 9)])
 def test_decision_row_is_top_anchored_tall_and_spread(name, n):
-    placed, deck, _ = lay(name, n)
+    placed, deck, _ = lay(name, n, cards_to_bar=False)  # the sparse row fill (cards_to_bar: test_l3_bar.py)
     H = 720 * 9525
     lead = role(placed, "lead")[0]
     foot = role(placed, "footnote")[0]
@@ -103,9 +103,7 @@ def test_render_reopens_with_tall_cards(tmp_path):
     assert len(tall) >= 2
     top = min(s.top for s in tall)
     assert top < 0.25 * prs.slide_height  # right under the lead
-    assert (
-        0.4 * prs.slide_height < max(s.top + s.height for s in tall) < 0.7 * prs.slide_height
-    )  # shrunk to its content, never stretched to the band
+    assert max(s.top + s.height for s in tall) > 0.8 * prs.slide_height  # stretched down to the bar
     paras = [s for s in sl.shapes if s.has_text_frame and "2027" in s.text_frame.text]
     assert paras and any(
         p.space_before and p.space_before.pt > 8 for sh in paras for p in sh.text_frame.paragraphs[1:]
@@ -179,11 +177,11 @@ def tails(placed):
 
 @pytest.mark.parametrize(("name", "n"), [("16-jp-strategy.md", 10), ("11-jp-consulting.md", 9)])
 def test_decision_cards_tail_is_at_most_a_quarter(name, n):
-    placed, _, _ = lay(name, n)
+    placed, _, _ = lay(name, n, cards_to_bar=False)  # the shortened sparse row (stretching: test_l3_bar.py)
     assert max(tails(placed)) <= LayoutTokens().l3_tail_max + 0.01
-    off, _, _ = lay(name, n, l3_tail_max=1.0)  # the rule off: the old, emptier cards
+    off, _, _ = lay(name, n, l3_tail_max=1.0, cards_to_bar=False)  # the rule off: the old, emptier cards
     assert max(tails(off)) > 0.28
-    top = lay(name, n, l3_tail_max=1.0)[0]
+    top = lay(name, n, l3_tail_max=1.0, cards_to_bar=False)[0]
     assert min(c.y for c in cards(placed)) == min(c.y for c in cards(top))  # top-anchored either way
     assert all(inside(placed, c)[0].style.valign in (None, "top") for c in cards(placed))
 

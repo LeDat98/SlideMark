@@ -72,6 +72,8 @@ class LayoutTokens(BaseModel):
     chevron_fill_share: float = (
         0.66  # a lone chevron row (top-anchored) is this share of the body tall at least
     )
+    chevron_text_max_pt: float = 26  # a lone chevron row grows its text up to this size (pt), 0 = off ...
+    chevron_text_fill: float = 0.6  # ... while the text block stays within this share of the chevron height
     chevron_pad: Length = "4pt"
     chevron_min_h: Length = "0.7in"
     chevron_max_h: Length = "1.3in"
@@ -180,6 +182,7 @@ class LayoutTokens(BaseModel):
     sparse_max_pt: float = 20  # ... but body text never beyond this size (pt)
     sparse_para_gap: float = 0.6  # paragraph gap (em) of a card at the sparse step
     callout_pad_min: Length = "6pt"  # a callout / note box has at least this padding on every side
+    conclusion_foot_gap: Length = "0.12in"  # air between a conclusion bar and the footnote line under it
     footnote_gap: Length = "0.14in"  # min air between a chart (legend included) and the footnote band
     body_size_unify: bool = True  # table text on a slide with boxes is never smaller than the box body text
     unify_max: float = 1.3  # ... lifting a table by more than this factor is refused
@@ -247,6 +250,10 @@ class LayoutTokens(BaseModel):
     l3_panel_shrink: float = (
         0.9  # ... a sparse panel gives back this share of its empty height (ends at its content)
     )
+    cards_to_bar: bool = True  # cards (row / grid) above a conclusion bar stretch down to it
+    card_hollow_fill: float = 0.5  # ... a stretched card filled less than this spreads its items
+    card_stretch_min_fill: float = 0.35  # ... cards that would stay under this filled keep hugging
+    card_hollow_gap_cap: float = 2.0  # ... by at most this extra paragraph gap (em), instead of one dead band
     l3_short_items: int = 4  # ... before the row is shortened to meet l3_tail_max (top-anchored)
 
 
