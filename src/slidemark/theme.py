@@ -324,6 +324,10 @@ class LayoutTokens(BaseModel):
     tree_box_air: float = (
         1.15  # ... but a box is at most this much taller than its text (the rest goes to the gaps)
     )
+    tree_box_air_max: float = (
+        1.2  # ... up to this much once the gaps are at their cap (the tree then fills the body)
+    )
+    tree_parent_span: float = 0.5  # a parent is at least this share of its children's span wide (never wider)
     tree_pad_share: float = 0.5  # ... and this share of the height the text leaves free moves the body down
     tree_wide: float = 1.3  # ... a lone box of a level (the root) may be this much wider ...
     tree_wide_max: float = 0.6  # ... but never beyond this share of the body width

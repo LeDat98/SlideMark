@@ -818,6 +818,48 @@ def _fill_tree(items: list, body: Rect, lt, reserve: int) -> list:
     row_of = {b: k for k, r in enumerate(rows) for b in r}
     lone = [r[0] for r in rows if len(r) == 1 and len(rows) > 1 and lt.tree_wide > 1.0]
 
+    kids: dict[int, list[int]] = {}
+    for i in lines:
+        a = items[i].element.attrs
+        kids.setdefault(by_rect[tuple(a["src_box"])], [])
+        if by_rect[tuple(a["dst_box"])] not in kids[by_rect[tuple(a["src_box"])]]:
+            kids[by_rect[tuple(a["src_box"])]].append(by_rect[tuple(a["dst_box"])])
+
+    def _balance(res: dict[int, tuple[int, int]]) -> dict[int, tuple[int, int]]:
+        """Siblings of one parent get the widest sibling's width (when the row stays clear);
+        parents are centered over their children, as wide as ``tree_parent_span`` of the children's span
+        but never wider than that span (nor narrower than they already are)."""
+        if lt.tree_parent_span <= 0:
+            return res
+        orig = dict(res)
+        for ks in kids.values():
+            if len(ks) > 1:
+                w = max(res[k][1] for k in ks)
+                eq = {k: (res[k][0] + res[k][1] // 2 - w // 2, w) for k in ks}
+                rest = [(res[k][0], res[k][1]) for k in order if k not in eq and row_of[k] == row_of[ks[0]]]
+                xs = sorted([*eq.values(), *rest])
+                ok = xs[0][0] >= body.x and xs[-1][0] + xs[-1][1] <= body.right
+                ok = ok and all(xs[n][0] + xs[n][1] <= xs[n + 1][0] for n in range(len(xs) - 1))
+                if ok:
+                    res.update(eq)
+        for k in range(len(rows) - 2, -1, -1):  # bottom-up: a parent follows its (final) children
+            for b in rows[k]:
+                ks = kids.get(b)
+                if not ks:
+                    continue
+                left = min(res[c][0] for c in ks)
+                right = max(res[c][0] + res[c][1] for c in ks)
+                span = right - left
+                w = res[b][1]
+                if w < span:
+                    w = min(max(w, round(lt.tree_parent_span * span)), span) if len(ks) > 1 else span
+                res[b] = (min(max((left + right) // 2 - w // 2, body.x), max(body.right - w, body.x)), w)
+        for r in rows:  # a row that now overlaps keeps its old widths
+            xs = sorted(res[b] for b in r)
+            if any(xs[n][0] + xs[n][1] > xs[n + 1][0] for n in range(len(xs) - 1)):
+                return orig
+        return res
+
     fitted: set[int] = set()  # lone boxes widened beyond the usual factor to keep their heading on one line
 
     def widths(tf: float) -> dict[int, tuple[int, int]]:
@@ -836,7 +878,7 @@ def _fill_tree(items: list, body: Rect, lt, reserve: int) -> list:
                     fitted.add(b)
             w = min(w, cap)
             res[b] = (min(max(p.x + p.w // 2 - w // 2, body.x), max(body.right - w, body.x)), w)
-        return res
+        return _balance(res)
 
     new_x = widths(1.0)
 
@@ -877,6 +919,18 @@ def _fill_tree(items: list, body: Rect, lt, reserve: int) -> list:
         nhs.append(min(round(row_h[k] * sb), max(floor, round(need * air))))
     if gs > 0:
         sg = max(1.0, min((target - sum(nhs)) / gs, lt.tree_gap_grow))
+    left = target - sum(nhs) - round(gs * sg)
+    if left > 0 and lt.tree_box_air_max > lt.tree_box_air:  # gaps are capped: the boxes take the rest
+        caps = []
+        for k, r in enumerate(rows):
+            need = max(
+                _tree_stack(items, b, members[b], new_x[b][1] - items[b].w, tf, b in fitted)[1] for b in r
+            )
+            caps.append(max(nhs[k], min(round(row_h[k] * sb), round(need * lt.tree_box_air_max))) - nhs[k])
+        tot = sum(caps)
+        if tot > 0:
+            take = min(left, tot) / tot
+            nhs = [h + round(c * take) for h, c in zip(nhs, caps, strict=True)]
     # ---- new geometry
     out = list(items)
     new_rect: dict[tuple, tuple[int, int, int, int]] = {}
