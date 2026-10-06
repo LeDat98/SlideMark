@@ -295,6 +295,12 @@ class LayoutTokens(BaseModel):
     badge_pad: int = 2  # a badge run of Latin text gets this many no-break spaces on each side
     badge_pad_cjk: int = 1  # ... of CJK text this many full-width spaces
     badge_gap: bool = True  # a badge after text that does not end in a space gets a plain space before it
+    # --- chevron rows: alone on the slide / above a table
+    chevron_lone_h: float = 0.72  # a lone chevron row grows up to this share of the body height ...
+    chevron_lone_aspect: float = 1.0  # ... but never taller than this x its chevron width
+    chevron_lone_top: float = 0.4  # ... and sits with this share of the leftover above it (optical center)
+    chevron_table_fill: float = 0.72  # above a table the chevron text may fill this share of its height ...
+    chevron_table_grow: Length = "0.3in"  # ... and the row may grow this much taller at the table's expense
 
 
 class RenderTokens(BaseModel):
