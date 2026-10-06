@@ -202,12 +202,14 @@ def fill_text(
     inset: int | None = None,
     gap_em: float | None = None,
     box_w: int | None = None,
+    squeeze: bool = True,
 ) -> None:
     """Write ``paragraphs`` into text frame ``tf`` using the (already merged) ``style``.
 
     ``gap_em`` is the space before every paragraph but the first, x font size (default ``measure.para_gap()``;
     the layout passes a larger value for roomy cards, as ``attrs["para_gap"]`` of the text).
-    ``box_w`` (EMU, the frame width) turns on the CJK orphan squeeze, which needs the line width.
+    ``box_w`` (EMU, the text width before the frame margins) turns on the CJK orphan squeeze and the phrase
+    breaks, which need the line width; ``squeeze=False`` keeps only the phrase breaks (chevrons).
     """
     gap = measure.para_gap() if gap_em is None else gap_em
     tf.word_wrap = True
@@ -233,7 +235,7 @@ def fill_text(
         cuts: dict[int, list[int]] = {}
         if box_w is not None and not field:
             wpt = (box_w - pl - pr - (measure.list_indent(size, p.level)[0] if p.marker else 0)) / EMU_PER_PT
-            sq = measure.paragraph_squeeze(p, pst, wpt, size)
+            sq = measure.paragraph_squeeze(p, pst, wpt, size) if squeeze else 0.0
             if plan := jbreak.plan_breaks(p, pst, wpt, size, sq):
                 cuts, sq = plan
         first_text = ""
