@@ -463,3 +463,11 @@ Goal: L3 consulting-grade per the run-6 designer review; AC4 gate text unchanged
   (to the footnote); spread hollow cards stay top-anchored (no lead air); covers: larger title in the band.
 - **Wave 4 B2 (`render/`):** value axis max = a nice number just above the data max (stacked: category sums) unless
   `max=`; bar gap width scales with few categories; CJK badges never clip glyphs.
+- **Wave 4 status:** card gutter above/below the conclusion bar, top-anchored spread cards, composed covers (11 title
+  34 → 60pt), nice value-axis max (11 s3 0–140 → 0–125), gap width 180% for ≤ 3 categories, non-bold CJK badges. 1653 tests.
+- **Designer re-score 2 (same prompt):** 11 = 3, 16 = 3, 19 = 2.5–3, "no": decision cards still sparse, card body text
+  too large (20pt+), conclusion bar text smaller than card text, chevrons vs table columns, greyed `.muted` cards.
+- **Eval smoke (skill-only, brief set 2):** c05 3 calls 20.0k, c08 3 calls 21.6k above start, both accepted, 0 images (unchanged).
+- **Wave 5 B1 (`layout/engine.py`, `layout/l3fill.py`, `layout/vfill.py`):** a lone KPI row (eval c05 s2: four cards
+  stretched to the full body, value floating mid-card) hugs its content, KPI values grow, the row sits at the optical center.
+- **Wave 5 B2 (`theme.py` role sizes / `render/`):** conclusion bar text never smaller than the card body text on its slide.
