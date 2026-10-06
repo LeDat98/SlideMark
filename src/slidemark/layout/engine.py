@@ -407,7 +407,20 @@ def _callout_floor(ctx: _Ctx, st: Style) -> Style:
     small = ctx.theme.sizes.get("footnote", DEFAULT_SIZES["footnote"])
     if st.font_size is not None and st.font_size < small:
         upd["font_size"] = small
-    return st.merged(fast_style(**upd)) if upd else st
+    st = st.merged(fast_style(**upd)) if upd else st
+    if ctx.depth > 0:  # inside a box: roomier, and the text clears the accent bar
+        box = max(to_emu(ctx.lt.callout_box_pad), to_emu(ctx.lt.callout_pad_min))
+        bar = to_emu(ctx.lt.callout_bar_w)
+        left, top, right, bottom = css.insets(st)
+        st = st.merged(
+            fast_style(
+                padding_left=f"{max(left, box + bar) / EMU_PER_PT}pt",
+                padding_top=f"{max(top, box) / EMU_PER_PT}pt",
+                padding_right=f"{max(right, box) / EMU_PER_PT}pt",
+                padding_bottom=f"{max(bottom, box) / EMU_PER_PT}pt",
+            )
+        )
+    return st
 
 
 def _only_inheritable(s: Style) -> Style:
@@ -564,6 +577,14 @@ def _grown(ctx: _Ctx, el, eff: float) -> float:
         if el.role == "body" and "callout" not in el.classes:
             ctx.grew = True
             return eff * ctx.grow
+        if "callout" in el.classes and ctx.depth > 0 and ctx.lt.callout_text_step > 0:
+            # a note inside a box follows the box text: at most one step smaller
+            base = max(_text_style(ctx, el, fast_style()).font_size or 18, 1.0)
+            box_pt = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
+            f = min(max(box_pt / ctx.lt.callout_text_step / base, 1.0), ctx.grow)
+            if f > 1.0:
+                ctx.grew = True
+                return eff * f
     elif (
         ctx.grow > 1.0
         and ctx.depth == 0

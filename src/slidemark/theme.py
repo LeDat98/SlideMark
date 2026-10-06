@@ -209,6 +209,11 @@ class LayoutTokens(BaseModel):
     sparse_max_pt: float = 20  # ... but body text never beyond this size (pt)
     sparse_para_gap: float = 0.6  # paragraph gap (em) of a card at the sparse step
     callout_pad_min: Length = "6pt"  # a callout / note box has at least this padding on every side
+    callout_box_pad: Length = "8pt"  # ... inside a box / card it has at least this (left: + the accent bar)
+    callout_text_step: float = (
+        1.15  # ... a callout in a box grows with the box text, at most this much smaller
+    )
+    callout_bar_w: Length = "4pt"  # ... width of its left accent bar
     cover_title_y: float = (
         0.42  # cover: the title (+ subtitle) block is centred on this share of the slide height (0 = off)
     )
@@ -280,6 +285,12 @@ class LayoutTokens(BaseModel):
     l3_text_max_pt: float = 20  # ... card / panel body text of such a slide may grow up to this size (pt)
     chart_plot_top_em: float = (
         3.5  # ... a chart with a title: its plot area starts this many title sizes below the chart top
+    )
+    panel_to_visual: bool = (
+        True  # a hollow panel beside a chart spans it: top at the plot top, bottom at the chart's
+    )
+    panel_top_plot: bool = (
+        False  # ... True: its top meets the plot area of a titled chart (default: the chart top)
     )
     l3_gap_cap: float = 0.8  # ... paragraph gaps never exceed this extra (em): one even rhythm, no stretching
     l3_head_pad: float = 0.35  # ... air (em) between a card heading band and its first item

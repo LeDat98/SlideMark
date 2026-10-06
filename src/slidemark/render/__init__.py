@@ -35,7 +35,7 @@ from ..layout import measure
 from ..layout.css import has_side_borders, side_borders, slide_style
 from ..template import clone_footer, open_template, pick_layout
 from ..theme import DEFAULT_SIZES, Theme
-from ..units import slide_size
+from ..units import slide_size, to_emu
 from .anim import build_timing
 from .design_part import write_design_part
 from .effects import apply_fill, apply_shadow, cover_crop, set_picture
@@ -648,7 +648,12 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
 
 def _accent_bar(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     """Callout cards get a thick accent bar on the left edge, in the border color."""
-    bar = pl.model_copy(update={"w": min(emu(4), pl.w), "style": Style(fill=pl.style.line, line=None)})
+    bar = pl.model_copy(
+        update={
+            "w": min(to_emu(rc.theme.layout.callout_bar_w), pl.w),
+            "style": Style(fill=pl.style.line, line=None),
+        }
+    )
     _autoshape(rc, slide, bar, MSO_SHAPE.RECTANGLE, f"{name} accent")
 
 
