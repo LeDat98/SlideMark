@@ -12,6 +12,7 @@ The renderer imports the shared constants so that both sides agree.
 from __future__ import annotations
 
 import json
+import re
 import unicodedata
 from functools import cache
 from pathlib import Path
@@ -156,6 +157,34 @@ def _bind_cached(texts: tuple[str, ...], skip: tuple[bool, ...]) -> tuple[str, .
     return tuple(out) if hit else texts
 
 
+WJ = "\u2060"  # WORD JOINER: invisible, zero width, forbids a break on both sides
+CJK_UNITS = "万億兆千百円件人名社店台歳年月日時分秒割倍回点個本枚品位階期週目部課号番級"  # counters
+_SIGN_NUM = re.compile(r"([▲△▼+−±¥$￥])(?=\d)")
+_NUM_PCT = re.compile(r"(?<=\d)(?=[％])")
+
+
+def _unit_re(units: str) -> re.Pattern:
+    u = f"[{re.escape(units)}]"
+    return re.compile(rf"(\d(?:[\d,.]*\d)?[％%]?)({u})({u})?")
+
+
+_UNIT_RE = _unit_re(CJK_UNITS)
+
+
+def join_cjk_units(text: str, units: str | None = None) -> str:
+    """Keep Japanese numbers with their units (``38万円``, ``▲8%``, ``54歳``) on one line.
+
+    Viewers break between any two CJK characters and between a digit and a CJK character, so U+2060
+    goes after a sign that precedes a digit and between a number and up to two unit characters.
+    The caller decides whether the text is CJK-relevant and skips code runs, links and badges."""
+    if not any(c.isdigit() for c in text):
+        return text
+    rx = _UNIT_RE if units is None else _unit_re(units)
+    text = _SIGN_NUM.sub(lambda m: m.group(1) + WJ, text)
+    text = _NUM_PCT.sub(WJ, text)
+    return rx.sub(lambda m: WJ.join(g for g in m.groups() if g), text)
+
+
 def bound_texts(runs) -> list[str]:
     """Run texts of a paragraph with its last two short words joined by a no-break space (orphan control).
 
@@ -166,10 +195,20 @@ def bound_texts(runs) -> list[str]:
     counts agree; the importer turns U+00A0 back into a space.
     """
     texts = tuple(r.text for r in runs)
-    if not texts or " " not in "".join(texts):
-        return list(texts)
-    skip = tuple(bool(getattr(r, "code", False) or getattr(r, "highlight", None)) for r in runs)
-    return list(_bind_cached(texts, skip))
+    skip = tuple(
+        bool(getattr(r, "code", False) or getattr(r, "highlight", None) or getattr(r, "link", None))
+        for r in runs
+    )
+    if " " in "".join(texts):
+        texts = _bind_cached(texts, skip)
+    return list(_join_cached(texts, skip, _tok.cjk_unit_join)) if _tok.cjk_unit_join else list(texts)
+
+
+@cache
+def _join_cached(texts: tuple[str, ...], skip: tuple[bool, ...], on: bool) -> tuple[str, ...]:
+    if not on or not has_cjk("".join(texts)):
+        return texts
+    return tuple(t if sk or "://" in t else join_cjk_units(t) for t, sk in zip(texts, skip, strict=True))
 
 
 def bind_last_words(text: str) -> str:
@@ -255,6 +294,10 @@ def _units(
     return hit
 
 
+def _glue_prev(u: tuple[float, float, str, bool, str]) -> bool:
+    return not u[3] and u[1] == 0.0 and len(u[2]) == 1 and u[2] == u[4] and is_cjk(u[2])
+
+
 def _units0(
     segments: list[Segment], font: str | None = None, extra: float = 0.0
 ) -> list[tuple[float, float, str, bool, str]]:
@@ -287,7 +330,13 @@ def _units0(
             units.append((w, 0.0, "", False, ""))
             continue
         for ch in text:
-            if ch in "\n\v":
+            if st["word"].endswith(WJ) and ch not in " \t\n\v":  # glued to the previous character
+                st["word"] += ch
+                st["w"] += _char_em(ch, kind, key)
+            elif ch == WJ and not st["word"] and not st["sp"] and units and _glue_prev(units[-1]):
+                w0, _, f0, _, _ = units.pop()  # a CJK character before the joiner joins its word
+                st["word"], st["w"] = f0 + ch, w0
+            elif ch in "\n\v":
                 flush()
                 units.append((0.0, 0.0, "", True, ""))
             elif ch in " \t":
