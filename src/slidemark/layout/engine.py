@@ -32,7 +32,7 @@ from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import css, measure
-from .chartnote import expand_notes
+from .chartnote import expand_notes, scale_warning
 from .diagram import fill_tree
 from .gantt import expand_gantt
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
@@ -4043,6 +4043,14 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 Diagnostic(level="warning", message=msg, slide=index + 1, rule="chart-note", hint=hint)
             ),
         )
+    if final_ctx:
+        for p in final_ctx.out:
+            if isinstance(p.element, Chart) and (warn := scale_warning(p.element, theme)):
+                deck.diagnostics.append(
+                    Diagnostic(
+                        level="warning", message=warn[0], slide=index + 1, rule="chart-scale", hint=warn[1]
+                    )
+                )
     if final_ctx and any(
         isinstance(p.element, Table) and "gantt" in p.element.classes for p in final_ctx.out
     ):

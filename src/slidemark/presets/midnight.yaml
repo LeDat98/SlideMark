@@ -19,3 +19,5 @@ classes:
   chart-note: {fill: surface}
 table_hl_fill: accent
 table_hl_strength: 0.2
+# series colors: primary, secondary, slate, then deeper / softer shades (the accent is reserved for `hl=`)
+palette: [primary, secondary, muted, "#2B7FA6", "#7AD9CD", "#475569"]

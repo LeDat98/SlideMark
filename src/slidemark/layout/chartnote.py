@@ -641,3 +641,33 @@ def expand_notes(
                 )
             res.append(it)
     return res
+
+
+SCALED = ("column", "bar", "line")
+
+
+def scale_warning(ch: Chart, theme: Theme) -> tuple[str, str] | None:
+    """(message, hint) when a series is crushed by another on the same value axis, else None.
+
+    A series whose largest value is below ``render.chart_scale_ratio`` of another series' largest value is
+    drawn as a sliver (sales 1280 next to profit 96). The chart itself is never changed.
+    """
+    ratio = theme.render.chart_scale_ratio
+    if ratio <= 0 or ch.kind not in SCALED or len(ch.series) < 2:
+        return None
+    tops = []
+    for sr in ch.series:
+        vals = [v for v in (_num(x) for x in sr.values) if v is not None]
+        if vals and min(vals) >= 0:
+            tops.append((max(vals), sr.name))
+    if len(tops) < 2:
+        return None
+    big = max(tops, key=lambda t: t[0])
+    small = min((t for t in tops if t[0] > 0), key=lambda t: t[0], default=None)
+    if small is None or small is big or small[0] >= big[0] * ratio:
+        return None
+    return (
+        f"series '{small[1]}' (max {small[0]:g}) is under {ratio * 100:g}% of '{big[1]}' (max {big[0]:g}): "
+        "it is drawn as a sliver",
+        "split into two charts, or show the ratio as a KPI / `note=`",
+    )

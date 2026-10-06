@@ -337,6 +337,7 @@ def _chart_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
 
     Colors come from the renderer's own resolvers (``Theme.chart_palette`` / ``chart_label_ink``).
     """
+    from .render.axis import label_pt, legend_pt
     from .render.objects import _legend_pos, flag
     from .render.util import hex6
 
@@ -359,22 +360,23 @@ def _chart_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
     if ch.title:
         checks.append(("title", "#" + hex6(theme, "fg"), size * rt.chart_title_scale, True, back_hex, "fg"))
     if _legend_pos(opts, pie, len(series)) is not None:
-        checks.append(("legend", base, size, False, back_hex, "chart"))
+        checks.append(("legend", base, legend_pt(size, rt), False, back_hex, "chart"))
     if not pie:
         checks.append(("axis labels", base, size, False, back_hex, "chart"))
     labels = opts.get("labels", opts.get("data_labels"))
-    lab_pct = isinstance(labels, str) and labels.strip().lower() == "percent"
-    lsize = size * rt.chart_label_scale
+    lab_on = (isinstance(labels, str) and labels.strip().lower() in ("percent", "value")) or flag(labels)
+    lsize = label_pt(kind, ncat, size, rt) if pie else size * rt.chart_label_scale
     pal = theme.chart_palette(opts.get("colors"))
-    if (lab_pct or flag(labels)) and kind != "scatter":
+    if lab_on and kind != "scatter":
         if pie:
             bg = hex6(theme, "bg")
+            both = kind == "pie" and str(rt.chart_pie_label_pos).strip().lower() in ("best_fit", "best-fit")
             for i in range(ncat):
                 fill = pal[i % len(pal)]
-                ink = "#" + theme.chart_label_ink(fill, *([bg] if kind == "pie" else []))
+                ink = "#" + theme.chart_label_ink(fill, *([bg] if both else []))
                 # Judged on the slice only: a pie label may also land outside it (best fit), where no single
                 # ink reads on both a mid-tone slice and the page; the renderer then favors the slice.
-                checks.append(("data labels", ink, lsize, False, ["#" + fill], "labels"))
+                checks.append(("data labels", ink, lsize, rt.chart_pie_label_bold, ["#" + fill], "labels"))
         elif kind in ("stacked-bar", "stacked-column"):
             for i in range(len(series)):
                 fill = pal[i % len(pal)]

@@ -368,7 +368,7 @@ Chart options go in the fence attributes:
 |---|---|---|
 | `title` | text | none |
 | `legend` | `bottom`, `right`, `top`, `left`, `none` | `bottom` when >1 series, else `none` |
-| `labels` | `on` (values), `percent` (pie/doughnut), `off` | `off` |
+| `labels` | `on` (values; on a pie/doughnut the share, `render.chart_pie_labels`), `percent` / `value` (pie/doughnut), `off` | `off` |
 | `totals` | stacked kinds: `off` drops, `on` forces the stack total at the end of each stack (default: shown with `labels=on`) | `on` with labels |
 | `fmt` | Excel number format for labels and the value axis, e.g. `0.0`, `#,##0`, `0%` | general |
 | `min`, `max` | value axis bounds | auto |
@@ -380,6 +380,15 @@ Chart options go in the fence attributes:
 CSV cells may be quoted (`"1,240"`), may carry `%` or thousands separators (`1,240`, `12%` → number), and may
 use full-width digits; an empty cell is a gap. A cell that is not a number becomes a gap plus a warning.
 A takeaway is two attributes: `` ```bar {hl=郊外大型 note="赤字42店の半数は郊外大型"} ``. Several series keep their colors: an `hl` category gets a `render.chart_hl` outline in each; a line gets a larger marker. A `note` pins the plot area and value axis so the pointer hits the bar; a too-long note shrinks, wraps, then warns (`chart-note`).
+
+Chart look defaults are tokens (`style: render.chart_legend_scale=1.4`): legend size = `chart_legend_scale` x chart text,
+data labels = `chart_label_scale`, pie/doughnut wedge labels = `chart_pie_label_scale` (bold, `chart_pie_label_bold`,
+inside the wedge, `chart_pie_label_pos`; a wedge under `chart_pie_label_min` of the total labels outside). The series
+palette (`palette`) holds no accent colour in the built-in presets: `accent` is reserved for `hl=`. On a pie, `labels=on`
+shows each share once (`36%`), also when the values already add up to 100; `fmt=` keeps the raw values instead. On a
+line chart, labels of two series closer than `render.chart_collide_em` label heights alternate above / below the point.
+A series under `render.chart_scale_ratio` (10%) of another on the same axis (sales 1280 next to profit 96) warns
+`chart-scale`: split it into two charts or state the ratio as a KPI; the chart itself is never changed.
 
 Whole numbers written with thousands separators (`1,240`, `2.100` with `lang: vi`) keep them: labels and the
 axis use `#,##0` (shown in the viewer's locale) unless `fmt` is set.

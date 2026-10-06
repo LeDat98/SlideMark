@@ -122,14 +122,82 @@ def chart_text_pt(base: float, w_emu: float, h_emu: float, rt: RenderTokens) -> 
     return max(base, big)
 
 
+def legend_pt(size: float, rt: RenderTokens) -> float:
+    """Legend text size (pt) of a chart whose text is ``size`` pt."""
+    return size * rt.chart_legend_scale
+
+
+def pie_label_pt(size: float, rt: RenderTokens) -> float:
+    """Wedge label size (pt) of a pie / doughnut: ``chart_pie_label_scale`` x chart text, never below the
+    plain data label size and at most ``chart_pie_label_max_pt``."""
+    plain = size * rt.chart_label_scale
+    return max(plain, min(size * rt.chart_pie_label_scale, rt.chart_pie_label_max_pt))
+
+
+def pie_percent(labels, nf: str | None, rt: RenderTokens) -> bool:
+    """Do the labels of a pie / doughnut show each wedge's share?
+
+    ``labels=percent`` always does and ``labels=value`` never does. ``labels=on`` follows
+    ``chart_pie_labels``, unless the chart sets its own number format (`fmt=` / `percent=on`): that formats
+    the raw values, so a deck whose values already are percentages reads `36%` once, never `36%` twice.
+    """
+    word = labels.strip().lower() if isinstance(labels, str) else ""
+    if word == "percent":
+        return True
+    if word == "value":
+        return False
+    return rt.chart_pie_labels == "percent" and not nf
+
+
 def label_pt(kind: str, ncat: int, size: float, rt: RenderTokens) -> float:
     """Data label size (pt) of a chart whose text is ``size`` pt: bigger inside stacked segments (never below
     the chart text) and on a sparse bar chart, else ``chart_label_scale``."""
+    if kind in ("pie", "doughnut"):
+        return pie_label_pt(size, rt)
     if kind.startswith("stacked"):
         return size * max(rt.chart_seg_label_scale, 1.0)
     if kind in ("bar", "column") and ncat <= rt.chart_gap_few_cats:
         return size * rt.chart_label_scale_few
     return size * rt.chart_label_scale
+
+
+def label_collisions(
+    series_values: list[list],
+    lo: float | None,
+    hi: float | None,
+    label_size: float,
+    chart_h_pt: float,
+    rt: RenderTokens,
+) -> dict[int, list[int]]:
+    """``{series: [category, ...]}`` of line-chart points whose label goes below the point.
+
+    In a category, series whose values are closer than ``chart_collide_em`` label heights (at the plot's
+    scale: ``chart_plot_share`` of the chart height spans the value axis) form a cluster; it alternates
+    above / below, highest first, so the labels of two close lines (60 and 55) no longer overprint.
+    """
+    cols = [[_num(v) for v in vals] for vals in series_values]
+    flat = [v for c in cols for v in c if v is not None]
+    if rt.chart_collide_em <= 0 or len(cols) < 2 or not flat:
+        return {}
+    lo = min(0.0, min(flat)) if lo is None else lo  # an automatic axis starts at zero
+    hi = max(flat) if hi is None else hi
+    span = hi - lo
+    plot_h = chart_h_pt * rt.chart_plot_share
+    if span <= 0 or plot_h <= 0:
+        return {}
+    near = span * rt.chart_collide_em * label_size / plot_h
+    below: dict[int, list[int]] = {}
+    for ci in range(max(len(c) for c in cols)):
+        pts = sorted(
+            ((c[ci], si) for si, c in enumerate(cols) if ci < len(c) and c[ci] is not None),
+            key=lambda p: (-p[0], p[1]),
+        )
+        rank = 0
+        for k, (v, si) in enumerate(pts):
+            rank = rank + 1 if k and pts[k - 1][0] - v < near else 0
+            if rank % 2:
+                below.setdefault(si, []).append(ci)
+    return below
 
 
 ZERO_BASE = ("column", "bar", "stacked-column", "stacked-bar", "area")

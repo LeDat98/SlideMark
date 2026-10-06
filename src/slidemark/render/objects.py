@@ -23,8 +23,18 @@ from ..layout.css import border_spec, cell_insets
 from ..layout.tablehl import hl_names, hl_rows, join_names
 from ..layout.tables import column_widths, compact_header, table_grid
 from ..theme import Theme
+from ..units import EMU_PER_PT
 from . import waterfall as wfall
-from .axis import axis_shown, label_pt, line_axis, resolve_axis
+from .axis import (
+    axis_shown,
+    label_collisions,
+    label_pt,
+    legend_pt,
+    line_axis,
+    pie_label_pt,
+    pie_percent,
+    resolve_axis,
+)
 from .charthl import apply_hl, pin_plot
 from .effects import apply_fill, apply_shadow
 from .text import _ANCHOR, fill_text
@@ -388,14 +398,31 @@ def _ink_hex(theme: Theme, fill: str, fallback: str, *backs: str) -> str:
     return theme.chart_label_ink(fill, *backs) or fallback
 
 
-def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct) -> None:
+_PIE_POS = {
+    "center": XL_LABEL_POSITION.CENTER,
+    "inside_end": XL_LABEL_POSITION.INSIDE_END,
+    "outside_end": XL_LABEL_POSITION.OUTSIDE_END,
+    "best_fit": XL_LABEL_POSITION.BEST_FIT,
+}
+
+
+def _pie_pos(theme: Theme):
+    """Default label position of a pie wedge (``render.chart_pie_label_pos``; unknown words = best fit)."""
+    return _PIE_POS.get(str(theme.render.chart_pie_label_pos).strip().lower().replace("-", "_"))
+
+
+def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct, vals=()) -> None:
     """Per-slice ``c:dLbl`` so each label has its own readable ink (slices differ in fill).
 
-    A doughnut label always sits on its slice. A pie label may land inside or outside (best fit), so its
-    ink must also read on the slide background when one does both; else it reads on the slice.
+    A doughnut label always sits on its slice. A pie label sits where ``render.chart_pie_label_pos`` says
+    (inside the wedge: ink chosen for the slice); a wedge below ``render.chart_pie_label_min`` of the total
+    goes outside (ink for the page), and best fit may land either way (one ink that reads on both).
     """
+    rt = theme.render
+    pt = pie_label_pt(size, rt)
     dls = ser.data_labels  # series-level dLbls override the plot-level ones: repeat the shared settings
-    dls.font.size = Pt(size * theme.render.chart_label_scale)
+    dls.font.size = Pt(pt)
+    dls.font.bold = rt.chart_pie_label_bold
     dls.font.color.rgb = fg
     if lab_pct:
         dls.show_value, dls.show_percentage = False, True
@@ -406,14 +433,24 @@ def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct) -> None:
         if nf:
             dls.number_format = nf
             dls.number_format_is_linked = False
-    if kind == "pie":
-        dls.position = XL_LABEL_POSITION.BEST_FIT
+    pos = _pie_pos(theme)
+    if kind == "pie" and pos is not None:
+        dls.position = pos
     bg, fg_hex = hex6(theme, "bg"), hex6(theme, "fg")
+    nums = [_num(v) for v in vals]
+    total = sum(v for v in nums if v and v > 0)
     for pi in range(n):
         fill = pal[pi % len(pal)]
-        ink = _ink_hex(theme, fill, fg_hex, *([bg] if kind == "pie" else []))
+        share = (nums[pi] / total) if pi < len(nums) and nums[pi] and total > 0 else None
+        out = kind == "pie" and (
+            pos == XL_LABEL_POSITION.OUTSIDE_END
+            or (share is not None and share < rt.chart_pie_label_min and pos != XL_LABEL_POSITION.BEST_FIT)
+        )
+        both = kind == "pie" and pos in (None, XL_LABEL_POSITION.BEST_FIT)
+        ink = fg_hex if out else _ink_hex(theme, fill, fg_hex, *([bg] if both else []))
         dl = ser.points[pi].data_label
-        dl.font.size = Pt(size * theme.render.chart_label_scale)
+        dl.font.size = Pt(pt)
+        dl.font.bold = rt.chart_pie_label_bold
         dl.font.color.rgb = RGBColor.from_string(ink)
         el = dl._dLbl
         if el is None:
@@ -430,7 +467,34 @@ def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct) -> None:
                 anchor = el.find(qn("c:txPr"))
             anchor.addprevious(nfe)
         if kind == "pie":
-            dl.position = XL_LABEL_POSITION.BEST_FIT
+            if out:
+                dl.position = XL_LABEL_POSITION.OUTSIDE_END
+            elif pos is not None:
+                dl.position = pos
+
+
+def _below_labels(ser, idxs: list[int], theme: Theme, size_pt: float, fg, nf) -> None:
+    """Move the data labels of the points ``idxs`` of a line series below the point (the series default is
+    above). A series-level ``c:dLbls`` overrides the plot-level one, so its shared settings are repeated."""
+    dls = ser.data_labels
+    dls.show_value = True
+    dls.font.size = Pt(size_pt)
+    dls.font.color.rgb = fg
+    dls.position = XL_LABEL_POSITION.ABOVE
+    if nf:
+        dls.number_format, dls.number_format_is_linked = nf, False
+    for i in idxs:
+        dl = ser.points[i].data_label
+        dl.font.size = Pt(size_pt)
+        dl.font.color.rgb = fg
+        dl.position = XL_LABEL_POSITION.BELOW
+        el = dl._dLbl
+        if el is not None and nf:
+            nfe = el.makeelement(qn("c:numFmt"), {"formatCode": nf, "sourceLinked": "0"})
+            anchor = el.find(qn("c:spPr"))
+            if anchor is None:
+                anchor = el.find(qn("c:txPr"))
+            anchor.addprevious(nfe)
 
 
 def _waterfall_plan(ch: Chart, ser: Series, opts: dict, theme: Theme) -> dict:
@@ -588,8 +652,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         wf = _waterfall_plan(ch, series[0], opts, theme)
         series = wf["series"]
     labels = opts.get("labels", opts.get("data_labels"))
-    lab_pct = isinstance(labels, str) and labels.strip().lower() == "percent"
-    lab_on = lab_pct or flag(labels)
+    lab_word = labels.strip().lower() if isinstance(labels, str) else ""
+    lab_on = lab_word in ("percent", "value") or flag(labels)
     real_series = len(series)
     series = stack_totals(ch, series, lab_on, opts, theme.render) if not wf else series
     carrier = len(series) > real_series
@@ -642,7 +706,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     if pos is not None:
         chart.legend.position = pos
         chart.legend.include_in_layout = False
-        chart.legend.font.size = Pt(size)
+        chart.legend.font.size = Pt(legend_pt(size, theme.render))
     # colors: explicit list (theme names / hex) else the theme palette
     cl = opts.get("colors")
     if isinstance(cl, str):
@@ -652,6 +716,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     pct_flag = flag(opts.get("percent"))
     nf = opts.get("fmt") or opts.get("number_format") or opts.get("format")
     nf = str(nf) if nf else ('0"%"' if pct_flag else "#,##0" if flag(opts.get("grouped")) else None)
+    lab_pct = pie and lab_on and pie_percent(labels, nf, theme.render)
     plot = chart.plots[0]
     if lab_on and kind not in ("scatter", "waterfall"):  # python-pptx has no data labels for XY series
         plot.has_data_labels = True
@@ -667,8 +732,11 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             if nf:
                 dl.number_format = nf
                 dl.number_format_is_linked = False
+        if pie:
+            dl.font.bold = theme.render.chart_pie_label_bold
         if kind == "pie":
-            dl.position = XL_LABEL_POSITION.BEST_FIT
+            if (pos := _pie_pos(theme)) is not None:
+                dl.position = pos
         elif kind in ("column", "bar"):
             dl.position = XL_LABEL_POSITION.OUTSIDE_END
         elif kind == "line":
@@ -692,7 +760,9 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     pt.format.fill.fore_color.rgb = RGBColor.from_string(pal[pi % len(pal)])
                     pt.format.line.color.rgb = rgb(theme, "bg")
                 if lab_on:
-                    _pie_point_labels(ser, pal, len(cats), theme, kind, fg, size, nf, lab_pct)
+                    _pie_point_labels(
+                        ser, pal, len(cats), theme, kind, fg, size, nf, lab_pct, series[0].values
+                    )
             elif kind in ("line", "radar", "scatter"):
                 if kind == "scatter":
                     ser.format.line.fill.background()
@@ -781,6 +851,12 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 lo, hi, unit = la
         if note_plan and note_plan.axis:  # the pointer of a `note=` needs the exact scale
             lo, hi, unit = note_plan.axis
+        if kind == "line" and lab_on:  # close lines: their labels alternate above / below
+            lpt = label_pt(kind, ncat, size, theme.render)
+            for si, idxs in label_collisions(
+                [s.values for s in series], lo, hi, lpt, pl.h / EMU_PER_PT, theme.render
+            ).items():
+                _below_labels(chart.plots[0].series[si], idxs, theme, lpt, fg, nf)
         if wf and wf["axis"] and wf["axis"][0] < 0:
             chart.category_axis.tick_label_position = XL_TICK_LABEL_POSITION.LOW
         if unit:

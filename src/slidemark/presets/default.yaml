@@ -22,3 +22,5 @@ cover_rule: primary
 cover_rule_h: 0.05in
 table_hl_fill: accent
 table_hl_strength: 0.22
+# series colors: primary, secondary, grey, then light tints (the accent is reserved for `hl=` emphasis)
+palette: [primary, secondary, muted, "#99AFED", "#93C1BE", border]

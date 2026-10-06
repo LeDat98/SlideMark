@@ -497,7 +497,21 @@ class RenderTokens(BaseModel):
     chart_title_scale: float = 1.2  # chart title size / chart text size
     chart_text_ratio: float = 0.034  # big chart text >= this x the frame shorter side (0 = off) ...
     chart_text_max_pt: float = 16  # ... up to this size (pt); never below the theme chart size
-    chart_label_scale: float = 0.9  # data label size / chart text size
+    chart_label_scale: float = 1.0  # data label size / chart text size
+    chart_legend_scale: float = 1.2  # legend size / chart text size
+    chart_pie_labels: str = (
+        "percent"  # `labels=on` on a pie / doughnut shows the share ("percent") or the raw "value"
+    )
+    chart_pie_label_scale: float = 1.4  # pie / doughnut wedge label size / chart text size ...
+    chart_pie_label_max_pt: float = 24  # ... at most this size (pt)
+    chart_pie_label_bold: bool = True  # wedge labels are bold
+    chart_pie_label_pos: str = "inside_end"  # pie label: center | inside_end | outside_end | best_fit
+    chart_pie_label_min: float = 0.06  # a pie wedge below this share puts its label outside the wedge
+    chart_collide_em: float = 1.3  # line chart: labels of two series closer than this many label heights (at
+    # the plot's scale) alternate above / below the point, the lower series going below (0 = off)
+    chart_plot_share: float = 0.7  # ... assuming the plot takes this share of the chart height
+    chart_scale_ratio: float = 0.1  # `chart-scale` warning: a column / bar series whose max is below this
+    # share of another series' max is crushed (0 = off)
     ink_dark: str = "#1F2937"  # text on light fills when the color is chosen for contrast (badges, labels)
     ink_light: str = "#FFFFFF"  # text on dark fills
     highlight: str = "#FFFF00"  # default ==highlight== color
