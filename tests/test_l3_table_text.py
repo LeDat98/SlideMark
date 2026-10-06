@@ -23,6 +23,7 @@ def table_of(path: Path, slide: int, vtext: float | None = None):
     if vtext is not None:
         theme = copy.deepcopy(theme)
         theme.layout.table_vtext_max = vtext
+        theme.layout.table_fit = False
     items = layout_slide(deck.slides[slide - 1], deck, theme, slide - 1)
     tab = next(p for p in items if isinstance(p.element, Table))
     foot = [p for p in items if isinstance(p.element, Text) and p.element.role == "footnote"]
