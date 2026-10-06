@@ -15,6 +15,7 @@ SRC = """theme: none
 colors: bg=#FFF7ED fg=#431407 primary=#EA580C accent=#C2410C
 fonts: heading="Lora" body="Inter"
 lang: vi
+style: layout.chevron_steps=off
 
 # Lộ trình ra mắt
 @chevron

@@ -601,14 +601,21 @@ def _grow_step_arrows(out: list[Placed], arrows: list[Placed], lt: LayoutTokens)
 
 
 def fill_cards_to_bar(
-    out: list[Placed], body: Rect, lt: LayoutTokens, bar: bool, anchored: bool, foot: bool
+    out: list[Placed],
+    body: Rect,
+    lt: LayoutTokens,
+    bar: bool,
+    anchored: bool,
+    foot: bool,
+    to_body: bool = False,
 ) -> list[Placed] | None:
     """A body of text cards (one row or a grid) above a conclusion bar: top-anchored, stretched to the bar.
 
     ``None`` = not this case (caller continues with the other fills). Applies with a conclusion bar, or with
-    a footnote when the block is already top-anchored (``anchored``)."""
+    a footnote when the block is already top-anchored (``anchored``). ``to_body`` (small-body themes): cards
+    alone on a sparse slide stretch down the body without a bar (``_cards_to_body``)."""
     try:
-        return _cards_to_bar(out, body, lt, bar, anchored, foot)
+        return _cards_to_bar(out, body, lt, bar, anchored, foot, False, to_body)
     except Exception:  # never raise on bad input
         return None
 
@@ -646,6 +653,48 @@ def _cap_card_text(plan: dict[int, list[Placed]], lt: LayoutTokens) -> dict[int,
     return caps
 
 
+def _cards_to_body(
+    out: list[Placed], body: Rect, lt: LayoutTokens, force: bool = False
+) -> list[Placed] | None:
+    """Text cards alone on a slide (no bar to stretch to) that leave much of the body empty.
+
+    The cards stretch down the body like cards above a bar, as far as their content keeps them from looking
+    hollow: the share of the body height is tried from the full height down (``cards_to_body_min`` in steps of
+    ``cards_to_body_step``); text grows up to ``card_fill_text_max_pt`` and the items spread inside."""
+    if not lt.cards_to_body or lt.card_fill_text_max_pt <= 0:
+        return None
+    items = _body_items(out, body)
+    boxes = [p for p in items if isinstance(p.element, Container)]
+    cards = [p for p in boxes if not any(q is not p and _contains(q, p) for q in boxes)]
+    if len(cards) < 2 or any("kpi" in c.element.classes for c in cards):
+        return None
+    if any(not any(q is p or _contains(q, p) for q in cards) for p in items):
+        return None  # a table / chart / loose text shares the body: the cards keep their height
+    free = (min(c.y for c in cards) - body.y) + (body.bottom - max(c.y + c.h for c in cards))
+    if free <= lt.cards_to_body_free * body.h:
+        return None
+    lt2 = lt.model_copy(
+        update={
+            "card_text_max": lt.card_fill_text_max_pt,
+            "l3_text_max_pt": max(lt.l3_text_max_pt, lt.card_fill_text_max_pt),
+            "card_stretch_min_fill": max(lt.card_stretch_min_fill, lt.cards_to_body_fill),
+        }
+    )
+    air = to_emu(lt.cards_to_body_air)
+    step = max(lt.cards_to_body_step, 0.02)
+    k = 0
+    while True:
+        share = round(1.0 - k * step, 3)
+        if share < lt.cards_to_body_min - 1e-9:
+            return None
+        res = _cards_to_bar(
+            out, Rect(body.x, body.y, body.w, round(body.h * share) - air), lt2, True, True, False, force
+        )
+        if res is not None:
+            return res
+        k += 1
+
+
 def _cards_to_bar(
     out: list[Placed],
     body: Rect,
@@ -654,11 +703,12 @@ def _cards_to_bar(
     anchored: bool,
     foot: bool,
     force: bool = False,
+    to_body: bool = False,
 ) -> list[Placed] | None:
     if not lt.l3_fill or not lt.cards_to_bar or (lt.body_valign == "top" and not force) or body.h <= 0:
         return None
     if not (bar or (foot and anchored)):
-        return None
+        return _cards_to_body(out, body, lt, force) if to_body else None
     items = _body_items(out, body)
     boxes = [p for p in items if isinstance(p.element, Container)]
     cards = [p for p in boxes if not any(q is not p and _contains(q, p) for q in boxes)]

@@ -191,7 +191,9 @@ the right.
 and its bullets sit in a card under that arrow, in the same column. A step with no bullets shows only its
 arrow. The cards grow down to the conclusion bar / footnote (as far as their text fills them). Other blocks
 after the steps (use `@end`) stay full width below. `@4 chevron` is the compact form: heading and bullets
-inside the arrow.
+inside the arrow. A chevron row alone on the slide whose steps all have short bodies (at most
+`layout.chevron_steps_items` paragraphs each) is built as `@steps` too, so `@chevron` with one bullet per
+step also fills the slide (`style: layout.chevron_steps=off` keeps the thin strip).
 
 ```markdown
 @4 steps
@@ -244,6 +246,14 @@ heading is the label. CSS: `.kpi { color; font-size; font-family; font-weight }`
 12.4億円
 前年比 +8%
 ```
+
+**Sparse slides use the body** (themes with a small body size, such as `jp-business`; nothing to write). A lead
+plus a short bullet list grows its text (up to `layout.list_text_max_pt`) and spacing; a few text cards alone
+stretch down the slide (`cards_to_body*`, text up to `card_fill_text_max_pt`); a table alone (up to
+`table_free_max_rows` rows) grows its text (`table_free_text_max_pt`) and rows (`table_free_row_em`), and a `>`
+conclusion bar under it attaches to the table (`bar_attach=grow|move|off`, gap `bar_attach_gap`). Sizes you set
+(`{size=}`, CSS, `sizes: table=`) are never changed; `style: layout.list_fill=off` (and `cards_to_body`,
+`table_free`) switch a pass off.
 
 **Hero KPI.** A wider card gets a bigger number (never wrapping), so a ratio grid makes one KPI the hero:
 `@2:1:1:1` before the cards gives the first twice the width. Shorter without an `@` line: add `.hero` to the

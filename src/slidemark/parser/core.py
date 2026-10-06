@@ -774,7 +774,7 @@ def _expand_steps(slide: Slide, ctx: Ctx) -> None:
         return
     n = len(steps)
     g = (slide.grid or "").strip()
-    ok = (g.isdigit() and int(g) >= n) or (":" in g and g.count(":") + 1 >= n and "/" not in g)
+    ok = steps_grid_ok(g, n)
     if g and not ok:
         ctx.add(
             "info",
@@ -783,14 +783,24 @@ def _expand_steps(slide: Slide, ctx: Ctx) -> None:
             "steps-grid",
             f"use @{n} steps, or ratios such as @{':'.join(['1'] * n)} steps",
         )
-    group = Container(
-        classes=["plain", "group", "steps"], grid=g if ok else str(n), children=steps, line=steps[0].line
-    )
-    rest = [e for e in slide.elements if all(e is not b for b in steps)]
     if slide.links:
         ctx.add(
             "info", "slide connectors are ignored with '@steps'", slide.line, "steps-links", "remove them"
         )
+    group_steps(slide, steps, g if ok else str(n))
+
+
+def steps_grid_ok(grid: str, n: int) -> bool:
+    """A slide grid that gives each of ``n`` steps its own column (``4``, ``1:2:1``)."""
+    return (grid.isdigit() and int(grid) >= n) or (
+        ":" in grid and grid.count(":") + 1 >= n and "/" not in grid
+    )
+
+
+def group_steps(slide: Slide, steps: list[Any], grid: str) -> None:
+    """The ``##`` ``steps`` of ``slide`` become one ``steps`` group (arrows over cards, by the layout)."""
+    group = Container(classes=["plain", "group", "steps"], grid=grid, children=steps, line=steps[0].line)
+    rest = [e for e in slide.elements if all(e is not b for b in steps)]
     slide.elements = [group, *rest]
     slide.links = []
     slide.grid = f"1x{len(slide.elements)}" if rest else None

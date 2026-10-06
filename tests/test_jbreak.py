@@ -125,7 +125,9 @@ def test_import_keeps_user_breaks_drops_ours():
     assert [r.text for r in paras[0].runs] == ["一行目", "\n", "二行目", "三行目"]
 
 
-CHEVRON_MD = """# 工程
+CHEVRON_MD = """style: layout.chevron_steps=off
+
+# 工程
 
 @4 chevron
 ## 現場の課題を把握する

@@ -313,7 +313,8 @@ def test_dense_slide_diagram_does_not_grow():
 
 
 def test_chevron_only_slide_is_not_a_thin_band():
-    md = "# Timeline\n@4 chevron\n## 2023\nFounded\n## 2024\nSeed round\n## 2025\nGrowth\n## 2026\nSeries A\n"
+    md = "style: layout.chevron_steps=off\n\n# Timeline\n@4 chevron\n"
+    md += "## 2023\nFounded\n## 2024\nSeed round\n## 2025\nGrowth\n## 2026\nSeries A\n"
     deck, theme, placed = lay(md)
     chev = [p for p in placed if isinstance(p.element, Shape) and p.element.shape == "chevron"]
     assert len(chev) == 4

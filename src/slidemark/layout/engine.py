@@ -38,6 +38,7 @@ from .gantt import expand_gantt
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
 from .l3fill import (
+    _body_items,
     align_chevron_table,
     center_band,
     fill_cards_to_bar,
@@ -52,6 +53,7 @@ from .l3fill import (
 from .pills import expand_pills, has_pills
 from .score import score as score_layout
 from .search import alternatives
+from .sparsefill import fill_table_free, fill_text_list, lone_table
 from .tables import capped_width, column_widths, right_align_numbers, row_heights, table_grid
 from .vfill import fill_body
 
@@ -3574,7 +3576,56 @@ def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, f
     return Rect(Mx, top, inner_w, max(foot_y - top - sg, 0))
 
 
+def _chevron_steps(slide: Slide, lt: LayoutTokens) -> Slide:
+    """A chevron row alone on the slide whose steps all carry short bodies is built as ``@steps``.
+
+    ``@chevron`` with one or two bullets per heading otherwise renders as a thin strip; ``@steps`` (arrows
+    with a card under each) fills the body, so an agent gets the full-slide form with either spelling.
+    Plain chevrons (no bodies), longer bodies (``chevron_steps_items``), other blocks on the slide,
+    connectors and explicit boxes keep the chevron row."""
+    els = slide.elements
+    if (
+        not lt.chevron_steps
+        or lt.body_valign == "top"
+        or "chevron" not in slide.classes
+        or "steps" in slide.classes
+        or slide.links
+        or len(els) < 2
+        or any(
+            not (isinstance(e, Container) and e.title is not None and e.children and not e.links) for e in els
+        )
+        or any(
+            not isinstance(ch, Text) or ch.box is not None or ch.role != "body"
+            for e in els
+            for ch in e.children
+        )
+        or any(sum(len(ch.paragraphs) for ch in e.children) > lt.chevron_steps_items for e in els)
+    ):
+        return slide
+    from ..parser.core import group_steps, steps_grid_ok
+
+    grid = (slide.grid or "").strip()
+    new = slide.model_copy(deep=False)
+    new.classes = [c for c in slide.classes if c not in ("steps", "chevron")]
+    group_steps(new, list(els), grid if steps_grid_ok(grid, len(els)) else str(len(els)))
+    return new
+
+
+def _attach_bar(
+    out: list[Placed], body: Rect, tail: list[Placed], bar: Text | None, lt: LayoutTokens
+) -> list[Placed]:
+    """The conclusion bar moves up to ``bar_attach_gap`` under the lone table above it (never down)."""
+    if bar is None or lt.bar_attach == "off":
+        return tail
+    tab = lone_table(_body_items(out, body))
+    if tab is None:
+        return tail
+    y = tab.y + tab.h + to_emu(lt.bar_attach_gap)
+    return [p.model_copy(update={"y": y}) if p.element is bar and y < p.y else p for p in tail]
+
+
 def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
+    slide = _chevron_steps(slide, theme.layout)
     try:
         W, H = slide_size(deck.size)
     except ValueError:
@@ -3964,7 +4015,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 bool(final_ctx.completed) or _block_h(final_ctx.out) < ctx.lt.center_min_fill * body.h,
                 bool(slide.footnotes),
             )
-            if fill_cards_to_bar(final_ctx.out, body, ctx.lt, *to_bar_args) is not None:
+            if fill_cards_to_bar(final_ctx.out, body, ctx.lt, *to_bar_args, small) is not None:
                 to_bar = to_bar_args  # applied after the lead / footnote growth (it moves the body edges)
             else:
                 final_ctx.out = fill_row(
@@ -3995,7 +4046,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             )  # dense decks keep their size ratios
         if to_bar is not None:  # cards reach the conclusion bar (replaces the sparse row fill)
             edge = _edges(final_ctx.out, tail)
-            fin = fill_cards_to_bar(final_ctx.out, _shifted(body, edge, edge0), ctx.lt, *to_bar)
+            fin = fill_cards_to_bar(final_ctx.out, _shifted(body, edge, edge0), ctx.lt, *to_bar, small)
             if fin is not None:
                 final_ctx.out = fin
         body_now = _shifted(
@@ -4010,6 +4061,27 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             final_ctx.out = (
                 scale_kpi_values(final_ctx.out, body_now, ctx.lt, fixed) if lone is final_ctx.out else lone
             )
+        if (
+            kind == "content"
+            and not final_ctx.over
+            and final_ctx.out
+            and not slide.links
+            and theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
+            and not any(
+                _table_size_explicit(final_ctx, e) if isinstance(e, Table) else _explicit_size(final_ctx, e)
+                for e in slide.elements
+                if isinstance(e, (Table, Text))
+            )
+        ):  # small-body (consulting) themes: a short list / a lone table use the body (pinned sizes stay)
+            final_ctx.out = fill_text_list(final_ctx.out, body_now, ctx.lt)
+            lone = fill_table_free(
+                final_ctx.out,
+                body_now,
+                ctx.lt,
+                slide.conclusion is not None and bool(slide.conclusion.paragraphs),
+            )
+            final_ctx.out = lone
+            tail = _attach_bar(final_ctx.out, body_now, tail, slide.conclusion, ctx.lt)
         if (
             kind == "content"
             and not final_ctx.over

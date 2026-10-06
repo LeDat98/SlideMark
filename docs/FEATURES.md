@@ -64,3 +64,4 @@ step does not apply (no visual risk to lint, or no syntax).
 | JP phrase-aware line breaks (BudouX soft breaks, render only; importer strips them) | x | x | x | x | x | x | - | - |
 | Table row emphasis: `hl=` first-cell values, `table.hl.*` tokens, CSS `tr.hl`, lint, importer round trip (`hl=` in the shape name) | x | x | x | x | x | x | x | - |
 | `@steps`: arrow row + outcome cards in the same columns (`steps-arrow` / `steps-card` classes, `layout.steps_*` tokens, importer folds it back) | x | x | x | x | x | x | - | - |
+| Sparse slides use the body (design wave 2): short lead + bullets grow (`layout.list_*`), box cards stretch down the slide (`cards_to_body*`, `card_fill_text_max_pt`), `@chevron` with short bodies is built as `@steps` (`chevron_steps*`), a lone table grows its text and rows (`table_free*`) and the conclusion bar attaches to it (`bar_attach*`) | - | x | x | x | x | x | - | - |
