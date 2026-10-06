@@ -43,7 +43,7 @@ packages = ["src/slidemark"]
 
 [tool.ruff]
 line-length = 110
-extend-exclude = ["bench/corpus", "bench/answers", "bench/lengthbench/*/python-pptx", ".claude/worktrees"]
+extend-exclude = ["bench/corpus", "bench/answers", "bench/lengthbench/*/python-pptx", "docs/COMPARE.md", ".claude/worktrees"]
 target-version = "py310"
 
 [tool.ruff.lint]
