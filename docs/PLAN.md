@@ -471,3 +471,12 @@ Goal: L3 consulting-grade per the run-6 designer review; AC4 gate text unchanged
 - **Wave 5 B1 (`layout/engine.py`, `layout/l3fill.py`, `layout/vfill.py`):** a lone KPI row (eval c05 s2: four cards
   stretched to the full body, value floating mid-card) hugs its content, KPI values grow, the row sits at the optical center.
 - **Wave 5 B2 (`theme.py` role sizes / `render/`):** conclusion bar text never smaller than the card body text on its slide.
+- **Wave 5 status:** lone KPI rows hug content (card 5.05 → 2.51in, value 54 → 66pt, optical center); conclusion bar text ≥
+  card body text (13 → 17pt), one line when it fits. 1663 tests.
+
+## Leftovers for the next run
+- [ ] L3 consulting-grade: re-score 3/3 ("no"); open: chevron steps aligned to the table columns below, decision slides
+      (content-bound: sparse cards vs oversized text), `.muted` cards read as disabled, bar touching the footer without a
+      footnote, orphan last words in card list items (VI "đồng", "số")
+- [ ] AC4 (owner decision on the gate wording still pending); SKILL.md trims give ≤ 1–2 points (AGENT_COST.md floor analysis)
+- [ ] Owner: real PowerPoint check (gradients, shadows, customXml, media, per-point dLbl, U+2060 range joiners); PyPI token; L7 token gate

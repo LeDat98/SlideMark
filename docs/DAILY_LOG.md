@@ -103,12 +103,16 @@ Run goal:
 - Problems: setup needed `.[dev,html]` (8 HTML tests failed without Playwright); one GitHub 500 on push (retried).
 - Next: AC4 gate decision (owner), L3 card row above a conclusion bar, decision slides (content-bound empty band).
 
-## 2026-10-06 (run 7, chained manual, L3 consulting-grade, 00:23 UTC–)
+## 2026-10-06 (run 7, chained manual, L3 consulting-grade, 00:23–03:35 UTC)
 Run goal:
-- [ ] Card rows / 2x2 grids reach the conclusion bar (no empty bottom 40%), decision slides 11 s9 / 16 s10, risk 11 s8
-- [ ] Conclusion bar keeps a gap above the footnote
-- [ ] Org chart / issue tree fill the body (bigger boxes + text), 11 s6, 16 s5
-- [ ] Roadmap table: compact header row, two-row merged header (year over halves), 16 s9
-- [ ] Lone chevron rows: text grows inside tall chevrons
-- [ ] Independent designer re-score of examples/11 + 16; L3 gate verdict
-- [ ] AC (gate text unchanged): shrink SKILL.md / output tokens without losing first-pass success
+- [x] Card rows / 2x2 grids reach the conclusion bar with one gutter; hollow cards spread capped + top-anchored
+- [x] Conclusion bar: gutter above the footnote, text ≥ card body text, stays one line when it fits
+- [x] Org charts / issue trees fill the body; a lone root widens until its heading fits one line
+- [x] Roadmap: compact header rows, `{header=2}` merged headers centered (examples/16 s9), importer keeps `header=2`
+- [x] Lone chevron rows taller + optically centered; chevrons above tables grow text; lone KPI rows hug content
+- [ ] L3 gate: same-prompt designer re-score 3 / 3 (19: 2.5–3), still "no" (sparse decision cards vs big text, chevron/table columns)
+- [x] AC (gate unchanged): SKILL.md 2,884 → 2,856 tokens; smoke c05/c08 skill-only 3 calls, 0 images, accepted, cost unchanged
+- Done: 5 waves, 10 Sonnet coding agents + 2 review + 2 eval agents. Also nice value-axis max, 180% gaps for ≤ 3 bars, composed covers, stretched-table text, no-new-wrap table guard, `2027–2029` kept whole (U+2060), preview retry, examples/19 (VI brand stress deck).
+- Metrics: tests 1663 passed (1577 at start); q3 155 tokens = 30% of python-pptx, markup 13–27% (unchanged); round trip 117/119 (2 pre-existing); card tails > 25%: 26 → 20 / 104.
+- Problems: 21 spurious LibreOffice failures when pytest runs overlapped (retry added); wave-2 hollow spread (5.5 em gaps) looked broken → capped; reviewers contradict run to run.
+- Next: chevron rows aligned to table columns, decision slides (content-bound), `.muted` cards read as disabled, conclusion bar vs footer gap without a footnote.
