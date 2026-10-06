@@ -285,7 +285,7 @@ A ` ```table ` fence takes CSV instead. Its first row is the header.
 ## Charts (native, editable)
 
 Name the fence after the chart: `bar`, `column`, `stacked-bar`, `stacked-column`, `line`, `area`, `pie`,
-`doughnut`, `scatter`, `radar`. The body is CSV. The first row holds the categories (its first cell is ignored),
+`doughnut`, `scatter`, `radar`, `waterfall`. The body is CSV. The first row holds the categories (its first cell is ignored),
 and each following row is one series.
 
 ````markdown
@@ -293,6 +293,17 @@ and each following row is one series.
 ,Q1,Q2,Q3
 2025,10,12,15
 2026,12,16,21
+```
+````
+
+A `waterfall` (bridge) takes one series: the first value is the starting total, the next values are changes,
+and a lone `=` cell is a total bar (the running sum). Up, down and total bars use `render.waterfall_up`,
+`render.waterfall_down` and `render.waterfall_total` (theme color names or hex); the bars are native and editable.
+
+````markdown
+```waterfall {title="営業利益の増減（億円）" labels=on}
+,2026,再編,PB,その他,2029
+営業利益,44,18,24,-33,=
 ```
 ````
 

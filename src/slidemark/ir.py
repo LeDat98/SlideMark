@@ -237,6 +237,7 @@ class Chart(ElementBase):
         "doughnut",
         "scatter",
         "radar",
+        "waterfall",  # one series: first value absolute, then deltas; "=" cells are running totals
     ] = "column"
     title: str | None = None
     categories: list[str] = Field(default_factory=list)
