@@ -34,7 +34,7 @@ from . import css, measure
 from .diagram import fill_tree
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
-from .l3fill import fill_cards_to_bar, fill_chevron_row, fill_panels, fill_row
+from .l3fill import fill_cards_to_bar, fill_chevron_row, fill_panels, fill_row, grow_chevron_table
 from .score import score as score_layout
 from .search import alternatives
 from .tables import capped_width, column_widths, right_align_numbers, row_heights, table_grid
@@ -3444,6 +3444,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     ctx.lt,
                     _emu(ctx.lt.top_gap) if (slide.conclusion or slide.footnotes) else 0,
                 )
+            final_ctx.out = grow_chevron_table(final_ctx.out, body, ctx.lt)
             final_ctx.out = fill_body(
                 final_ctx.out,
                 body,

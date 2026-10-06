@@ -133,7 +133,7 @@ def _base_em(ch: str, kind: str, font: str) -> float:
         return 1.0
     if unicodedata.east_asian_width(ch) == "H":
         return 0.5
-    if unicodedata.combining(ch) or ch in "\u200b\u200c\u200d\ufeff":
+    if unicodedata.combining(ch) or ch in "\u200b\u200c\u200d\u2060\ufeff":
         return 0.0
     if font == "wide":
         return _base_em(ch, kind, "arial") * (UNKNOWN_FONT_WIDEN + (0.06 if kind == "bold" else 0.0))

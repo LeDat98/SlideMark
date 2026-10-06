@@ -679,19 +679,23 @@ def _fill_chevron_row(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[P
     top = min(c.y for c in chevs)
     h0 = max(c.h for c in chevs)
     if lt.sparse_left_max > 0 and body.bottom - (body.y + h0) > round(lt.sparse_left_max * body.h):
-        grow = max(round(lt.chevron_fill_share * body.h) - h0, 0)
+        want = round(lt.chevron_fill_share * body.h)
+        if lt.chevron_lone_h > 0:  # taller, up to a share of the body and an aspect of the chevron width
+            wide = (
+                round(lt.chevron_lone_aspect * min(c.w for c in chevs)) if lt.chevron_lone_aspect > 0 else 0
+            )
+            want = max(want, min(round(lt.chevron_lone_h * body.h), wide or want))
+        grow = max(want - h0, 0)
         if grow > body.bottom - (top + h0):  # never past the body
             grow = max(body.bottom - (top + h0), 0)
         dy = min(body.y - top, 0)
-        if body.y - top < 0 or grow:
+        if lt.chevron_lone_top > 0:  # the leftover is split (optical center), not left as a dead lower half
+            left = body.bottom - (body.y + h0 + grow)
+            dy = body.y - top + round(max(left, 0) * min(lt.chevron_lone_top, 1.0))
+        if dy or grow:
             for p in items:
-                if (
-                    id(p) in ids
-                ):  # the point depth (adj x shorter side) stays, so the text area keeps its width
-                    short = min(p.w, p.h)
-                    adj = p.element.attrs.get("adj", lt.chevron_adj) * short / max(min(p.w, p.h + grow), 1)
-                    el = p.element.model_copy(update={"attrs": {**p.element.attrs, "adj": round(adj, 4)}})
-                    res[id(p)] = p.model_copy(update={"y": p.y + dy, "h": p.h + grow, "element": el})
+                if id(p) in ids:
+                    res[id(p)] = _resize_chevron(p, dy, grow, lt)
                 else:  # an icon stays centred on its chevron
                     res[id(p)] = p.model_copy(update={"y": p.y + dy + grow // 2})
     grown = _grow_chevron_text([res.get(id(c), c) for c in chevs], lt)
@@ -700,7 +704,84 @@ def _fill_chevron_row(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[P
     return _apply(out, res) if res else out
 
 
-def _grow_chevron_text(chevs: list[Placed], lt: LayoutTokens) -> list[Placed] | None:
+def _resize_chevron(p: Placed, dy: int, grow: int, lt: LayoutTokens) -> Placed:
+    """Move chevron ``p`` by ``dy`` and make it ``grow`` taller. The point depth (adj x shorter side) stays,
+    so the text area keeps its width."""
+    short = min(p.w, p.h)
+    adj = p.element.attrs.get("adj", lt.chevron_adj) * short / max(min(p.w, p.h + grow), 1)
+    el = p.element.model_copy(update={"attrs": {**p.element.attrs, "adj": round(adj, 4)}})
+    return p.model_copy(update={"y": p.y + dy, "h": p.h + grow, "element": el})
+
+
+def grow_chevron_table(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+    """A chevron row above a table: its text grows while the row has width to spare, so the table below may
+    follow (table text never out-sizes the chevron text). Runs before the vertical fill."""
+    try:
+        return _grow_chevron_table(out, body, lt)
+    except Exception:  # never raise on bad input
+        return out
+
+
+def _grow_chevron_table(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+    from .tables import row_heights, table_grid
+
+    if not lt.l3_fill or body.h <= 0 or lt.chevron_table_fill <= 0 or lt.chevron_text_max_pt <= 0:
+        return out
+    items = _body_items(out, body)
+    chevs = [p for p in items if isinstance(p.element, Shape) and p.element.shape == "chevron"]
+    tables = [p for p in items if isinstance(p.element, Table)]
+    if len(chevs) < 2 or len(tables) != 1:
+        return out
+    tp = tables[0]
+    ids = {id(c) for c in chevs} | {id(tp)}
+    for p in items:  # nothing else may share the body (icons on a chevron excepted)
+        if id(p) not in ids and not (
+            isinstance(p.element, Shape) and p.element.shape == "icon" and any(_contains(c, p) for c in chevs)
+        ):
+            return out
+    bottom = max(c.y + c.h for c in chevs)
+    if min(c.y + c.h for c in chevs) <= max(c.y for c in chevs) or tp.y < bottom - 2:
+        return out
+    t = tp.element
+    rh, cw = t.attrs.get("_row_h"), t.attrs.get("_col_w")
+    slack = 0
+    nat: list[int] = []
+    if rh and cw:
+        _n, _c, anchors = table_grid(t)
+        nat = row_heights(t, anchors, cw, tp.style, tp.font_scale)
+        if len(nat) == len(rh):
+            slack = max(sum(rh) - sum(nat), 0)
+    cap = min(
+        to_emu(lt.chevron_table_grow), slack, max(to_emu(lt.chevron_max_h) - max(c.h for c in chevs), 0)
+    )
+    best: tuple[float, int, list[Placed]] | None = None
+    for k in range(4):  # the smallest height that reaches the largest text
+        dh = round(cap * k / 3)
+        trial = [_resize_chevron(c, 0, dh, lt) if dh else c for c in chevs]
+        grown = _grow_chevron_text(trial, lt, lt.chevron_table_fill, strict=True)
+        if grown is None:
+            continue
+        factor = grown[0].font_scale / max(chevs[0].font_scale, 1e-6)
+        if best is None or factor > best[0] + 1e-6:
+            best = (factor, dh, grown)
+    if best is None:
+        return out
+    _f, dh, grown = best
+    res: dict[int, Placed] = {id(c): g for c, g in zip(chevs, grown, strict=True)}
+    for p in items:
+        if id(p) in ids or dh == 0:
+            continue
+        res[id(p)] = p.model_copy(update={"y": p.y + dh // 2})  # an icon stays centred on its chevron
+    if dh and slack:  # the table gives the height back out of its stretched rows
+        new = [r - round(dh * (r - n) / slack) for r, n in zip(rh, nat, strict=True)]
+        el = t.model_copy(update={"attrs": {**t.attrs, "_row_h": new}})
+        res[id(tp)] = tp.model_copy(update={"element": el, "y": tp.y + dh, "h": sum(new)})
+    return _apply(out, res)
+
+
+def _grow_chevron_text(
+    chevs: list[Placed], lt: LayoutTokens, fill: float | None = None, strict: bool = False
+) -> list[Placed] | None:
     """Text of a lone chevron row grows to fill the chevron: one factor for the whole row, capped by
     ``chevron_text_max_pt`` and ``chevron_text_fill`` of the height. A word never breaks (it fits one line
     ``chevron_word_slack`` narrower) and no paragraph wraps onto more lines than it did (in an area
@@ -724,7 +805,7 @@ def _grow_chevron_text(chevs: list[Placed], lt: LayoutTokens) -> list[Placed] | 
                 return False
             new_fs = c.font_scale * s
             if measure.paragraphs_height(paras, round(avail * EMU_PER_PT), c.style, new_fs) > (
-                lt.chevron_text_fill * c.h
+                (lt.chevron_text_fill if fill is None else fill) * c.h
             ):
                 return False
             em = _longest_word_em(paras)
@@ -737,9 +818,8 @@ def _grow_chevron_text(chevs: list[Placed], lt: LayoutTokens) -> list[Placed] | 
                     para, i == 0 and bool(para.runs) and all(r.bold for r in para.runs)
                 )
                 narrow = avail / max(slack, 1.0)
-                if measure.count_lines(segs, narrow, sz * s, c.style.font) > max(
-                    measure.count_lines(segs, narrow, sz, c.style.font), 1
-                ):
+                ref = measure.count_lines(segs, avail if strict else narrow, sz, c.style.font)
+                if measure.count_lines(segs, narrow, sz * s, c.style.font) > max(ref, 1):
                     return False
         return True
 
