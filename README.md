@@ -53,7 +53,7 @@ Windows: `slidemark preview` / `review --png` tự tìm LibreOffice trong `C:\Pr
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-06 · commit `d49bfc9` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-06 · commit `5529791` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -220,6 +220,31 @@ Nguồn: [`examples/19-vi-consulting-brand.md`](examples/19-vi-consulting-brand.
 ![19-vi-consulting-brand slide 3](docs/gallery/19-vi-consulting-brand/slide-03.png)
 ![19-vi-consulting-brand slide 4](docs/gallery/19-vi-consulting-brand/slide-04.png)
 ![19-vi-consulting-brand slide 5](docs/gallery/19-vi-consulting-brand/slide-05.png)
+
+### 20-jp-retail-dense
+
+Nguồn: [`examples/20-jp-retail-dense.md`](examples/20-jp-retail-dense.md)
+
+![20-jp-retail-dense slide 1](docs/gallery/20-jp-retail-dense/slide-01.png)
+![20-jp-retail-dense slide 2](docs/gallery/20-jp-retail-dense/slide-02.png)
+![20-jp-retail-dense slide 3](docs/gallery/20-jp-retail-dense/slide-03.png)
+![20-jp-retail-dense slide 4](docs/gallery/20-jp-retail-dense/slide-04.png)
+![20-jp-retail-dense slide 5](docs/gallery/20-jp-retail-dense/slide-05.png)
+![20-jp-retail-dense slide 6](docs/gallery/20-jp-retail-dense/slide-06.png)
+![20-jp-retail-dense slide 7](docs/gallery/20-jp-retail-dense/slide-07.png)
+![20-jp-retail-dense slide 8](docs/gallery/20-jp-retail-dense/slide-08.png)
+![20-jp-retail-dense slide 9](docs/gallery/20-jp-retail-dense/slide-09.png)
+![20-jp-retail-dense slide 10](docs/gallery/20-jp-retail-dense/slide-10.png)
+![20-jp-retail-dense slide 11](docs/gallery/20-jp-retail-dense/slide-11.png)
+
+### 21-jp-dark-pitch
+
+Nguồn: [`examples/21-jp-dark-pitch.md`](examples/21-jp-dark-pitch.md)
+
+![21-jp-dark-pitch slide 1](docs/gallery/21-jp-dark-pitch/slide-01.png)
+![21-jp-dark-pitch slide 2](docs/gallery/21-jp-dark-pitch/slide-02.png)
+![21-jp-dark-pitch slide 3](docs/gallery/21-jp-dark-pitch/slide-03.png)
+![21-jp-dark-pitch slide 4](docs/gallery/21-jp-dark-pitch/slide-04.png)
 <!-- gallery:end -->
 
 ## Tài liệu
