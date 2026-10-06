@@ -22,6 +22,7 @@ from .contrast import nearest_passing
 from .contrast import ratio as _ratio
 from .ir import Chart, Container, Deck, Diagnostic, Image, Media, Placed, Shape, Table, Text
 from .layout import css, measure
+from .layout.chartnote import chart_size
 from .layout.tables import table_grid
 from .theme import Theme
 from .units import EMU_PER_PT, slide_size
@@ -332,7 +333,6 @@ def _chart_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
     """
     from .render.objects import _legend_pos, flag
     from .render.util import hex6
-    from .theme import DEFAULT_SIZES
 
     ch: Chart = p.element  # type: ignore[assignment]
     if not behind:
@@ -342,7 +342,7 @@ def _chart_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
     kind = ch.kind
     pie = kind in ("pie", "doughnut")
     rt = theme.render
-    size = (p.style.font_size or theme.sizes.get("table", DEFAULT_SIZES["table"])) * p.font_scale
+    size = chart_size(p, theme)
     base = "#" + hex6(theme, p.style.color or "fg")
     series = ch.series
     ncat = max([len(ch.categories), *(len(s.values) for s in series)])

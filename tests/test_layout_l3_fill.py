@@ -298,7 +298,7 @@ def test_lone_chevron_row_is_top_anchored_and_cjk_lines_fit_one_line():
     chevs = [p for p in placed if p.element.type == "shape" and getattr(p.element, "shape", "") == "chevron"]
     assert len(chevs) == 4
     lead_bottom = max(p.y + p.h for p in role(placed, "title"))
-    assert min(c.y for c in chevs) - lead_bottom <= 0.2 * 720 * 9525  # optical center: above the middle
+    assert min(c.y for c in chevs) - lead_bottom <= 0.3 * 720 * 9525  # optical center: above the middle
     assert len({c.y for c in chevs}) == 1 and len({c.h for c in chevs}) == 1
     slack = theme.layout.chevron_cjk_slack
     for c in chevs:
@@ -327,4 +327,4 @@ def test_chevron_row_fuzz_and_render(tmp_path):
         for s in prs.slides[0].shapes
         if s.width > 0.15 * prs.slide_width and s.top > 0.15 * prs.slide_height
     ]
-    assert tops and min(tops) < 0.3 * prs.slide_height
+    assert tops and min(tops) < 0.45 * prs.slide_height

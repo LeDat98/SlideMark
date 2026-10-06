@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 from ..theme import RenderTokens
+from ..units import EMU_PER_PT
 
 _STEPS = (1.0, 2.0, 2.5, 5.0)
 
@@ -110,6 +111,15 @@ def axis_shown(opts: dict, kind: str, ncat: int, labels_on: bool, rt: RenderToke
     if v in ("on", "true", "yes", "1"):
         return True
     return not (labels_on and kind in BAR_KINDS and 0 < ncat <= rt.chart_axis_off_cats)
+
+
+def chart_text_pt(base: float, w_emu: float, h_emu: float, rt: RenderTokens) -> float:
+    """Chart text size (pt): ``base``, grown for a big chart frame to ``chart_text_ratio`` x its shorter side,
+    at most ``chart_text_max_pt`` and never below ``base``."""
+    if rt.chart_text_ratio <= 0:
+        return base
+    big = min(rt.chart_text_ratio * min(w_emu, h_emu) / EMU_PER_PT, rt.chart_text_max_pt)
+    return max(base, big)
 
 
 def label_pt(kind: str, ncat: int, size: float, rt: RenderTokens) -> float:

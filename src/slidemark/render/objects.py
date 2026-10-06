@@ -21,7 +21,7 @@ from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Series, Style, Tabl
 from ..layout import chartnote, measure
 from ..layout.css import border_spec, cell_insets
 from ..layout.tables import column_widths, compact_header, table_grid
-from ..theme import DEFAULT_SIZES, Theme
+from ..theme import Theme
 from . import waterfall as wfall
 from .axis import axis_shown, label_pt, line_axis, resolve_axis
 from .charthl import apply_hl, pin_plot
@@ -614,7 +614,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     gf.name = name
     chart = gf.chart
     _positive_axis_ids(chart)
-    size = (pl.style.font_size or theme.sizes.get("table", DEFAULT_SIZES["table"])) * pl.font_scale
+    size = chartnote.chart_size(pl, theme)
     fg = rgb(theme, pl.style.color or "fg")
     _chart_font(chart, theme, pl.style.font or theme.fonts.body, size, fg)
     if ch.title:

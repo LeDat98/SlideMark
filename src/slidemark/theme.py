@@ -412,6 +412,8 @@ class LayoutTokens(BaseModel):
     chevron_lone_h: float = 0.72  # a lone chevron row grows up to this share of the body height ...
     chevron_lone_aspect: float = 1.0  # ... but never taller than this x its chevron width
     chevron_lone_top: float = 0.4  # ... and sits with this share of the leftover above it (optical center)
+    chevron_lone_cap_aspect: float = 0.45  # a lone chevron row is at most this x its chevron width tall ...
+    chevron_lone_cap_text: float = 3.0  # ... and at most this x the height of its text block (0 = off)
     chevron_table_fill: float = 0.72  # above a table the chevron text may fill this share of its height ...
     chevron_table_grow: Length = "0.3in"  # ... and the row may grow this much taller at the table's expense
     chevron_table_align: bool = True  # chevron i spans column i of the table below (equal counts only)
@@ -456,6 +458,8 @@ class RenderTokens(BaseModel):
     connector_width: float = 1.5  # pt, connectors / arrows between blocks
     chart_line_width: float = 2.25  # pt, line chart series
     chart_title_scale: float = 1.2  # chart title size / chart text size
+    chart_text_ratio: float = 0.034  # big chart text >= this x the frame shorter side (0 = off) ...
+    chart_text_max_pt: float = 16  # ... up to this size (pt); never below the theme chart size
     chart_label_scale: float = 0.9  # data label size / chart text size
     ink_dark: str = "#1F2937"  # text on light fills when the color is chosen for contrast (badges, labels)
     ink_light: str = "#FFFFFF"  # text on dark fills
