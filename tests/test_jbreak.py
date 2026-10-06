@@ -175,3 +175,20 @@ def test_chevron_and_gantt_text_gets_phrase_breaks(tmp_path, md, preset):
     assert total, "wrapped CJK text in a chevron/gantt bar should get a phrase break"
     text, _ = import_pptx(path)
     assert "\x0b" not in text and "<br>" not in text
+
+
+def test_number_unit_stays_together():
+    out = measure.bound_texts([Run(text="Non-volatile, 2 ns access")])[0]
+    assert "2\u00a0ns" in out
+    assert "2\u00a0of" not in measure.bound_texts([Run(text="Take 2 of them")])[0]
+
+
+def test_binding_wider_than_the_line_is_undone():
+    runs = [Run(text="Runs today's models unchanged")]
+    bound = measure.bound_texts(runs)
+    assert "models\u00a0unchanged" in bound[0]
+    narrow = measure.loosen_wide_bindings([r.text for r in runs], bound, 150, 24)
+    assert "\u00a0" not in narrow[0]
+    wide = measure.loosen_wide_bindings([r.text for r in runs], bound, 900, 24)
+    assert wide == bound
+    assert measure.loosen_wide_bindings(["a b"], ["a b"], 0, 12) == ["a b"]

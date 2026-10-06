@@ -242,6 +242,8 @@ def fill_text(
         prev = ""
         prev_r = None
         bound = [r.text for r in p.runs] if field else measure.bound_texts(p.runs)
+        if box_w is not None and not field:  # a binding never forces a mid-word break
+            bound = measure.loosen_wide_bindings([r.text for r in p.runs], bound, wpt, size, pst.font)
         for ri, (run, run_text) in enumerate(zip(p.runs, bound, strict=True)):
             segs = run_text.replace("\r", "").replace("\v", "\n").split("\n")
             for k, seg in enumerate(segs):

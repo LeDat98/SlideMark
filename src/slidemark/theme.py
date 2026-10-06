@@ -122,6 +122,7 @@ class LayoutTokens(BaseModel):
     )
     cjk_phrase_break: bool = True  # CJK paragraphs wrap at phrase boundaries (soft breaks, render only)
     cjk_phrase_margin: float = 0.02  # ... and every phrase line must fit this much narrower
+    bind_margin: float = 0.12  # a no-break binding wider than a line minus this share is undone (render)
     cjk_phrase_slack: float = 0.07  # ... also when a viewer with this much more room would break inside one
     cjk_unit_join: bool = True  # Japanese numbers stay with their units (38万円, ▲8%): U+2060 joiners
     grow: bool = True  # sparse slides grow text / cards to fill the body (False = keep nominal sizes)
