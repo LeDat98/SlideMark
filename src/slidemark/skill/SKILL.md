@@ -135,9 +135,29 @@ Installs,1600,2100,2600
 ```
 ````
 
-Brand recipe: `colors:` + `fonts:` is enough; title, cards, tables, KPIs and charts follow those tokens. On a
+Brand recipe: `colors:` + `fonts:` restyle title, cards, tables, KPIs and charts at once; add `style:` or css for
+the rest of your design. On a
 dark `bg` also set `surface` (card fill) and `border`, and keep `fg` light. Text colours that fail contrast
 are reported with a passing shade to paste.
+
+## Design is yours
+
+Presets and the automatic layout give a clean but generic deck; the design decisions are yours, and none of the
+looks above are required. Decide before you write, so it costs no extra build:
+1. **A look for this deck:** what this topic, audience and use (talk or read-alone) call for: colour roles, type,
+   and one recurring idea that ties the slides together. Declare it once in the header (`colors:` `fonts:`
+   `style:` or a css fence) so every slide follows. A look the brief asks for wins; on a preset, still ask what
+   this topic adds.
+2. **One focal point per slide:** what must the viewer get in three seconds? Give that the most visual weight
+   (size, colour, position) and keep the rest quiet.
+3. **The form that fits the content,** not the first one: a single number, a comparison, a sequence, a trend, a
+   part of a whole and a list each read best in a different form (KPI, table, chart with a takeaway, chevron or
+   flow, boxes, callout, icons, badges). When the content changes, let the form change.
+4. **Space as a choice:** balance each slide; a small block in a large empty area reads as unfinished.
+5. **One system:** the same kind of thing looks the same on every slide; spend boldness in one place and drop
+   decoration that carries no meaning.
+6. **Never drop an idea for the syntax:** if blocks cannot express it, use `style:`, a ` ```css ` fence or an
+   `@html` slide.
 
 ## Syntax
 
@@ -213,7 +233,8 @@ quotes (`"1,6"`) or `;` rows (`T1;1,6;1,9`). Charts show numbers in the viewer's
 ## Rules
 
 - One message per slide (the `>` lead); at most 4 boxes × 6 bullets and 8 table rows, else split the slide.
-- Never set positions unless asked; the layout fits and sizes text by itself.
+- Positions are optional: the layout fits and sizes text by itself. Set `x y w h`, `@free` or `@html` when your
+  design needs a specific placement.
 - Every image has alt text.
 - Warnings: `overflow` (shorten or split), `contrast` (paste the colour from the hint), `missing-end` (add
   `@end`), `unknown-*` (follow the did-you-mean). Fix only the named line.
