@@ -325,6 +325,18 @@ class RenderTokens(BaseModel):
     contrast_min: float = 4.5  # contrast ratio auto ink aims for (normal text)
     contrast_large: float = 3.0  # ... for large text (>= `large_pt`, e.g. KPI numbers)
     large_pt: float = 24  # text at least this size counts as large
+    # --- chart axis and bars
+    chart_axis_headroom: float = (
+        0.06  # an auto value axis ends this share above the data max (label room; 0 = off)
+    )
+    chart_axis_lines_min: int = 4  # ... with at least this many gridlines
+    chart_axis_lines_max: int = 6  # ... and at most this many
+    chart_gap: int = 60  # bar/column gap width (% of a bar) ...
+    chart_gap_few: int = (
+        180  # ... for a chart with at most `chart_gap_few_cats` categories (fat bars look crude)
+    )
+    chart_gap_few_cats: int = 3
+    badge_cjk_bold: bool = False  # CJK badge text stays bold (synthetic bold smears small CJK glyphs)
 
 
 _BASE_COLORS = ("bg", "fg", "surface", "border", "muted")  # never moved by auto ink (muted has its own rule)

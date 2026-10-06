@@ -21,6 +21,7 @@ from ..layout import measure
 from ..layout.css import border_spec, cell_insets
 from ..layout.tables import column_widths, compact_header, table_grid
 from ..theme import DEFAULT_SIZES, Theme
+from .axis import auto_axis
 from .effects import apply_fill, apply_shadow
 from .text import _ANCHOR, fill_text
 from .util import RenderCtx, emu, hex6, rgb
@@ -538,7 +539,11 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             hole.set("val", "55")
     if kind in ("bar", "column", "stacked-bar", "stacked-column"):
         try:
-            chart.plots[0].gap_width = 60
+            rt = theme.render
+            gw = _num(opts.get("gap_width"))
+            if gw is None:
+                gw = rt.chart_gap_few if ncat <= rt.chart_gap_few_cats else rt.chart_gap
+            chart.plots[0].gap_width = max(0, min(500, round(gw)))
         except Exception:
             pass
     if pie:
@@ -562,6 +567,11 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             va.minimum_scale = lo
         if hi is not None:
             va.maximum_scale = hi
+        elif kind in ("bar", "column", "stacked-column", "stacked-bar", "area") and lo in (None, 0.0):
+            auto = auto_axis(kind, [s.values for s in series], theme.render)
+            if auto:  # LibreOffice / PowerPoint round the auto max far up (117 -> 140)
+                va.maximum_scale = auto[0]
+                va.major_unit = auto[1]
         if kind in ("bar", "stacked-bar"):  # first category on top, value axis stays at the bottom
             chart.category_axis.reverse_order = True
             va._element.find(qn("c:crosses")).set("val", "max")
