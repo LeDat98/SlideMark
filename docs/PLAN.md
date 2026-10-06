@@ -623,6 +623,15 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       highlighted, cards that hug their text, the plan bar highlighted, a closing slide). Check which of these the
       syntax already has (`hl=`/`note=`, `.accent`, chevron bullets) and why agents do not reach for them; add the
       missing ones as syntax, then document them as capabilities (not rules) in SKILL.md and re-run the judge.
+- [ ] Design wave 1 (2026-10-06, merged): table `hl=` rows, `@steps` (arrows + outcome cards, sparse groups fill
+      the body), `{.kpi .hero}` and exact KPI ratio grids, lone KPI rows that fill, lead in body colour and larger,
+      all as tokens; SKILL.md patterns now use them. Agent run on the 15-slide brief: 4 calls, 27 s, cost 61k (was
+      5 / 40 s / 85k). Blind judge round 2: python-pptx 3.5, old SlideMark 3.0, new run 2.5 (n = 1, noisy). The
+      hero KPI was called the new deck's real strength; still weak: the agent kept `@chevron` (thin strip), sparse
+      bullet and box slides float, table/bullet text small for the space, red accent used as a data colour in
+      jp-business charts, no closing slide. Wave 2 candidates: give `@chevron` the same sparse composition as
+      `@steps`; sparse bullet/box slides compose (grow text, balance); tables grow text to fill; chart palettes
+      keep the accent for emphasis (`hl=`) rather than as a series colour; then re-judge with 3 runs per arm.
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or
