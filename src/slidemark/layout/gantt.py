@@ -74,6 +74,75 @@ def _bar_paragraphs(cell: Cell, theme: Theme, style: Style) -> list[Paragraph]:
     return out
 
 
+_PILL_H = 0.7  # a badge pill inside a bar is this share of the bar height
+_PILL_GAP_EM = 0.6  # space between the bar text and its pill (em)
+
+
+def _bar_pill(
+    cell: Cell,
+    paras: list[Paragraph],
+    style: Style,
+    theme: Theme,
+    pill_style: Callable[[Cell], Style],
+    w: int,
+    h: int,
+    scale: float,
+) -> tuple[list[Paragraph], Style, Placed] | None:
+    """A badge after the label of a bar becomes a native rounded pill inside the bar.
+
+    Returns (bar paragraphs cut back to the label, bar style, pill relative to the bar origin), label + pill
+    centered together; None (the badge stays a text highlight) when the bar has no label before the badge, is
+    not centered / left aligned, or label + pill do not fit its width."""
+    from .pills import _HEAD, _LINE, _trim, pill_run  # noqa: PLC0415 (pills imports this module)
+
+    hit = pill_run(cell.model_copy(update={"paragraphs": paras}))
+    align = style.align or "left"
+    if not hit or not hit.lead or align not in ("left", "center"):
+        return None
+    pst = pill_style(cell)
+    left, _t, right, _b = css.insets(style)
+    ph, pv = css.inset_hv(pst)
+    size = (style.font_size or 14) * scale
+    ph_h = round(_PILL_H * h)
+    psize = min(size, (ph_h - pv) / EMU_PER_PT / _LINE)
+    if psize < theme.min_font_size or psize < 0.6 * size:
+        return None
+    bold = not measure.has_cjk(hit.text)
+    em = measure.text_em(css.transform_text(hit.text, pst.text_transform), bold=bold)
+    need = round(em * _HEAD * psize * EMU_PER_PT) + ph
+    lead = Paragraph(runs=_trim(hit.lead))
+    tx = round(_para_em(lead, bool(style.bold), style.text_transform)[0] * _HEAD * size * EMU_PER_PT)
+    gap = round(_PILL_GAP_EM * size * EMU_PER_PT)
+    avail = w - left - right
+    if tx + gap + need > avail:
+        return None
+    if align == "center":
+        px = left + (avail - (tx + gap + need)) // 2 + tx + gap
+        bar_style = style.merged(fast_style(padding_right=f"{(right + need + gap) / EMU_PER_PT:.2f}pt"))
+    else:
+        px = left + tx + gap
+        bar_style = style
+    ink = pst.color or theme.badge_ink(hit.run.highlight)
+    pill_st = pst.merged(
+        fast_style(
+            fill=pst.fill or hit.run.highlight, color=ink, bold=bold, font_size=psize / max(scale, 1e-6)
+        )
+    )
+    run = hit.run.model_copy(update={"highlight": None, "color": None, "bold": False, "text": hit.text})
+    pill = Placed(
+        element=Shape(
+            shape="rounded-rect", paragraphs=[Paragraph(runs=[run])], classes=["pill"], attrs={"pill": True}
+        ),
+        x=px,
+        y=(h - ph_h) // 2,
+        w=need,
+        h=ph_h,
+        style=pill_st,
+        font_scale=scale,
+    )
+    return [hit.para.model_copy(update={"runs": _trim(hit.lead)})], bar_style, pill
+
+
 def _tidy(c: Cell, emptied: set[int], marks: set[int]) -> Cell:
     if id(c) in emptied:
         return c.model_copy(update={"paragraphs": [Paragraph()]})
@@ -247,6 +316,7 @@ def expand_gantt(
     pad_pt: float,
     bar_ratio: float,
     diag: Callable[[str, str], None] | None = None,
+    pill_style: Callable[[Placed, Cell], Style] | None = None,
 ) -> list[Placed]:
     """Replace every gantt table by (table with emptied bar cells, bars...) in z-order.
 
@@ -293,6 +363,15 @@ def expand_gantt(
                     "shorten the bar text or merge more period cells with <",
                 )
             emptied.add(id(cell))
+            extra: list[Placed] = []
+            bar_style = style
+            if ok and pill_style is not None:
+                got = _bar_pill(
+                    cell, paras, style, theme, lambda c, pl=pl: pill_style(pl, c), x1 - x0, bh, scale
+                )
+                if got:
+                    paras, bar_style, pill = got
+                    extra = [pill.model_copy(update={"x": x0 + pill.x, "y": y0 + pill.y})]
             bars.append(
                 Placed(
                     element=Shape(
@@ -305,10 +384,11 @@ def expand_gantt(
                     y=y0,
                     w=x1 - x0,
                     h=bh,
-                    style=style,
+                    style=bar_style,
                     font_scale=scale,
                 )
             )
+            bars.extend(extra)
         marks = {id(c) for r, k, c in anchors if r >= t.header_rows and k >= max(t.header_cols, 1)} - emptied
 
         rows = [[_tidy(c, emptied, marks) for c in row] for row in t.rows]

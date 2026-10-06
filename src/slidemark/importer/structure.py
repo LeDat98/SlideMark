@@ -109,6 +109,15 @@ def _fold_pill(cell, it: Item) -> None:
         cell.paras = [ParaT(runs=runs, size=it.paras[0].size)]
 
 
+def _bar_anchor(t: Item, r: int, c: int):
+    """The cell with the text of the bar covering cell (r, c): walk left over ``<``, up over ``^``."""
+    while c > 0 and t.rows[r][c].hmerge:
+        c -= 1
+    while r > 0 and t.rows[r][c].vmerge:
+        r -= 1
+    return t.rows[r][c]
+
+
 def fold_into_tables(data: SlideData) -> None:
     """Text drawn on top of an empty table cell (status pills, tags) becomes that cell's text."""
     for t in [i for i in data.items if i.kind == "table" and i.col_w and i.row_h]:
@@ -127,6 +136,8 @@ def fold_into_tables(data: SlideData) -> None:
             if c is None or r is None or r >= len(t.rows) or c >= len(t.rows[r]):
                 continue
             cell = t.rows[r][c]
+            if t.gantt and it.name.lower().startswith("pill") and it.fill and it.text:
+                cell = _bar_anchor(t, r, c)  # a pill inside a Gantt bar goes back to the bar cell's badge
             if (
                 it.name.lower().startswith("pill")
                 and it.fill

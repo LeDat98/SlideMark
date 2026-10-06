@@ -3933,6 +3933,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             lambda msg, hint: deck.diagnostics.append(
                 Diagnostic(level="warning", message=msg, slide=index + 1, rule="gantt-text", hint=hint)
             ),
+            (lambda pl, cell: _pill_style(ctx, pl, cell)) if ctx.lt.table_pills else None,
         )
     if (
         final_ctx

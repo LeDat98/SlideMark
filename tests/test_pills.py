@@ -86,7 +86,8 @@ def test_token_off_keeps_the_old_text_highlight():
 
 
 def test_gantt_tables_keep_their_badges():
-    md = "# P\n\n{.gantt}\n| 施策 | 上期 |\n|-|-|\n| A | x [済]{.badge} |\n"
+    # badge-only bar: text highlight; badge after a label: a pill inside the bar (test_gantt_pill.py)
+    md = "# P\n\n{.gantt}\n| 施策 | 上期 |\n|-|-|\n| A | [済]{.badge} |\n"
     assert all("gantt" in p.element.classes for p in _parts(md)[1])
 
 
