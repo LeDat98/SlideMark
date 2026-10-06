@@ -480,3 +480,12 @@ Goal: L3 consulting-grade per the run-6 designer review; AC4 gate text unchanged
       footnote, orphan last words in card list items (VI "đồng", "số")
 - [ ] AC4 (owner decision on the gate wording still pending); SKILL.md trims give ≤ 1–2 points (AGENT_COST.md floor analysis)
 - [ ] Owner: real PowerPoint check (gradients, shadows, customXml, media, per-point dLbl, U+2060 range joiners); PyPI token; L7 token gate
+
+## Run 2026-10-06 (run 8, chained, 03:41 UTC) work packages
+Goal: run-7 leftovers (L3), then an independent re-score with a content-rich dense deck; AC4 gate text unchanged (owner).
+- **Wave 1 B1 (`layout/engine.py`, `layout/l3fill.py`, `layout/vfill.py`):** sparse decision cards (16 s10, 19 s5): card
+  list text capped (`layout.card_text_max`), spread items separated by thin rules (`layout.card_spread_rules`, off-able);
+  conclusion bar shrinks (down to a floor) before it wraps; bar keeps one gutter above the footer when no footnote.
+- **Wave 1 B2 (`render/`, `layout/measure.py`, `importer/`, `theme.py`, `presets/`):** orphan control for space-separated
+  scripts (bind the last two short words with U+00A0 in measure and render, importer restores spaces); `.muted` boxes
+  mute the header band/border via preset tokens and keep body text at fg contrast.

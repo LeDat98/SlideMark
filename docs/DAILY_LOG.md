@@ -116,3 +116,10 @@ Run goal:
 - Metrics: tests 1663 passed (1577 at start); q3 155 tokens = 30% of python-pptx, markup 13–27% (unchanged); round trip 117/119 (2 pre-existing); card tails > 25%: 26 → 20 / 104.
 - Problems: 21 spurious LibreOffice failures when pytest runs overlapped (retry added); wave-2 hollow spread (5.5 em gaps) looked broken → capped; reviewers contradict run to run.
 - Next: chevron rows aligned to table columns, decision slides (content-bound), `.muted` cards read as disabled, conclusion bar vs footer gap without a footnote.
+
+## 2026-10-06 (run 8, chained manual, L3 leftovers + re-score, 03:41– UTC)
+Run goal:
+- [ ] Sparse decision slides: card text capped, spread items ruled (token), conclusion bar shrink-before-wrap, bar–footer gutter without a footnote
+- [ ] Latin/VI orphan control (last two short words bound), `.muted` boxes read as lower priority, not disabled
+- [ ] Chevron rows aligned to the table below (equal counts) + `widths=` on chevron rows
+- [ ] Content-rich dense deck (examples/20) for scoring; independent L3 re-score incl. 11/16/19
