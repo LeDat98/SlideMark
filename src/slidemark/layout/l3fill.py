@@ -942,7 +942,8 @@ def _fill_chevron_row(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[P
                 round(lt.chevron_lone_aspect * min(c.w for c in chevs)) if lt.chevron_lone_aspect > 0 else 0
             )
             want = max(want, min(round(lt.chevron_lone_h * body.h), wide or want))
-        grow = max(want - h0, 0)
+        want = _lone_chevron_cap(chevs, want, lt)
+        grow = want - h0 if want < h0 else max(want - h0, 0)
         if grow > body.bottom - (top + h0):  # never past the body
             grow = max(body.bottom - (top + h0), 0)
         dy = min(body.y - top, 0)
@@ -959,6 +960,23 @@ def _fill_chevron_row(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[P
     if grown:
         res.update({id(c): g for c, g in zip(chevs, grown, strict=True)})
     return _apply(out, res) if res else out
+
+
+def _lone_chevron_cap(chevs: list[Placed], want: int, lt: LayoutTokens) -> int:
+    """A lone chevron row is never taller than ``chevron_lone_cap_aspect`` x its chevron width nor
+    ``chevron_lone_cap_text`` x its text block (no giant arrows around two small lines); never below what
+    its text needs."""
+    cap, floor = want, 0
+    if lt.chevron_lone_cap_aspect > 0:
+        cap = min(cap, round(lt.chevron_lone_cap_aspect * min(c.w for c in chevs)))
+    if lt.chevron_lone_cap_text > 0:
+        text = max(
+            measure.paragraphs_height(c.element.paragraphs, max(round(0.6 * c.w), 1), c.style, c.font_scale)
+            for c in chevs
+        )
+        cap = min(cap, round(lt.chevron_lone_cap_text * text))
+        floor = round(text / max(lt.chevron_text_fill, 0.3))  # the text keeps its share of the height
+    return max(cap, floor)
 
 
 def _resize_chevron(p: Placed, dy: int, grow: int, lt: LayoutTokens) -> Placed:

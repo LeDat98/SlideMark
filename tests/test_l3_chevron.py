@@ -139,3 +139,28 @@ def test_render_reopens_with_chevrons_inside_the_slide(tmp_path):
     for s in shapes:
         assert s.top + s.height <= prs.slide_height
         assert s.text_frame.text.strip()
+
+
+JP4 = """theme: jp-business
+lang: ja
+
+# 今後のスケジュール
+@4 chevron
+## 11月
+FAQ公開
+## 12月
+チャット試行
+## 2027年1月
+システム更新
+## 2027年3月
+効果検証
+@end
+"""
+
+
+def test_lone_row_of_short_text_is_capped_by_width_and_text():
+    chev = chevrons(lay(JP4, 1))
+    lt = LayoutTokens()
+    assert len(chev) == 4
+    assert chev[0].h <= lt.chevron_lone_cap_aspect * min(c.w for c in chev) + 2  # no giant arrows
+    assert chev[0].h <= 0.3 * 7.5 * EMU
