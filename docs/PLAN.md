@@ -507,3 +507,6 @@ Goal: run-7 leftovers (L3), then an independent re-score with a content-rich den
   Top asks: Gantt bars instead of text tables, bridge charts and totals, chevrons that map to table columns, composed
   covers, chips on the text baseline, JP orphans in dense cards.
 - **Wave 4 A (`parser/blocks.py`, `render/objects.py`, `importer/`):** native `waterfall` chart (contract committed fd5c20f).
+- **Wave 3/4A status:** JP number + unit/sign groups joined with U+2060 (`layout.cjk_unit_join`), generic on/off for bool
+  tokens; native `waterfall` (bridge) chart with totals (`=`), importer round trip (118/121). 1728 tests.
+- **Wave 4B:** `{.gantt}` tables draw native bars (16 s9, 20 s10); composed covers via cover tokens (jp-business, default).
