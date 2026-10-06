@@ -181,3 +181,55 @@ def test_fuzz_never_raises():
         deck = parse(src)
         theme, _ = resolve_theme(deck.theme, Path("."))
         layout_slide(deck.slides[0], deck, theme, 0)
+
+
+def _rule_ys(placed, card):
+    return sorted(
+        r.y for r in _rules(placed) if card.x <= r.x < card.x + card.w and card.y <= r.y <= card.y + card.h
+    )
+
+
+def test_sibling_cards_share_item_rows_and_rules():
+    placed, _, _ = lay("11-jp-consulting.md", 8)
+    top = sorted((c for c in cards(placed) if c.y == min(c2.y for c2 in cards(placed))), key=lambda c: c.x)
+    assert len(top) == 2
+    (b0,), (b1,) = (inside(placed, c) for c in top)
+    assert b0.y == b1.y  # first items start at one height
+    assert b0.element.attrs["para_gap"] == b1.element.attrs["para_gap"]  # one pitch
+    ys0, ys1 = (_rule_ys(placed, c) for c in top)
+    assert len(ys0) == 2 and len(ys1) == 1
+    assert ys0[0] == ys1[0]  # the first divider is level across the row
+
+
+def test_matching_item_counts_align_every_rule():
+    src = _src()
+    deck = parse(
+        src.replace("- One\n- Two\n- Three", "- One\n- A much longer second item that wraps maybe\n- Three")
+    )
+    theme, _ = deck_theme(deck, EX)
+    placed = layout_slide(deck.slides[0], deck, theme, 0)
+    cs = sorted((c for c in placed if c.element.__class__.__name__ == "Container"), key=lambda c: c.x)
+    ys = [_rule_ys(placed, c) for c in cs]
+    assert len(ys) == 2 and ys[0] and len(ys[0]) == len(ys[1])
+    assert ys[0] == ys[1]
+
+
+@pytest.mark.parametrize(
+    "name", ["11-jp-consulting.md", "16-jp-strategy.md", "20-jp-retail-dense.md", "22-en-launch-plan.md"]
+)
+def test_sibling_cards_on_a_row_share_one_text_size(name):
+    deck = parse((EX / name).read_text(encoding="utf-8"))
+    theme, _ = deck_theme(deck, EX)
+    for i, slide in enumerate(deck.slides):
+        placed = layout_slide(slide, deck, theme, i)
+        rows: dict[int, list] = {}
+        for c in cards(placed):
+            rows.setdefault(c.y, []).append(c)
+        for row in rows.values():
+            sizes = {
+                round((p.style.font_size or 0) * p.font_scale, 1)
+                for c in row
+                for p in inside(placed, c)
+                if "callout" not in p.element.classes
+            }
+            assert len(sizes) <= 1, (name, i + 1, sizes)

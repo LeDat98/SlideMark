@@ -713,7 +713,7 @@ def _one_line_width(q, w0: int, cap: int, tf: float) -> int:
 
 
 def _tree_stack(
-    items: list, b: int, ms: list[int], dw: int, tf: float, shrink: bool = False
+    items: list, b: int, ms: list[int], dw: int, tf: float, shrink: bool = False, hug: bool = False
 ) -> tuple[list[tuple[int, int, int]], int]:
     """Text of box ``b`` at factor ``tf`` and ``dw`` more width: ([(item, y offset, height)], used height).
 
@@ -723,6 +723,7 @@ def _tree_stack(
     res: list[tuple[int, int, int]] = []
     cursor = 0
     prev = box.y  # bottom of the previous member in the old geometry
+    lead_pad = 0  # air between the heading band and the first body paragraph (old geometry)
     for n, j in enumerate(ms):
         q = items[j]
         w = q.w + dw
@@ -732,6 +733,8 @@ def _tree_stack(
         head = n == 0 and getattr(q.element, "role", "") == "heading" and q.y - box.y <= 2
         if not head:
             cursor += round(max(q.y - prev, 0) * tf)
+            if not lead_pad and n > 0:
+                lead_pad = round(max(q.y - prev, 0) * tf)
         res.append((j, cursor, q.h + grow))
         cursor += q.h + grow
         prev = q.y + q.h
@@ -741,6 +744,8 @@ def _tree_stack(
         from . import css
 
         tail = min(tail, css.insets(box.style)[3] * 2)
+    if hug and last is not None and lead_pad:  # even air above and below the body text
+        return res, cursor + min(round(tail * tf), lead_pad)
     return res, cursor + round(tail * tf)
 
 
@@ -889,7 +894,7 @@ def _fill_tree(items: list, body: Rect, lt, reserve: int) -> list:
         wx = widths(tf)
         for b, ms in members.items():
             dw = wx[b][1] - items[b].w
-            stack, used = _tree_stack(items, b, ms, dw, tf, b in fitted)
+            stack, used = _tree_stack(items, b, ms, dw, tf, b in fitted, lt.tree_hug)
             if used > round(row_h[row_of[b]] * sb):
                 return False
             for j in ms:
@@ -912,8 +917,11 @@ def _fill_tree(items: list, body: Rect, lt, reserve: int) -> list:
     # ---- row heights: boxes keep an airy fit around their text, the rest of the growth goes to the gaps
     nhs: list[int] = []
     for k, r in enumerate(rows):
-        need = max(_tree_stack(items, b, members[b], new_x[b][1] - items[b].w, tf, b in fitted)[1] for b in r)
-        floor, air = row_h[k], lt.tree_box_air
+        need = max(
+            _tree_stack(items, b, members[b], new_x[b][1] - items[b].w, tf, b in fitted, lt.tree_hug)[1]
+            for b in r
+        )
+        floor, air = (0 if lt.tree_hug else row_h[k]), lt.tree_box_air
         if r[0] in fitted and len(r) == 1:
             floor, air = min(floor, round(need)), 1.0  # a widened lone box gives back the height it unwrapped
         nhs.append(min(round(row_h[k] * sb), max(floor, round(need * air))))
@@ -942,7 +950,7 @@ def _fill_tree(items: list, body: Rect, lt, reserve: int) -> list:
             bx, bw = new_x[b]
             out[b] = p.model_copy(update={"x": bx, "y": y, "w": bw, "h": nh})
             new_rect[_rect4(p)] = (bx, y, bw, nh)
-            stack, used = _tree_stack(items, b, members[b], bw - p.w, tf, b in fitted)
+            stack, used = _tree_stack(items, b, members[b], bw - p.w, tf, b in fitted, lt.tree_hug)
             spare = max(nh - used, 0)
             shift = round(spare * lt.tree_pad_share)  # part of the growth is padding above the body text
             for n, (j, off, h) in enumerate(stack):

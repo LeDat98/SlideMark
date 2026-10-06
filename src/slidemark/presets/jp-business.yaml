@@ -50,3 +50,4 @@ cover_rule: accent
 cover_rule_h: 0.06in
 # series colors: navy, light steel blue, red, slate grey, green, pale grey (neighbors never look alike)
 palette: [primary, "#7FA3C7", accent, "#6B7684", success, "#BFC7D1"]
+render: {connector_width: 2}

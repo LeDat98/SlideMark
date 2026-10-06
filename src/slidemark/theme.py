@@ -346,6 +346,11 @@ class LayoutTokens(BaseModel):
         0.8  # a stretched card filled less than this after growth spreads its items (0 = off)
     )
     card_spread_gap_max: float = 2.2  # ... with equal gaps of at most this many em; the rest centers the list
+    panel_end_air: float = (
+        0.08  # a ruled panel beside a chart ends under its note if > this share of its span is empty
+    )
+    panel_end_max: float = 0.2  # ... but only up to this share (a much emptier panel keeps the chart's span)
+    card_align_rows: bool = True  # ... cards in one row share gap and lead: item / rule k sits at one height
     card_spread_ratio: float = 1.7  # ... a card's gap is at most this multiple of the smallest gap in its row
     card_spread_tail: float = 0.0  # ... em of air kept between the last item and the card bottom padding
     card_text_max: float = (
@@ -360,10 +365,11 @@ class LayoutTokens(BaseModel):
         0.92  # a linked tree grows (top-anchored) until it fills this share of the body (0 = off)
     )
     tree_box_grow: float = 1.6  # ... its boxes become at most this much taller ...
-    tree_gap_grow: float = 3.0  # ... and the connector gaps between levels at most this much larger
+    tree_gap_grow: float = 6.0  # ... and the connector gaps between levels at most this much larger
     tree_text_max: float = 1.4  # ... box text steps up by at most this factor (body <= l3_text_max_pt)
+    tree_hug: bool = True  # ... a box hugs its text (even padding above and below); the rest goes to the gaps
     tree_box_air: float = (
-        1.15  # ... but a box is at most this much taller than its text (the rest goes to the gaps)
+        1.08  # ... but a box is at most this much taller than its text (the rest goes to the gaps)
     )
     tree_box_air_max: float = (
         1.2  # ... up to this much once the gaps are at their cap (the tree then fills the body)
