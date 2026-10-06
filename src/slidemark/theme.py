@@ -15,12 +15,33 @@ from functools import cache
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .contrast import best_ink, nearest_passing, ratio
 from .ir import Diagnostic, Length, Style
 
 PRESET_DIR = Path(__file__).parent / "presets"
+
+
+_OFF = ("off", "no", "false")
+_ON = ("on", "yes", "true")
+
+
+def _coerce_bools(cls, data):
+    """`style: layout.x=off` reaches the model as None (see ``_value``): bool fields read None/off/no/false
+    as False and on/yes/true as True."""
+    if not isinstance(data, dict):
+        return data
+    out = dict(data)
+    for name, f in cls.model_fields.items():
+        if f.annotation is not bool or name not in out:
+            continue
+        v = out[name]
+        if v is None or (isinstance(v, str) and v.strip().lower() in _OFF):
+            out[name] = False
+        elif isinstance(v, str) and v.strip().lower() in _ON:
+            out[name] = True
+    return out
 
 
 class Fonts(BaseModel):
@@ -41,10 +62,10 @@ class LayoutTokens(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("card_spread_rules", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def _rules_off(cls, v):  # `style: layout.card_spread_rules=off` reaches the model as None (see _value)
-        return False if v is None else v
+    def _bools(cls, data):
+        return _coerce_bools(cls, data)
 
     top_gap: Length = "0.25in"  # title band (or lead) -> body, the same on every slide
     line_latin: float = 1.2  # line height / font size for Latin text
@@ -85,6 +106,7 @@ class LayoutTokens(BaseModel):
     chevron_vpad: Length = "0.17in"
     footnote_max: float = 0.2  # footnotes never take more than this share of the slide height
     math_grow: float = 1.6  # an equation alone in its cell is this much larger than body text
+    cjk_unit_join: bool = True  # Japanese numbers stay with their units (38万円, ▲8%): U+2060 joiners
     grow: bool = True  # sparse slides grow text / cards to fill the body (False = keep nominal sizes)
     box_pad: Length = "10pt"  # inner padding of a box whose style has none
     # --- icons and chevrons
@@ -352,6 +374,11 @@ class RenderTokens(BaseModel):
     """Renderer defaults that change the look (line widths, readable ink colors, chart text scales)."""
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _bools(cls, data):
+        return _coerce_bools(cls, data)
 
     line_width: float = 0.75  # pt, a bordered shape without its own line width
     connector_width: float = 1.5  # pt, connectors / arrows between blocks

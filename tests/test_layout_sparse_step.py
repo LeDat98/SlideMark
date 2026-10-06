@@ -90,7 +90,7 @@ def test_render_reopens_with_the_stepped_size(tmp_path):
     want = max(body_sizes(placed))
     sizes = set()
     for sh in Presentation(str(out)).slides[0].shapes:
-        if sh.has_text_frame and "第1期投資" in sh.text_frame.text:
+        if sh.has_text_frame and "第1期投資" in sh.text_frame.text.replace("\u2060", ""):
             for p in sh.text_frame.paragraphs:
                 for r in p.runs:
                     sizes.add(r.font.size.pt)
