@@ -82,6 +82,13 @@ def test_long_text_is_not_a_subtitle():
     assert d.slides[0].subtitle is None and len(d.slides[0].elements) == 1
 
 
+def test_first_slide_long_tagline_is_a_cover():
+    tag = "FY2027 rollout of 24 partner clinics · Board review, October 2026"  # 66 chars
+    d = parse(f"# Plan\n{tag}\n\n# Part\n{tag}\n")
+    assert d.slides[0].layout == "cover" and d.slides[0].subtitle.paragraphs[0].plain == tag
+    assert d.slides[1].layout is None and d.slides[1].subtitle is None  # later slides keep the short limit
+
+
 def test_notes():
     d = parse("# A\ntext\n??? say hello\nsecond line\n# B\n")
     assert d.slides[0].notes == "say hello\nsecond line"

@@ -912,9 +912,10 @@ def _infer_cover(slide: Slide, index: int, ctx: Ctx | None = None) -> None:
     explicit = slide.layout in ("cover", "section")
     if not explicit:
         paras = [p for t in texts for p in t.paragraphs]
+        limit = SHORT_LINE * (2 if index == 0 else 1)  # first-slide subtitles are often a long tagline
         short = (
             len(paras) <= 2
-            and all(p.marker is None and len(p.plain) <= SHORT_LINE for p in paras)
+            and all(p.marker is None and len(p.plain) <= limit for p in paras)
             and slide.lead is None
             and slide.conclusion is None
             and slide.grid is None
