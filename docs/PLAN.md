@@ -641,6 +641,13 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       without % labels and a tiny legend; line labels overlapping at the last point; sparse slides that float
       (chevron strip, mid-slide bullets, cards in the top third); takeaway bar detached far below its table;
       equal-weight KPI rows when no hero is set; a list of policies could read as a numbered list.
+- [ ] Design experiment 3 (2026-10-06, not adopted): one owner-written paragraph at the top of SKILL.md (picture
+      the components the topic and audience need, weigh every element's position, shape, format, colour and
+      content, build as if you had one chance to convince). 15-slide brief: 4 calls, 1 build, 27 s, cost 72k
+      (wave-1 run: 4 calls, 61k). Blind judge round 4: python-pptx 3.5, this run 3.0, wave-1 run 3.0; the judge
+      called the two SlideMark decks almost identical. Deck in `bench/lengthbench/t2/slidemark-onechance/`.
+      Verdict: three kinds of design prose (rules-free advice, external guide, intent paragraph) moved no score;
+      the gap is in the defaults the judge names every round (same list as experiment 2), so fix those (wave 2).
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or
