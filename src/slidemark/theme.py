@@ -479,6 +479,37 @@ class LayoutTokens(BaseModel):
     )
     band_max: float = 0.25  # ... only when more than this share of the body stays empty below the block
     band_shift_max: float = 0.15  # ... and it never moves down by more than this share of the body
+    # --- sparse slides use the body (design wave 2): a short list, a few cards, a lone chevron / table
+    list_fill: bool = True  # lead + a short bullet list: the list grows with the free height (False = off)
+    list_fill_free: float = 0.3  # ... when more than this share of the body stays empty
+    list_text_max_pt: float = 28  # ... its text grows up to this size (pt), never onto a new wrapped line
+    list_fill_share: float = 0.7  # ... aiming at this share of the body height (text, then paragraph gaps)
+    list_gap_max: float = 1.2  # ... paragraph gaps (em) up to this much
+    list_top_share: float = 0.4  # ... and the block sits with this share of the leftover height above it
+    cards_to_body: bool = True  # a few text cards alone on the slide stretch down the body (no bar needed)
+    cards_to_body_free: float = 0.2  # ... when more than this share of the body stays empty around them
+    cards_to_body_min: float = 0.45  # ... as tall as this share of the body at least (none hollow) ...
+    cards_to_body_step: float = 0.1  # ... tried from the full body height down in steps of this share
+    cards_to_body_fill: float = (
+        0.45  # ... and their text ends at least this share down the card (none hollow)
+    )
+    cards_to_body_air: Length = "0.08in"  # ... ending this far above the body bottom (footnote / margin)
+    card_fill_text_max_pt: float = 26  # ... their text grows up to this size (pt), items spread inside
+    chevron_steps: bool = True  # a chevron row alone whose steps all have short bodies is built as `@steps`
+    chevron_steps_items: int = 3  # ... "short" = at most this many paragraphs under every heading
+    table_free: bool = True  # a table alone on the slide (<= table_free_max_rows rows) grows with free height
+    table_free_min: float = 0.06  # ... when more than this share of the body stays empty under / around it
+    table_free_max_rows: int = 8  # ... only tables with at most this many rows (denser ones keep their size)
+    table_free_text_max_pt: float = (
+        22  # ... its text grows up to this size (pt), never onto a new wrapped line
+    )
+    table_free_row_em: float = 3.6  # ... then its rows up to this x the text size
+    table_free_top: float = 0.4  # ... a table that still leaves air sits with this share of it above
+    bar_attach: Literal["grow", "move", "off"] = (
+        "grow"  # bar under a lone table: grow = the table meets it (rows <= table_free_row_em, the bar then
+        # moves up to the rest); move = only the bar moves up; off = the bar stays at the bottom
+    )
+    bar_attach_gap: Length = "0.15in"  # air between a table and the bar attached to it
 
 
 class RenderTokens(BaseModel):

@@ -153,6 +153,7 @@ VI5 = "theme: jp-business\nlang: vi\n\n# Lộ trình\n@chevron\n## Tháng 11\n- 
 
 
 def _chev(src, **tokens):
+    tokens.setdefault("chevron_steps", False)  # the compact chevron row (steps: tests/test_sparse_wave2.py)
     placed, _, _ = lay("", 1, src, **tokens)
     return [p for p in placed if getattr(p.element, "shape", "") == "chevron"]
 

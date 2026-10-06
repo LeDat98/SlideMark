@@ -18,6 +18,7 @@ fonts: heading="Montserrat" body="Inter"
 lang: vi
 footer: Công ty CP Logistics Sao Mai · Nội bộ
 num: on
+style: layout.chevron_steps=off
 
 """
 LONE = (
