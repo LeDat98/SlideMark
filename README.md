@@ -53,7 +53,7 @@ Windows: `slidemark preview` / `review --png` tự tìm LibreOffice trong `C:\Pr
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-06 · commit `0b7847f` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-06 · commit `bfcf2e3` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -177,7 +177,7 @@ Nguồn: [`examples/15-html-mixed.md`](examples/15-html-mixed.md)
 ![15-html-mixed slide 2](docs/gallery/15-html-mixed/slide-02.png)
 ![15-html-mixed slide 3](docs/gallery/15-html-mixed/slide-03.png)
 
-### 16-jp-strategy
+### Tiếng Nhật: chiến lược dịch vụ, Gantt, quyết định
 
 Nguồn: [`examples/16-jp-strategy.md`](examples/16-jp-strategy.md)
 
@@ -192,7 +192,7 @@ Nguồn: [`examples/16-jp-strategy.md`](examples/16-jp-strategy.md)
 ![16-jp-strategy slide 9](docs/gallery/16-jp-strategy/slide-09.png)
 ![16-jp-strategy slide 10](docs/gallery/16-jp-strategy/slide-10.png)
 
-### 17-editorial-css
+### Thiết kế tự do bằng CSS fence: phong cách tạp chí
 
 Nguồn: [`examples/17-editorial-css.md`](examples/17-editorial-css.md)
 
@@ -202,7 +202,7 @@ Nguồn: [`examples/17-editorial-css.md`](examples/17-editorial-css.md)
 ![17-editorial-css slide 4](docs/gallery/17-editorial-css/slide-04.png)
 ![17-editorial-css slide 5](docs/gallery/17-editorial-css/slide-05.png)
 
-### 18-brand-lime
+### Thiết kế tự do: thương hiệu xanh chanh
 
 Nguồn: [`examples/18-brand-lime.md`](examples/18-brand-lime.md)
 
@@ -211,7 +211,7 @@ Nguồn: [`examples/18-brand-lime.md`](examples/18-brand-lime.md)
 ![18-brand-lime slide 3](docs/gallery/18-brand-lime/slide-03.png)
 ![18-brand-lime slide 4](docs/gallery/18-brand-lime/slide-04.png)
 
-### 19-vi-consulting-brand
+### Tiếng Việt: bộ tư vấn theo thương hiệu (theme: none)
 
 Nguồn: [`examples/19-vi-consulting-brand.md`](examples/19-vi-consulting-brand.md)
 
@@ -221,7 +221,7 @@ Nguồn: [`examples/19-vi-consulting-brand.md`](examples/19-vi-consulting-brand.
 ![19-vi-consulting-brand slide 4](docs/gallery/19-vi-consulting-brand/slide-04.png)
 ![19-vi-consulting-brand slide 5](docs/gallery/19-vi-consulting-brand/slide-05.png)
 
-### 20-jp-retail-dense
+### Tiếng Nhật: bộ 11 slide dày đặc (biểu đồ cầu, Gantt, ghi chú biểu đồ)
 
 Nguồn: [`examples/20-jp-retail-dense.md`](examples/20-jp-retail-dense.md)
 
@@ -237,7 +237,7 @@ Nguồn: [`examples/20-jp-retail-dense.md`](examples/20-jp-retail-dense.md)
 ![20-jp-retail-dense slide 10](docs/gallery/20-jp-retail-dense/slide-10.png)
 ![20-jp-retail-dense slide 11](docs/gallery/20-jp-retail-dense/slide-11.png)
 
-### 21-jp-dark-pitch
+### Tiếng Nhật: pitch tối thiết kế bằng CSS/HTML
 
 Nguồn: [`examples/21-jp-dark-pitch.md`](examples/21-jp-dark-pitch.md)
 
@@ -245,6 +245,18 @@ Nguồn: [`examples/21-jp-dark-pitch.md`](examples/21-jp-dark-pitch.md)
 ![21-jp-dark-pitch slide 2](docs/gallery/21-jp-dark-pitch/slide-02.png)
 ![21-jp-dark-pitch slide 3](docs/gallery/21-jp-dark-pitch/slide-03.png)
 ![21-jp-dark-pitch slide 4](docs/gallery/21-jp-dark-pitch/slide-04.png)
+
+### Tiếng Anh: kế hoạch ra mắt, chevron khớp cột bảng, ghi chú biểu đồ (hl=, note=)
+
+Nguồn: [`examples/22-en-launch-plan.md`](examples/22-en-launch-plan.md)
+
+![22-en-launch-plan slide 1](docs/gallery/22-en-launch-plan/slide-01.png)
+![22-en-launch-plan slide 2](docs/gallery/22-en-launch-plan/slide-02.png)
+![22-en-launch-plan slide 3](docs/gallery/22-en-launch-plan/slide-03.png)
+![22-en-launch-plan slide 4](docs/gallery/22-en-launch-plan/slide-04.png)
+![22-en-launch-plan slide 5](docs/gallery/22-en-launch-plan/slide-05.png)
+![22-en-launch-plan slide 6](docs/gallery/22-en-launch-plan/slide-06.png)
+![22-en-launch-plan slide 7](docs/gallery/22-en-launch-plan/slide-07.png)
 <!-- gallery:end -->
 
 ## Tài liệu

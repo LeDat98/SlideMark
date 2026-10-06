@@ -26,6 +26,13 @@ TITLES = {
     "13-brand-aurora": "Thiết kế tự do: thương hiệu tối, gradient, bóng đổ (theme: none + token)",
     "14-brand-terracotta": "Thiết kế tự do: thương hiệu sáng, font serif, màu đất nung (token)",
     "15-html-mixed": "Slide HTML toàn trang (@html) + slide SlideMark dùng chung token",
+    "16-jp-strategy": "Tiếng Nhật: chiến lược dịch vụ, Gantt, quyết định",
+    "17-editorial-css": "Thiết kế tự do bằng CSS fence: phong cách tạp chí",
+    "18-brand-lime": "Thiết kế tự do: thương hiệu xanh chanh",
+    "19-vi-consulting-brand": "Tiếng Việt: bộ tư vấn theo thương hiệu (theme: none)",
+    "20-jp-retail-dense": "Tiếng Nhật: bộ 11 slide dày đặc (biểu đồ cầu, Gantt, ghi chú biểu đồ)",
+    "21-jp-dark-pitch": "Tiếng Nhật: pitch tối thiết kế bằng CSS/HTML",
+    "22-en-launch-plan": "Tiếng Anh: kế hoạch ra mắt, chevron khớp cột bảng, ghi chú biểu đồ (hl=, note=)",
 }
 
 
