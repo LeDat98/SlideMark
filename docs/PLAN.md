@@ -489,3 +489,12 @@ Goal: run-7 leftovers (L3), then an independent re-score with a content-rich den
 - **Wave 1 B2 (`render/`, `layout/measure.py`, `importer/`, `theme.py`, `presets/`):** orphan control for space-separated
   scripts (bind the last two short words with U+00A0 in measure and render, importer restores spaces); `.muted` boxes
   mute the header band/border via preset tokens and keep body text at fg contrast.
+- **Wave 1 status:** card text capped at 18pt (19 s5 21.8 → 18pt), hollow cards spread as ruled lists (`card_spread_rules`),
+  bar shrinks before wrapping (`conclusion_min_scale`), bar keeps a gutter above the footer; last two short words bound
+  with U+00A0 (measure + render, importer restores); `.muted` boxes get a muted band/border and fg body text (`muted-box`).
+- **Wave 2 B1 (`layout/engine.py`, `layout/l3fill.py`):** a chart after `@N … @end` spans the full width like a table
+  (20 s4: half width); stacked hollow cards beside a chart spread as ruled lists like cards above a bar (20 s6);
+  chevron rows over a table with the same column count share its column edges.
+- **Wave 2 B2 (`render/charts*`, `layout/tables.py`, `layout/vfill.py`):** negative bars: category labels at the low
+  end (20 s3/s8 label over the bar); a table beside a taller chart takes the chart height (rows + text, no new wraps;
+  20 s3/s8 lower half empty); full-width tables reach the footnote gutter (20 s7/s10 70–110px bands).
