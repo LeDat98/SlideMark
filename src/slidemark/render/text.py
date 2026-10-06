@@ -13,6 +13,7 @@ from pptx.util import Emu, Pt
 from ..ir import Paragraph, Run, Style
 from ..layout import measure
 from ..layout.css import insets, transform_text
+from ..units import EMU_PER_PT
 from .util import RenderCtx, hex6, rgb
 
 _RPR_ORDER = [
@@ -102,7 +103,14 @@ def _lang_for(text: str, deck_lang: str | None) -> str:
 
 
 def _format_run(
-    rc: RenderCtx, r, run: Run, style: Style, size_pt: float, text: str, scale: float = 1.0
+    rc: RenderCtx,
+    r,
+    run: Run,
+    style: Style,
+    size_pt: float,
+    text: str,
+    scale: float = 1.0,
+    squeeze: float = 0.0,
 ) -> None:
     theme = rc.theme
     f = r.font
@@ -125,6 +133,8 @@ def _format_run(
         rpr.set("strike", "sngStrike")
     if style.letter_spacing:
         rpr.set("spc", str(round(style.letter_spacing * scale * 100)))  # 1/100 pt
+    elif squeeze:
+        rpr.set("spc", str(round(squeeze * 100)))  # CJK orphan squeeze (measure.paragraph_squeeze)
     if run.sup:
         rpr.set("baseline", "30000")
     elif run.sub:
@@ -183,11 +193,13 @@ def fill_text(
     field: str | None = None,
     inset: int | None = None,
     gap_em: float | None = None,
+    box_w: int | None = None,
 ) -> None:
     """Write ``paragraphs`` into text frame ``tf`` using the (already merged) ``style``.
 
     ``gap_em`` is the space before every paragraph but the first, x font size (default ``measure.para_gap()``;
     the layout passes a larger value for roomy cards, as ``attrs["para_gap"]`` of the text).
+    ``box_w`` (EMU, the frame width) turns on the CJK orphan squeeze, which needs the line width.
     """
     gap = measure.para_gap() if gap_em is None else gap_em
     tf.word_wrap = True
@@ -209,6 +221,10 @@ def fill_text(
         para.space_before = Pt(size * gap) if (i > 0 and para_gap) else Pt(0)
         para.space_after = Pt(0)
         _set_bullet(para, p, size)
+        sq = 0.0
+        if box_w is not None and not field:
+            wpt = (box_w - pl - pr - (measure.list_indent(size, p.level)[0] if p.marker else 0)) / EMU_PER_PT
+            sq = measure.paragraph_squeeze(p, pst, wpt, size)
         first_text = ""
         prev = ""
         prev_r = None
@@ -234,7 +250,7 @@ def fill_text(
                         )  # a plain space keeps the badge off the text before it
                 r = para.add_run()
                 r.text = f"{pad}{_join_ranges(seg)}{pad}"
-                _format_run(rc, r, run, pst, size, seg, scale)
+                _format_run(rc, r, run, pst, size, seg, scale, sq)
                 prev = seg
                 prev_r = None if run.highlight else r  # a badge carries its own padding
                 first_text = first_text or seg

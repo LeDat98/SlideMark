@@ -374,6 +374,13 @@ def count_lines(
 
     ``spacing_pt`` is the CSS letter spacing added after every character. Results are memoised
     per (segments, width, size, font, spacing): layout re-measures the same text in many trials."""
+    return _lines_tail(segments, width_pt, size_pt, font, spacing_pt)[0]
+
+
+def _lines_tail(
+    segments: list[Segment], width_pt: float, size_pt: float, font: str | None, spacing_pt: float
+) -> tuple[int, float]:
+    """(lines, width in em of the last line), memoised."""
     key = (tuple(segments), width_pt, size_pt, font, spacing_pt, _default_font)
     hit = _LINES_CACHE.get(key)
     if hit is None:
@@ -385,7 +392,7 @@ def count_lines(
 
 def _count_lines(
     segments: list[Segment], width_pt: float, size_pt: float, font: str | None, spacing_pt: float
-) -> int:
+) -> tuple[int, float]:
     width = max(width_pt / max(size_pt, 1.0), 1.0)  # in em
     lines, cur = 1, 0.0
     line: list[tuple[float, float, str, bool, str]] = []  # units on the current line
@@ -416,7 +423,7 @@ def _count_lines(
             cur += w
             line.append(u)
         cur += sp
-    return lines
+    return lines, cur
 
 
 def para_segments(
@@ -444,6 +451,61 @@ def text_spacing(style: Style, p: Paragraph | None = None) -> tuple[float, str |
     return ls or 0.0, tf
 
 
+_SQUEEZE_CACHE: dict = {}
+
+
+def _explicit_spacing(style: Style, p: Paragraph | None) -> bool:
+    ps = p.style if p is not None else None
+    return bool((ps and ps.letter_spacing) or style.letter_spacing)
+
+
+def paragraph_squeeze(
+    p: Paragraph,
+    style: Style,
+    width_pt: float,
+    size_pt: float,
+    segments: list[Segment] | None = None,
+    *,
+    mono: bool = False,
+) -> float:
+    """Letter spacing (pt, <= 0, rounded to 0.01) that pulls a CJK orphan back onto the previous line.
+
+    A paragraph with CJK text whose last line is at most ``cjk_orphan_chars`` characters wide gets the
+    smallest spacing (steps of 0.01 em, up to ``cjk_squeeze_max`` em) at which it needs one line less, also
+    when the line width is ``cjk_squeeze_margin`` narrower (renders wrap earlier than the model). 0.0 when
+    nothing helps, the token is off, or the deck set a letter spacing itself (explicit spacing wins).
+    The renderer applies it per paragraph (``fill_text``); ``paragraphs_height(squeeze=True)`` counts it."""
+    tk = _tok
+    if tk.cjk_squeeze_max <= 0 or tk.cjk_orphan_chars <= 0 or mono or _explicit_spacing(style, p):
+        return 0.0
+    if not p.runs or not has_cjk(p.plain):
+        return 0.0
+    if segments is None:
+        bold = bool((p.style and p.style.bold) or style.bold)
+        segments = para_segments(p, bold, mono, text_spacing(style, p)[1])
+    font = style.font
+    lines, tail = _lines_tail(segments, width_pt, size_pt, font, 0.0)
+    if lines < 2 or tail <= 0 or tail > tk.cjk_orphan_chars + 1e-6:
+        return 0.0
+    key = (tuple(segments), width_pt, size_pt, font, _default_font, tk.cjk_orphan_chars)
+    key += (tk.cjk_squeeze_max, tk.cjk_squeeze_margin)
+    hit = _SQUEEZE_CACHE.get(key)
+    if hit is None:
+        if len(_SQUEEZE_CACHE) > 50_000:
+            _SQUEEZE_CACHE.clear()
+        hit = 0.0
+        narrow = width_pt * (1.0 - tk.cjk_squeeze_margin)
+        for k in range(1, int(tk.cjk_squeeze_max / 0.01 + 1e-9) + 1):
+            sp = -round(k * 0.01 * size_pt, 2)
+            if sp == 0:
+                continue
+            if _lines_tail(segments, narrow, size_pt, font, sp)[0] < lines:
+                hit = sp
+                break
+        _SQUEEZE_CACHE[key] = hit
+    return hit
+
+
 def paragraphs_height(
     paragraphs: list[Paragraph],
     width_emu: float,
@@ -453,10 +515,14 @@ def paragraphs_height(
     default_size: float = 18,
     mono: bool = False,
     gap: float | None = None,
+    squeeze: bool = False,
 ) -> float:
     """Estimated height in EMU of ``paragraphs`` wrapped into ``width_emu`` (insets already removed).
 
     ``gap`` is the space before every paragraph but the first, x font size (default: the token).
+    ``squeeze`` counts the CJK orphan squeeze (:func:`paragraph_squeeze`) the renderer applies. Off by
+    default: the squeeze only removes lines, so the layout stays safe (never too short), and counting it
+    inside the growth loops changed text sizes and card heights across decks.
     """
     gap = _tok.para_gap if gap is None else gap
     base = style.font_size or default_size
@@ -468,7 +534,9 @@ def paragraphs_height(
         wpt = (width_emu - indent) / EMU_PER_PT
         bold = bool((p.style and p.style.bold) or style.bold)
         spc, tf = text_spacing(style, p)
-        lines = count_lines(para_segments(p, bold, mono, tf), wpt, size, font, spc * scale)
+        segs = para_segments(p, bold, mono, tf)
+        sq = paragraph_squeeze(p, style, wpt, size, segs, mono=mono) if squeeze else 0.0
+        lines = count_lines(segs, wpt, size, font, spc * scale + sq)
         ls = (p.style.line_spacing if p.style and p.style.line_spacing else style.line_spacing) or 1.0
         lh = size * (_tok.line_cjk if has_cjk(p.plain) else _tok.line_latin) * ls
         total_pt += lines * lh + (size * gap if i > 0 else 0)

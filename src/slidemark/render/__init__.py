@@ -577,6 +577,7 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             pl.font_scale,
             field=field,
             gap_em=float(gap) if isinstance(gap, (int, float)) else None,
+            box_w=None if field else pl.w,
         )
         if el.attrs.get("nowrap"):  # one line measured by Chromium: a wider substitute font must not wrap it
             tf.word_wrap = False
@@ -598,7 +599,10 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             kind = MSO_SHAPE.RECTANGLE
         shp = _autoshape(rc, s, pl, kind, name)
         if el.paragraphs:
-            fill_text(rc, shp.text_frame, el.paragraphs, st, pl.font_scale)
+            squeezable = el.shape != "chevron" and not el.attrs.get("icon_inset")
+            fill_text(
+                rc, shp.text_frame, el.paragraphs, st, pl.font_scale, box_w=pl.w if squeezable else None
+            )
             if inset := el.attrs.get("icon_inset"):  # room for the icon the layout placed before the text
                 shp.text_frame.margin_left = Emu(shp.text_frame.margin_left + int(inset))
         if el.shape == "chevron":
