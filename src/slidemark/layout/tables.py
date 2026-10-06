@@ -47,6 +47,47 @@ def _min_em(text: str) -> float:
     return min(max((measure.text_em(w) for w in text.split()), default=0.0), 12.0)
 
 
+def _badge_em(text: str) -> float:
+    """Width in em of a badge as rendered: bold text plus the padding render/text.py adds around it."""
+    tk = measure.tokens()
+    if measure.has_cjk(text):
+        return measure.text_em(text, bold=True) + 2.0 * tk.badge_pad_cjk
+    return measure.text_em(text, bold=True) + 2 * tk.badge_pad * measure.text_em("\u00a0")
+
+
+def _badge_unit_em(text: str, lead: str, bold: bool) -> float:
+    """Width in em that a badge and the word before it must keep together (with headroom for wider fonts)."""
+    em = _badge_em(text) + (measure.text_em(lead, bold=bold) + measure.text_em(" ") if lead else 0.0)
+    return em * measure.tokens().badge_headroom
+
+
+def _para_em(p, bold: bool, tf: str | None) -> tuple[float, float]:
+    """(full width, width that must stay on one line) in em of a paragraph with its badges padded.
+
+    The second figure is the widest unit that may not break: a word, or the word before a badge together with
+    the whole badge (a badge never sits alone on a line while the column can be widened).
+    """
+    runs = p.runs
+    if not any(r.highlight for r in runs):
+        return measure.text_em(css.transform_text(p.plain, tf), bold=bold), _min_em(p.plain)
+    total = 0.0
+    keep = _min_em("".join(r.text for r in runs if not r.highlight))
+    prev = ""
+    for r in runs:
+        txt = css.transform_text(r.text, tf)
+        if r.highlight:
+            b = _badge_em(txt)
+            if measure.tokens().badge_gap and prev and not prev.endswith((" ", "\u00a0", "\u3000")):
+                total += measure.text_em(" ", bold=bold)
+            lead = prev.split()[-1] if prev.split() else ""
+            keep = max(keep, _badge_unit_em(txt, lead, bold))
+            total += b
+        else:
+            total += measure.text_em(txt, bold=bold or r.bold)
+        prev = txt
+    return total, min(keep, 20.0)
+
+
 def _measured_em(
     t: Table, ncols: int, anchors: list[tuple[int, int, Cell]], size_pt: float
 ) -> tuple[list[float], list[float]]:
@@ -58,12 +99,9 @@ def _measured_em(
             continue
         bold = r < t.header_rows or c < t.header_cols
         tf = cell.style.text_transform if cell.style else None
-        n = max(
-            (measure.text_em(css.transform_text(p.plain, tf), bold=bold) for p in cell.paragraphs),
-            default=0.0,
-        )
-        weights[c] = max(weights[c], min(n, 30.0))
-        mins[c] = max(mins[c], *(_min_em(p.plain) for p in cell.paragraphs), 0.0)
+        ems = [_para_em(p, bold, tf) for p in cell.paragraphs]
+        weights[c] = max(weights[c], min(max((e[0] for e in ems), default=0.0), 30.0))
+        mins[c] = max(mins[c], *(e[1] for e in ems), 0.0)
     pad_em = 2 * measure.cell_pad()[0] / EMU_PER_PT / max(size_pt, 1.0)
     weights = [w + pad_em for w in weights]
     min_w = [(m + pad_em) * 1.08 for m in mins]  # a little headroom: fallback fonts run wider

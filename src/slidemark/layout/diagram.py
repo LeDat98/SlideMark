@@ -694,8 +694,26 @@ def _tree_text_h(p, width: int, scale: float) -> float:
     return measure.paragraphs_height(p.element.paragraphs, max(width - ph, 1), p.style, scale) + pv
 
 
+def _one_line_width(q, w0: int, cap: int, tf: float) -> int:
+    """Smallest box width in [w0, cap] that keeps heading ``q`` on one line at scale ``tf``."""
+    sc = q.font_scale * tf
+    one = _tree_text_h(q, 10**9, sc)
+    if _tree_text_h(q, w0, sc) <= one * 1.01:
+        return w0
+    if _tree_text_h(q, cap, sc) > one * 1.01:
+        return cap
+    lo, hi = w0, cap
+    while hi - lo > 20000:
+        mid = (lo + hi) // 2
+        if _tree_text_h(q, mid, sc) <= one * 1.01:
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
 def _tree_stack(
-    items: list, b: int, ms: list[int], dw: int, tf: float
+    items: list, b: int, ms: list[int], dw: int, tf: float, shrink: bool = False
 ) -> tuple[list[tuple[int, int, int]], int]:
     """Text of box ``b`` at factor ``tf`` and ``dw`` more width: ([(item, y offset, height)], used height).
 
@@ -709,8 +727,8 @@ def _tree_stack(
         q = items[j]
         w = q.w + dw
         grow = 0
-        if tf > 1.0:
-            grow = round(_tree_text_h(q, w, q.font_scale * tf) - _tree_text_h(q, w, q.font_scale))
+        if tf > 1.0 or (dw and shrink):  # a box widened to fit its heading unwraps: the shrink counts
+            grow = round(_tree_text_h(q, w, q.font_scale * tf) - _tree_text_h(q, q.w, q.font_scale))
         head = n == 0 and getattr(q.element, "role", "") == "heading" and q.y - box.y <= 2
         if not head:
             cursor += round(max(q.y - prev, 0) * tf)
@@ -719,6 +737,10 @@ def _tree_stack(
         prev = q.y + q.h
     last = items[ms[-1]] if ms else None
     tail = max(box.y + box.h - (last.y + last.h), 0) if last is not None else 0
+    if shrink and dw and last is not None:  # stretched before: keep only its real bottom padding
+        from . import css
+
+        tail = min(tail, css.insets(box.style)[3] * 2)
     return res, cursor + round(tail * tf)
 
 
@@ -792,22 +814,40 @@ def _fill_tree(items: list, body: Rect, lt, reserve: int) -> list:
     if gs > 0:
         sg = max(1.0, min((target - hb * sb) / gs, lt.tree_gap_grow))
     sb = max(1.0, min((target - gs * sg) / hb, lt.tree_box_grow))
-    # ---- widths: a lone box of a level (the root) may be wider
-    new_x: dict[int, tuple[int, int]] = {i: (items[i].x, items[i].w) for i in order}
-    for r in rows:
-        p = items[r[0]]
-        if len(r) == 1 and len(rows) > 1 and lt.tree_wide > 1.0 and p.w < lt.tree_wide_max * body.w:
-            w = min(round(p.w * lt.tree_wide), round(lt.tree_wide_max * body.w))
-            new_x[r[0]] = (min(max(p.x + p.w // 2 - w // 2, body.x), max(body.right - w, body.x)), w)
+    # ---- widths: a lone box of a level (the root) may be wider, until its heading fits one line
     row_of = {b: k for k, r in enumerate(rows) for b in r}
+    lone = [r[0] for r in rows if len(r) == 1 and len(rows) > 1 and lt.tree_wide > 1.0]
+
+    fitted: set[int] = set()  # lone boxes widened beyond the usual factor to keep their heading on one line
+
+    def widths(tf: float) -> dict[int, tuple[int, int]]:
+        fitted.clear()
+        res: dict[int, tuple[int, int]] = {i: (items[i].x, items[i].w) for i in order}
+        for b in lone:
+            p = items[b]
+            cap = max(round(lt.tree_wide_max * body.w), p.w)
+            w = min(round(p.w * lt.tree_wide), cap) if p.w < cap else p.w
+            heads = [items[j] for j in members[b] if getattr(items[j].element, "role", "") == "heading"]
+            if heads and lt.tree_head_fit > 0:
+                cap = max(cap, round(lt.tree_head_fit * body.w))
+                fit = _one_line_width(heads[0], p.w, cap, tf)
+                if fit > w:
+                    w = fit
+                    fitted.add(b)
+            w = min(w, cap)
+            res[b] = (min(max(p.x + p.w // 2 - w // 2, body.x), max(body.right - w, body.x)), w)
+        return res
+
+    new_x = widths(1.0)
 
     def pt(p, tf: float) -> float:
         return (p.style.font_size or 14) * p.font_scale * tf
 
     def fits(tf: float) -> bool:
+        wx = widths(tf)
         for b, ms in members.items():
-            dw = new_x[b][1] - items[b].w
-            stack, used = _tree_stack(items, b, ms, dw, tf)
+            dw = wx[b][1] - items[b].w
+            stack, used = _tree_stack(items, b, ms, dw, tf, b in fitted)
             if used > round(row_h[row_of[b]] * sb):
                 return False
             for j in ms:
@@ -826,11 +866,15 @@ def _fill_tree(items: list, body: Rect, lt, reserve: int) -> list:
         if fits(round(1.0 + 0.05 * k, 2)):
             tf = round(1.0 + 0.05 * k, 2)
             break
+    new_x = widths(tf)
     # ---- row heights: boxes keep an airy fit around their text, the rest of the growth goes to the gaps
     nhs: list[int] = []
     for k, r in enumerate(rows):
-        need = max(_tree_stack(items, b, members[b], new_x[b][1] - items[b].w, tf)[1] for b in r)
-        nhs.append(min(round(row_h[k] * sb), max(row_h[k], round(need * lt.tree_box_air))))
+        need = max(_tree_stack(items, b, members[b], new_x[b][1] - items[b].w, tf, b in fitted)[1] for b in r)
+        floor, air = row_h[k], lt.tree_box_air
+        if r[0] in fitted and len(r) == 1:
+            floor, air = min(floor, round(need)), 1.0  # a widened lone box gives back the height it unwrapped
+        nhs.append(min(round(row_h[k] * sb), max(floor, round(need * air))))
     if gs > 0:
         sg = max(1.0, min((target - sum(nhs)) / gs, lt.tree_gap_grow))
     # ---- new geometry
@@ -844,7 +888,7 @@ def _fill_tree(items: list, body: Rect, lt, reserve: int) -> list:
             bx, bw = new_x[b]
             out[b] = p.model_copy(update={"x": bx, "y": y, "w": bw, "h": nh})
             new_rect[_rect4(p)] = (bx, y, bw, nh)
-            stack, used = _tree_stack(items, b, members[b], bw - p.w, tf)
+            stack, used = _tree_stack(items, b, members[b], bw - p.w, tf, b in fitted)
             spare = max(nh - used, 0)
             shift = round(spare * lt.tree_pad_share)  # part of the growth is padding above the body text
             for n, (j, off, h) in enumerate(stack):
