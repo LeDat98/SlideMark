@@ -156,7 +156,7 @@ message (lead), `>` last = conclusion bar, `※ text` = footnote. `@end` closes 
 
 **`@` line** (only if the automatic layout is wrong; one per slide, tokens space separated):
 `@3` columns · `@2x2` grid · `@1:2` ratios · `@aab/aac` areas (letters = blocks in order, `.` empty) ·
-`chevron` steps (heading + 1–2 short bullets each) · `flow` cards with arrows · `a>b` arrow, `a-b` line
+`chevron` steps (heading + 1–2 short bullets each) · `steps` arrows with each step's bullets in a card below · `flow` cards with arrows · `a>b` arrow, `a-b` line
 between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition · `@bg=#0B1020` or
 `@bg="linear-gradient(135deg,#1A0B2E,#7A1FA2)"` slide background (dark bg flips text light; `@dark`/`@light`
 force it) · `@free` absolute positions only.
@@ -170,7 +170,8 @@ block: `x y w h` (`%` `in` `cm` `pt`), `size`, `color`, `fill`, `align`, `valign
 
 ## Components
 
-- **KPI card:** `## Label {.kpi icon=yen}` + value line + caption line. Up to 4 in a row; `@end` + a list or
+- **KPI card:** `## Label {.kpi icon=yen}` + value line + caption line; `{.kpi .hero}` = the lead metric,
+  wider with a bigger number. Up to 4 in a row; `@end` + a list or
   table below them.
 - **Callout:** `> [!note] text` (`tip` `warn` `caution`), at slide level or inside a box.
 - **Icons:** `icon=` on a box heading: `check warning info user users building chart money yen target rocket
@@ -184,7 +185,7 @@ block: `x y w h` (`%` `in` `cm` `pt`), `size`, `color`, `fill`, `align`, `valign
 ## Tables and charts
 
 Table: ` ```table ` fence with CSV (first row = header; quote cells with commas: `"1,240"`), or a GFM table.
-Options on the fence or the line before: `{widths=3:1:1 align=lrr header=1 hcol=1 .zebra}`; `.gantt` draws filled period cells as bars. Merge: a lone
+Options on the fence or the line before: `{widths=3:1:1 align=lrr header=1 hcol=1 .zebra}`; `.gantt` draws filled period cells as bars; `hl=Metro,Kyoto` emphasises the rows whose first cell matches. Merge: a lone
 `<` joins the cell to the left, `^` the cell above. Numeric columns align right by themselves. ≤ 8 rows.
 
 Chart fence kinds: `column bar line area pie doughnut scatter radar stacked-column stacked-bar waterfall` (waterfall: one row, `=` cell = total). CSV body:
