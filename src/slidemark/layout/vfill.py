@@ -96,9 +96,10 @@ def _grow_table(p: Placed, peer_pt: float = 0.0) -> Placed:
     return p
 
 
-def _fit_target(items: list[Placed], i: int, body: Rect, reserve: int) -> int | None:
-    """Height (EMU) table ``i`` should fill: down to a taller chart / image beside it, or, as the
-    lowest block of the body, down to one gutter (``reserve``) above the footnote. None = leave it."""
+def _fit_target(items: list[Placed], i: int, body: Rect, reserve: int) -> tuple[int, bool] | None:
+    """(height in EMU, beside a visual) table ``i`` should fill: down to a taller chart / image beside it,
+    or, as the lowest block of the body, down to one gutter (``reserve``) above the footnote. None = leave
+    it."""
     t = items[i]
     others = [q for j, q in enumerate(items) if j != i and not _is_line(q) and _owner(items, j) is None]
     beside = [
@@ -112,20 +113,22 @@ def _fit_target(items: list[Placed], i: int, body: Rect, reserve: int) -> int | 
     if beside:
         bottom = max(q.y + q.h for q in beside)
         if bottom - t.y > t.h * 1.08:
-            return bottom - t.y
+            return bottom - t.y, True
         return None
     if reserve <= 0 or any(q.y < t.y + t.h - 2 and q.y + q.h > t.y + 2 for q in others):
         return None  # needs a footnote / conclusion below, and nothing beside it
     if any(q.y + q.h > t.y + t.h + 2 for q in others):
         return None  # not the lowest block
     target = body.y + body.h - reserve - t.y
-    return target if target > t.h + 0.03 * body.h else None
+    return (target, False) if target > t.h + 0.03 * body.h else None
 
 
-def _fit_table(p: Placed, target: int, peer_pt: float) -> Placed:
+def _fit_table(p: Placed, target: int, peer_pt: float, beside: bool = False) -> Placed:
     """Stretch table ``p`` to ``target`` EMU: its text grows first (``table_text_max``, ``table_peer_max`` /
     ``table_box_max``, no new wrapped line), then its rows, which stay <= ``table_vrow_max_em`` x text
-    (the text has grown as far as it can by then); the table stays top-anchored when rows hit the cap."""
+    (the text has grown as far as it can by then); the table stays top-anchored when rows hit the cap.
+    ``beside`` (a taller chart / image next to it): the rows may take up to ``table_fit_row_max_em`` x text
+    so the table bottom meets the visual's."""
     tk = measure.tokens()
     t = p.element
     rh, cw = t.attrs.get("_row_h"), t.attrs.get("_col_w")
@@ -161,11 +164,21 @@ def _fit_table(p: Placed, target: int, peer_pt: float) -> Placed:
         break
     f, nat = best
     em = max(tk.table_row_max_em, tk.table_vrow_max_em) if tk.table_row_max_em > 0 else 0  # text at its limit
-    cap = round(em * size * f * EMU_PER_PT) if em > 0 else 0
     ratio = target / max(sum(nat), 1)
-    new = [round(h * ratio) for h in nat]
-    if cap:
-        new = [min(n, max(h, cap)) for n, h in zip(new, nat, strict=True)]
+
+    def rows(em: float) -> list[int]:
+        cap = round(em * size * f * EMU_PER_PT) if em > 0 else 0
+        out = [round(h * ratio) for h in nat]
+        return [min(n, max(h, cap)) for n, h in zip(out, nat, strict=True)] if cap else out
+
+    new = rows(em)
+    if beside and em > 0 and tk.table_fit_row_max_em > em and sum(new) < target:
+        wide = rows(tk.table_fit_row_max_em)
+        hm, nh = tk.table_header_max, min(max(t.header_rows, 0), nrows - 1)  # the render compacts header rows
+        head = sum(min(w, round(a * hm)) if hm > 0 else w for w, a in zip(wide[:nh], nat[:nh], strict=False))
+        body = (sum(wide) - head) / max(nrows - nh, 1)
+        if body <= tk.table_fit_row_max_em * size * f * EMU_PER_PT:  # not a few rows stretched hollow
+            new = wide
     if f == 1.0 and sum(new) <= sum(rh) + 2:
         return p
     el = t.model_copy(update={"attrs": {**t.attrs, "_row_h": new, "_row_cap": True}})
@@ -251,9 +264,9 @@ def fill_body(
         if tk.table_fit:
             for i, p in enumerate(items):
                 if isinstance(p.element, Table) and _owner(items, i) is None:
-                    target = _fit_target(items, i, body, reserve)
-                    if target:
-                        items[i] = _fit_table(p, target, peer)
+                    got = _fit_target(items, i, body, reserve)
+                    if got:
+                        items[i] = _fit_table(p, got[0], peer, got[1])
         return _fill(
             items,
             body,

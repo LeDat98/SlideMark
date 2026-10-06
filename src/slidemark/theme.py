@@ -361,6 +361,9 @@ class LayoutTokens(BaseModel):
     table_fit: bool = (
         True  # a table beside a taller chart / image, or the last block above a footnote, fills to there
     )
+    table_fit_row_max_em: float = (
+        7.0  # a table fitted to a taller chart / image beside it: body rows <= this x text (bottoms line up)
+    )
     badge_pad: int = 2  # a badge run of Latin text gets this many no-break spaces on each side
     badge_pad_cjk: int = 1  # ... of CJK text this many full-width spaces
     badge_headroom: float = 1.3  # a badge and the word before it keep this x their width in a table column
