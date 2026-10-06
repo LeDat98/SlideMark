@@ -52,3 +52,4 @@ step does not apply (no visual risk to lint, or no syntax).
 | Sparse slide completion (KPI rows, short lists, box rows, lone tables grow) | - | - | x | x | x | x | - | - |
 | Decimal commas in chart CSV for vi/de/fr…; `※` kept in footnotes | x | x | x | x | x | - | - | - |
 | Pie/doughnut per-point label ink | - | - | x | x | x | x | - | - |
+| Orphan control (no-break space between the last two short words); `.muted` box = muted band/border, normal body ink | x | x | x | x | x | x | x | - |

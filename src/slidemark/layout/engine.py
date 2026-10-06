@@ -252,7 +252,9 @@ def _class_styles(ctx: _Ctx, el, skip: tuple[str, ...] = ()) -> list[Style]:
     for name in getattr(el, "classes", []):
         if name in skip:
             continue
-        if name in ctx.theme.classes:
+        if name == "muted" and isinstance(el, Container):  # a muted box: border + band, body keeps its ink
+            out.append(ctx.theme.classes.get("muted-box") or ctx.theme.classes["muted"])
+        elif name in ctx.theme.classes:
             out.append(ctx.theme.classes[name])
         elif name in ctx.theme.colors and name not in ("bg", "fg", "surface", "border"):
             if isinstance(el, Container):
@@ -996,7 +998,7 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
     """(heading element, merged style, autofit scale, band fill) of a box, or ``None`` without a heading."""
     if c.title is None or not c.title.paragraphs:
         return None
-    band = None if kpi else ctx.theme.heading_band
+    band, band_ink = (None, "bg") if kpi else ctx.theme.heading_band_for(c.classes)
     h_el = c.title if c.title.role == "heading" else c.title.model_copy(update={"role": "heading"})
     hst = _text_style(ctx, h_el, fast_style())
     if kpi:
@@ -1008,7 +1010,7 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
         hst = hst.merged(
             fast_style(
                 fill=band,
-                color=ctx.theme.heading_band_color,
+                color=band_ink,
                 bold=True,
                 valign="middle",
                 padding=f"{round(pad / EMU_PER_PT, 2)}pt",

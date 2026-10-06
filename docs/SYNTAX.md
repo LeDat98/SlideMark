@@ -199,6 +199,10 @@ Keys:
 | Image | `fit=contain` (default), `cover`, `stretch` |
 | Classes | theme colors (`.primary`, `.accent`, `.danger`, `.success`, `.muted`), `.plain` (box without card), `.kpi` (big number box) |
 
+`.muted` on a **box** reads as lower priority, not disabled: muted border and (with a heading band) a muted band; body text keeps its normal ink. Restore grey body text with `style: muted-box.color=muted`; turn the band off with `muted.band=none`. `.muted` on text, spans and badges stays grey text.
+
+Orphan control: the last two words of a paragraph (3+ words, each up to 12 characters, not CJK/URL/code) are joined by a no-break space so a line never ends with a lone word; the importer turns it back into a plain space.
+
 ## Components
 
 **KPI box.** A box with `.kpi` shows its first line as a big number and the rest as a small caption; the

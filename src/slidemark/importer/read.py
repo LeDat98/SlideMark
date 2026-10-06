@@ -180,7 +180,7 @@ def _hex(el) -> str | None:
 def _read_run(r, ctx: ReadCtx, part) -> RunT:
     t = r.find(qn("a:t"))
     text = ((t.text or "") if t is not None else "").replace("\u2060", "")  # render's range joiners
-    run = RunT(text=text)
+    run = RunT(text=text.replace(" ", " "))  # no-break spaces: the renderer's orphan control
     rpr = r.find(qn("a:rPr"))
     if rpr is None:
         return run

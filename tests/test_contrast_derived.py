@@ -80,7 +80,7 @@ def test_rendered_pptx_uses_the_derived_colors(tmp_path):
                     if run.font.color and run.font.color.type is not None:
                         colors[run.text] = str(run.font.color.rgb)
     assert colors["12.4B"] != "84CC16" and ratio("#" + colors["12.4B"], "#F3F4F6") >= 3.0
-    assert ratio("#" + colors["Best month of the year"], "#84CC16") >= 4.5
+    assert ratio("#" + colors["Best month of the\u00a0year"], "#84CC16") >= 4.5
 
 
 FULL = BODY + "\n# Detail\n> lead line\n## Box\ntext here\n^ footnote text\n"

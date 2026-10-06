@@ -42,7 +42,7 @@ def one(prs, prefix: str, slide: int = 0):
 
 def by_text(prs, text: str, slide: int = 0):
     for s in prs.slides[slide].shapes:
-        if s.has_text_frame and text in s.text_frame.text:
+        if s.has_text_frame and text in s.text_frame.text.replace("\u00a0", " "):
             return s
     raise AssertionError(f"no shape with text {text!r}")
 
@@ -226,7 +226,7 @@ def test_capitalize_and_lowercase(tmp_path):
     md = HEAD + css(".box > h2 {text-transform: capitalize}\n.box p {text-transform: lowercase}")
     md += "# T\n@1\n## the big heading\nSHOUTING Body\n"
     prs, _ = build(md, tmp_path)
-    assert by_text(prs, "Big Heading").text_frame.text == "The Big Heading"
+    assert by_text(prs, "Big Heading").text_frame.text.replace("\u00a0", " ") == "The Big Heading"
     assert by_text(prs, "shouting").text_frame.text == "shouting body"
 
 

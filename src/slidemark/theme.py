@@ -406,7 +406,10 @@ def _base_classes() -> dict[str, Style]:
     return {
         "card": Style(fill="surface", line="border", line_width=0.75, radius=6, padding="10pt"),
         "callout": Style(fill="surface", line="primary", line_width=1, padding="10pt"),
-        "muted": Style(color="muted"),
+        "muted": Style(color="muted"),  # text, spans, badges: grey ink
+        # a `.muted` BOX (card): lower priority but readable. Muted border (+ `muted_band` header fill),
+        # the body keeps its normal ink. `muted-box.color=muted` brings the grey body text back.
+        "muted-box": Style(line="muted"),
         "dense": Style(font_size=11),
         "kpi": Style(font_size=36, bold=True, color="primary", align="center", valign="middle"),
         # callout kinds (`> [!note]` ...): border color. Badges: `[x]{.badge}`.
@@ -453,6 +456,7 @@ class Theme(BaseModel):
     table_zebra_fill: str | None = None  # alternate body row fill for `.zebra` tables (None = derived)
     heading_band: str | None = None  # fill of a full-width band behind `##` box headings (None = plain)
     heading_band_color: str = "bg"  # heading text color on the band
+    muted_band: str | None = "muted"  # heading band fill of a `.muted` box (None = the normal band)
     template: str | None = None  # path of a user .pptx/.potx used as the base presentation (masters, layouts)
     columns: int = 12  # layout track grid: ratio/area columns snap to multiples of width/columns
     dense_scale: float = 0.8  # body/table/code size factor for `density: dense` / `.dense` slides
@@ -523,6 +527,14 @@ class Theme(BaseModel):
         if ph and ratio(ph, fh) >= need:
             return prefer  # type: ignore[return-value]
         return best_ink(fh, cands, need)
+
+    def heading_band_for(self, classes) -> tuple[str | None, str]:
+        """(fill, ink) of a box heading band: the ``muted_band`` color for a ``.muted`` box, else the normal
+        band. The ink keeps ``heading_band_color`` while it reads on the fill (layout and lint share it)."""
+        band = self.heading_band
+        if band and "muted" in classes and self.muted_band:
+            return self.muted_band, self.ink_on(self.muted_band, self.heading_band_color)
+        return band, self.heading_band_color
 
     def badge_ink(self, highlight: str | None) -> str:
         """Ink of a run on a badge highlight (the badge class color when it is the same fill)."""
@@ -1000,7 +1012,7 @@ _KEYWORDS = {"none", "hidden", "solid", "dashed", "dotted", "double", "thin", "m
 _PT_FIELDS = {"font_size", "line_width", "radius", "letter_spacing"}
 _PT_PATHS = {"min_font_size", "render.line_width", "render.connector_width", "render.chart_line_width"}
 _THEME_COLOR_SUFFIX = ("_fill", "_color", "_band", "_border")
-_OPTIONAL_COLORS = {"title_band", "heading_band", "table_zebra_fill"}
+_OPTIONAL_COLORS = {"title_band", "heading_band", "muted_band", "table_zebra_fill"}
 _MEDIUM_PT = 2.25  # CSS `medium` border width (3px)
 
 
