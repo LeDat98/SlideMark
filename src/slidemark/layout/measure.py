@@ -239,6 +239,8 @@ def _base_em(ch: str, kind: str, font: str) -> float:
         return 0.5
     if unicodedata.combining(ch) or ch in "\u200b\u200c\u200d\u2060\ufeff":
         return 0.0
+    if ch == VIEWER_GAP:
+        return VIEWER_GAP_EM
     if ch == NBSP:
         ch = " "
     if font == "wide":
@@ -459,6 +461,55 @@ def _explicit_spacing(style: Style, p: Paragraph | None) -> bool:
     return bool((ps and ps.letter_spacing) or style.letter_spacing)
 
 
+_CJKSET = "\u2e80-\ufaff\uff00-\uffef"
+_WJ_BETWEEN_CJK = re.compile(f"(?<=[{_CJKSET}]){WJ}(?=[{_CJKSET}])")
+_GAP_L2C = re.compile(f"(?<=[0-9A-Za-z%])(?={WJ}?[{_CJKSET}])")  # Latin -> CJK
+_GAP_C2L = re.compile(f"(?<=[{_CJKSET}▲△▼])(?={WJ}?[0-9A-Za-z])")  # CJK -> Latin
+VIEWER_GAP = "\ue000"  # private marker: one tenth of an em of space, only in the viewer model
+VIEWER_GAP_EM = 0.1
+
+
+def _viewer_text(text: str, gap: str) -> str:
+    text = _WJ_BETWEEN_CJK.sub("", text)
+    if gap:
+        text = _GAP_C2L.sub(gap, _GAP_L2C.sub(gap, text))
+    return text
+
+
+def _viewer_segments(segments: list[Segment], gap_em: float) -> list[Segment]:
+    """Segments as LibreOffice lays them out, not as the PowerPoint-minded model does.
+
+    LibreOffice ignores U+2060 between two CJK characters and adds ``gap_em`` of space between CJK and
+    Latin text that touch (the Asian typography option; PowerPoint does neither)."""
+    gap = VIEWER_GAP * round(gap_em / VIEWER_GAP_EM) if gap_em > 0 else ""
+    return [s if len(s) > 3 and s[3] else (_viewer_text(s[0], gap), *s[1:]) for s in segments]
+
+
+def _squeeze_for(
+    segments: list[Segment], width_pt: float, size_pt: float, font: str | None, tk: LayoutTokens
+) -> float:
+    lines, tail = _lines_tail(segments, width_pt, size_pt, font, 0.0)
+    near = tk.cjk_squeeze_fill > 0 and tk.cjk_squeeze_tail > 0
+    fill = width_pt * tk.cjk_squeeze_fill
+    widths: list[float] = []  # the line widths the squeezed paragraph must keep ``goal`` lines at
+    goal = lines
+    if 2 <= lines and 0 < tail <= tk.cjk_orphan_chars + 1e-6:  # an orphan at the model width: save a line
+        goal = lines - 1
+        widths = [fill, width_pt * (1.0 - tk.cjk_squeeze_margin)] if near else widths
+        if not near:
+            widths = [width_pt * (1.0 - tk.cjk_squeeze_margin)]
+    elif near:  # a nearly full line: the viewer may wrap a few trailing characters of it
+        lines_n, tail_n = _lines_tail(segments, fill, size_pt, font, 0.0)
+        if lines_n > lines and 0 < tail_n <= tk.cjk_squeeze_tail + 1e-6:
+            widths = [fill]
+    for narrow in widths:  # the safest width first; fall back to a thinner margin
+        for k in range(1, int(tk.cjk_squeeze_max / 0.01 + 1e-9) + 1):
+            sp = -round(k * 0.01 * size_pt, 2)
+            if sp != 0 and _lines_tail(segments, narrow, size_pt, font, sp)[0] <= goal:
+                return sp
+    return 0.0
+
+
 def paragraph_squeeze(
     p: Paragraph,
     style: Style,
@@ -468,12 +519,15 @@ def paragraph_squeeze(
     *,
     mono: bool = False,
 ) -> float:
-    """Letter spacing (pt, <= 0, rounded to 0.01) that pulls a CJK orphan back onto the previous line.
+    """Letter spacing (pt, <= 0, rounded to 0.01) that keeps CJK lines whole in the viewers.
 
-    A paragraph with CJK text whose last line is at most ``cjk_orphan_chars`` characters wide gets the
-    smallest spacing (steps of 0.01 em, up to ``cjk_squeeze_max`` em) at which it needs one line less, also
-    when the line width is ``cjk_squeeze_margin`` narrower (renders wrap earlier than the model). 0.0 when
-    nothing helps, the token is off, or the deck set a letter spacing itself (explicit spacing wins).
+    Measured the way LibreOffice breaks (no joiner between two CJK characters). Two cases: a paragraph
+    whose last line is at most ``cjk_orphan_chars`` characters wide gets the smallest spacing (steps of
+    0.01 em, up to ``cjk_squeeze_max`` em) at which it needs one line less, also when the line is
+    ``cjk_squeeze_margin`` narrower; a paragraph whose lines are nearly full (it would wrap with at most
+    ``cjk_squeeze_tail`` characters on the last line at ``cjk_squeeze_fill`` of the width) gets the
+    smallest spacing that keeps it at its line count at that width. 0.0 when nothing helps, the tokens
+    are off, or the deck set a letter spacing itself (explicit spacing wins).
     The renderer applies it per paragraph (``fill_text``); ``paragraphs_height(squeeze=True)`` counts it."""
     tk = _tok
     if tk.cjk_squeeze_max <= 0 or tk.cjk_orphan_chars <= 0 or mono or _explicit_spacing(style, p):
@@ -484,25 +538,16 @@ def paragraph_squeeze(
         bold = bool((p.style and p.style.bold) or style.bold)
         segments = para_segments(p, bold, mono, text_spacing(style, p)[1])
     font = style.font
-    lines, tail = _lines_tail(segments, width_pt, size_pt, font, 0.0)
-    if lines < 2 or tail <= 0 or tail > tk.cjk_orphan_chars + 1e-6:
-        return 0.0
     key = (tuple(segments), width_pt, size_pt, font, _default_font, tk.cjk_orphan_chars)
-    key += (tk.cjk_squeeze_max, tk.cjk_squeeze_margin)
+    key += (tk.cjk_squeeze_max, tk.cjk_squeeze_margin, tk.cjk_squeeze_fill, tk.cjk_squeeze_tail)
+    key += (tk.cjk_latin_gap,)
     hit = _SQUEEZE_CACHE.get(key)
     if hit is None:
         if len(_SQUEEZE_CACHE) > 50_000:
             _SQUEEZE_CACHE.clear()
-        hit = 0.0
-        narrow = width_pt * (1.0 - tk.cjk_squeeze_margin)
-        for k in range(1, int(tk.cjk_squeeze_max / 0.01 + 1e-9) + 1):
-            sp = -round(k * 0.01 * size_pt, 2)
-            if sp == 0:
-                continue
-            if _lines_tail(segments, narrow, size_pt, font, sp)[0] < lines:
-                hit = sp
-                break
-        _SQUEEZE_CACHE[key] = hit
+        hit = _SQUEEZE_CACHE[key] = _squeeze_for(
+            _viewer_segments(segments, tk.cjk_latin_gap), width_pt, size_pt, font, tk
+        )
     return hit
 
 

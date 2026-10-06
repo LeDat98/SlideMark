@@ -42,7 +42,7 @@ def test_squeeze_pulls_orphan_onto_previous_line():
     p = _p()
     sq = measure.paragraph_squeeze(p, Style(), W, SIZE)
     assert sq < 0
-    assert abs(sq) <= 0.1 * SIZE + 1e-9
+    assert abs(sq) <= LayoutTokens().cjk_squeeze_max * SIZE + 1e-9
     segs = measure.para_segments(p)
     assert measure.count_lines(segs, W, SIZE, None, 0.0) == 2
     assert measure.count_lines(segs, W * 0.99, SIZE, None, sq) == 1  # fits with the safety margin
@@ -57,9 +57,9 @@ def test_layout_height_counts_the_squeeze():
 
 
 def test_no_squeeze_when_it_would_not_help():
-    # an orphan on a short line cannot be pulled back by 0.1 em per character
+    # an orphan on a short line cannot be pulled back by the bounded spacing per character
     p = _p("売上高の推移を示す")
-    assert measure.paragraph_squeeze(p, Style(), 8 * SIZE, SIZE) == 0.0
+    assert measure.paragraph_squeeze(p, Style(), 7 * SIZE, SIZE) == 0.0
 
 
 def test_no_squeeze_without_orphan_or_cjk():
@@ -77,6 +77,37 @@ def test_explicit_letter_spacing_wins():
 def test_token_off_switch():
     measure.set_tokens(LayoutTokens(cjk_squeeze_max=0))
     assert measure.paragraph_squeeze(_p(), Style(), W, SIZE) == 0.0
+
+
+def test_nearly_full_line_is_squeezed_before_the_viewer_wraps_it():
+    # "38万円" fills the line to 98%: the model keeps one line, LibreOffice wraps a lone 円
+    p = _p("1件あたり平均38万円")
+    w = 10.2 * SIZE
+    segs = measure.para_segments(p)
+    assert measure.count_lines(segs, w, SIZE, None, 0.0) == 1
+    sq = measure.paragraph_squeeze(p, Style(), w, SIZE)
+    assert sq < 0
+    assert abs(sq) <= LayoutTokens().cjk_squeeze_max * SIZE + 1e-9
+    narrow = w * LayoutTokens().cjk_squeeze_fill
+    assert measure.count_lines(segs, narrow, SIZE, None, sq) == 1
+
+
+def test_loose_line_is_left_alone():
+    assert measure.paragraph_squeeze(_p("1件あたり平均38万円"), Style(), 14 * SIZE, SIZE) == 0.0
+
+
+def test_squeeze_counts_the_space_the_viewer_adds_between_cjk_and_latin():
+    # the same width: CJK-only text needs no squeeze, text with touching Latin runs does
+    w = 11.5 * SIZE
+    assert measure.paragraph_squeeze(_p("あいうえおかきくけこ"), Style(), w, SIZE) == 0.0
+    assert measure.paragraph_squeeze(_p("あい12うえお34かきく"), Style(), w, SIZE) < 0
+
+
+def test_near_full_squeeze_token_off():
+    p = _p("あいうえおかきくけこ")
+    assert measure.paragraph_squeeze(p, Style(), 10.5 * SIZE, SIZE) < 0
+    measure.set_tokens(LayoutTokens(cjk_squeeze_tail=0))
+    assert measure.paragraph_squeeze(p, Style(), 10.5 * SIZE, SIZE) == 0.0
 
 
 EXAMPLE = Path(__file__).parent.parent / "examples" / "20-jp-retail-dense.md"
@@ -113,3 +144,13 @@ def test_importer_does_not_emit_letter_spacing(tmp_path):
     text, _ = import_pptx(out, tmp_path)
     assert "letter" not in text.lower()
     assert "spacing" not in text.lower()
+
+
+def test_render_squeezes_the_nearly_full_pitch_card(tmp_path):
+    out = tmp_path / "pitch.pptx"
+    build(
+        (Path(__file__).parent.parent / "examples" / "21-jp-dark-pitch.md").read_text(encoding="utf-8"), out
+    )
+    spc = _spc_by_paragraph(out)
+    (cost,) = [t for t in spc if "38" in t and "平均" in t]
+    assert len(spc[cost]) == 1 and int(next(iter(spc[cost]))) < 0
