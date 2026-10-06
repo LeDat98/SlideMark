@@ -3986,7 +3986,12 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     ctx.lt,
                     _emu(ctx.lt.top_gap) if (slide.conclusion or slide.footnotes) else 0,
                 )
-            final_ctx.out = fill_steps(final_ctx.out, body, ctx.lt)
+            final_ctx.out = fill_steps(
+                final_ctx.out,
+                body,
+                ctx.lt,
+                theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt,
+            )
             final_ctx.out = align_chevron_table(final_ctx.out, body, ctx.lt)
             final_ctx.out = grow_chevron_table(final_ctx.out, body, ctx.lt)
             final_ctx.out = fill_body(
@@ -4057,7 +4062,14 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 isinstance(e, Container) and "kpi" in e.classes and _kpi_explicit(final_ctx, e)
                 for e in slide.elements
             )
-            lone = fit_lone_kpi(final_ctx.out, body_now, ctx.lt, has_bar, fixed)
+            lone = fit_lone_kpi(
+                final_ctx.out,
+                body_now,
+                ctx.lt,
+                has_bar,
+                fixed,
+                theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt,
+            )
             final_ctx.out = (
                 scale_kpi_values(final_ctx.out, body_now, ctx.lt, fixed) if lone is final_ctx.out else lone
             )

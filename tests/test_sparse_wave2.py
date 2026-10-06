@@ -221,3 +221,91 @@ def test_table_pptx_font_size_follows_the_layout(tmp_path: Path):
     gf = next(s for s in slide.shapes if s.has_table)
     bar = next(s for s in slide.shapes if s.has_text_frame and "成長" in s.text_frame.text)
     assert Emu(0) <= bar.top - (gf.top + gf.height) <= Emu(int(0.4 * 914400))
+
+
+# ---- KPI rows and steps fill the body (small-body themes) ------------------------------------------------
+
+KPI = HEAD + (
+    "# 目標\n> 売上・利益ともに過去最高を目指す\n## 売上高 {.kpi .hero}\n1,280億円\n前年比 +8%\n"
+    "## 営業利益 {.kpi}\n96億円\n前年比 +12%\n## ROE {.kpi}\n9.0%\n+0.8pt\n"
+)
+KPI_FLAT = KPI.replace(" .hero", "")
+
+
+def _value_pt(p) -> float:
+    return p.element.paragraphs[0].style.font_size * p.font_scale
+
+
+def _kpi_cards(placed):
+    return [p for p in placed if isinstance(p.element, Container) and "kpi" in p.element.classes]
+
+
+def test_lone_kpi_row_stretches_down_the_body_and_the_hero_stays_larger():
+    placed, _, _ = lay("", 1, src=KPI)
+    off, _, _ = lay("", 1, src=KPI, kpi_to_body=False)
+    cs, cs0 = _kpi_cards(placed), _kpi_cards(off)
+    assert len({(c.y, c.h) for c in cs}) == 1
+    assert cs[0].h > 1.15 * cs0[0].h
+    assert cs[0].h <= 0.72 * H  # kpi_to_body_h of the body at most
+    assert cs[0].y + cs[0].h < H
+    vals = sorted((p.x, _value_pt(p)) for p in _bodies(placed))
+    assert vals[0][1] > vals[1][1]  # the hero keeps its larger value
+    flat, _, _ = lay("", 1, src=KPI_FLAT)
+    assert len({round(_value_pt(p), 1) for p in _bodies(flat)}) == 1  # no hero invented: one weight
+
+
+def test_kpi_to_body_share_is_a_token():
+    a, _, _ = lay("", 1, src=KPI, kpi_to_body_h=0.8)
+    b, _, _ = lay("", 1, src=KPI, kpi_to_body_h=0.6)
+    assert _kpi_cards(a)[0].h > _kpi_cards(b)[0].h
+
+
+def test_kpi_text_stays_inside_the_card_and_in_one_line_cjk():
+    placed, _, _ = lay("", 1, src=KPI)
+    for c in _kpi_cards(placed):
+        for p in _bodies(placed) + role(placed, "heading"):
+            if c.x <= p.x < c.x + c.w:
+                assert c.y <= p.y and p.y + p.h <= c.y + c.h + 2
+
+
+STEPS = HEAD + "# 年間\n@steps\n## 4–6月\n- 価格改定\n## 7–9月\n- タイ工場着工\n## 10–12月\n- 北米発売\n"
+
+
+def _step_cards(placed):
+    return [p for p in placed if isinstance(p.element, Container) and "steps-card" in p.element.classes]
+
+
+def test_sparse_steps_fill_the_body_without_a_bar():
+    placed, _, _ = lay("", 1, src=STEPS)
+    off, _, _ = lay("", 1, src=STEPS, steps_to_body=False)
+    cs, cs0 = _step_cards(placed), _step_cards(off)
+    assert len(cs) == 3
+    assert cs[0].y + cs[0].h > cs0[0].y + cs0[0].h + 0.05 * H
+    assert cs[0].y + cs[0].h <= H
+    assert cs[0].h <= 2.0 * cs[0].w + 1  # steps_to_body_aspect
+    for c in cs:
+        (t,) = [p for p in _bodies(placed) if c.x <= p.x < c.x + c.w]
+        assert c.y <= t.y and t.y + t.h <= c.y + c.h + 2
+    chev, _, _ = lay("", 1, src=STEPS.replace("@steps", "@chevron"))
+    assert [(p.x, p.y, p.h) for p in _step_cards(chev)] == [(p.x, p.y, p.h) for p in cs]  # same either way
+
+
+def test_steps_with_a_bar_still_stretch_to_the_bar():
+    placed, _, _ = lay("", 1, src=STEPS + BAR)
+    bar = role(placed, "conclusion")[0]
+    assert max(c.y + c.h for c in _step_cards(placed)) <= bar.y
+
+
+def test_kpi_and_steps_pptx_geometry(tmp_path: Path):
+    out = tmp_path / "k.pptx"
+    build(KPI + STEPS.replace(HEAD, "\n"), out)
+    prs = Presentation(out)
+    k, st = prs.slides[0], prs.slides[1]
+    box = max(
+        (s for s in k.shapes if s.height > 0.3 * prs.slide_height and s.width < prs.slide_width),
+        key=lambda s: s.height,
+    )
+    assert box.height >= 0.45 * prs.slide_height
+    step_cards = [s for s in st.shapes if s.name.endswith(" card")]
+    assert len(step_cards) == 3
+    assert max(s.top + s.height for s in step_cards) > 0.8 * prs.slide_height
