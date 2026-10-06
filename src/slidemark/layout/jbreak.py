@@ -45,7 +45,9 @@ def phrase_cuts(text: str) -> list[int]:
     return out[:-1]
 
 
-_Flat = list[tuple[str, int, int]]  # (char as the viewer sees it, run index, offset in the run text; -1 = gap)
+_Flat = list[
+    tuple[str, int, int]
+]  # (char as the viewer sees it, run index, offset in the run text; -1 = gap)
 
 
 def _flatten(texts: list[str], gap_em: float) -> _Flat:
@@ -179,15 +181,18 @@ def plan_breaks(
     if not bounds:
         return None
     cands = sorted(bounds) + [n]
+
+    def clean(sp: float) -> bool:
+        """The viewer (also with a little more room) breaks only between phrases at spacing ``sp``."""
+        for w in (width_pt, width_pt * (1.0 + tk.cjk_phrase_slack)):
+            nat = _natural_starts(m, w, sp)
+            if nat is None or any(e not in bounds for e in nat):
+                return nat is None
+        return True
+
+    if clean(sq):
+        return None  # includes a squeezed paragraph that now fits one line
     for sp in dict.fromkeys((0.0, sq)):
-        wnat = width_pt
-        nat = _natural_starts(m, wnat, sp)
-        if nat is None or not nat:
-            if sp == sq:
-                return None
-            continue
-        if all(e in bounds for e in nat):
-            return None  # the viewer breaks between phrases already
         cuts: list[int] = []
         s, ok = 0, True
         width = width_pt * (1.0 - tk.cjk_phrase_margin)

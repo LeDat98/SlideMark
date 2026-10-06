@@ -207,6 +207,8 @@ Keys:
 
 Orphan control: the last two words of a paragraph (3+ words, each up to 12 characters, not CJK/URL/code) are joined by a no-break space so a line never ends with a lone word; the importer turns it back into a plain space.
 
+Japanese line breaks: a wrapping CJK paragraph breaks at phrase boundaries (BudouX) with soft `<a:br>` marked `bmk="sm"`, only when the line count does not grow; the importer drops them. No syntax.
+
 ## Components
 
 **KPI box.** A box with `.kpi` shows its first line as a big number and the rest as a small caption; the

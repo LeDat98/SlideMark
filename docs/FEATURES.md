@@ -58,3 +58,4 @@ step does not apply (no visual risk to lint, or no syntax).
 | `{.gantt}` tables (native bars over period cells, `gantt` class) | x | x | x | x | x | x | x | - |
 | Composed covers (`cover.band_h/pad/gap/rule/footer` tokens) | x | - | x | x | x | x | x | - |
 | Stacked totals (`totals=`), negative-axis headroom, JP number+unit joiners, JP orphan squeeze | x | x | x | x | x | x | - | - |
+| JP phrase-aware line breaks (BudouX soft breaks, render only; importer strips them) | x | x | x | x | x | x | - | - |
