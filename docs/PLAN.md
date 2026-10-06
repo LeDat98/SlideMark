@@ -498,3 +498,8 @@ Goal: run-7 leftovers (L3), then an independent re-score with a content-rich den
 - **Wave 2 B2 (`render/charts*`, `layout/tables.py`, `layout/vfill.py`):** negative bars: category labels at the low
   end (20 s3/s8 label over the bar); a table beside a taller chart takes the chart height (rows + text, no new wraps;
   20 s3/s8 lower half empty); full-width tables reach the footnote gutter (20 s7/s10 70–110px bands).
+- **Wave 2 status:** lone block after a full `@N` row spans the width (20 s4 chart 4.0 → 12.3in); hollow stacked cards beside a
+  chart spread as ruled lists (20 s6); chevrons follow table columns when counts match (`chevron_table_align`); negative
+  bars put category labels low; tables fill to a visual's bottom / the footnote gutter (`table_fit`; 20 s8 325 → 489pt). 1707 tests.
+- **Wave 3 B (`layout/measure.py`, `render/text.py`):** JP numbers keep their units and signs (`38万円`, `▲8%`) via U+2060;
+  generic on/off parsing for bool layout/render tokens. **Orchestrator:** independent L3 re-score (11, 16, 19, 20).
