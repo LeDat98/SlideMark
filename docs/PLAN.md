@@ -582,6 +582,17 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       rows too tall for one line + 9pt headers (20 s3/s5/s7); waterfall with small deltas (break or delta mode); covers
 - [ ] U+2060 number+unit joiners break Ctrl+F/copy in PowerPoint → replace by phrase packing for CJK where possible
 - [ ] 16 s9: a badge in the first gantt column still pins that column wider than the rest
-- [ ] Owner decisions relayed in run 9 via another session (PowerPoint check, PyPI, AC4 wording, L3 on deck 20) were not
-      recorded: confirm them directly and they will be applied
-- [ ] AC4 (open)
+- [x] Owner decisions (PowerPoint check, PyPI deferred, AC4 on >= 5-slide briefs, L3 on content-rich decks) recorded
+      in TARGETS.md and AGENT_COST.md (c22c3d7, 2026-10-06)
+- [ ] AC4 (open; >= 5-slide briefs at 41%, gate 35%)
+- [ ] Long briefs (owner, 2026-10-06): add 2–3 briefs of 20–30 slides (EN, dense JA, VI with brand colours) to the
+      agent-cost bench, all three arms, 3 runs each. Hypothesis to confirm: the ratio falls with deck length because
+      SlideMark's per-run cost is mostly fixed (SKILL.md + re-reads) while python-pptx output grows ~4–5x faster per
+      slide (run 6 medians above start: 3 slides 18.0k vs 32.8k = 55%, 5 slides 20.0k vs 45.7k = 44%, 10 slides
+      24.3k vs 75.3k = 32%). Record per-length ratios; watch for new fix loops on long decks.
+- [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
+      tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
+      mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or
+      rebuild and turn it into a build-line fact, a lint rule or an auto-fix. (b) Measure a 2-call path where SKILL.md
+      is already in the agent's starting context (installed skill or prompt), so call 1 writes + builds and call 2
+      hands back; report the saving and the cost of carrying SKILL.md when no deck is made.
