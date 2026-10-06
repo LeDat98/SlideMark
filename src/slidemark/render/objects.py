@@ -478,6 +478,17 @@ def _style_waterfall_series(ser, si: int, plan: dict, theme: Theme, size: float,
         dl.position = XL_LABEL_POSITION.INSIDE_BASE
 
 
+def _hide_legend_entry(chart, idx: int) -> None:
+    leg = chart._chartSpace.find(".//" + qn("c:legend"))
+    if leg is None:
+        return
+    anchor = leg.find(qn("c:legendPos"))
+    e = leg.makeelement(qn("c:legendEntry"), {})
+    etree.SubElement(e, qn("c:idx")).set("val", str(idx))
+    etree.SubElement(e, qn("c:delete")).set("val", "1")
+    anchor.addnext(e) if anchor is not None else leg.insert(0, e)
+
+
 def _waterfall_legend(chart) -> None:
     """Hide the legend entries of the helper series (base, below zero, label carrier)."""
     leg = chart._chartSpace.find(".//" + qn("c:legend"))
@@ -489,6 +500,48 @@ def _waterfall_legend(chart) -> None:
         etree.SubElement(e, qn("c:idx")).set("val", str(idx))
         etree.SubElement(e, qn("c:delete")).set("val", "1")
         anchor.addnext(e) if anchor is not None else leg.insert(0, e)
+
+
+TOTAL_CARRIER = "total (hidden)"  # name of the invisible series that carries the stack-total labels
+BLANK_CARRIER = (
+    " "  # ... on a horizontal stack: LibreOffice deletes the wrong legend entry there, so it is unnamed
+)
+
+
+def stack_totals(ch: Chart, series: list[Series], lab_on: bool, opts: dict, rt) -> list[Series]:
+    """``series`` plus a hidden carrier on top whose per-point labels read each stack's sum.
+
+    Wanted for stacked kinds with segment labels (``totals=off`` disables, ``totals=on`` forces); skipped
+    when a value is negative (the sum is not the stack's end) or no stack has a positive sum.
+    """
+    t = str(opts.get("totals", "")).strip().lower()
+    on = flag(t) if t in ("1", "true", "on", "yes", "y", "0", "false", "off", "no", "n") else lab_on
+    if not on or ch.kind not in ("stacked-bar", "stacked-column") or not series or not _all_nonneg(ch):
+        return series
+    n = max(len(s.values) for s in series)
+    sums = [round(sum(_num(s.values[i]) or 0.0 for s in series if i < len(s.values)), 10) for i in range(n)]
+    top = max(sums, default=0.0)
+    if top <= 0:
+        return series
+    pad = top * rt.chart_total_pad
+    name = BLANK_CARRIER if ch.kind == "stacked-bar" else TOTAL_CARRIER
+    return [*series, Series(name=name, values=[pad if v > 0 else None for v in sums])]
+
+
+def _style_total_carrier(ser, sums: list[float], theme: Theme, size: float, fg, nf) -> None:
+    ser.format.fill.background()
+    ser.format.line.fill.background()
+    for i, v in enumerate(sums):
+        if v <= 0:
+            continue
+        dl = ser.points[i].data_label
+        tf = dl.text_frame
+        tf.text = wfall.fmt_num(v, nf, sign=False)
+        run = tf.paragraphs[0].runs[0]
+        run.font.size = Pt(size * theme.render.chart_label_scale)
+        run.font.bold = True
+        run.font.color.rgb = fg
+        dl.position = XL_LABEL_POSITION.INSIDE_BASE
 
 
 def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
@@ -510,6 +563,12 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     if kind == "waterfall" and series:
         wf = _waterfall_plan(ch, series[0], opts, theme)
         series = wf["series"]
+    labels = opts.get("labels", opts.get("data_labels"))
+    lab_pct = isinstance(labels, str) and labels.strip().lower() == "percent"
+    lab_on = lab_pct or flag(labels)
+    real_series = len(series)
+    series = stack_totals(ch, series, lab_on, opts, theme.render) if not wf else series
+    carrier = len(series) > real_series
     ncat = max([len(cats_in), *(len(s.values) for s in series)])
     cats = [str(c) for c in cats_in] or [str(i + 1) for i in range(ncat)]
     cats += [str(i + 1) for i in range(len(cats), ncat)]  # more values than categories
@@ -553,7 +612,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         chart.chart_title.include_in_layout = False
     else:
         chart.has_title = False
-    pos = _legend_pos(opts, pie, 1 if wf else len(series))
+    pos = _legend_pos(opts, pie, 1 if wf else real_series)
     chart.has_legend = pos is not None
     if pos is not None:
         chart.legend.position = pos
@@ -568,9 +627,6 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     pct_flag = flag(opts.get("percent"))
     nf = opts.get("fmt") or opts.get("number_format") or opts.get("format")
     nf = str(nf) if nf else ('0"%"' if pct_flag else "#,##0" if flag(opts.get("grouped")) else None)
-    labels = opts.get("labels", opts.get("data_labels"))
-    lab_pct = isinstance(labels, str) and labels.strip().lower() == "percent"
-    lab_on = lab_pct or flag(labels)
     plot = chart.plots[0]
     if lab_on and kind not in ("scatter", "waterfall"):  # python-pptx has no data labels for XY series
         plot.has_data_labels = True
@@ -595,7 +651,13 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     for plot in chart.plots:
         for si, ser in enumerate(plot.series):
             color = pal[si % len(pal)]
-            if wf:
+            if carrier and si == real_series:
+                tot = [
+                    round(sum(_num(s.values[i]) or 0.0 for s in series[:-1] if i < len(s.values)), 10)
+                    for i in range(len(series[-1].values))
+                ]
+                _style_total_carrier(ser, tot, theme, size, fg, nf)
+            elif wf:
                 _style_waterfall_series(ser, si, wf, theme, size, fg, lab_on, nf)
             elif pie:
                 for pi in range(len(cats)):
@@ -641,6 +703,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             hole.set("val", "55")
     if wf and pos is not None:  # a legend lists only the visible bars
         _waterfall_legend(chart)
+    if carrier and pos is not None and kind == "stacked-column":  # the legend lists only the visible series
+        _hide_legend_entry(chart, real_series)
     if kind in ("bar", "column", "stacked-bar", "stacked-column", "waterfall"):
         try:
             rt = theme.render

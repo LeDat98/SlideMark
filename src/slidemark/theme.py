@@ -404,6 +404,9 @@ class RenderTokens(BaseModel):
     chart_axis_headroom: float = (
         0.06  # an auto value axis ends this share above the data max (label room; 0 = off)
     )
+    chart_total_pad: float = (
+        0.08  # stack-total label room: the hidden carrier is this share of the longest stack
+    )
     chart_axis_lines_min: int = 4  # ... with at least this many gridlines
     chart_axis_lines_max: int = 6  # ... and at most this many
     chart_gap: int = 60  # bar/column gap width (% of a bar) ...

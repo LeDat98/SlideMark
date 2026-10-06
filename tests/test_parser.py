@@ -569,3 +569,9 @@ def test_trailing_at_line_after_last_box_applies_to_slide():
 def test_box_at_line_with_sub_boxes_stays_in_the_box():
     deck = parse("# T\n## a\n### x\n- 1\n### y\n- 2\n@2\n")
     assert deck.slides[0].elements[0].grid == "2"
+
+
+def test_chart_totals_option_is_kept():
+    d = parse("# A\n```stacked-bar {labels=on totals=off}\n,Q1,Q2\na,1,2\nb,3,4\n```\n")
+    c = d.slides[0].elements[0]
+    assert isinstance(c, Chart) and c.options == {"labels": "on", "totals": "off"}

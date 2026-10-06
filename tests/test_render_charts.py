@@ -169,3 +169,44 @@ def test_negative_values_put_category_labels_low(tmp_path, kind):
     chart, _ = chart_of(tmp_path, mk(kind, ONE))
     pos = chart.category_axis._element.find(qn("c:tickLblPos"))
     assert pos is None or pos.get("val") != "low"
+
+
+# ---- stack totals (hidden carrier series with per-point sum labels)
+
+STACK = [Series(name="a", values=[38, 40]), Series(name="b", values=[62.6, 68])]
+
+
+def _carrier_texts(ser):
+    return [t.text for t in ser._element.iter(qn("a:t"))]
+
+
+@pytest.mark.parametrize("kind", ["stacked-bar", "stacked-column"])
+def test_stack_totals_carrier(tmp_path, kind):
+    chart, _ = chart_of(tmp_path, mk(kind, series=STACK, cats=["x", "y"], labels="on"))
+    sers = list(chart.plots[0].series)
+    assert len(sers) == 3
+    car = sers[-1]
+    assert car._element.find(qn("c:spPr")).find(qn("a:noFill")) is not None  # hidden
+    assert _carrier_texts(car) == ["100.6", "108"]  # the stack sums
+    assert all(s._element.find(qn("c:dLbls")) is not None for s in sers[:2])
+    assert chart.value_axis.maximum_scale > 108
+
+
+def test_stack_totals_options(tmp_path):
+    off, _ = chart_of(tmp_path, mk("stacked-column", series=STACK, labels="on", totals="off"))
+    assert len(list(off.plots[0].series)) == 2
+    on, _ = chart_of(tmp_path, mk("stacked-column", series=STACK, totals="on", cats=["x", "y"]))
+    assert len(list(on.plots[0].series)) == 3
+    none, _ = chart_of(tmp_path, mk("stacked-column", series=STACK))  # no labels: no totals
+    assert len(list(none.plots[0].series)) == 2
+    neg, _ = chart_of(tmp_path, mk("stacked-column", series=[Series(name="a", values=[-1, 2])], labels="on"))
+    assert len(list(neg.plots[0].series)) == 1  # a negative value: the sum is not the stack's end
+
+
+def test_stack_totals_fmt_and_legend(tmp_path):
+    chart, _ = chart_of(
+        tmp_path, mk("stacked-column", series=STACK, cats=["x", "y"], labels="on", fmt="#,##0")
+    )
+    assert _carrier_texts(list(chart.plots[0].series)[-1]) == ["101", "108"]
+    leg = chart._chartSpace.find(".//" + qn("c:legend"))
+    assert [e.find(qn("c:idx")).get("val") for e in leg.findall(qn("c:legendEntry"))] == ["2"]

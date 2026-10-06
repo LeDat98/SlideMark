@@ -55,8 +55,8 @@ def test_pie_percent_labels_keep_format_and_ink(tmp_path):
 def test_stacked_bar_label_ink_per_series(tmp_path):
     cs = _chart_xml(tmp_path, "```stacked-column {labels=on}\n,Q1,Q2\nA,5,6\nB,3,4\n```\n")
     sers = cs.xpath(".//c:ser")
-    assert len(sers) == 2
-    for ser in sers:
+    assert len(sers) == 3  # A, B and the hidden total carrier
+    for ser in sers[:2]:
         fill = ser.xpath("string(c:spPr//a:srgbClr/@val)")
         ink = ser.xpath("string(c:dLbls/c:txPr//a:srgbClr/@val)")
         assert ratio("#" + ink, "#" + fill) >= 4.5
