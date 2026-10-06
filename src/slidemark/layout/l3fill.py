@@ -456,12 +456,88 @@ def _cards_to_bar(
     if min(r[1]) < lt.card_stretch_min_fill:  # even spread out, a card would stay a mostly empty box
         return None
     res = dict(r[0])
+    if lt.card_spread_fill > 0:
+        for row in rows:
+            if min(_card_share(res, c, plan[id(c)]) for c in row) < lt.card_spread_fill:
+                _distribute_row(res, row, plan, lt)
     for c in cards:  # decoration inside a card (icons, header bars) follows the card top
         dy = res[id(c)].y - c.y
         for p in items:
             if p is not c and id(p) not in res and _contains(c, p):
                 res[id(p)] = p.model_copy(update={"y": p.y + dy})
     return _apply(out, res)
+
+
+def _main_of(inner: list[Placed]) -> Placed | None:
+    mains = [p for p in inner if p.element.role != "heading" and not _is_note(p)]
+    return mains[0] if len(mains) == 1 else None
+
+
+def _card_share(res: dict[int, Placed], card: Placed, inner: list[Placed]) -> float:
+    """Share of the (placed) card its text ends at."""
+    from .engine import _text_h
+
+    c = res[id(card)]
+    m = res.get(id(_main_of(inner)))
+    return (m.y + _text_h(m) - c.y) / max(c.h, 1) if m is not None else 1.0
+
+
+def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: LayoutTokens) -> None:
+    """Spread the paragraphs of every card of ``row`` over its body (equal gaps, capped); the rest is air
+    above the first item, equal for the whole row so the first items share one y."""
+    jobs = []
+    for c in row:
+        main = _main_of(plan[id(c)])
+        if main is None or len(main.element.paragraphs) < 2:
+            return
+        m = res[id(main)]
+        card = res[id(c)]
+        pad = _pad(main, card)
+        floor = card.y + card.h - pad
+        for p in plan[id(c)]:
+            if p is not main and _is_note(p) and p.element.role != "heading":
+                floor = min(floor, res[id(p)].y - pad)
+        tpad = _text_pad(m)
+        width = m.w - 2 * tpad
+        paras = m.element.paragraphs
+        n = len(paras)
+        size = (m.style.font_size or 18) * m.font_scale * EMU_PER_PT
+        if size <= 0:
+            return
+        avail = floor - m.y - 2 * tpad - round(lt.card_spread_tail * size)
+        g0 = m.element.attrs.get("para_gap")
+        if g0 is None:
+            g0 = measure.element_gap(m.element)
+            g0 = measure.para_gap() if g0 is None else g0
+        width = min(width, round(width * (1.0 - lt.l3_wrap_margin)))  # renders wrap earlier: fit that
+        need = measure.paragraphs_height(paras, width, m.style, m.font_scale, gap=g0)
+        free = avail - need
+        if free <= 0:
+            jobs.append((c, m, g0, 0, avail, paras, width))
+            continue
+        gap = min(g0 + free / ((n - 1) * size), lt.card_spread_gap_max)
+        gap = max(gap, g0)
+        for _ in range(12):  # the estimate has a safety factor: shrink until it surely fits
+            used = measure.paragraphs_height(paras, width, m.style, m.font_scale, gap=gap)
+            if used <= avail or gap <= g0:
+                break
+            gap = max(g0, gap - 0.05)
+        used = measure.paragraphs_height(paras, width, m.style, m.font_scale, gap=gap)
+        jobs.append((c, m, round(gap, 3), max(avail - used, 0), avail, paras, width))
+    top_gap = min(j[2] for j in jobs) * lt.card_spread_ratio  # siblings keep a similar rhythm
+    capped = []
+    for c, m, g, rest, av, ps, w in jobs:
+        if g > top_gap:
+            g = top_gap
+            rest = max(av - measure.paragraphs_height(ps, w, m.style, m.font_scale, gap=g), 0)
+        capped.append((c, m, g, rest, av))
+    jobs = capped
+    lead = min(j[3] for j in jobs) // 2
+    for c, m, gap, _rest, _avail in jobs:
+        el = m.element.model_copy(update={"attrs": {**m.element.attrs, "para_gap": gap}})
+        res[id(_main_of(plan[id(c)]))] = m.model_copy(
+            update={"element": el, "y": m.y + lead, "h": m.h - lead}
+        )
 
 
 def _fill_share(card: Placed, inner: list[Placed]) -> float:
