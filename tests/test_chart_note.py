@@ -345,3 +345,22 @@ def test_import_line_note_does_not_invent_min_max(tmp_path):
     build_md(tmp_path, fence("line", 'hl=b note="peak"', ",a,b,c\nx,3,5,4"))
     text, _ = import_pptx(tmp_path / "d.pptx")
     assert "min=" not in text and "max=" not in text and "hl=b" in text
+
+
+def _note_pt(note) -> float:
+    return min(int(r.get("sz")) for r in note._element.iter(qn("a:rPr")) if r.get("sz")) / 100
+
+
+def test_note_is_never_smaller_than_the_axis_labels(tmp_path):
+    md = (
+        "# Demand\n\n@1:1\n"
+        '```bar {title="Visits (k)" labels=on hl=Metro note="Metro alone: 40% of visits"}\n'
+        ",North,Coast,Valley,Metro\nVisits,64,108,72,166\n```\n## Why\n- a\n- b\n"
+    )
+    deck, prs = build_md(tmp_path, md)
+    note = the_note(prs)
+    axis = {
+        int(e.get("sz")) / 100 for e in chart_of(prs).chart._chartSpace.iter(qn("a:defRPr")) if e.get("sz")
+    }
+    assert _note_pt(note) >= max(axis)
+    assert inside(note, chart_of(prs))

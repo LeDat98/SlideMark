@@ -425,8 +425,8 @@ def _plan(ch: Chart, pl: Placed, theme: Theme, note: str) -> NotePlan:
     base = theme.classes.get(NOTE_CLASS) or fast_style()
     font = pl.style.font
     note_style = base.merged(fast_style(font=font)) if font else base
-    size0 = size * rt.chart_label_scale + rt.chart_note_size_add
-    floor = min(theme.min_font_size, size0)
+    floor = size  # never smaller than the category / axis labels (they use the chart text size)
+    size0 = max(size * rt.chart_label_scale + rt.chart_note_size_add, floor)
     d = _data(ch, theme) if ch.kind in PLOTTED else None
     frac = plot_fractions(ch, d, W, H, size, theme) if d else None
     marks = _marks(ch, d, frac, W, H, size, theme) if d and frac else None
