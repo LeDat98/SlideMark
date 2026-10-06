@@ -340,6 +340,18 @@ Attributes on a table (`{...}` on the line before a GFM table, or on a `table` f
 
 Numeric columns are right-aligned automatically.
 
+**Gantt.** `{.gantt}` on a table draws every filled body cell after the first column as a native bar spanning its
+merged range (`<` continues the bar), with the cell text inside; cells holding only `―`, `-` or nothing stay empty.
+The bar look is the `gantt` class (`style: gantt.fill=accent gantt.radius=4`, or `.gantt` in CSS).
+
+```markdown
+{.gantt header=2}
+| 施策 | 2027 | < | 2028 | < |
+|-|-|-|-|-|
+| ^ | 上期 | 下期 | 上期 | 下期 |
+| IoT標準化 | 新機種へ搭載 | < | 既設機へ | ― |
+```
+
 ## CSS fence
 
 A ` ```css ` fence styles SlideMark elements with CSS. In the deck header (before the first `#`) it applies to
