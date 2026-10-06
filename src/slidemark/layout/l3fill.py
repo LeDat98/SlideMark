@@ -407,14 +407,15 @@ def _hug_height(cards: list[Placed], plan: dict[int, list[Placed]], top: int, lt
     return best
 
 
-def fill_steps(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+def fill_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: bool = False) -> list[Placed]:
     """``@steps``: the cards under the arrows grow down to the conclusion bar / footnote.
 
     The arrows stay where they are; the cards are stretched like any card row above a bar (text grows up to
     ``card_text_max``, items spread, never a mostly empty box). Nothing else may share the body under the
-    arrows. Never raises: anything unexpected returns the items."""
+    arrows. ``to_body`` (small-body themes, ``steps_to_body``): a sparse group fills the body (see
+    ``_compose_steps``). Never raises: anything unexpected returns the items."""
     try:
-        return _fill_steps(out, body, lt)
+        return _fill_steps(out, body, lt, to_body)
     except Exception:
         return out
 
@@ -423,7 +424,7 @@ def _is_step_arrow(p: Placed) -> bool:
     return isinstance(p.element, Shape) and str(p.element.attrs.get("shape_name", "")).endswith(" arrow")
 
 
-def _fill_steps(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+def _fill_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: bool = False) -> list[Placed]:
     if not lt.l3_fill or not lt.steps_stretch or not lt.cards_to_bar or body.h <= 0:
         return out
     items = _body_items(out, body)
@@ -460,10 +461,10 @@ def _fill_steps(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]
             out = [new.get(id(p), p) for p in out] + res[len(keep) :]
             break
     out = _grow_step_arrows(out, arrows, lt)
-    return _compose_steps(out, body, lt)
+    return _compose_steps(out, body, lt, to_body)
 
 
-def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: bool = False) -> list[Placed]:
     """A sparse steps group (a few short bullets) uses the body: bigger text, taller arrows, centred.
 
     Only when the group (arrows to card bottoms) covers less than ``steps_sparse_below`` of the body and
@@ -471,9 +472,18 @@ def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Plac
     ``steps_text_max_pt``, never onto a new wrapped line), then the arrows (label up to
     ``steps_arrow_text_max_pt``, never wrapped) and the card height (``steps_sparse_fill`` of the body, a
     card at most ``steps_card_max_aspect`` x its width tall, text centred in it); the group sits with
-    ``steps_top_share`` of the leftover height above it. Dense steps are left as they are."""
+    ``steps_top_share`` of the leftover height above it. Dense steps are left as they are.
+
+    ``to_body`` (``steps_to_body``, small-body themes): the group fills ``steps_to_body_fill`` of the body,
+    cards up to ``steps_to_body_aspect`` x their width tall, text up to ``steps_to_body_text_max_pt``, the
+    group sitting with ``steps_to_body_top`` of the leftover above it."""
     if not lt.steps_sparse or body.h <= 0:
         return out
+    to_body = to_body and lt.steps_to_body and lt.body_valign != "top"
+    fill = lt.steps_to_body_fill if to_body else lt.steps_sparse_fill
+    aspect = lt.steps_to_body_aspect if to_body else lt.steps_card_max_aspect
+    text_max = lt.steps_to_body_text_max_pt if to_body else lt.steps_text_max_pt
+    top_share = lt.steps_to_body_top if to_body else lt.steps_top_share
     items = _body_items(out, body)
     arrows = [p for p in items if _is_step_arrow(p)]
     cards = [p for p in items if isinstance(p.element, Container) and "steps-card" in p.element.classes]
@@ -496,13 +506,13 @@ def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Plac
         return out  # something else (icons, a table under the cards) shares the body
     top0 = min(a.y for a in arrows)
     bottom0 = max(c.y + c.h for c in cards)
-    if (bottom0 - top0) >= lt.steps_sparse_below * body.h:
+    if (bottom0 - top0) >= (fill if to_body else lt.steps_sparse_below) * body.h:
         return out
     mains = list(inner.values())
     pad_v = max(min(m.y - c.y for c, m in zip(cards, mains, strict=True)), 0)
     # 1. card text: the largest common growth that wraps nothing new and stays under the cap
     cur_pt = max(m.style.font_size * m.font_scale for m in mains)  # type: ignore[operator]
-    s_top = max(lt.steps_text_max_pt / max(cur_pt, 1.0), 1.0)
+    s_top = max(text_max / max(cur_pt, 1.0), 1.0)
     step = max(lt.l3_grow_step, 0.01)
     best, k = 1.0, 1
     while True:
@@ -541,14 +551,12 @@ def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Plac
         for g in grown.values()
     )
     colw = min(c.w for c in cards)
-    want = round(lt.steps_sparse_fill * body.h) - h_arrow - gap
-    card_h = max(
-        round(text_h + 2 * _text_pad(mains[0]) + 2 * pad_v), min(want, round(lt.steps_card_max_aspect * colw))
-    )
+    want = round(fill * body.h) - h_arrow - gap
+    card_h = max(round(text_h + 2 * _text_pad(mains[0]) + 2 * pad_v), min(want, round(aspect * colw)))
     group_h = h_arrow + gap + card_h
     if group_h > body.h:
         return out
-    top = body.y + round((body.h - group_h) * min(max(lt.steps_top_share, 0.0), 1.0))
+    top = body.y + round((body.h - group_h) * min(max(top_share, 0.0), 1.0))
     res: dict[int, Placed] = {}
     for a, na in zip(arrows, new_arrows, strict=True):
         res[id(a)] = na.model_copy(update={"y": top})
@@ -1620,7 +1628,12 @@ def _scale_kpi_values(out: list[Placed], body: Rect, lt: LayoutTokens, fixed: bo
 
 
 def fit_lone_kpi(
-    out: list[Placed], body: Rect, lt: LayoutTokens, on_bar: bool = False, fixed: bool = False
+    out: list[Placed],
+    body: Rect,
+    lt: LayoutTokens,
+    on_bar: bool = False,
+    fixed: bool = False,
+    to_body: bool = False,
 ) -> list[Placed]:
     """A body of nothing but KPI cards: cards that use the body height in a balanced way, centred.
 
@@ -1629,9 +1642,11 @@ def fit_lone_kpi(
     ``kpi_lone_min_h`` and ``kpi_lone_h`` of the body, and the row sits with ``kpi_lone_center`` of the free
     height above it (``on_bar``: ``kpi_lone_bar_center``, nearer to the conclusion bar).
     ``fixed``: the author set the KPI text size (CSS, {size=}): only the card height follows its content.
-    Other blocks, icons, explicit sizes / heights: unchanged."""
+    Other blocks, icons, explicit sizes / heights: unchanged.
+    ``to_body`` (small-body themes, ``kpi_to_body``): the cards stretch down the body to
+    ``kpi_to_body_h`` of its height and the text grows with them, within the ``kpi_lone_*`` caps."""
     try:
-        return _fit_lone_kpi(out, body, lt, on_bar, fixed)
+        return _fit_lone_kpi(out, body, lt, on_bar, fixed, to_body)
     except Exception:  # never raise on bad input
         return out
 
@@ -1642,7 +1657,9 @@ def _step_up(plain: str, pt: float, wpt: float, bold: bool, lt: LayoutTokens) ->
     return big if measure.text_em(plain, bold=bold) * big <= wpt * lt.kpi_fit_margin else pt
 
 
-def _fit_lone_kpi(out: list[Placed], body: Rect, lt: LayoutTokens, on_bar: bool, fixed: bool) -> list[Placed]:
+def _fit_lone_kpi(
+    out: list[Placed], body: Rect, lt: LayoutTokens, on_bar: bool, fixed: bool, to_body: bool = False
+) -> list[Placed]:
     if not lt.kpi_lone or body.h <= 0:
         return out
     items = _body_items(out, body)
@@ -1688,7 +1705,8 @@ def _fit_lone_kpi(out: list[Placed], body: Rect, lt: LayoutTokens, on_bar: bool,
         ),
         default=0.0,
     )
-    limit = round(lt.kpi_lone_h * body.h)
+    stretch = to_body and lt.kpi_to_body and lt.body_valign != "top"
+    limit = round(max(lt.kpi_lone_h, lt.kpi_to_body_h if stretch else 0.0) * body.h)
     if fixed:
         g, label_hi, cap_hi = 1.0, label0, cap0
     # largest step of the growth (1 = full, 0 = the sizes the slide had) whose card stays within the share
@@ -1700,7 +1718,7 @@ def _fit_lone_kpi(out: list[Placed], body: Rect, lt: LayoutTokens, on_bar: bool,
         card_h = 2 * pad + hh + gap + mh
         if card_h <= limit:
             break
-    floor = min(round(lt.kpi_lone_min_h * body.h), limit)
+    floor = min(round(max(lt.kpi_lone_min_h, lt.kpi_to_body_h if stretch else 0.0) * body.h), limit)
     extra = max(
         floor - card_h, 0
     )  # a short row still fills its share of the body: the air goes into the card

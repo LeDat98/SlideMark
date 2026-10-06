@@ -182,7 +182,7 @@ def test_explicit_sizes_are_untouched():
     ids=["ja", "ja-hero", "en", "en-bar", "ja-hero-bar"],
 )
 def test_kpi_row_uses_the_body_height(md):
-    placed, _, theme = lay(md)
+    placed, _, theme = lay(md, kpi_to_body=False)  # the old share (kpi_to_body: tests/test_sparse_wave2.py)
     lt = theme.layout
     cs = kpi_cards(placed)
     top = max(p.y + p.h for p in placed if getattr(p.element, "role", None) in ("title", "lead"))

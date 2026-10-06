@@ -443,6 +443,11 @@ class LayoutTokens(BaseModel):
     steps_top_share: float = 0.4  # ... and sit with this share of the leftover height above them
     steps_arrow_text_ratio: float = 1.15  # arrow heading size >= this x the card text (0 = off) ...
     steps_arrow_text_fill: float = 0.7  # ... while the heading stays within this share of the arrow height
+    steps_to_body: bool = True  # small-body themes: a sparse steps group fills the body (no bar needed) ...
+    steps_to_body_fill: float = 0.92  # ... arrows + cards cover this share of the body height ...
+    steps_to_body_aspect: float = 2.0  # ... cards at most this x their width tall ...
+    steps_to_body_text_max_pt: float = 28  # ... card text grows up to this size (pt, CJK wrap guard) ...
+    steps_to_body_top: float = 0.1  # ... and the group sits with this share of the leftover above it
     # --- conclusion bar
     conclusion_min_ratio: float = (
         1.0  # the bar text is at least this x the largest card / box body text (0 = off)
@@ -472,6 +477,10 @@ class LayoutTokens(BaseModel):
         0.3  # ... of that air, this share goes above the label, the rest around the number
     )
     kpi_lone_center: float = 0.42  # the row sits with this share of the free height above it (optical center)
+    kpi_to_body: bool = True  # small-body themes: a lone KPI row stretches down the body (text grows with it)
+    kpi_to_body_h: float = (
+        0.72  # ... cards this share of the body height (the numbers stay within kpi_lone_*)
+    )
     kpi_lone_bar_center: float = 0.6  # ... with a conclusion bar under the row: nearer to the bar
     # --- band balance: a block of cards / columns that still leaves a band under it after the growth passes
     band_shift: float = (
