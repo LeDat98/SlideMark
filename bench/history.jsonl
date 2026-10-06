@@ -142,3 +142,4 @@
 {"date": "2026-10-06T08:33:23+00:00", "metric": "markup_tokens", "deck": "jp-dense", "content": 382, "slidemark_markup": 100, "html_markup": 446, "ratio": 0.224, "tokenizer": "o200k_base"}
 {"date": "2026-10-06T08:33:23+00:00", "metric": "markup_tokens", "deck": "jp-kpi", "content": 417, "slidemark_markup": 134, "html_markup": 497, "ratio": 0.27, "tokenizer": "o200k_base"}
 {"date": "2026-10-06T08:33:23+00:00", "metric": "markup_tokens", "deck": "q3-review", "content": 131, "slidemark_markup": 24, "html_markup": 190, "ratio": 0.126, "tokenizer": "o200k_base"}
+{"date": "2026-10-06T09:14:42+00:00", "commit": "0b7847f", "metric": "roundtrip", "roundtrip": 0.983, "value": 0.983, "decks": 121, "lossless": 119, "token_ratio": 0.981, "design_decks": 7, "design_ok": 7, "failures": {"style": 1, "size": 1, "geometry": 1}}

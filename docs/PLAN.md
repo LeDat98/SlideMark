@@ -517,3 +517,13 @@ Goal: run-7 leftovers (L3), then an independent re-score with a content-rich den
 - **Wave 6 A (`render/objects.py`, `layout/gantt.py`):** badges inside gantt bars read as pills (no hard white boxes);
   negative bar labels never collide with category labels. **Wave 6 B (`layout/diagram.py`, `layout/engine.py`):** org
   charts keep the body gutter under the lead and use the body height (19 s3, 11 s6 level widths).
+- **Wave 6/7 status:** gantt badges as tinted pills, negative-axis headroom (`chart_neg_pad`), balanced org charts
+  (`tree_parent_span`, `tree_box_air_max`), JP orphan squeeze (`cjk_squeeze_max`, render-only spc). 1780 tests.
+
+## Leftovers for the next run
+- [ ] L3 consulting-grade: re-score 2 = 11/16/19 at 3.5 "no", 20 at 4 "yes (with polish)"; open: loose ruled panels with a
+      callout at the bottom, JP orphans where LibreOffice wraps earlier than the model, Gantt equal time columns (decide
+      widths after the last growth pass), chart takeaways (annotations), single-item bullets in org boxes
+- [ ] AC4 (owner decision on the gate wording still pending)
+- [ ] Owner: real PowerPoint check (waterfall carrier labels, stacked totals legend on bars, U+2060 between ideographs,
+      gradients, customXml); PyPI token; L7 token gate

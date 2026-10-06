@@ -117,9 +117,18 @@ Run goal:
 - Problems: 21 spurious LibreOffice failures when pytest runs overlapped (retry added); wave-2 hollow spread (5.5 em gaps) looked broken → capped; reviewers contradict run to run.
 - Next: chevron rows aligned to table columns, decision slides (content-bound), `.muted` cards read as disabled, conclusion bar vs footer gap without a footnote.
 
-## 2026-10-06 (run 8, chained manual, L3 leftovers + re-score, 03:41– UTC)
+## 2026-10-06 (run 8, chained manual, L3 leftovers + re-score, 03:41–09:30 UTC, paused 04:15–05:57 by a usage limit)
 Run goal:
-- [ ] Sparse decision slides: card text capped, spread items ruled (token), conclusion bar shrink-before-wrap, bar–footer gutter without a footnote
-- [ ] Latin/VI orphan control (last two short words bound), `.muted` boxes read as lower priority, not disabled
-- [ ] Chevron rows aligned to the table below (equal counts) + `widths=` on chevron rows
-- [ ] Content-rich dense deck (examples/20) for scoring; independent L3 re-score incl. 11/16/19
+- [x] Sparse decision slides: card text capped, ruled spread lists (token), bar shrink-before-wrap, bar–footer gutter
+- [x] Latin/VI orphan binding (U+00A0), `.muted` boxes muted band + fg text, JP number+unit joiners, JP orphan squeeze
+- [x] Chevrons follow table columns when counts match (+ AGENT_TIPS); full-width blocks after `@N` rows
+- [x] Content-rich examples/20 + independent re-score: 11/16/19/20 = 3.5/3.5/3/3.5 → 3.5/3.5/3.5/4 ("yes, with polish" for 20)
+- Done: 7 waves, 12 Sonnet coding agents (2 resumed after HTTP 429) + 2 review agents; native waterfall charts, `{.gantt}`
+  bars, composed covers (`cover.*`), stacked totals, distinct jp-business palette, panels spanning charts, callouts at body
+  size, tables filling to visuals/footnotes, negative-axis headroom, balanced org charts, examples/21 (dark CSS/HTML pitch).
+- Metrics: tests 1780 passed (1663 at start); q3 155 tokens = 30% of python-pptx, markup 13–27% (unchanged); SKILL.md
+  2,881 tokens; round trip 117/119 → 119/121 (2 pre-existing).
+- Problems: account usage limit killed both wave-2 agents mid-work (resumed, ~1h40 lost); container fonts changed
+  (Inter/Montserrat present) → 19 goldens regenerated; my own gantt equal-column tweak fought growth passes (reverted).
+- Next: L3 gate on content-rich decks (owner: accept 20 at 4?), JP orphans where LibreOffice and the model disagree, Gantt
+  equal time columns after the last growth pass, AC4 owner decision.
