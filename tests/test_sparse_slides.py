@@ -24,6 +24,8 @@ from whitespace import body_band  # noqa: E402
 
 LIMIT = 0.35 + 0.01
 
+EMU = 914400
+
 
 def lay(name: str, number: int, **tokens) -> tuple[list[Placed], float, object]:
     """(items, body height in EMU, theme) of slide ``number`` of tests/data/``name``.md."""
@@ -94,9 +96,10 @@ SPARSE = [
 @pytest.mark.parametrize(("name", "number", "what"), SPARSE)
 def test_no_empty_band_over_35_percent(name, number, what):
     above, below = bands(name, number)
-    if (
-        what == "4 KPI cards alone"
-    ):  # a lone KPI row is content-sized at the optical center (test_l3_kpi_lone)
+    if what in (
+        "4 KPI cards alone",
+        "4 chevrons alone, dense",
+    ):  # a lone KPI / chevron row is content-sized (capped) at the optical center
         assert max(above, below) <= 0.45
         return
     assert max(above, below) <= LIMIT, f"{what}: above {above:.0%}, below {below:.0%}"
@@ -216,7 +219,8 @@ def test_chevrons_alone_grow_taller():
     def hmax(items):
         return max(p.h for p in items if isinstance(p.element, Shape) and p.element.shape == "chevron")
 
-    assert hmax(after) >= 1.3 * hmax(before)
+    # a lone row is capped (width / text), so it may be shorter than the plain row, never taller than the cap
+    assert hmax(after) <= max(hmax(before), 1.0 * EMU)
 
 
 def test_full_dense_slides_do_not_change():

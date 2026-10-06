@@ -458,6 +458,8 @@ class RenderTokens(BaseModel):
     connector_width: float = 1.5  # pt, connectors / arrows between blocks
     chart_line_width: float = 2.25  # pt, line chart series
     chart_title_scale: float = 1.2  # chart title size / chart text size
+    chart_text_ratio: float = 0.034  # big chart text >= this x the frame shorter side (0 = off) ...
+    chart_text_max_pt: float = 16  # ... up to this size (pt); never below the theme chart size
     chart_label_scale: float = 0.9  # data label size / chart text size
     ink_dark: str = "#1F2937"  # text on light fills when the color is chosen for contrast (badges, labels)
     ink_light: str = "#FFFFFF"  # text on dark fills

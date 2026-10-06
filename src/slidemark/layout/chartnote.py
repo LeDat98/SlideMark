@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 from ..ir import Chart, Paragraph, Placed, Run, Shape, Text, fast_style
 from ..render import waterfall as wfall
-from ..render.axis import axis_shown, label_pt, line_axis, resolve_axis
+from ..render.axis import axis_shown, chart_text_pt, label_pt, line_axis, resolve_axis
 from ..theme import DEFAULT_SIZES, Theme
 from ..units import EMU_PER_PT
 from . import css, measure
@@ -55,7 +55,8 @@ def _num(v) -> float | None:
 
 def chart_size(pl: Placed, theme: Theme) -> float:
     """Chart text size in pt, as the renderer computes it."""
-    return (pl.style.font_size or theme.sizes.get("table", DEFAULT_SIZES["table"])) * pl.font_scale
+    base = (pl.style.font_size or theme.sizes.get("table", DEFAULT_SIZES["table"])) * pl.font_scale
+    return chart_text_pt(base, pl.w, pl.h, theme.render)
 
 
 def resolve_hl(ch: Chart, cats: list[str]) -> list[int]:
