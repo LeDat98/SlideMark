@@ -21,6 +21,7 @@ from ..layout import measure
 from ..layout.css import border_spec, cell_insets
 from ..layout.tables import column_widths, compact_header, table_grid
 from ..theme import DEFAULT_SIZES, Theme
+from . import waterfall as wfall
 from .axis import auto_axis
 from .effects import apply_fill, apply_shadow
 from .text import _ANCHOR, fill_text
@@ -37,6 +38,7 @@ CHART_TYPES = {
     "doughnut": XL_CHART_TYPE.DOUGHNUT,
     "scatter": XL_CHART_TYPE.XY_SCATTER,
     "radar": XL_CHART_TYPE.RADAR_MARKERS,
+    "waterfall": XL_CHART_TYPE.COLUMN_STACKED,
 }
 
 
@@ -395,6 +397,76 @@ def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct) -> None:
             dl.position = XL_LABEL_POSITION.BEST_FIT
 
 
+def _waterfall_plan(ch: Chart, ser: Series, opts: dict, theme: Theme) -> dict:
+    """Bars, the six native stacked series, the axis and the label texts of a waterfall."""
+    totals = [int(i) for i in ch.options.get("totals", []) if isinstance(i, (int, float))]
+    vals = [_num(v) for v in ser.values]
+    bs = wfall.bars(vals, totals)
+    got = wfall.axis(bs, theme.render)
+    ax = got or (0.0, 0.0, 0.0)
+    span = (ax[1] - ax[0]) or max((b[2] - b[1] for b in bs), default=1.0) or 1.0
+    cols = wfall.columns(bs, span * 0.07)
+    rt = theme.render
+    colors = {
+        wfall.UP: hex6(theme, rt.waterfall_up),
+        wfall.DOWN: hex6(theme, rt.waterfall_down),
+        wfall.TOTAL: hex6(theme, rt.waterfall_total),
+    }
+    colors[wfall.CROSS] = colors[wfall.UP]
+    return {
+        "bars": bs,
+        "axis": got,
+        "colors": colors,
+        "series": [
+            Series(name=(ser.name if i == wfall.PAD else n), values=c)
+            for i, (n, c) in enumerate(zip(wfall.SERIES, cols, strict=True))
+        ],
+    }
+
+
+def _style_waterfall_series(ser, si: int, plan: dict, theme: Theme, size: float, fg, lab_on, nf) -> None:
+    if si == wfall.BASE or si == wfall.PAD:  # invisible: no fill, no line
+        ser.format.fill.background()
+        ser.format.line.fill.background()
+    else:
+        ser.format.fill.solid()
+        color = plan["colors"][si]
+        ser.format.fill.fore_color.rgb = RGBColor.from_string(color)
+        if si == wfall.CROSS:  # the below-zero part of a crossing bar takes the color of that bar
+            for i, b in enumerate(plan["bars"]):
+                if b[3] is not None and b[0] == "down":
+                    pt = ser.points[i]
+                    pt.format.fill.solid()
+                    pt.format.fill.fore_color.rgb = RGBColor.from_string(plan["colors"][wfall.DOWN])
+        ser.format.line.fill.background()
+    if si != wfall.PAD or not lab_on:
+        return
+    ink = fg
+    for i, (kind, _lo, _hi, shown) in enumerate(plan["bars"]):
+        if kind == "gap":
+            continue
+        dl = ser.points[i].data_label
+        tf = dl.text_frame
+        tf.text = wfall.fmt_num(shown, nf, sign=kind in ("up", "down"))
+        run = tf.paragraphs[0].runs[0]
+        run.font.size = Pt(size * theme.render.chart_label_scale)
+        run.font.color.rgb = ink
+        dl.position = XL_LABEL_POSITION.INSIDE_BASE
+
+
+def _waterfall_legend(chart) -> None:
+    """Hide the legend entries of the helper series (base, below zero, label carrier)."""
+    leg = chart._chartSpace.find(".//" + qn("c:legend"))
+    if leg is None:
+        return
+    anchor = leg.find(qn("c:legendPos"))
+    for idx in (wfall.BASE, wfall.CROSS, wfall.PAD):
+        e = leg.makeelement(qn("c:legendEntry"), {})
+        etree.SubElement(e, qn("c:idx")).set("val", str(idx))
+        etree.SubElement(e, qn("c:delete")).set("val", "1")
+        anchor.addnext(e) if anchor is not None else leg.insert(0, e)
+
+
 def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     ch: Chart = pl.element  # type: ignore[assignment]
     theme = rc.theme
@@ -410,6 +482,10 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         series = [
             Series(name=ch.categories[0] if ch.categories else "", values=[s.values[0] for s in series])
         ]
+    wf = None
+    if kind == "waterfall" and series:
+        wf = _waterfall_plan(ch, series[0], opts, theme)
+        series = wf["series"]
     ncat = max([len(cats_in), *(len(s.values) for s in series)])
     cats = [str(c) for c in cats_in] or [str(i + 1) for i in range(ncat)]
     cats += [str(i + 1) for i in range(len(cats), ncat)]  # more values than categories
@@ -453,7 +529,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         chart.chart_title.include_in_layout = False
     else:
         chart.has_title = False
-    pos = _legend_pos(opts, pie, len(series))
+    pos = _legend_pos(opts, pie, 1 if wf else len(series))
     chart.has_legend = pos is not None
     if pos is not None:
         chart.legend.position = pos
@@ -472,7 +548,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     lab_pct = isinstance(labels, str) and labels.strip().lower() == "percent"
     lab_on = lab_pct or flag(labels)
     plot = chart.plots[0]
-    if lab_on and kind != "scatter":  # python-pptx has no data labels for XY series
+    if lab_on and kind not in ("scatter", "waterfall"):  # python-pptx has no data labels for XY series
         plot.has_data_labels = True
         dl = plot.data_labels
         dl.font.size = Pt(size * theme.render.chart_label_scale)
@@ -495,7 +571,9 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     for plot in chart.plots:
         for si, ser in enumerate(plot.series):
             color = pal[si % len(pal)]
-            if pie:
+            if wf:
+                _style_waterfall_series(ser, si, wf, theme, size, fg, lab_on, nf)
+            elif pie:
                 for pi in range(len(cats)):
                     pt = ser.points[pi]
                     pt.format.fill.solid()
@@ -537,7 +615,9 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         hole = chart.plots[0]._element.find(qn("c:holeSize"))
         if hole is not None:
             hole.set("val", "55")
-    if kind in ("bar", "column", "stacked-bar", "stacked-column"):
+    if wf and pos is not None:  # a legend lists only the visible bars
+        _waterfall_legend(chart)
+    if kind in ("bar", "column", "stacked-bar", "stacked-column", "waterfall"):
         try:
             rt = theme.render
             gw = _num(opts.get("gap_width"))
@@ -561,6 +641,13 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 va.tick_labels.number_format = nf
                 va.tick_labels.number_format_is_linked = False
         lo, hi = _num(opts.get("min")), _num(opts.get("max"))
+        if wf and wf["axis"]:
+            lo = lo if lo is not None else wf["axis"][0]
+            hi = hi if hi is not None else wf["axis"][1]
+            if wf["axis"][2]:
+                va.major_unit = wf["axis"][2]
+            if wf["axis"][0] < 0:
+                chart.category_axis.tick_label_position = XL_TICK_LABEL_POSITION.LOW
         if lo is None and kind in _ZERO_BASE and _all_nonneg(ch):
             lo = 0.0  # bars start at zero: an auto axis from 3.45 would exaggerate 3.6 vs 3.9
         if lo is not None:

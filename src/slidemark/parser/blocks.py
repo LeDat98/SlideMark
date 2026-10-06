@@ -27,6 +27,7 @@ CHART_KINDS = (
     "doughnut",
     "scatter",
     "radar",
+    "waterfall",
 )
 RAW_KINDS = ("mermaid", "math", "html")
 CALLOUT_RE = re.compile(r"^\[!(\w+)\]\s*")
@@ -215,8 +216,21 @@ def build_chart(kind: str, body: str, ctx: Ctx, line: int) -> Chart:
     if len(rows) < 2:
         ctx.error("chart has no series", line, "empty-chart", "add one row per series after the header")
     pct: list[bool] = []
+    totals: list[int] = []
+    if kind == "waterfall" and len(rows) > 2:
+        ctx.warn(
+            f"waterfall takes one series, got {len(rows) - 1}",
+            line,
+            "waterfall-series",
+            "keep one data row (first value, changes, = for totals); the extra rows were ignored",
+        )
+        rows = rows[:2]
     for r in rows[1:]:
-        vals = numbers_row(r[1:], r[0], ctx, line, pct)
+        cells = r[1:]
+        if kind == "waterfall":  # a lone `=` is a total bar (the running sum), not a number
+            totals = [i for i, c in enumerate(cells) if c == "="]
+            cells = ["" if c == "=" else c for c in cells]
+        vals = numbers_row(cells, r[0], ctx, line, pct)
         if len(vals) != n:
             ctx.warn(
                 f"series '{r[0]}' has {len(vals)} values for {n} categories",
@@ -226,6 +240,8 @@ def build_chart(kind: str, body: str, ctx: Ctx, line: int) -> Chart:
             )
             vals = (vals + [None] * n)[:n]
         chart.series.append(Series(name=r[0], values=vals))
+    if totals:
+        chart.options["totals"] = totals  # value None + index here = a total bar
     if pct and all(pct):
         chart.options["percent"] = True
     elif _grouped(rows[1:], chart):

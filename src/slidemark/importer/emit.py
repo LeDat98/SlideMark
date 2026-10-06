@@ -327,5 +327,6 @@ def chart_lines(ch: ChartT) -> list[str]:
     head = f"```{ch.kind}" + (" {" + " ".join(attrs) + "}" if attrs else "")
     rows = ["," + ",".join(_csv(c) for c in ch.categories)]
     for name, vals in ch.series:
-        rows.append(",".join([_csv(name), *(_val(v) for v in vals)]))
+        marks = set(ch.totals)
+        rows.append(",".join([_csv(name), *("=" if i in marks else _val(v) for i, v in enumerate(vals))]))
     return [head, *rows, "```"]

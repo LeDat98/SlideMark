@@ -75,6 +75,7 @@ CALLOUTS = {
 }  # fmt: skip
 CHART_KINDS = (
     "bar", "column", "stacked-bar", "stacked-column", "line", "area", "pie", "doughnut", "scatter", "radar",
+    "waterfall",
 )  # fmt: skip
 WS = re.compile(r"\s+")
 HINT = "kept as raw HTML (an image when rendering is available); use section.slide, h1, h2 cards, ul, table for editable shapes"  # noqa: E501
@@ -792,6 +793,10 @@ class _Conv:
             vals = s.get("data", s.get("values", []))
             out: list[float | None] = []
             for v in vals if isinstance(vals, list) else []:
+                if kind == "waterfall" and v == "=":
+                    ch.options.setdefault("totals", []).append(len(out))
+                    out.append(None)
+                    continue
                 try:
                     out.append(None if v is None or isinstance(v, bool) else float(v))
                 except (TypeError, ValueError):

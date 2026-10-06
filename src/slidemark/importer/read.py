@@ -65,6 +65,7 @@ class ChartT:
     categories: list[str]
     series: list[tuple[str, list[float | None]]]
     options: dict[str, str]
+    totals: list[int] = field(default_factory=list)  # waterfall: indexes of the `=` total bars
 
 
 @dataclass
@@ -416,6 +417,10 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
         )
     plot = chart.plots[0]
     series = list(plot.series)
+    if kind == "stacked-column" and series and (series[0].name or "") == _wf().SERIES[0]:
+        got = _read_waterfall(chart, series)
+        if got:
+            return got
     if kind == "scatter":
         xs: list[str] = []
         if series:
@@ -484,6 +489,55 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
     if fmt:
         opts["fmt"] = fmt
     return ChartT(kind=kind, title=title, categories=cats, series=data, options=opts)
+
+
+def _wf():
+    from ..render import waterfall
+
+    return waterfall
+
+
+def _read_waterfall(chart, series) -> ChartT | None:
+    """A waterfall SlideMark drew (stacked columns with an invisible first series) -> one series + totals."""
+    wf = _wf()
+    if len(series) != len(wf.SERIES) or [s.name for s in series[:-1]] != list(wf.SERIES[:-1]):
+        return None
+    try:
+        cols = [[_num(v) for v in s.values] for s in series]
+        values, totals = wf.decode(cols)
+        cats = [str(c) for c in chart.plots[0].categories]
+        opts: dict[str, str] = {}
+        title = chart.chart_title.text_frame.text.strip() or None if chart.has_title else None
+        if chart.has_legend:
+            pos = {1: "bottom", -4107: "bottom", -4131: "left", -4152: "right", -4160: "top"}.get(
+                int(chart.legend.position), "right"
+            )
+            opts["legend"] = pos
+        if series[wf.PAD]._element.find(qn("c:dLbls")) is not None:
+            opts["labels"] = "on"
+        va = chart.value_axis
+        if not va.visible:
+            opts["axis"] = "off"
+        if not va.tick_labels.number_format_is_linked and va.tick_labels.number_format != "General":
+            opts["fmt"] = va.tick_labels.number_format
+        from ..theme import RenderTokens
+
+        auto = wf.axis(wf.bars(values, totals), RenderTokens())
+        lo, hi = va.minimum_scale, va.maximum_scale
+        if lo is not None and not (auto and abs(lo - auto[0]) < 1e-9):
+            opts["min"] = f"{lo:g}"
+        if hi is not None and not (auto and abs(hi - auto[1]) < 1e-9):
+            opts["max"] = f"{hi:g}"
+        return ChartT(
+            kind="waterfall",
+            title=title,
+            categories=cats,
+            series=[(series[wf.PAD].name or "", values)],
+            options=opts,
+            totals=totals,
+        )
+    except Exception:
+        return None
 
 
 def _is_auto_max(kind: str, data, va) -> bool:

@@ -379,6 +379,9 @@ class RenderTokens(BaseModel):
         180  # ... for a chart with at most `chart_gap_few_cats` categories (fat bars look crude)
     )
     chart_gap_few_cats: int = 3
+    waterfall_up: str = "success"  # waterfall bars: increase, decrease, total (theme color names or hex)
+    waterfall_down: str = "danger"
+    waterfall_total: str = "primary"
     badge_cjk_bold: bool = False  # CJK badge text stays bold (synthetic bold smears small CJK glyphs)
 
 

@@ -375,7 +375,7 @@ def _chart_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
                 checks.append(
                     ("data labels", "#" + theme.chart_label_ink(fill), lsize, False, ["#" + fill], "labels")
                 )
-        elif kind in ("column", "bar", "line"):
+        elif kind in ("column", "bar", "line", "waterfall"):
             checks.append(("data labels", base, lsize, False, back_hex, "chart"))
     groups: dict[str, list[tuple[float, float, str, list[str], str]]] = {}
     for label, ink, sz, bold, backs, fix in checks:
