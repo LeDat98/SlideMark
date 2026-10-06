@@ -256,12 +256,31 @@ def header_rows_of(rows: list[list[CellT]]) -> int:
     return n
 
 
+def hl_row_set(rows: list[list[CellT]], hl: str, header_rows: int = 1) -> set[int]:
+    """Body rows whose first cell is one of the ``hl=`` values (the renderer drew them bold on a tint)."""
+    from ..layout.tablehl import norm_key, split_names
+
+    keys = {norm_key(n) for n in split_names(hl)}
+    out: set[int] = set()
+    for ri in range(header_rows, len(rows)):
+        first = rows[ri][0] if rows[ri] else None
+        if first is not None and norm_key("".join(p.plain for p in first.paras)) in keys:
+            out.add(ri)
+    return out
+
+
 def table_lines(
-    rows: list[list[CellT]], *, accent=None, classes=None, header_rows: int = 1
+    rows: list[list[CellT]],
+    *,
+    accent=None,
+    classes=None,
+    header_rows: int = 1,
+    hl_rows: set[int] = frozenset(),
 ) -> tuple[list[str], int]:
     """GFM table with ``<`` / ``^`` merge markers. Returns (lines, merged cells dropped).
 
-    The first ``header_rows`` rows are header rows: their plain text is bold by default (no ``**``).
+    The first ``header_rows`` rows are header rows, and ``hl_rows`` the rows an ``hl=`` emphasises: their
+    plain text is bold by default (no ``**``).
     """
     if not rows:
         return [], 0
@@ -283,7 +302,7 @@ def table_lines(
                     [r for p in c.paras for r in (p.runs + [RunT(text="\n")])][:-1] if c.paras else [],
                     accent=accent,
                     classes=classes,
-                    plain_bold=(ri < header_rows),
+                    plain_bold=(ri < header_rows or ri in hl_rows),
                     cell=True,
                 )
                 cells.append(txt)

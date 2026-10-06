@@ -494,7 +494,7 @@ def _table_widths(lines: list[str], sd: SlideData, header: list[str]) -> list[st
                 k += 1
                 if k in bad:
                     w = "widths=" + ":".join(map(str, _units(list(tables[k].col_w))))
-                    if out and out[-1].startswith("{align="):
+                    if out and out[-1].startswith("{") and out[-1].endswith("}"):
                         out[-1] = out[-1][:-1] + " " + w + "}"
                     else:
                         out.append("{" + w + "}")

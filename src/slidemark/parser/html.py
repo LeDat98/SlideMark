@@ -852,7 +852,15 @@ class _Conv:
                     header += 1
                 else:
                     break
-        return Table(rows=grid, header_rows=header, id=n.attrs.get("id") or None, line=self.at(n))
+        tbl = Table(rows=grid, header_rows=header, id=n.attrs.get("id") or None, line=self.at(n))
+        hl = [  # `<tr class="hl">` emphasises the row (same as `hl=` on a table)
+            "".join(p.plain for p in grid[r][0].paragraphs).strip()
+            for r, tr in enumerate(trs)
+            if "hl" in tr.classes and r >= header and grid[r] and grid[r][0].paragraphs
+        ]
+        if hl := [h for h in dict.fromkeys(hl) if h]:
+            tbl.attrs["hl"] = hl
+        return tbl
 
 
 def _int(v: str | None) -> int:

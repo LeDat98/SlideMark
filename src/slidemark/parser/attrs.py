@@ -17,10 +17,11 @@ from .tabular import apply_chart_kv, apply_table_kv
 _TOKEN = re.compile(
     r"""\s*(?:\.(?P<cls>[\w-]+)
         |\#(?P<id>[\w-]+)
-        |(?P<key>[A-Za-z][\w-]*)=(?P<val>"[^"]*"|'[^']*'|[^\s"'{}]+)
+        |(?P<key>[A-Za-z][\w-]*)=(?P<val>(?:"[^"]*"|'[^']*'|[^\s"'{}]+)+)
         |(?P<bare>bold|italic|autoplay|loop)(?![\w-]))""",
     re.X,
 )
+_COMMA_SPACE = re.compile(r"""("[^"]*"|'[^']*')|,[ \t]+(?![A-Za-z][\w-]*=)""")  # quoted text stays as it is
 MEDIA_EXT = {
     **dict.fromkeys((".mp4", ".m4v", ".mov", ".wmv", ".avi", ".webm"), "video"),
     **dict.fromkeys((".mp3", ".m4a", ".wav", ".aac", ".wma"), "audio"),
@@ -48,6 +49,7 @@ def parse_attr_body(body: str) -> Attrs | None:
     """Parse the inside of ``{...}``; ``None`` when it is not a valid attribute list."""
     a = Attrs()
     pos = 0
+    body = _COMMA_SPACE.sub(lambda m: m.group(1) or ",", body)  # `hl=a, b` reads as `hl=a,b`
     while body[pos:].strip():
         m = _TOKEN.match(body, pos)
         if not m or m.end() == pos:
@@ -58,7 +60,7 @@ def parse_attr_body(body: str) -> Attrs | None:
             a.id = m.group("id")
         elif m.group("key"):
             val = m.group("val")
-            if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+            if re.fullmatch(r"\"[^\"]*\"|'[^']*'", val):  # one quoted value (`hl="a",b` keeps its quotes)
                 val = val[1:-1]
             a.kv[m.group("key")] = val
         else:
@@ -225,7 +227,7 @@ def apply_attrs(
 # --------------------------------------------------------------------------- the `@` line
 
 LAYOUT_WORDS = ("cover", "section", "blank", "center", "free")
-FLAGS = ("flow", "chevron")
+FLAGS = ("flow", "chevron", "steps")
 AT_KEYS = ("bg", "t", "id", "gap")
 KNOWN_WORDS = (*LAYOUT_WORDS, *FLAGS, "html", "hidden", "build", "dense", "dark", "light", "plain")
 TRANSITIONS = ("fade", "push", "wipe", "split", "cover", "zoom", "morph")

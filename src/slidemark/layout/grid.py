@@ -6,7 +6,7 @@ import math
 import re
 from dataclasses import dataclass, field
 
-FLAGS = {"flow", "chevron"}
+FLAGS = {"flow", "chevron", "steps"}
 
 
 @dataclass

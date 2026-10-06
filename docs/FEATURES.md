@@ -60,3 +60,5 @@ step does not apply (no visual risk to lint, or no syntax).
 | Composed covers (`cover.band_h/pad/gap/rule/footer` tokens) | x | - | x | x | x | x | x | - |
 | Stacked totals (`totals=`), negative-axis headroom, JP number+unit joiners, JP orphan squeeze | x | x | x | x | x | x | - | - |
 | JP phrase-aware line breaks (BudouX soft breaks, render only; importer strips them) | x | x | x | x | x | x | - | - |
+| Table row emphasis: `hl=` first-cell values, `table.hl.*` tokens, CSS `tr.hl`, lint, importer round trip (`hl=` in the shape name) | x | x | x | x | x | x | x | - |
+| `@steps`: arrow row + outcome cards in the same columns (`steps-arrow` / `steps-card` classes, `layout.steps_*` tokens, importer folds it back) | x | x | x | x | x | x | - | - |

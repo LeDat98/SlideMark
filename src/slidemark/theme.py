@@ -423,6 +423,16 @@ class LayoutTokens(BaseModel):
     chevron_table_fill: float = 0.72  # above a table the chevron text may fill this share of its height ...
     chevron_table_grow: Length = "0.3in"  # ... and the row may grow this much taller at the table's expense
     chevron_table_align: bool = True  # chevron i spans column i of the table below (equal counts only)
+    # --- `@steps`: an arrow row with an outcome card under every arrow
+    steps_arrow_aspect: float = 0.3  # arrow height / column width ...
+    steps_arrow_min_h: Length = "0.55in"  # ... but at least this ...
+    steps_arrow_max_h: Length = "1.2in"  # ... and at most this tall
+    steps_gap: Length = "0.12in"  # arrow row -> card row
+    steps_stretch: bool = True  # the cards grow down to the conclusion bar / footnote (items spread inside)
+    steps_stretch_min: float = 0.4  # hollow at full height: cards are tried shorter, down to this share ...
+    steps_stretch_step: float = 0.15  # ... in steps of this share of the free height
+    steps_arrow_text_ratio: float = 1.15  # arrow heading size >= this x the card text (0 = off) ...
+    steps_arrow_text_fill: float = 0.7  # ... while the heading stays within this share of the arrow height
     # --- conclusion bar
     conclusion_min_ratio: float = (
         1.0  # the bar text is at least this x the largest card / box body text (0 = off)
@@ -637,6 +647,12 @@ class Theme(BaseModel):
     table_body_fill: str = "bg"
     table_border: str = "border"
     table_zebra_fill: str | None = None  # alternate body row fill for `.zebra` tables (None = derived)
+    # rows emphasised with `hl=` on a table: `table_hl_strength` of this color mixed into the body fill
+    # (1 = exactly it; none = bold only), bold text, and an ink (None = the cell's own, made readable)
+    table_hl_fill: str | None = "accent"
+    table_hl_strength: float = Field(0.2, ge=0, le=1)
+    table_hl_color: str | None = None
+    table_hl_bold: bool = True
     heading_band: str | None = None  # fill of a full-width band behind `##` box headings (None = plain)
     heading_band_color: str = "bg"  # heading text color on the band
     muted_band: str | None = "muted"  # heading band fill of a `.muted` box (None = the normal band)
@@ -784,12 +800,32 @@ class Theme(BaseModel):
             f"{round(int(a[i : i + 2], 16) * (1 - 0.6) + int(b[i : i + 2], 16) * 0.6):02X}" for i in (0, 2, 4)
         )
 
+    def table_hl_fill_of(self, body_fill: str) -> str:
+        """Fill of an ``hl=`` row: ``table.hl.fill`` mixed into the body fill by ``table.hl.strength``."""
+        from .render.util import hex6  # lazy: render imports theme
+
+        if not self.table_hl_fill or body_fill.lower().startswith(("linear", "radial")):
+            return body_fill
+        a, b, k = hex6(self, self.table_hl_fill), hex6(self, body_fill), self.table_hl_strength
+        mixed = (round(int(a[i : i + 2], 16) * k + int(b[i : i + 2], 16) * (1 - k)) for i in (0, 2, 4))
+        return "#" + "".join(f"{v:02X}" for v in mixed)
+
     def table_cell_fill(
-        self, row: int, col: int, header_rows: int, header_cols: int, body_fill: str, zebra: bool
+        self,
+        row: int,
+        col: int,
+        header_rows: int,
+        header_cols: int,
+        body_fill: str,
+        zebra: bool,
+        hl: bool = False,
     ) -> str:
-        """Fill of grid cell (row, col) before any per-cell CSS fill: header, first column, body or band."""
+        """Fill of grid cell (row, col) before any per-cell CSS fill: header, emphasised row, first column,
+        body or band."""
         if row < header_rows:
             return self.table_header_fill
+        if hl:
+            return self.table_hl_fill_of(body_fill)
         if col < header_cols:
             return "surface"
         if zebra and (row - header_rows) % 2 == 1:
@@ -797,11 +833,27 @@ class Theme(BaseModel):
         return body_fill
 
     def table_cell_style(
-        self, base: Style, header: bool, first_col: bool, colspan: int, cell_style: Style | None
+        self,
+        base: Style,
+        header: bool,
+        first_col: bool,
+        colspan: int,
+        cell_style: Style | None,
+        hl_fill: str | None = None,
     ) -> Style:
-        """Text style of a table cell: the table's, header / first-column defaults, then the cell's own."""
+        """Text style of a table cell: the table's, header / first-column defaults, then the cell's own.
+
+        ``hl_fill`` is the fill of an emphasised (``hl=``) body row: bold, and an ink readable on it."""
         st = base
-        if header:
+        if hl_fill is not None and not header:
+            ink = self.table_hl_color or self.ink_on(hl_fill, base.color or "fg")
+            st = st.merged(
+                Style(
+                    bold=True if self.table_hl_bold else None,
+                    color=ink if ink != (base.color or "fg") else None,
+                )
+            )
+        elif header:
             st = st.merged(
                 Style(bold=True, color=self.table_header_color, align="center" if colspan > 1 else None)
             )
@@ -1211,7 +1263,15 @@ _KEYWORDS = {"none", "hidden", "solid", "dashed", "dotted", "double", "thin", "m
 _PT_FIELDS = {"font_size", "line_width", "radius", "letter_spacing"}
 _PT_PATHS = {"min_font_size", "render.line_width", "render.connector_width", "render.chart_line_width"}
 _THEME_COLOR_SUFFIX = ("_fill", "_color", "_band", "_border")
-_OPTIONAL_COLORS = {"title_band", "heading_band", "muted_band", "table_zebra_fill", "cover_rule"}
+_OPTIONAL_COLORS = {
+    "title_band",
+    "heading_band",
+    "muted_band",
+    "table_zebra_fill",
+    "table_hl_fill",
+    "table_hl_color",
+    "cover_rule",
+}
 _MEDIUM_PT = 2.25  # CSS `medium` border width (3px)
 
 

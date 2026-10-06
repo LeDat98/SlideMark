@@ -171,6 +171,7 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `rows/rows` | **areas**: block 1 = `a`, block 2 = `b`, ... in source order; repeat a letter to span; `.` = empty | `@aab/aac` |
 | `flow` | arrows between blocks in reading order (process diagrams) | `@4 flow` |
 | `chevron` | blocks drawn as chevrons (steps) | `@4 chevron` |
+| `steps` | a process row: each `##` heading is an arrow, its bullets sit in a card under that arrow (below) | `@4 steps` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
 | `free` | absolute positioning: every block with `{x= y= w= h=}` (% of the area under the title, or lengths) sits exactly there, with no growth, balance or search; unplaced blocks stack on top (info `free-unplaced`) | `{x=10% y=30% w=40% h=20%}` |
 | `key=value` | `bg=` color or image, `t=` transition (`fade`, `push`, `wipe`, `split`, `cover`, `zoom`, `morph`; `t=fade:0.5` sets seconds), `id=`, `gap=` | `@bg=#0F172A t=fade` |
@@ -185,6 +186,27 @@ whose box has no `###` sub-boxes applies to the slide (info `at-hoisted`).
 `@aab/aac` reads as two rows. In the first row, block `a` takes two columns and `b` one. In the second row, `a`
 continues and `c` takes the last column. The result: a tall box on the left two-thirds and two stacked boxes on
 the right.
+
+**Steps.** `@steps` is a process row with an outcome per step: every `## heading` is an arrow (a chevron),
+and its bullets sit in a card under that arrow, in the same column. A step with no bullets shows only its
+arrow. The cards grow down to the conclusion bar / footnote (as far as their text fills them). Other blocks
+after the steps (use `@end`) stay full width below. `@4 chevron` is the compact form: heading and bullets
+inside the arrow.
+
+```markdown
+@4 steps
+## 現状分析
+- 全店の業務を棚卸し
+- 課題を30件に整理
+## 設計
+- 標準フローを策定
+```
+
+Looks are tokens: `style: steps-arrow.fill=accent steps-card.fill=#EEF2FF` (classes `steps-arrow` / `steps-card`,
+or per step `## 設計 {.accent}`), `layout.steps_gap` (arrow row to cards), `layout.steps_arrow_aspect` /
+`steps_arrow_min_h` / `steps_arrow_max_h` (arrow height), `layout.steps_arrow_text_ratio` (arrow text vs card
+text), `layout.steps_stretch=off` (cards keep their content height). Fewer than two `##` steps: warning
+`steps-few`. Column ratios work (`@1:2:1 steps`).
 
 ## Attributes `{...}`
 
@@ -353,8 +375,15 @@ Attributes on a table (`{...}` on the line before a GFM table, or on a `table` f
 | `header` | number of header rows (0 = none) | `header=2` |
 | `hcol` | number of header columns | `hcol=1` |
 | `.zebra` | alternate row fill | |
+| `hl` | emphasise the body rows whose **first cell** equals one of these values (comma list; quote a value that holds a comma): tinted fill + bold text | `hl=冷凍食品,海外` |
 
 Numeric columns are right-aligned automatically.
+
+**Row emphasis.** `hl=` takes the first-cell values of the rows to stress, the same option name a chart uses:
+`{hl=冷凍食品,海外}` (or `{hl="Metro, East",Other}`). Look = tokens `table.hl.fill` (default `accent`, mixed into the
+body fill by `table.hl.strength` 0.2; `none` = bold only), `table.hl.color` (default: the cell ink, made readable),
+`table.hl.bold`; CSS `tr.hl { background: ...; color: ... }` overrides them. An unknown value is a warning
+(`table-hl`) with the closest first cell. `<tr class="hl">` in HTML tables does the same.
 
 **Gantt.** `{.gantt}` on a table draws every filled body cell after the first column as a native bar spanning its
 merged range (`<` continues the bar), with the cell text inside; cells holding only `―`, `-` or nothing stay empty.
@@ -385,7 +414,7 @@ tr:nth-child(even) td { background: #F6F7FB }
 
 Selectors: `slide`, `slide.cover`, `slide.section`, `h1` (slide title), `h2` (box heading), `p`/`li` (body
 text), `.lead`, `.conclusion`, `.footnote`, `.subtitle`, `.box` (any `##` box), `.kpi`, `.chevron`, `.callout`,
-`table`, `tr`, `th`, `td`, `code`, `img`, `.chart`, and any `{.class}` / `{#id}`; combined with descendant
+`table`, `tr` (`tr.hl` = rows emphasised by `hl=`), `th`, `td`, `code`, `img`, `.chart`, and any `{.class}` / `{#id}`; combined with descendant
 (` `) and child (`>`) combinators, `:nth-child(even|odd|N)`, `:first-child`, `:last-child`. Comma lists are
 split. Later rules and higher specificity win; inline `{}` attributes win over CSS.
 

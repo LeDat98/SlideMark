@@ -661,6 +661,15 @@ def parse_slide(
             if len(els) == 1:
                 slide_els.extend(els)
                 continue
+            if "steps" in flags and not _all_steps(els):
+                ctx.add(
+                    "warning",
+                    "'@steps' needs a row of two or more '##' steps and nothing else",
+                    getattr(els[0], "line", None),
+                    "steps-few",
+                    "put other blocks after '@end' and an '@' line of their own, or drop 'steps'",
+                )
+                flags = [f for f in flags if f != "steps"]
             g = Container(
                 classes=["plain", "group", *flags], grid=spec.grid, line=getattr(els[0], "line", None)
             )
@@ -735,7 +744,56 @@ def parse_slide(
     for box, raw in ctx.box_links:
         box.links = _resolve_links(raw, len(box.children), "box", ctx, box, box.children)
     ctx.box_links = []
+    _expand_steps(slide, ctx)
     return slide
+
+
+def _all_steps(els: list[Any]) -> bool:
+    return len(els) >= 2 and all(isinstance(e, Container) and e.title is not None for e in els)
+
+
+def _expand_steps(slide: Slide, ctx: Ctx) -> None:
+    """``@steps``: the slide's ``##`` steps become one ``steps`` group (arrows over cards, by the layout).
+
+    The group takes the slide grid (``@4 steps`` / ``@1:2:1 steps``: one column per step; anything else is
+    one equal column per step). Blocks that are not ``##`` steps stay full width below it. Fewer than two
+    steps: a hint, and the slide is left as written.
+    """
+    if "steps" not in slide.classes:
+        return
+    slide.classes = [c for c in slide.classes if c not in ("steps", "chevron")]  # arrows are the steps' own
+    steps = [e for e in slide.elements if isinstance(e, Container) and e.title is not None]
+    if len(steps) < 2:
+        ctx.add(
+            "warning",
+            f"'@steps' needs two or more '##' steps, found {len(steps)}",
+            slide.line,
+            "steps-few",
+            "write one '## Heading' per step with its bullets under it, or drop '@steps'",
+        )
+        return
+    n = len(steps)
+    g = (slide.grid or "").strip()
+    ok = (g.isdigit() and int(g) >= n) or (":" in g and g.count(":") + 1 >= n and "/" not in g)
+    if g and not ok:
+        ctx.add(
+            "info",
+            f"grid '{g}' replaced by {n} equal columns for '@steps'",
+            slide.line,
+            "steps-grid",
+            f"use @{n} steps, or ratios such as @{':'.join(['1'] * n)} steps",
+        )
+    group = Container(
+        classes=["plain", "group", "steps"], grid=g if ok else str(n), children=steps, line=steps[0].line
+    )
+    rest = [e for e in slide.elements if all(e is not b for b in steps)]
+    if slide.links:
+        ctx.add(
+            "info", "slide connectors are ignored with '@steps'", slide.line, "steps-links", "remove them"
+        )
+    slide.elements = [group, *rest]
+    slide.links = []
+    slide.grid = f"1x{len(slide.elements)}" if rest else None
 
 
 def _hint_missing_end(box_els: list[Container], ctx: Ctx, trail: int | None = None) -> None:

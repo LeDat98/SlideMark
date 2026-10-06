@@ -407,6 +407,85 @@ def _hug_height(cards: list[Placed], plan: dict[int, list[Placed]], top: int, lt
     return best
 
 
+def fill_steps(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+    """``@steps``: the cards under the arrows grow down to the conclusion bar / footnote.
+
+    The arrows stay where they are; the cards are stretched like any card row above a bar (text grows up to
+    ``card_text_max``, items spread, never a mostly empty box). Nothing else may share the body under the
+    arrows. Never raises: anything unexpected returns the items."""
+    try:
+        return _fill_steps(out, body, lt)
+    except Exception:
+        return out
+
+
+def _is_step_arrow(p: Placed) -> bool:
+    return isinstance(p.element, Shape) and str(p.element.attrs.get("shape_name", "")).endswith(" arrow")
+
+
+def _fill_steps(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+    if not lt.l3_fill or not lt.steps_stretch or not lt.cards_to_bar or body.h <= 0:
+        return out
+    items = _body_items(out, body)
+    arrows = [p for p in items if _is_step_arrow(p)]
+    cards = [p for p in items if isinstance(p.element, Container) and "steps-card" in p.element.classes]
+    if not arrows or len(cards) < 2:
+        return out
+    rest = [
+        p for p in items if not _is_step_arrow(p) and all(p is not c and not _contains(c, p) for c in cards)
+    ]
+    if any(p.y >= min(c.y for c in cards) - 2 for p in rest):
+        return out  # a table / chart under the cards shares the body: they keep their height
+    dy = body.y - min(a.y for a in arrows)  # top-anchored, right under the lead
+    moved = {id(p): p.model_copy(update={"y": p.y + dy}) for p in items} if dy else {}
+    out = [moved.get(id(p), p) for p in out]
+    arrows = [moved.get(id(p), p) for p in arrows]
+    top = min(moved.get(id(c), c).y for c in cards)
+    up = top - (
+        max(a.y + a.h for a in arrows) + to_emu(lt.steps_gap)
+    )  # the sparse passes may have spread them
+    if up > 0:
+        shifted = {id(p): p.model_copy(update={"y": p.y - up}) for p in out if not _is_step_arrow(p)}
+        out = [shifted.get(id(p), p) for p in out]
+        top -= up
+    keep = [p for p in out if not _is_step_arrow(p)]
+    full = body.bottom - top
+    step = max(lt.steps_stretch_step, 0.05)
+    low = lt.steps_stretch_min
+    shares = [1.0, *(round(1.0 - k * step, 3) for k in range(1, 20) if 1.0 - k * step >= low)]
+    for share in shares:  # as far as the content keeps the cards from looking hollow
+        res = _cards_to_bar(keep, Rect(body.x, top, body.w, round(full * share)), lt, True, True, False, True)
+        if res is not None:
+            new = {id(old): nw for old, nw in zip(keep, res, strict=False)}
+            out = [new.get(id(p), p) for p in out] + res[len(keep) :]
+            break
+    return _grow_step_arrows(out, arrows, lt)
+
+
+def _grow_step_arrows(out: list[Placed], arrows: list[Placed], lt: LayoutTokens) -> list[Placed]:
+    """The arrow headings are at least as large as the card text (x ``steps_arrow_text_ratio``)."""
+    if lt.steps_arrow_text_ratio <= 0:
+        return out
+    inner = [
+        p
+        for p in out
+        if isinstance(p.element, Text) and p.element.role == "body" and p.style.font_size is not None
+    ]
+    if not inner:
+        return out
+    card_pt = max(p.style.font_size * p.font_scale for p in inner)  # type: ignore[operator]
+    want = card_pt * lt.steps_arrow_text_ratio
+    now = min((a.style.font_size or 18) * a.font_scale for a in arrows)
+    if want <= now * 1.02:
+        return out
+    cap = lt.model_copy(update={"chevron_text_max_pt": want, "chevron_text_fill": lt.steps_arrow_text_fill})
+    grown = _grow_chevron_text(arrows, cap, strict=True)
+    if not grown:
+        return out
+    swap = {id(c): g for c, g in zip(arrows, grown, strict=True)}
+    return [swap.get(id(p), p) for p in out]
+
+
 def fill_cards_to_bar(
     out: list[Placed], body: Rect, lt: LayoutTokens, bar: bool, anchored: bool, foot: bool
 ) -> list[Placed] | None:
@@ -454,9 +533,15 @@ def _cap_card_text(plan: dict[int, list[Placed]], lt: LayoutTokens) -> dict[int,
 
 
 def _cards_to_bar(
-    out: list[Placed], body: Rect, lt: LayoutTokens, bar: bool, anchored: bool, foot: bool
+    out: list[Placed],
+    body: Rect,
+    lt: LayoutTokens,
+    bar: bool,
+    anchored: bool,
+    foot: bool,
+    force: bool = False,
 ) -> list[Placed] | None:
-    if not lt.l3_fill or not lt.cards_to_bar or lt.body_valign == "top" or body.h <= 0:
+    if not lt.l3_fill or not lt.cards_to_bar or (lt.body_valign == "top" and not force) or body.h <= 0:
         return None
     if not (bar or (foot and anchored)):
         return None
