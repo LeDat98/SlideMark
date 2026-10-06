@@ -254,6 +254,14 @@ class LayoutTokens(BaseModel):
     card_hollow_fill: float = 0.5  # ... a stretched card filled less than this spreads its items
     card_stretch_min_fill: float = 0.35  # ... cards that would stay under this filled keep hugging
     card_hollow_gap_cap: float = 2.0  # ... by at most this extra paragraph gap (em), instead of one dead band
+    card_spread_fill: float = (
+        0.8  # a stretched card filled less than this after growth spreads its items (0 = off)
+    )
+    card_spread_gap_max: float = (
+        5.5  # ... with equal gaps of at most this many em (~4 lines) (rest: air above and below)
+    )
+    card_spread_ratio: float = 1.7  # ... a card's gap is at most this multiple of the smallest gap in its row
+    card_spread_tail: float = 0.0  # ... em of air kept between the last item and the card bottom padding
     l3_short_items: int = 4  # ... before the row is shortened to meet l3_tail_max (top-anchored)
     # --- org charts / issue trees (slide-level a>b links) and compact table headers
     tree_fill: float = (
