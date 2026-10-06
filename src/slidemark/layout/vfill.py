@@ -17,7 +17,9 @@ from __future__ import annotations
 
 from ..ir import Container, Placed, Shape, Table, Text
 from ..units import EMU_PER_PT
+from . import measure
 from .grid import Rect
+from .tables import row_heights, table_grid
 
 
 def _contains(a: Placed, b: Placed) -> bool:
@@ -30,9 +32,66 @@ def _is_line(p: Placed) -> bool:
 
 def _row_cap(p: Placed, row_max_em: float) -> int | None:
     """Tallest a row of table ``p`` may get (EMU): ``row_max_em`` x its text size; None = no cap."""
-    if row_max_em <= 0 or not isinstance(p.element, Table) or not p.element.attrs.get("_row_cap"):
+    cap = p.element.attrs.get("_row_cap") if isinstance(p.element, Table) else None
+    if row_max_em <= 0 or not cap:
         return None
-    return round(row_max_em * (p.style.font_size or 14) * p.font_scale * EMU_PER_PT)
+    em = max(float(cap), row_max_em) if cap is not True else row_max_em  # a number: this table's own limit
+    return round(em * (p.style.font_size or 14) * p.font_scale * EMU_PER_PT)
+
+
+_VTEXT_STEP = 0.05  # table text grows in steps of this factor (see ``_grow_table``)
+
+
+def _grow_table(p: Placed, peer_pt: float = 0.0) -> Placed:
+    """A table whose rows are stretched beyond ``table_comfort_em`` grows its text (header and body alike).
+
+    The factor is the largest one (<= ``table_vtext_max``, ``table_vtext_max_pt``) that keeps every row at its
+    stretched height without a new wrapped line (CJK guard: natural height <= the old one x the factor). Rows
+    keep their heights; the vertical fill may then stretch them again up to ``table_row_max_em``.
+    ``peer_pt`` (> 0) caps the size: chevron text x ``table_peer_max``, box text x ``table_box_max``.
+    """
+    tk = measure.tokens()
+    t = p.element
+    if (
+        tk.table_comfort_em <= 0
+        or tk.table_vtext_max <= 1.0
+        or tk.table_text_step <= 0
+        or not isinstance(t, Table)
+    ):
+        return p
+    rh, cw = t.attrs.get("_row_h"), t.attrs.get("_col_w")
+    nrows, _ncols, anchors = table_grid(t)
+    if (
+        not rh
+        or not cw
+        or t.attrs.get("_row_cap")  # already grown by the layout's table text step
+        or len(rh) != nrows
+        or not tk.table_vtext_min_rows <= nrows <= tk.table_vtext_max_rows
+        or any(c.style is not None and c.style.font_size is not None for row in t.rows for c in row)
+    ):
+        return p
+    size = (p.style.font_size or 14) * p.font_scale
+    avg = sum(rh) / nrows / (size * EMU_PER_PT)
+    if avg <= tk.table_comfort_em:
+        return p
+    cap_pt = tk.table_vtext_max_pt
+    if peer_pt > 0:
+        cap_pt = min(cap_pt, peer_pt)
+    top = min(tk.table_vtext_max, cap_pt / max(size, 1e-6), avg / tk.table_comfort_em)
+    base = row_heights(t, anchors, cw, p.style, p.font_scale)
+    n = int((top - 1.0) / _VTEXT_STEP + 1e-9)
+    for i in range(n):
+        f = round(top - _VTEXT_STEP * i, 3) if i else top
+        if f <= 1.0 + 1e-6:
+            break
+        nat = row_heights(t, anchors, cw, p.style, p.font_scale * f)
+        if all(a <= b * f * 1.02 and a <= h for a, b, h in zip(nat, base, rh, strict=True)):
+            el = t.model_copy(update={"attrs": {**t.attrs, "_row_cap": True, "_vgrown": True}})
+            return p.model_copy(update={"element": el, "font_scale": p.font_scale * f})
+    if tk.table_vrow_max_em > 0:  # the text cannot grow: the rows may take a little more slack
+        el = t.model_copy(update={"attrs": {**t.attrs, "_row_cap": tk.table_vrow_max_em, "_vgrown": True}})
+        return p.model_copy(update={"element": el})
+    return p
 
 
 def _is_chevron(p: Placed) -> bool:
@@ -97,6 +156,19 @@ def fill_body(
     row_max_em: float = 0.0,
 ) -> list[Placed]:
     try:
+        tk = measure.tokens()
+        caps = []  # the table never out-sizes the chevron / box text beside it (inverted hierarchy)
+        for p in items:
+            sz = (p.style.font_size or 14) * p.font_scale
+            if _is_chevron(p) and tk.table_peer_max > 0:
+                caps.append(sz * tk.table_peer_max)
+            elif isinstance(p.element, Text) and p.element.role == "body" and tk.table_box_max > 0:
+                caps.append(sz * tk.table_box_max)
+        peer = min(caps, default=0.0)
+        items = [
+            _grow_table(p, peer) if isinstance(p.element, Table) and _owner(items, i) is None else p
+            for i, p in enumerate(items)
+        ]
         return _fill(
             items,
             body,
@@ -156,7 +228,12 @@ def _fill(
     gap_add = [0] * max(len(rows) - 1, 0)
     budget = max(free - reserve, 0)  # the block keeps ``reserve`` of air to the conclusion / footnote
     small = (bottom_all(items, roots) - min(items[i].y for i in roots)) < center_min * body.h
-    if free > thr or small:
+    # a table that grew its text takes the slack below it even under the threshold (its rows only)
+    vgrown = free <= thr and not small
+    vgrown = vgrown and any(
+        items[i].element.attrs.get("_vgrown") for i in roots if isinstance(items[i].element, Table)
+    )
+    if free > thr or small or vgrown:
         want = []
         for r, row in enumerate(rows):
             kinds = {
@@ -171,6 +248,8 @@ def _fill(
             }
             ok = kinds <= {Table, "chev", "card"} and 0 not in kinds
             share = spread_max * (card_share if kinds == {"card"} else 1.0)
+            if vgrown and kinds != {Table}:
+                ok = False  # a table that grew its text takes the slack; chevrons keep their height
             w = round(share * (bots[r] - tops[r])) if ok else 0
             tabs = [items[i] for i in row if isinstance(items[i].element, Table)]
             caps = [_row_cap(tp, row_max_em) for tp in tabs]
@@ -189,6 +268,8 @@ def _fill(
                 grow[r] = round(want[r] * take / sum(want))
             budget -= sum(grow)
         gw = [round(spread_max * (tops[r + 1] - bots[r])) for r in range(len(rows) - 1)]
+        if vgrown:
+            gw = [0] * len(gw)
         take = min(budget, sum(gw))
         if sum(gw) > 0 and take > 0:
             for r in range(len(gw)):

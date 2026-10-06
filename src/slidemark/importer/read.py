@@ -198,7 +198,7 @@ def _read_run(r, ctx: ReadCtx, part) -> RunT:
     hl = rpr.find(qn("a:highlight"))
     if hl is not None:
         run.badge = _hex(hl) or "x"
-        run.text = text.strip("　")
+        run.text = text.strip("　 ")  # badge padding: full-width / no-break spaces
     latin = rpr.find(qn("a:latin"))
     if latin is not None and any(m in (latin.get("typeface") or "").lower() for m in MONO):
         run.code = True
