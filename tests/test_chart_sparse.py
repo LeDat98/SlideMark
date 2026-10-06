@@ -103,3 +103,19 @@ def test_line_chart_far_from_zero_starts_above_it(tmp_path):
     assert ch.value_axis.minimum_scale == 0
     ch = build_chart(tmp_path, "line", ["a", "b", "c"], [Series(name="a", values=[1, 8, 3])])
     assert ch.value_axis.minimum_scale in (None, 0)
+
+
+def test_import_does_not_emit_axis_for_the_automatic_drop(tmp_path):
+    from slidemark import build
+    from slidemark.importer import import_pptx
+
+    def roundtrip(attrs):
+        src = tmp_path / "r.md"
+        src.write_text(f"# T\n\n```column {{{attrs}}}\n,a,b,c\nx,4,12,21\n```\n", encoding="utf-8")
+        build(src, tmp_path / "r.pptx")
+        md = import_pptx(tmp_path / "r.pptx")
+        return md if isinstance(md, str) else getattr(md, "markdown", str(md))
+
+    assert "axis" not in roundtrip("labels=on")
+    assert "axis=on" in roundtrip("labels=on axis=on")
+    assert "axis=off" in roundtrip("axis=off")
