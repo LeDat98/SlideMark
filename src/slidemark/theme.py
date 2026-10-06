@@ -108,9 +108,18 @@ class LayoutTokens(BaseModel):
     math_grow: float = 1.6  # an equation alone in its cell is this much larger than body text
     cjk_orphan_chars: int = 2  # a CJK paragraph whose last line holds at most this many characters ...
     cjk_squeeze_max: float = (
-        0.1  # ... gets up to this much negative letter spacing (em) to pull it back; 0 = off
+        0.15  # ... gets up to this much negative letter spacing (em) to pull it back; 0 = off
     )
     cjk_squeeze_margin: float = 0.01  # ... and the pulled-back line must fit this much narrower
+    cjk_squeeze_fill: float = (
+        0.9  # nearly full lines (would wrap a short tail at this share of the width) ...
+    )
+    cjk_squeeze_tail: int = (
+        4  # ... with at most this many characters on the last line are squeezed too; 0 = off
+    )
+    cjk_latin_gap: float = (
+        0.3  # LibreOffice adds this much space (em) where CJK and Latin text touch; the squeeze counts it
+    )
     cjk_unit_join: bool = True  # Japanese numbers stay with their units (38万円, ▲8%): U+2060 joiners
     grow: bool = True  # sparse slides grow text / cards to fill the body (False = keep nominal sizes)
     box_pad: Length = "10pt"  # inner padding of a box whose style has none
@@ -304,6 +313,8 @@ class LayoutTokens(BaseModel):
         1.12  # a note's text width is estimated this much wider (bold CJK + latin spacing)
     )
     chart_note_line_em: float = 1.2  # shortest pointer line (x chart text size)
+    chart_note_land_em: float = 1.0  # a pointer dropping onto a horizontal bar lands this far inside its end
+    chart_note_shrink_pt: float = 1.0  # a note may shrink this much (pt) to sit clearly nearer its bar
     panel_to_visual: bool = (
         True  # a hollow panel beside a chart spans it: top at the plot top, bottom at the chart's
     )

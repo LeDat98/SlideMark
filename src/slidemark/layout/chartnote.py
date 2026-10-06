@@ -232,6 +232,9 @@ class _Marks:
     plot: Rect
     rects: list[Rect | None]  # per category: what is drawn there (label included)
     target: list[tuple[float, float] | None]  # per category: where a pointer ends (edge facing the note)
+    edges: list[
+        tuple[tuple[float, float], tuple[float, float]] | None
+    ]  # horizontal bars: (top, bottom) points
     x_of: Callable[[float], float]
     y_of: Callable[[float], float]
 
@@ -259,6 +262,7 @@ def _marks(ch: Chart, d: _Data, frac, W: int, H: int, size: float, theme: Theme)
     air = 0.2 * size * EMU_PER_PT
     rects: list[Rect | None] = []
     target: list[tuple[float, float] | None] = []
+    edges: list[tuple[tuple[float, float], tuple[float, float]] | None] = []
     if d.kind in HORIZONTAL:
 
         def vx(v: float) -> float:
@@ -272,6 +276,7 @@ def _marks(ch: Chart, d: _Data, frac, W: int, H: int, size: float, theme: Theme)
             if e is None:
                 rects.append(None)
                 target.append(None)
+                edges.append(None)
                 continue
             cy = py + (i + 0.5) * slot
             half = max(slot * share / 2, lab_h / 2)
@@ -279,7 +284,16 @@ def _marks(ch: Chart, d: _Data, frac, W: int, H: int, size: float, theme: Theme)
             xr = vx(e[1]) + (lab_w[i] if d.above[i] else 0)
             rects.append((xl, cy - half, xr, cy + half))
             target.append((xr + air, cy))
-        return _Marks((px, py, px + pw, py + ph), rects, target, vx, vy)
+            if d.nser == 1:  # a pointer from above or below lands on the bar edge, near the bar's end
+                bar_h = slot * share / 2
+                neg = e[1] <= 0 and e[0] < 0
+                end, root = (vx(e[0]), vx(e[1])) if neg else (vx(e[1]), vx(e[0]))
+                inset = min(theme.layout.chart_note_land_em * size * EMU_PER_PT, abs(end - root) / 2)
+                x = end + inset if neg else end - inset
+                edges.append(((x, cy - bar_h), (x, cy + bar_h)))
+            else:
+                edges.append(None)
+        return _Marks((px, py, px + pw, py + ph), rects, target, edges, vx, vy)
 
     def vy2(v: float) -> float:
         return py + ph * (1 - (v - lo) / (hi - lo))
@@ -298,7 +312,7 @@ def _marks(ch: Chart, d: _Data, frac, W: int, H: int, size: float, theme: Theme)
             yb = max(yb, vy2(e[0]) + 0.4 * size * EMU_PER_PT)
         rects.append((cx - half, yt, cx + half, yb))
         target.append((cx, yt - air))
-    return _Marks((px, py, px + pw, py + ph), rects, target, lambda v: 0.0, vy2)
+    return _Marks((px, py, px + pw, py + ph), rects, target, [None] * n, lambda v: 0.0, vy2)
 
 
 # --------------------------------------------------------------------------- the note itself
@@ -355,7 +369,9 @@ def _start(rect: Rect, to: tuple[float, float]) -> tuple[float, float]:
     return x, y
 
 
-def _candidates(horizontal: bool, plot: Rect, w: float, h: float, tgt, step: float, room: float):
+def _candidates(
+    horizontal: bool, plot: Rect, w: float, h: float, tgt, step: float, room: float, lead: float = 0.0
+):
     """Note rectangles in order of preference (the first free one wins)."""
     px0, py0, px1, py1 = plot
     out: list[Rect] = []
@@ -364,8 +380,14 @@ def _candidates(horizontal: bool, plot: Rect, w: float, h: float, tgt, step: flo
         ys = [py0 + room + k * step for k in range(int(max(py1 - py0 - 2 * room - h, 0) / step) + 1)]
         if tgt:
             ys.sort(key=lambda y: abs(y + h / 2 - tgt[1]))
+        left = px0 + room
+        xs0 = [right]
+        k = 1
+        while right - k * w / 4 >= left and k < 16:  # slide the note left, towards the bars it may sit beside
+            xs0.append(right - k * w / 4)
+            k += 1
         for y in ys:
-            xs = [right]
+            xs = list(xs0)
             if tgt and tgt[0] + room + 0 < right:
                 xs.insert(0, tgt[0] + room)
             out += [(x, y, x + w, y + h) for x in xs]
@@ -420,35 +442,71 @@ def _plan(ch: Chart, pl: Placed, theme: Theme, note: str) -> NotePlan:
         plot = (edge, top, W - edge, H - edge)
     room = 0.3 * em
     maxw = min(lt.chart_note_max_w * (plot[2] - plot[0]), plot[2] - plot[0] - 2 * room)
+    area = (plot[0], plot[1], W - room, plot[3]) if horizontal and marks else plot  # may use the right margin
     hl = resolve_hl(ch, d.cats if d else [str(c) for c in ch.categories])
     hi_ = hl[0] if hl else None
     tgt = marks.target[hi_] if marks and hi_ is not None and marks.target[hi_] else None
     obstacles = [(i, r) for i, r in enumerate(marks.rects) if r] if marks else []
     margin = lt.chart_note_gap_em * em
+    lead = lt.chart_note_line_em * em * 0.6 + 1
     solid = [r for _, r in obstacles]
     solid_other = [r for i, r in obstacles if i != hi_]
+    options: list[tuple[str, tuple[float, float]]] = []
+    if tgt:
+        options.append(("end", tgt))
+    if horizontal and marks and hi_ is not None and marks.edges[hi_]:
+        top, bottom = marks.edges[hi_]
+        options += [("top", top), ("bottom", bottom)]
     chosen = None
     first = None
     fits = True
+    line_to = tgt
+    best = math.inf  # pointer length of ``chosen``
     for s, w, h, ok in _variants(note, size0, floor, maxw, note_style, theme):
+        if chosen and s < chosen[0] - lt.chart_note_shrink_pt:
+            break  # a smaller note is only worth it for a clearly nearer spot
         step = max(h / 2, 1.0)
-        for rect in _candidates(horizontal, plot, w, h, tgt, step, room):
-            if first is None:
-                first, fits = (s, rect), ok
-            if rect[2] > plot[2] - room + 1 or rect[3] > plot[3] - room + 1:
-                continue
-            if any(_hit(rect, r, margin) for r in solid):
-                continue
-            if tgt:
-                st = _start(rect, tgt)
-                if math.hypot(tgt[0] - st[0], tgt[1] - st[1]) < lt.chart_note_line_em * em * 0.5:
+        stop = False  # a pointer along the bar, or a note without bars: the first spot wins
+        for kind, aim in options or [("none", None)]:
+            for rect in _candidates(horizontal, area, w, h, aim, step, room, lead):
+                if first is None:
+                    first, fits = (s, rect), ok
+                if rect[2] > area[2] - room + 1 or rect[3] > area[3] - room + 1:
                     continue
-                if _crosses(st, tgt, solid_other):
+                if any(_hit(rect, r, margin) for r in solid):
                     continue
-            chosen = (s, rect, ok)
+                length = 0.0
+                if aim:
+                    if (
+                        horizontal
+                        and kind == "end"
+                        and not (rect[1] <= aim[1] <= rect[3] and rect[0] > aim[0])
+                    ):
+                        continue  # beside the value label, pointing along the bar
+                    if kind == "top" and not (
+                        rect[3] < aim[1] and rect[0] + room <= aim[0] <= rect[2] - room
+                    ):
+                        continue  # above the bar, the pointer drops straight onto it
+                    if kind == "bottom" and not (
+                        rect[1] > aim[1] and rect[0] + room <= aim[0] <= rect[2] - room
+                    ):
+                        continue
+                    st = _start(rect, aim)
+                    length = math.hypot(aim[0] - st[0], aim[1] - st[1])
+                    if length < lt.chart_note_line_em * em * 0.5:
+                        continue
+                    if _crosses(st, aim, solid_other):
+                        continue
+                if chosen is None or length < best - 2 * em:
+                    chosen, line_to, best = (s, rect, ok), aim, length
+                stop = kind in ("end", "none")
+                break
+            if stop:
+                break
+        if chosen and (stop or best <= 2 * em):
             break
-        if chosen:
-            break
+    if chosen is None and tgt:
+        line_to = tgt
     if chosen is None and first is not None:
         chosen = (first[0], first[1], fits)
         if marks:
@@ -484,7 +542,8 @@ def _plan(ch: Chart, pl: Placed, theme: Theme, note: str) -> NotePlan:
             style=st_note,
         )
     )
-    if tgt:
+    if line_to:
+        tgt = line_to
         a = _start(rect, tgt)
         if math.hypot(tgt[0] - a[0], tgt[1] - a[1]) > 1:
             lx, ly = pl.x + round(min(a[0], tgt[0])), pl.y + round(min(a[1], tgt[1]))
