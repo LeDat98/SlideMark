@@ -648,6 +648,20 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       called the two SlideMark decks almost identical. Deck in `bench/lengthbench/t2/slidemark-onechance/`.
       Verdict: three kinds of design prose (rules-free advice, external guide, intent paragraph) moved no score;
       the gap is in the defaults the judge names every round (same list as experiment 2), so fix those (wave 2).
+- [x] Design wave 2 (2026-10-06, merged 61cefe3): the judge-named defects fixed as token defaults, SKILL.md
+      unchanged. Lane A `layout.*`: short list grows into the body (`list_fill*`), text cards stretch to the body
+      (`cards_to_body*`), `@chevron` with short bodies is built as `@steps` (`chevron_steps`), the conclusion
+      bar attaches to its table (`bar_attach=grow`), a lone table grows its text to 22pt (`table_free*`), KPI
+      rows and `@steps` fill the body (`kpi_to_body*`, `steps_to_body*`); small-body themes only. Lane B
+      `render.*`: preset palettes without the accent, pie `labels=on` = share labels (`chart_pie_*`), bigger
+      legend / labels (`chart_legend_scale` 1.2, `chart_label_scale` 1.0), line label collisions alternate
+      (`chart_collide_em`), `chart-scale` info line (info, not warning: a brief may want both series on one
+      chart). Fresh-agent run on the 15-slide brief: 5 calls, 2 builds, 36 s, cost 73k, accepted. Blind judge
+      round 5: python-pptx 3.5, this run 3.0, wave-1 deck 2.5 (it scored 3.0 in rounds 3 and 4: noise ±0.5;
+      within one round wave 2 is +0.5 over wave 1). Deck in `bench/lengthbench/t2/slidemark-wave2/`.
+      Still named: tall cards holding one short bullet look like padding (steps, boxes); a plain list for an
+      ordered set of policies; the accent-free palette is now too single-hue to tell pie wedges / lines apart;
+      the python-pptx deck's footer + page number on every slide reads as "finished".
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or
