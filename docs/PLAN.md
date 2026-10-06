@@ -564,3 +564,8 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
   22 s5 waterfall back to a zero axis.
 - **Wave 4 B (`layout/tables.py`, new `layout/pills.py`, engine hook, importer helper):** badge-only table cells become native
   rounded pills with column-shared width and contrast ink.
+- **Wave 4 status:** chevron/gantt phrase breaks, note floor = axis label size, orphan binding only when it fits (15 s2
+  "unchange / d" fixed), number + unit bound (`2 ns`); native table pills (`table_pills`). 1892 tests.
+- **Wave 5 A (charts):** segment label size, sparse charts (≤ 3 categories), note clearance, line axes above zero.
+- **Wave 5 B (`layout/diagram.py`, `l3fill.py`, `vfill.py`, `engine.py`):** tree boxes hug content, ruled panel dead third,
+  sibling decision cards share a grown text size, aligned rules across 2x2 cards.
