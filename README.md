@@ -53,7 +53,7 @@ Windows: `slidemark preview` / `review --png` tự tìm LibreOffice trong `C:\Pr
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-06 · commit `bfcf2e3` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-06 · commit `b3e6a76` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
