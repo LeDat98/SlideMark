@@ -32,6 +32,7 @@ from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import css, measure
 from .diagram import fill_tree
+from .gantt import expand_gantt
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
 from .l3fill import (
@@ -252,7 +253,9 @@ def _role_style0(ctx: _Ctx, role: str, cover: bool = False) -> Style:
 def _class_styles(ctx: _Ctx, el, skip: tuple[str, ...] = ()) -> list[Style]:
     out: list[Style] = []
     for name in getattr(el, "classes", []):
-        if name in skip:
+        if name in skip or (
+            name == "gantt" and isinstance(el, Table)
+        ):  # the bars carry the look, not the grid
             continue
         if name == "muted" and isinstance(el, Container):  # a muted box: border + band, body keeps its ink
             out.append(ctx.theme.classes.get("muted-box") or ctx.theme.classes["muted"])
@@ -650,6 +653,23 @@ def _code_style(ctx: _Ctx, el: Code) -> Style:
     return _tighten(ctx, _styled(ctx, el, st))
 
 
+def _gantt_style(ctx: _Ctx, table: Placed) -> Style:
+    """Style of the bars of a placed ``.gantt`` table: the table text (font, size), the ``gantt`` theme class
+    (tokens ``style: gantt.*``) and the deck CSS rules that match ``.gantt``; the ink is chosen for contrast
+    on the bar fill unless one is set."""
+    t = table.style
+    st = fast_style(font=t.font, font_ea=t.font_ea, font_size=t.font_size, bold=t.bold)
+    st = st.merged(ctx.theme.classes.get("gantt") or fast_style(fill="primary"))
+    tn = ctx.css.node(table.element)
+    if tn is not None:
+        bar = css.Node(frozenset({"shape"}), frozenset({"gantt"}), "other", None, tn)
+        ctx.css._compute(bar)
+        st = st.merged(bar._own or fast_style())
+    if st.color is None:
+        st = st.merged(fast_style(color=ctx.theme.ink_on(st.fill, "bg")))
+    return st
+
+
 def _table_style(ctx: _Ctx, el: Table) -> Style:
     t = ctx.theme
     st = fast_style(
@@ -911,7 +931,7 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
                 True  # text grown by ``_table_text``: the vertical fill keeps rows <= row_max_em
             )
         ctx.emit(
-            right_align_numbers(el).model_copy(update={"attrs": attrs}),
+            (el if "gantt" in el.classes else right_align_numbers(el)).model_copy(update={"attrs": attrs}),
             Rect(rect.x, rect.y, min(rect.w, sum(cw)), min(total, rect.h) if total > rect.h else total),
             st,
             eff,
@@ -3321,6 +3341,9 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             kind = "cover" if index == 0 else "section"
     if deck.css or slide.css:
         ctx.css = css.CssIndex(deck, slide, index, kind)
+        for n in {id(n): n for n in ctx.css.nodes.values()}.values():
+            if n.kind == "table" and "gantt" in n.classes:  # `.gantt` rules style the bars, not the grid
+                n.classes = n.classes - {"gantt"}
 
     Mx, My = to_emu(theme.margin_x), to_emu(theme.margin_y)
     gap = to_emu(theme.gap)
@@ -3729,4 +3752,17 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
 
     ctx.diags += ctx.css.diagnostics()
     deck.diagnostics.extend(ctx.diags)
+    if final_ctx and any(
+        isinstance(p.element, Table) and "gantt" in p.element.classes for p in final_ctx.out
+    ):
+        final_ctx.out = expand_gantt(
+            final_ctx.out,
+            theme,
+            lambda pl: _gantt_style(ctx, pl),
+            ctx.lt.gantt_pad,
+            ctx.lt.gantt_bar,
+            lambda msg, hint: deck.diagnostics.append(
+                Diagnostic(level="warning", message=msg, slide=index + 1, rule="gantt-text", hint=hint)
+            ),
+        )
     return head + (final_ctx.out if final_ctx else []) + tail

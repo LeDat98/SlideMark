@@ -154,6 +154,28 @@ def _cell_fill(rc: RenderCtx, cell, st: Style) -> None:
         tcPr.insert(0, new)
 
 
+def _mix(a: str, b: str, k: float) -> str:
+    """``k`` x color ``a`` + (1 - k) x color ``b`` (both ``RRGGBB``), as ``#RRGGBB``."""
+    return "#" + "".join(
+        f"{round(int(a[i : i + 2], 16) * k + int(b[i : i + 2], 16) * (1 - k)):02X}" for i in (0, 2, 4)
+    )
+
+
+def _gantt_grid(tbl, t: Table, theme: Theme, border: str, fill_of: dict, nrows: int, ncols: int) -> None:
+    """Gantt tables: the vertical lines between period columns of the body are lightened (the bars carry the
+    chart); ``render.gantt_grid`` is the share of the border color that stays."""
+    k = theme.render.gantt_grid
+    for r in range(t.header_rows, nrows):
+        for c in range(1, ncols):
+            fill = fill_of.get((r, c), "bg")
+            light = _mix(hex6(theme, border), hex6(theme, fill), k)
+            tcPr = tbl.cell(r, c)._tc.get_or_add_tcPr()
+            if c > 1:
+                _cell_side(tcPr, "left", (0.5, "solid", light), theme)
+            if c < ncols - 1:
+                _cell_side(tcPr, "right", (0.5, "solid", light), theme)
+
+
 def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     t: Table = pl.element  # type: ignore[assignment]
     theme = rc.theme
@@ -209,6 +231,8 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             )
             if fill.lower().startswith(("linear", "radial")):
                 _cell_fill(rc, cell, Style(fill=fill))
+    if "gantt" in t.classes and not t_border and 0 <= theme.render.gantt_grid < 1:
+        _gantt_grid(tbl, t, theme, border, fill_of, nrows, ncols)
     grouped = t.header_rows > 0 and any(ct.colspan > 1 for r, _c, ct in anchors if r < t.header_rows)
     for r, c, ct in anchors:
         cell = tbl.cell(r, c)

@@ -92,6 +92,7 @@ class Item:
     sid: int = 0  # shape id in the slide (what ``a:stCxn``/``a:endCxn`` point at)
     col_w: list[int] = field(default_factory=list)  # table: column widths (EMU)
     row_h: list[int] = field(default_factory=list)  # table: row heights (EMU)
+    gantt: bool = False  # table: bars (filled shapes over body cells) were folded into it (`{.gantt}`)
     cropped: bool = False  # image: a:srcRect crop (``fit=cover``)
     latex: str | None = None  # math: the equation as LaTeX (``` math fence)
     missing: tuple[str, str] | None = None  # image: a "[image: label]" placeholder of a file that was absent
