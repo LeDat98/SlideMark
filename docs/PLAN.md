@@ -546,3 +546,10 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
 - **Wave 2 B (`layout/engine.py`, `l3fill.py`, `vfill.py`, `tables.py`):** Latin/default-theme fill: lone table grows and reaches
   the footnote gutter (22 s6), cards over a table hug content and the table takes the height (22 s2), dark-pitch cards
   top-anchored and grown (21 s2).
+- **Wave 2 status:** CJK near-full lines squeezed with a render-only viewer model (lone 円 fixed; ≥ 3.4em tails remain), bar-chart
+  note pointer lands on the bar, Latin tables wrap-grow and fill (22 s6 14 → 19.7pt), cards over tables hug content, sparse
+  dark cards top-anchored (21 s2). 1859 tests.
+- **Wave 3 A (`layout/measure.py`, `render/text.py`, `importer/`):** phrase-aware Japanese line breaks (年|齢, 費|用) via soft
+  breaks at phrase boundaries when the line count is unchanged; importer strips them.
+- **Wave 3 B (`layout/engine.py`, `l3fill.py`, `vfill.py`, `tables.py`, `grid.py`):** sparse brand/CSS slides (13 s2, 17 s2/s3,
+  14 s1, 21 s2, 22 s2) grow un-sized text and balance leftover bands; explicit CSS sizes never change.
