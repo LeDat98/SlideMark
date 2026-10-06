@@ -132,7 +132,8 @@ def test_hl_multi_series_outlines_every_series(tmp_path):
         dpt = ser._element.find(qn("c:dPt"))
         assert dpt.find(qn("c:idx")).get("val") == "2"
         assert dpt.find(".//" + qn("a:ln") + "//" + qn("a:srgbClr")).get("val") == accent_hex()
-        assert dpt.find(qn("c:spPr")).find(qn("a:solidFill")) is None  # keeps the series fill
+        fill = dpt.find(qn("c:spPr")).find(qn("a:solidFill") + "/" + qn("a:srgbClr")).get("val")
+        assert fill != accent_hex()  # keeps its series color (the outline carries the emphasis)
 
 
 def test_hl_line_marker_and_pie_slice(tmp_path):

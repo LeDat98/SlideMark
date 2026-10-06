@@ -21,7 +21,9 @@ def hl_color(theme: Theme) -> RGBColor:
     return RGBColor.from_string(hex6(theme, theme.render.chart_hl))
 
 
-def apply_hl(ch: Chart, chart, cats: list[str], real_series: int, wf: dict | None, theme: Theme) -> list[str]:
+def apply_hl(
+    ch: Chart, chart, cats: list[str], real_series: int, wf: dict | None, theme: Theme, pal: list[str]
+) -> list[str]:
     """Emphasise the ``hl=`` categories; returns their names. Never raises: a missing point is skipped."""
     idx = chartnote.resolve_hl(ch, cats)
     if not idx:
@@ -55,6 +57,8 @@ def apply_hl(ch: Chart, chart, cats: list[str], real_series: int, wf: dict | Non
                             pt.format.fill.solid()
                             pt.format.fill.fore_color.rgb = color
                         else:  # several series keep their colors: an outline marks the category
+                            pt.format.fill.solid()  # (a point without a fill falls back to the auto color)
+                            pt.format.fill.fore_color.rgb = RGBColor.from_string(pal[si % len(pal)])
                             pt.format.line.color.rgb = color
                             pt.format.line.width = Pt(rt.chart_hl_line)
                 except (IndexError, KeyError, AttributeError, ValueError):
