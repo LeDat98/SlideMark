@@ -76,7 +76,9 @@ def test_decision_row_is_top_anchored_tall_and_spread(name, n):
 
 @pytest.mark.parametrize(("name", "n"), [("16-jp-strategy.md", 3), ("11-jp-consulting.md", 3)])
 def test_panel_beside_chart_spreads_and_anchors_its_note(name, n):
-    placed, _, _ = lay(name, n)
+    placed, _, _ = lay(
+        name, n, panel_to_visual=False
+    )  # (the default spans the chart: test_layout_fill_policy)
     off, _, _ = lay(name, n, l3_fill=False)
     (panel,) = cards(placed)
     chart = next(p for p in placed if isinstance(p.element, Chart))

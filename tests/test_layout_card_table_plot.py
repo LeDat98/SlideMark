@@ -39,7 +39,7 @@ def test_card_row_explicit_height_wins():
 
 @pytest.mark.parametrize(("name", "n"), [("16-jp-strategy.md", 3), ("11-jp-consulting.md", 3)])
 def test_panel_top_meets_plot_area(name, n):
-    placed, _, theme = lay(name, n)
+    placed, _, theme = lay(name, n, panel_top_plot=True)
     ch = next(p for p in placed if isinstance(p.element, Chart))
     panel = next(p for p in placed if isinstance(p.element, Container))
     title_pt = ch.style.font_size * ch.font_scale * theme.render.chart_title_scale
@@ -48,6 +48,14 @@ def test_panel_top_meets_plot_area(name, n):
     assert panel.y + panel.h <= ch.y + ch.h
     head = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "heading")
     assert head.y >= panel.y - 2
+
+
+@pytest.mark.parametrize(("name", "n"), [("16-jp-strategy.md", 3), ("11-jp-consulting.md", 3)])
+def test_panel_top_defaults_to_the_chart_top(name, n):
+    placed, _, _ = lay(name, n)
+    ch = next(p for p in placed if isinstance(p.element, Chart))
+    panel = next(p for p in placed if isinstance(p.element, Container))
+    assert panel.y == ch.y
 
 
 def test_panel_without_chart_title_keeps_top():

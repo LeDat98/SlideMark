@@ -586,7 +586,7 @@ def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: L
 def _rule(card: Placed, pad: int, y: int, style: Style) -> Placed:
     """A thin horizontal rule inside ``card`` (native line shape), inset by the card padding."""
     return Placed(
-        element=Shape(shape="line", attrs={"head": "none", "flip_h": False, "flip_v": False}),
+        element=Shape(id="Rule", shape="line", attrs={"head": "none", "flip_h": False, "flip_v": False}),
         x=card.x + pad,
         y=y,
         w=max(card.w - 2 * pad, 0),
@@ -686,6 +686,55 @@ def _align_plot(
     return out
 
 
+def _panel_span(c: Placed, visuals: list[Placed], lt: LayoutTokens, scale: float) -> tuple[int, int] | None:
+    """``(top, bottom)`` a panel takes beside a visual that spans it: the top meets the plot area of a titled
+    chart (the visual's top otherwise), the bottom is the visual's bottom."""
+    side = [
+        v
+        for v in visuals
+        if (v.x + v.w <= c.x + 2 or c.x + c.w <= v.x + 2) and v.y <= c.y + 2 and v.y + v.h >= c.y + c.h - 2
+    ]
+    if not side:
+        return None
+    v = side[0]
+    top = v.y
+    if lt.panel_top_plot and isinstance(v.element, Chart) and v.element.title and lt.chart_plot_top_em > 0:
+        title_pt = (v.style.font_size or 10.5) * v.font_scale * scale
+        top = max(top, round(v.y + lt.chart_plot_top_em * title_pt * EMU_PER_PT))
+    return (top, v.y + v.h) if v.y + v.h - top > c.h * 0.5 else None
+
+
+def _fill_panel_span(
+    c: Placed, inner: list[Placed], lt: LayoutTokens, top: int, bottom: int
+) -> tuple[dict[int, Placed], list[Placed]] | None:
+    """A panel stretched over ``top..bottom`` (the visual beside it): the text grows first, the gaps spread
+    (ruled list when the panel stays hollow). ``None`` when the content would fill less than
+    ``card_hollow_fill`` of the span: the panel then ends at its content (``_fill_panel``)."""
+    r = _fill_card(c, inner, top, bottom, lt)
+    if r is None:
+        return None
+    full = bottom - top
+    s_top = _max_step(c, inner, lt)
+    k = 1
+    while s_top > 1.0 + 1e-6 and r[1] > lt.l3_tail_max * full:
+        s = min(1.0 + k * lt.l3_grow_step, s_top)
+        nxt = _fill_card(c, inner, top, bottom, lt, s)
+        if nxt is None:
+            break
+        r = nxt
+        k += 1
+        if s >= s_top:
+            break
+    notes = sum(p.h for p in inner if p.element.role != "heading" and _is_note(p))
+    if (r[2] + notes) / max(full, 1) < lt.card_hollow_fill:  # text + trailing note vs the span
+        return None
+    res = dict(r[0])
+    rules: list[Placed] = []
+    if lt.card_spread_fill > 0 and _card_share(res, c, inner) < lt.card_spread_fill:
+        rules = _distribute_row(res, [c], {id(c): inner}, lt)
+    return res, rules
+
+
 def _fill_panels(
     out: list[Placed], body: Rect, lt: LayoutTokens, consulting: bool, title_scale: float = 1.2
 ) -> list[Placed]:
@@ -697,14 +746,23 @@ def _fill_panels(
     res: dict[int, Placed] = {}
     visuals = [p for p in items if isinstance(p.element, (Chart, Image, Media))]
     visual_h = max(p.h for p in visuals)
+    panel_rules: list[Placed] = []
     for c in (p for p in items if isinstance(p.element, Container)):
         inner = _inner_texts(c, items)
         if inner is None or c.h < visual_h * 0.9 or _fill_share(c, inner) >= lt.panel_fill_min:
             continue
+        if consulting and lt.panel_to_visual:
+            span = _panel_span(c, visuals, lt, title_scale)
+            if span is not None:
+                got = _fill_panel_span(c, inner, lt, *span)
+                if got is not None:
+                    res.update(got[0])
+                    panel_rules += got[1]
+                    continue
         r = _fill_panel(c, inner, lt, consulting)
         if r is not None:
             res.update(_align_plot(c, r, items, visuals, lt, title_scale) if consulting else r)
-    rules = _spread_stack(items, visuals, res, lt)
+    rules = panel_rules + _spread_stack(items, visuals, res, lt)
     return _apply(out, res) + rules if res or rules else out
 
 
