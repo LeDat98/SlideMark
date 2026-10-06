@@ -387,7 +387,7 @@ inside the wedge, `chart_pie_label_pos`; a wedge under `chart_pie_label_min` of 
 palette (`palette`) holds no accent colour in the built-in presets: `accent` is reserved for `hl=`. On a pie, `labels=on`
 shows each share once (`36%`), also when the values already add up to 100; `fmt=` keeps the raw values instead. On a
 line chart, labels of two series closer than `render.chart_collide_em` label heights alternate above / below the point.
-A series under `render.chart_scale_ratio` (10%) of another on the same axis (sales 1280 next to profit 96) warns
+A series under `render.chart_scale_ratio` (10%) of another on the same axis (sales 1280 next to profit 96) gets an info line
 `chart-scale`: split it into two charts or state the ratio as a KPI; the chart itself is never changed.
 
 Whole numbers written with thousands separators (`1,240`, `2.100` with `lang: vi`) keep them: labels and the

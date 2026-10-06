@@ -1,5 +1,6 @@
 """Chart defaults of design wave 2: accent-free palettes, pie share labels, legend size, line label
-collisions and the `chart-scale` warning. Numbers are tokens; the .pptx is reopened."""
+collisions and the `chart-scale` info line (info, not warning: it must not cost an agent a rebuild).
+Numbers are tokens; the .pptx is reopened."""
 
 from __future__ import annotations
 

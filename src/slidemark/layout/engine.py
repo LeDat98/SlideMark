@@ -4048,7 +4048,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             if isinstance(p.element, Chart) and (warn := scale_warning(p.element, theme)):
                 deck.diagnostics.append(
                     Diagnostic(
-                        level="warning", message=warn[0], slide=index + 1, rule="chart-scale", hint=warn[1]
+                        level="info", message=warn[0], slide=index + 1, rule="chart-scale", hint=warn[1]
                     )
                 )
     if final_ctx and any(

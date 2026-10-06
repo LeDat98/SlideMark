@@ -510,7 +510,7 @@ class RenderTokens(BaseModel):
     chart_collide_em: float = 1.3  # line chart: labels of two series closer than this many label heights (at
     # the plot's scale) alternate above / below the point, the lower series going below (0 = off)
     chart_plot_share: float = 0.7  # ... assuming the plot takes this share of the chart height
-    chart_scale_ratio: float = 0.1  # `chart-scale` warning: a column / bar series whose max is below this
+    chart_scale_ratio: float = 0.1  # `chart-scale` info line: a column / bar series whose max is below this
     # share of another series' max is crushed (0 = off)
     ink_dark: str = "#1F2937"  # text on light fills when the color is chosen for contrast (badges, labels)
     ink_light: str = "#FFFFFF"  # text on dark fills

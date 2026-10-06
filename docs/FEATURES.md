@@ -56,7 +56,7 @@ step does not apply (no visual risk to lint, or no syntax).
 | Pie/doughnut per-point label ink | - | - | x | x | x | x | - | - |
 | Orphan control (no-break space between the last two short words); `.muted` box = muted band/border, normal body ink | x | x | x | x | x | x | x | - |
 | `waterfall` chart (bridge, `=` totals, native stacked columns) | x | x | x | x | x | x | x | - |
-| Chart defaults (design wave 2): accent-free preset palettes, pie `labels=on` = share on the wedge, larger legend / labels (`render.chart_legend_scale`, `chart_pie_label_*`), line label collision (`chart_collide_em`), `chart-scale` warning (`chart_scale_ratio`) | x | x | x | x | x | x | x | - |
+| Chart defaults (design wave 2): accent-free preset palettes, pie `labels=on` = share on the wedge, larger legend / labels (`render.chart_legend_scale`, `chart_pie_label_*`), line label collision (`chart_collide_em`), `chart-scale` info line (`chart_scale_ratio`; info, not a warning, so a brief that wants both series on one chart still builds with 0 warnings) | x | x | x | x | x | x | x | - |
 | Chart takeaway: `hl=` emphasised points + `note=` callout with pointer (pinned plot area) | x | x | x | x | x | x | x | x |
 | Table cell badges as native rounded pills (`layout.table_pills`, `pill` class, importer folds `Pill` back) | x | - | x | x | x | x | x | - |
 | `{.gantt}` tables (native bars over period cells, `gantt` class) | x | x | x | x | x | x | x | - |
