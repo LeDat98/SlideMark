@@ -2,20 +2,6 @@
 
 Newest at the bottom. ≤ 10 lines per day: done · metrics · problems · next.
 
-## 2026-10-05 (run 6, chained manual, agent cost + L3, 21:03–00:05 UTC)
-Run goal:
-- [x] AC full matrix on fresh brief set 2: python-pptx 9 + skill-only 27 + skill-open 27, all 63 accepted
-- [ ] AC4 ≤ 35%: 47% (≥ 5 slides 41%); 3-call floor ≈ 12k units (re-reads + SKILL.md) → owner decision (AGENT_COST.md)
-- [x] 5-step chevrons: headings wrap to two lines at spaces (VI 17 → 23.6pt, katakana 12.6 → 15pt); JA chevrons never break words
-- [x] Sparse lead/footnote growth re-landed without an extra pass; layout 38 → 22 ms/slide (pydantic-free styles)
-- [x] Contrast lint for table cells and chart text (shared Theme resolvers, paste-ready hints)
-- [ ] L3 consulting-grade: top-anchored rows, auto-fit cards/panels, takeaway bars; designer 3.5 (16) / 3.0 (11), still "no"
-- Done: 5 waves, 7 Sonnet coding agents + 65 eval agents + 3 review agents. AC2, AC3, AC5, AC6 pass (median 3 calls, p90 4, 0 images, 0 docs lookups, output 21%, blind review 1 defect / 54 slides).
-- Also: chart labels keep thousands separators (#,##0), bar/column/area axes start at 0, previews render decimal-comma decks in their locale, `look:` says where the accent shows; post-fix check 4/4 runs at 3 calls, 0 images (were up to 6 calls with looks).
-- Metrics: tests 1576 passed (1518 at start); q3 155 tokens = 30% of python-pptx, markup 13–27%, design paths 35/38% (all unchanged).
-- Problems: setup needed `.[dev,html]` (8 HTML tests failed without Playwright); one GitHub 500 on push (retried).
-- Next: AC4 gate decision (owner), L3 card row above a conclusion bar, decision slides (content-bound empty band).
-
 ## 2026-10-04 (day 0, manual session)
 - Done: proposal, 7-day plan, targets L1–L7, IR contract, theme/units, syntax v0, bench v0, project notes.
 - Metrics: syntax tokens compact 158 / python-pptx 528 (30%), o200k proxy.
@@ -102,3 +88,27 @@ Run goal (`docs/AGENT_COST.md`; DF1–DF6 already passed):
 - Metrics: tests 1518 passed (1423 at start); q3 155 tokens = 30% of python-pptx, markup vs HTML 13–27%, design paths 35/38% (all unchanged); layout 38 ms/slide in the gate test after the perf fix.
 - Problems: two red pushes (a `;`/`tail` chain hid pytest failures, fixed in minutes); layout time 31 → 38 ms/slide, the 50 ms gate test went flaky → lead re-layout reverted, perf package.
 - Next: AC full matrix (27 runs), cost ≤ 35% (python-pptx arm needs only 4–6 calls), 5-step chevron text size, perf margin.
+
+## 2026-10-05 (run 6, chained manual, agent cost + L3, 21:03–00:05 UTC)
+Run goal:
+- [x] AC full matrix on fresh brief set 2: python-pptx 9 + skill-only 27 + skill-open 27, all 63 accepted
+- [ ] AC4 ≤ 35%: 47% (≥ 5 slides 41%); 3-call floor ≈ 12k units (re-reads + SKILL.md) → owner decision (AGENT_COST.md)
+- [x] 5-step chevrons: headings wrap to two lines at spaces (VI 17 → 23.6pt, katakana 12.6 → 15pt); JA chevrons never break words
+- [x] Sparse lead/footnote growth re-landed without an extra pass; layout 38 → 22 ms/slide (pydantic-free styles)
+- [x] Contrast lint for table cells and chart text (shared Theme resolvers, paste-ready hints)
+- [ ] L3 consulting-grade: top-anchored rows, auto-fit cards/panels, takeaway bars; designer 3.5 (16) / 3.0 (11), still "no"
+- Done: 5 waves, 7 Sonnet coding agents + 65 eval agents + 3 review agents. AC2, AC3, AC5, AC6 pass (median 3 calls, p90 4, 0 images, 0 docs lookups, output 21%, blind review 1 defect / 54 slides).
+- Also: chart labels keep thousands separators (#,##0), bar/column/area axes start at 0, previews render decimal-comma decks in their locale, `look:` says where the accent shows; post-fix check 4/4 runs at 3 calls, 0 images (were up to 6 calls with looks).
+- Metrics: tests 1576 passed (1518 at start); q3 155 tokens = 30% of python-pptx, markup 13–27%, design paths 35/38% (all unchanged).
+- Problems: setup needed `.[dev,html]` (8 HTML tests failed without Playwright); one GitHub 500 on push (retried).
+- Next: AC4 gate decision (owner), L3 card row above a conclusion bar, decision slides (content-bound empty band).
+
+## 2026-10-06 (run 7, chained manual, L3 consulting-grade, 00:23 UTC–)
+Run goal:
+- [ ] Card rows / 2x2 grids reach the conclusion bar (no empty bottom 40%), decision slides 11 s9 / 16 s10, risk 11 s8
+- [ ] Conclusion bar keeps a gap above the footnote
+- [ ] Org chart / issue tree fill the body (bigger boxes + text), 11 s6, 16 s5
+- [ ] Roadmap table: compact header row, two-row merged header (year over halves), 16 s9
+- [ ] Lone chevron rows: text grows inside tall chevrons
+- [ ] Independent designer re-score of examples/11 + 16; L3 gate verdict
+- [ ] AC (gate text unchanged): shrink SKILL.md / output tokens without losing first-pass success

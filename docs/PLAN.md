@@ -423,3 +423,14 @@ Goal: run-5 leftovers (AC matrix, AC4, chevrons, sparse lead growth + perf, tabl
       empty bottom band; re-score after wave 5 (summary cards above a KPI table, panel top vs chart plot top)
 - [ ] Lone chevron rows are tall with modest text after the JA word-break fix (text could grow inside the chevron)
 - [ ] Owner: real PowerPoint check (gradients, shadows, customXml, media, per-point dLbl); PyPI token; L7 token gate; AC4 gate wording
+
+## Run 2026-10-06 (run 7, chained, 00:23 UTC) work packages
+Goal: L3 consulting-grade per the run-6 designer review; AC4 gate text unchanged (owner), cut SKILL.md/output tokens.
+- **Wave 1 B1 (`layout/vfill.py`, `layout/l3fill.py`, `layout/engine.py`):** card rows and 2x2 grids above a conclusion
+  bar reach it (grow text up to the sparse step, then stretch the row so its bottom sits one gap above the bar; no
+  centered floating block); conclusion bar ≥ `layout.conclusion_foot_gap` above the footnote; lone chevron rows grow
+  their text to fill the chevron interior (no word breaks).
+- **Wave 1 B2 (`layout/diagram.py`, `layout/tables.py`):** org charts / issue trees scale up to the body (box size, text
+  step, level gaps, top-anchored); table header rows stay compact (body rows take the slack); multi-row headers with
+  `<`/`^` merges render as merged, centered header cells (roadmap: year over halves).
+- **Orchestrator:** SKILL.md cut (≤ 2,700 tokens, same patterns), examples/16 s9 two-row roadmap header, designer re-score.
