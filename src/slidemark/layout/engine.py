@@ -475,6 +475,52 @@ def _css_width(ctx: _Ctx, el, r: Rect, inherit: Style) -> Rect:
     return Rect(r.x + dx, r.y, w, r.h)
 
 
+def _cover_explicit(ctx: _Ctx, *els) -> bool:
+    """The author styled the cover text (``{size=}``, CSS rule): the automatic cover composition stays off."""
+    for el in els:
+        if el is None:
+            continue
+        if _explicit_size(ctx, el) or (ctx.css.active and ctx.css.own(el) != fast_style()):
+            return True
+    return False
+
+
+def _grow_cover_title(ctx: _Ctx, el: Text, st: Style, rect: Rect, eff: float) -> float:
+    """Largest scale (up to the ``cover_title_max_pt`` token) at which the title keeps its line count, breaks
+    no word and fits its area: the title fills the band width instead of sitting small in a corner."""
+    size = st.font_size or 44
+    top = ctx.lt.cover_title_max_pt / size
+    if top <= eff + 1e-6 or eff < 1.0 - 1e-6:  # autofit already shrank it: leave it
+        return eff
+    huge = 10**9
+    ph, _pv = css.inset_hv(st)
+    avail = rect.w - ph
+
+    def lines(scale: float, width: int) -> float:
+        return _text_need(ctx, el, st, width, scale) / max(_text_need(ctx, el, st, huge, scale), 1)
+
+    def breaks_word(scale: float) -> bool:
+        pt = size * scale
+        for par in el.paragraphs:
+            for run in par.runs:
+                for w in run.text.split():
+                    if not measure.has_cjk(w) and measure.text_em(w, bold=True) * pt > avail / EMU_PER_PT:
+                        return True
+        return False
+
+    base = lines(eff, rect.w)
+    s = top
+    while s > eff + 1e-6:
+        if (
+            lines(s, rect.w) <= base + 0.05
+            and _text_need(ctx, el, st, rect.w, s) <= rect.h * _TOL
+            and not breaks_word(s)
+        ):
+            return s
+        s -= 0.05
+    return eff
+
+
 def _fit(ctx: _Ctx, need_fn, avail: int, base_size: float) -> float:
     """Smallest-effort local autofit scale for a standalone element (title, lead, ...)."""
     for s in _SCALES:
@@ -3238,6 +3284,12 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     if kind in ("cover", "section"):
         band_h = round(H * 0.34)
         by = round(H * 0.24)
+        sub = slide.subtitle or slide.lead
+        composed = kind == "cover" and ctx.lt.cover_title_y > 0 and not _cover_explicit(ctx, slide.title, sub)
+        if composed:
+            by = (
+                round(H * ctx.lt.cover_title_y) - band_h // 2
+            )  # the band (or its title block) is centred here
         if theme.title_band:
             put(
                 head,
@@ -3245,22 +3297,38 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 Rect(0, by, W, band_h),
                 fast_style(fill=theme.title_band, line=None),
             )
+        t_st = s_st = None
+        t_r = s_r = None
+        t_fs = s_fs = 1.0
         if slide.title:
-            st = _role_style(ctx, "title", cover=True)
-            st = st.merged(fast_style(valign="bottom"))
+            t_st = _role_style(ctx, "title", cover=True)
+            t_st = t_st.merged(fast_style(valign="bottom"))
             if theme.title_band:
-                st = st.merged(fast_style(color=theme.title_band_color))
-            r = Rect(Mx, by, inner_w, round(band_h * 0.65))
-            st = _styled(ctx, slide.title, st, classes=False)
-            put(head, slide.title, r, st, fit_text(slide.title, r, st))
-        sub = slide.subtitle or slide.lead
+                t_st = t_st.merged(fast_style(color=theme.title_band_color))
+            t_r = Rect(Mx, by, inner_w, round(band_h * 0.65))
+            t_st = _styled(ctx, slide.title, t_st, classes=False)
+            t_fs = fit_text(slide.title, t_r, t_st)
+            if composed:
+                t_fs = _grow_cover_title(ctx, slide.title, t_st, t_r, t_fs)
         if sub:
-            st = _role_style(ctx, "subtitle", cover=True)
+            s_st = _role_style(ctx, "subtitle", cover=True)
             if theme.title_band:
-                st = st.merged(fast_style(color=theme.title_band_color))
-            r = Rect(Mx, by + round(band_h * 0.68), inner_w, round(band_h * 0.3))
-            st = _styled(ctx, sub, st.merged(fast_style(valign="top")), classes=False)
-            put(head, sub, r, st, fit_text(sub, r, st))
+                s_st = s_st.merged(fast_style(color=theme.title_band_color))
+            s_r = Rect(Mx, by + round(band_h * 0.68), inner_w, round(band_h * 0.3))
+            s_st = _styled(ctx, sub, s_st.merged(fast_style(valign="top")), classes=False)
+            s_fs = fit_text(sub, s_r, s_st)
+        if composed and t_r is not None:  # title + subtitle: one block, centred on the token line
+            th = round(_text_need(ctx, slide.title, t_st, t_r.w, t_fs))
+            sh = round(_text_need(ctx, sub, s_st, s_r.w, s_fs)) if s_r is not None else 0
+            sp = sg if sh else 0
+            top = round(H * ctx.lt.cover_title_y) - (th + sp + sh) // 2
+            t_r = Rect(Mx, top, inner_w, th)
+            if s_r is not None:
+                s_r = Rect(Mx, top + th + sp, inner_w, sh)
+        if t_r is not None:
+            put(head, slide.title, t_r, t_st, t_fs)
+        if s_r is not None:
+            put(head, sub, s_r, s_st, s_fs)
         body = Rect(Mx, by + band_h + sg, inner_w, H - (by + band_h + sg) - My) if slide.elements else None
         y_top = 0
     else:
@@ -3388,7 +3456,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 fy0 += h
             foot_air = max(sg // 2, _emu(ctx.lt.footnote_gap)) if _has_chart(slide.elements) else sg // 2
             if slide.conclusion is not None and slide.conclusion.paragraphs:
-                foot_air = max(foot_air, _emu(ctx.lt.conclusion_foot_gap))  # bar and footnote never touch
+                foot_air = max(foot_air, _emu(ctx.lt.conclusion_foot_gap), round(gap * ctx.lt.conclusion_gap))
             bottom = bottom - sum(hs) - foot_air
         if slide.conclusion is not None and slide.conclusion.paragraphs:
             c = slide.conclusion
@@ -3397,7 +3465,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             h = min(h, round(H * ctx.lt.footnote_max))
             eff = fit_text(c, Rect(0, 0, inner_w, h), st)
             put(tail, c, Rect(Mx, bottom - h, inner_w, h), st, eff)
-            bottom = bottom - h - sg
+            bottom = bottom - h - max(sg, round(gap * ctx.lt.conclusion_gap))  # one card gutter above the bar
         body = Rect(Mx, y_top, inner_w, bottom - y_top)
         if kind == "blank":
             body = Rect(Mx, My, inner_w, bottom - My)

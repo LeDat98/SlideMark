@@ -182,6 +182,15 @@ class LayoutTokens(BaseModel):
     sparse_max_pt: float = 20  # ... but body text never beyond this size (pt)
     sparse_para_gap: float = 0.6  # paragraph gap (em) of a card at the sparse step
     callout_pad_min: Length = "6pt"  # a callout / note box has at least this padding on every side
+    cover_title_y: float = (
+        0.42  # cover: the title (+ subtitle) block is centred on this share of the slide height (0 = off)
+    )
+    cover_title_max_pt: float = (
+        60  # ... and the title grows to fill its area up to this size (pt), never wrapping more
+    )
+    conclusion_gap: float = (
+        1.0  # air between the body (cards) and the conclusion bar, in card gutters (theme gap)
+    )
     conclusion_foot_gap: Length = "0.12in"  # air between a conclusion bar and the footnote line under it
     footnote_gap: Length = "0.14in"  # min air between a chart (legend included) and the footnote band
     body_size_unify: bool = True  # table text on a slide with boxes is never smaller than the box body text

@@ -28,7 +28,7 @@ def test_hollow_cards_spread_to_the_bottom(name, n):
     for (c, body), (c0, b0) in zip(pairs, off, strict=True):
         tail = c.y + c.h - (body.y + engine._text_h(body))
         tail0 = c0.y + c0.h - (b0.y + engine._text_h(b0))
-        assert tail <= 0.75 * tail0 + 1  # the dead lower band shrinks (gaps capped, list starts lower)
+        assert tail <= 0.95 * tail0 + 1  # the dead lower band shrinks (capped equal gaps, list top-anchored)
     assert len({body.y for _, body in pairs}) == 1  # first items of siblings share one y
 
 
@@ -40,7 +40,7 @@ def test_spread_off_restores_top_packed():
     assert b1.element.attrs["para_gap"] > b0.element.attrs["para_gap"]
 
 
-def test_capped_gap_centres_the_list():
+def test_capped_gap_top_anchors_the_list():
     placed, _, _ = lay("16-jp-strategy.md", 10, card_spread_gap_max=2.0)
     pairs = _body_cards(placed)
     assert len({body.y for _, body in pairs}) == 1
@@ -49,7 +49,8 @@ def test_capped_gap_centres_the_list():
     for (_, body), (_, b0) in zip(pairs, offs, strict=True):
         assert body.element.attrs["para_gap"] <= max(2.0, b0.element.attrs["para_gap"]) + 1e-6
     b_off = offs[0][1]
-    assert pairs[0][1].y > b_off.y  # air above the first item: centred, not top-packed
+    assert all(abs(body.y - b0.y) <= 1 for (_, body), (_, b0) in zip(pairs, offs, strict=True))
+    assert pairs[0][1].y == b_off.y  # first item stays at the top padding: no air above it
 
 
 def test_unstretched_and_dense_slides_unchanged():

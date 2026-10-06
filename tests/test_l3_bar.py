@@ -30,9 +30,9 @@ def _bar(placed):
 def test_cards_stretch_down_to_one_gap_above_the_bar(name, n):
     placed, _, theme = lay(name, n)
     cs, bar, lead = cards(placed), _bar(placed), role(placed, "lead")
-    gap = to_emu(theme.gap) // 2
+    gap = to_emu(theme.gap)
     last = max(c.y + c.h for c in cs)
-    assert 0 <= bar.y - last <= gap + 2  # one standard gap, never into the bar
+    assert abs(bar.y - last - gap) <= 12700  # one full card gutter (the gap between siblings), within 1pt
     if lead:
         assert min(c.y for c in cs) - (lead[0].y + lead[0].h) <= 0.3 * EMU_IN  # top-anchored under the lead
     rows: dict[int, set[int]] = {}
@@ -93,9 +93,10 @@ def test_stretched_cards_keep_header_text_and_are_not_hollow(name, n):
 def test_bar_keeps_air_above_the_footnote(name, n):
     placed, _, theme = lay(name, n)
     bar, foot = _bar(placed), role(placed, "footnote")[0]
+    assert bar.y + bar.h + to_emu(theme.gap) <= foot.y + 2  # at least one card gutter
     assert bar.y + bar.h + to_emu(theme.layout.conclusion_foot_gap) <= foot.y + 2
-    tight, _, _ = lay(name, n, conclusion_foot_gap="0in")
-    assert foot.y - (_bar(tight).y + _bar(tight).h) < to_emu(theme.layout.conclusion_foot_gap)  # the old 4px
+    tight, _, _ = lay(name, n, conclusion_foot_gap="0in", conclusion_gap=0.0)
+    assert foot.y - (_bar(tight).y + _bar(tight).h) < to_emu(theme.gap)
 
 
 def test_hollow_slide_keeps_hugging_cards():  # 01-basics slide 3: one short bullet per card
