@@ -98,6 +98,30 @@ def neg_axis(kind: str, series_values: list[list], rt: RenderTokens) -> tuple[fl
     return fallback
 
 
+BAR_KINDS = ("column", "bar", "stacked-column", "stacked-bar")
+
+
+def axis_shown(opts: dict, kind: str, ncat: int, labels_on: bool, rt: RenderTokens) -> bool:
+    """Whether the value axis (and its gridlines) is drawn: ``axis=on`` / ``off`` decide, else a bar chart
+    whose labels carry the numbers drops it when it has few categories (``chart_axis_off_cats``)."""
+    v = str(opts.get("axis", "auto")).strip().lower()
+    if v in ("off", "false", "no", "0"):
+        return False
+    if v in ("on", "true", "yes", "1"):
+        return True
+    return not (labels_on and kind in BAR_KINDS and 0 < ncat <= rt.chart_axis_off_cats)
+
+
+def label_pt(kind: str, ncat: int, size: float, rt: RenderTokens) -> float:
+    """Data label size (pt) of a chart whose text is ``size`` pt: bigger inside stacked segments (never below
+    the chart text) and on a sparse bar chart, else ``chart_label_scale``."""
+    if kind.startswith("stacked"):
+        return size * max(rt.chart_seg_label_scale, 1.0)
+    if kind in ("bar", "column") and ncat <= rt.chart_gap_few_cats:
+        return size * rt.chart_label_scale_few
+    return size * rt.chart_label_scale
+
+
 ZERO_BASE = ("column", "bar", "stacked-column", "stacked-bar", "area")
 
 
@@ -110,12 +134,19 @@ def resolve_axis(
     wf_axis: tuple[float, float, float] | None,
     all_nonneg: bool,
     wf_top: float | None = None,
+    ncat: int | None = None,
+    tight: bool = False,
 ) -> tuple[float | None, float | None, float | None]:
     """(min, max, major unit) the renderer sets on the value axis; ``None`` leaves the auto value.
 
+    ``tight``: the axis is hidden, so the max hugs the data (no nice round-up).
     ``lo`` / ``hi`` are the author's ``min`` / ``max``; ``wf_axis`` the waterfall's own axis (None otherwise).
     """
     unit: float | None = None
+    if ncat is not None and ncat <= rt.chart_gap_few_cats:  # a sparse chart needs fewer gridlines
+        rt = rt.model_copy(
+            update={"chart_axis_lines_min": min(rt.chart_axis_lines_min, rt.chart_axis_lines_min_few)}
+        )
     if lo is not None and lo > 0 and hi is None:  # `min=100`: nice steps over the visible span
         top = wf_top if wf_axis else data_top(kind, series_values)
         above = axis_from(lo, top, rt) if top else None
@@ -140,9 +171,11 @@ def resolve_axis(
         and kind in ("bar", "column", "stacked-column", "stacked-bar", "area")
         and lo in (None, 0.0)
     ):
-        auto = auto_axis(kind, series_values, rt)
+        top = data_top(kind, series_values) if tight else None
+        auto = (top * (1 + rt.chart_axis_headroom), 0.0) if top else auto_axis(kind, series_values, rt)
         if auto:  # LibreOffice / PowerPoint round the auto max far up (117 -> 140)
             hi, unit = auto
+            unit = unit or None
     return lo, hi, unit
 
 
@@ -154,7 +187,7 @@ def line_axis(series_values: list[list], rt: RenderTokens) -> tuple[float, float
     if not flat:
         return None
     top, bot = max(flat), min(flat)
-    base = 0.0 if bot >= 0 and bot <= 0.6 * top else bot
+    base = 0.0 if bot >= 0 and bot <= rt.chart_line_zero_max * top else bot
     span = (top - base) or abs(top) or 1.0
     want_hi = top + span * rt.chart_axis_headroom
     want_lo = base - span * rt.chart_neg_pad if base < 0 or base == bot else base

@@ -489,8 +489,8 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
         pass
     try:
         va = chart.value_axis
-        if not va.visible:
-            opts["axis"] = "off"
+        if va.visible != _auto_axis(kind, len(cats), opts.get("labels") == "on"):
+            opts["axis"] = "on" if va.visible else "off"  # the build drops it itself for a few labelled bars
         if fmt is None and not va.tick_labels.number_format_is_linked:
             nf = va.tick_labels.number_format
             if nf and nf != "General":
@@ -589,18 +589,32 @@ def _auto_neg(kind: str, data, va):
         return None
 
 
+def _auto_axis(kind: str, ncat: int, labels: bool) -> bool:
+    """Whether the build draws the value axis by itself (no `axis=` needed)."""
+    from ..render.axis import axis_shown
+    from ..theme import RenderTokens
+
+    return axis_shown({}, kind, ncat, labels, RenderTokens())
+
+
 def _is_auto_max(kind: str, data, va) -> bool:
     """True when ``c:max`` is the nice max the renderer writes by itself (no `max=` needed on re-build)."""
     try:
-        from ..render.axis import auto_axis
+        from ..render.axis import auto_axis, data_top
         from ..theme import RenderTokens
 
         if kind not in ("column", "bar", "stacked-column", "stacked-bar", "area"):
             return False
         if va.minimum_scale not in (None, 0):
             return False
-        auto = auto_axis(kind, [vals for _, vals in data], RenderTokens())
-        return bool(auto) and abs(auto[0] - va.maximum_scale) < 1e-9
+        rt = RenderTokens()
+        sparse = rt.model_copy(update={"chart_axis_lines_min": rt.chart_axis_lines_min_few})
+        cols = [vals for _, vals in data]
+        found = [auto_axis(kind, cols, r) for r in (rt, sparse)]
+        top = data_top(kind, cols)
+        if top:  # the hidden-axis max hugs the data
+            found.append((top * (1 + rt.chart_axis_headroom), 0.0))
+        return any(a and abs(a[0] - va.maximum_scale) < 1e-9 for a in found)
     except Exception:
         return False
 

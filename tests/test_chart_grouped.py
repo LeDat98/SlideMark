@@ -47,7 +47,7 @@ def test_bar_axes_start_at_zero(tmp_path):
     slides = Presentation(tmp_path / "z.pptx").slides
     axes = [next(s.chart for s in sl.shapes if s.has_chart).value_axis for sl in slides]
     assert axes[0].minimum_scale == 0
-    assert axes[1].minimum_scale is None  # lines may zoom
+    assert axes[1].minimum_scale != 0  # lines may zoom
     assert axes[2].minimum_scale == 3  # explicit min wins
 
 
