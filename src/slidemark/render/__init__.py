@@ -375,15 +375,19 @@ def _name(pl: Placed, counters: dict[str, int]) -> str:
     elif isinstance(el, Container):
         base = "Card"
     else:
-        base = {
-            "table": "Table",
-            "chart": "Chart",
-            "image": "Image",
-            "media": "Media",
-            "code": "Code",
-            "raw": "Raw",
-            "shape": "Shape",
-        }[el.type]
+        base = (
+            "Pill"
+            if isinstance(el, Shape) and "pill" in el.classes
+            else {
+                "table": "Table",
+                "chart": "Chart",
+                "image": "Image",
+                "media": "Media",
+                "code": "Code",
+                "raw": "Raw",
+                "shape": "Shape",
+            }[el.type]
+        )
     counters[base] = counters.get(base, 0) + 1
     return f"{base} {counters[base]}"
 
@@ -600,13 +604,16 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
         shp = _autoshape(rc, s, pl, kind, name)
         if el.paragraphs:
             chev = el.shape == "chevron"
+            pill = bool(el.attrs.get("pill"))
             box_w: int | None = pl.w
             if chev:  # the preset text rectangle starts a point depth inside both ends
                 adj = float(el.attrs.get("adj", rc.theme.layout.chevron_adj))
                 box_w = pl.w - 2 * round(adj * min(pl.w, pl.h)) - int(el.attrs.get("icon_inset", 0))
-            elif el.attrs.get("icon_inset"):
+            elif el.attrs.get("icon_inset") or pill:
                 box_w = None
             fill_text(rc, shp.text_frame, el.paragraphs, st, pl.font_scale, box_w=box_w, squeeze=not chev)
+            if pill:  # a pill is one line: a wider substitute font spills over, never wraps
+                shp.text_frame.word_wrap = False
             if inset := el.attrs.get("icon_inset"):  # room for the icon the layout placed before the text
                 shp.text_frame.margin_left = Emu(shp.text_frame.margin_left + int(inset))
         if el.shape == "chevron":

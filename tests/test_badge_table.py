@@ -50,7 +50,7 @@ def test_rendered_badge_shares_the_paragraph(tmp_path):
     from slidemark import build
 
     out = tmp_path / "b.pptx"
-    build(MD, out)
+    build("style: layout.table_pills=off\n\n" + MD, out)  # the highlight path (pills are tested apart)
     tbl = next(sh.table for sh in Presentation(out).slides[0].shapes if sh.has_table)
     para = tbl.cell(2, 3).text_frame.paragraphs[0]
     txt = "".join(r.text for r in para.runs)

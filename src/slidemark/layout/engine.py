@@ -9,6 +9,7 @@ from dataclasses import dataclass, field, replace
 from .. import icons
 from ..ir import (
     Box,
+    Cell,
     Chart,
     Code,
     Container,
@@ -46,6 +47,7 @@ from .l3fill import (
     fit_lone_kpi,
     grow_chevron_table,
 )
+from .pills import expand_pills, has_pills
 from .score import score as score_layout
 from .search import alternatives
 from .tables import capped_width, column_widths, right_align_numbers, row_heights, table_grid
@@ -691,6 +693,21 @@ def _gantt_style(ctx: _Ctx, table: Placed) -> Style:
         st = st.merged(bar._own or fast_style())
     if st.color is None:
         st = st.merged(fast_style(color=ctx.theme.ink_on(st.fill, "bg")))
+    return st
+
+
+def _pill_style(ctx: _Ctx, table: Placed, cell: Cell) -> Style:
+    """Style of the pill that replaces the badge of a table cell: the cell text (font, size), the ``pill``
+    theme class (tokens ``style: pill.*``) and the deck CSS rules that match ``.pill``. Fill and ink follow
+    the badge unless a rule sets them."""
+    t = table.style.merged(cell.style) if cell.style else table.style
+    st = fast_style(font=t.font, font_ea=t.font_ea, font_size=t.font_size)
+    st = st.merged(ctx.theme.classes.get("pill") or fast_style())
+    tn = ctx.css.node(table.element)
+    if tn is not None:
+        pill = css.Node(frozenset({"shape"}), frozenset({"pill"}), "other", None, tn)
+        ctx.css._compute(pill)
+        st = st.merged(pill._own or fast_style())
     return st
 
 
@@ -3916,5 +3933,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             lambda msg, hint: deck.diagnostics.append(
                 Diagnostic(level="warning", message=msg, slide=index + 1, rule="gantt-text", hint=hint)
             ),
+        )
+    if (
+        final_ctx
+        and ctx.lt.table_pills
+        and any(isinstance(p.element, Table) and has_pills(p.element) for p in final_ctx.out)
+    ):
+        final_ctx.out = expand_pills(
+            final_ctx.out, theme, lambda pl, cell: _pill_style(ctx, pl, cell), ctx.lt.pill_h
         )
     return head + (final_ctx.out if final_ctx else []) + tail

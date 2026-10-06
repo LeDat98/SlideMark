@@ -80,7 +80,10 @@ def test_odd_tables_never_raise():
         layout_slide(deck.slides[0], deck, theme, 0)
 
 
-BADGE = "# T\n| 項目 | 状態 |\n|-|-|\n| A | 開始[完了]{.badge .success} |\n| B | Go [OK]{.badge .success} |\n"
+BADGE = (
+    "style: layout.table_pills=off\n\n"  # the highlight path (pills are tested apart)
+    "# T\n| 項目 | 状態 |\n|-|-|\n| A | 開始[完了]{.badge .success} |\n| B | Go [OK]{.badge .success} |\n"
+)
 
 
 def runs_of_badge_cells(tmp_path, md: str):

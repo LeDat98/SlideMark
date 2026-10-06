@@ -243,6 +243,11 @@ missing file is a warning. An unknown name is a warning listing the closest name
 **Badge.** `[text]{.badge}` is a small filled label inside text; add a color class to change it:
 `[済]{.badge .success}`, `[NEW]{.badge .danger}`.
 
+In a table body cell a badge (alone, or after the cell text: `4.2 万台 [首位]{.badge .success}`) is drawn as a
+native rounded pill shape over the cell (name `Pill`, editable text, fill = the badge color, ink chosen for
+contrast, bold only for non-CJK). Pills of one column share one width; `layout.table_pills=off` keeps the old
+text highlight; `style: pill.radius=4` / CSS `.pill { }` change the look. `{.gantt}` bars are not affected.
+
 ## Inline text
 
 Each source line of plain text is its own line on the slide (no Markdown soft-break merging); a line right

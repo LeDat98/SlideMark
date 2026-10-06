@@ -90,6 +90,25 @@ def _fold_bars(data: SlideData, t: Item, xs: list[int], ys: list[int]) -> None:
         data.items.remove(it)
 
 
+def _fold_pill(cell, it: Item) -> None:
+    """A ``Pill`` shape over a table cell becomes a badge run: alone in an empty cell, else after its text."""
+    runs = [
+        RunT(text=r.text.strip(), badge=it.fill, size=r.size)
+        for p in it.paras
+        for r in p.runs
+        if r.text.strip()
+    ]
+    if not runs:
+        return
+    if cell.paras and cell.paras[-1].runs:
+        last = cell.paras[-1]
+        if last.runs[-1].text and not last.runs[-1].text.endswith(" "):
+            last.runs[-1].text += " "
+        last.runs.extend(runs)
+    else:
+        cell.paras = [ParaT(runs=runs, size=it.paras[0].size)]
+
+
 def fold_into_tables(data: SlideData) -> None:
     """Text drawn on top of an empty table cell (status pills, tags) becomes that cell's text."""
     for t in [i for i in data.items if i.kind == "table" and i.col_w and i.row_h]:
@@ -108,6 +127,15 @@ def fold_into_tables(data: SlideData) -> None:
             if c is None or r is None or r >= len(t.rows) or c >= len(t.rows[r]):
                 continue
             cell = t.rows[r][c]
+            if (
+                it.name.lower().startswith("pill")
+                and it.fill
+                and it.text
+                and not (cell.hmerge or cell.vmerge)
+            ):
+                _fold_pill(cell, it)  # a table-cell status pill goes back to its badge
+                data.items.remove(it)
+                continue
             if (
                 cell.paras
                 or cell.hmerge
