@@ -62,6 +62,6 @@ def test_render_reopens(tmp_path):
     build(str(EX / "16-jp-strategy.md"), str(out))
     prs = Presentation(str(out))
     assert len(prs.slides) >= 10
-    assert (
-        any(sh.has_text_frame and "ご決議事項" in sh.text_frame.text for sh in prs.slides[9].shapes) or True
-    )
+    body = next(sh for sh in prs.slides[9].shapes if sh.has_text_frame and "基本方針" in sh.text_frame.text)
+    # spread items carry paragraph spacing in the XML
+    assert "spcBef" in body._element.xml or "spcAft" in body._element.xml
