@@ -823,7 +823,20 @@ def _fill_panel_span(
     rules: list[Placed] = []
     if lt.card_spread_fill > 0 and _card_share(res, c, inner) < lt.card_spread_fill:
         rules = _distribute_row(res, [c], {id(c): inner}, lt, follow=True)
+        _end_at_note(res, c, inner, lt, bottom - top)
     return res, rules
+
+
+def _end_at_note(res: dict[int, Placed], c: Placed, inner: list[Placed], lt: LayoutTokens, full: int) -> None:
+    """A ruled panel whose trailing note now follows the list ends one padding below that note when the rest
+    of its span would stay empty (``panel_end_air``): it lines up with the chart's plot, not its legend."""
+    notes = [res[id(p)] for p in inner if p.element.role != "heading" and _is_note(p) and id(p) in res]
+    if lt.panel_end_air <= 0 or not notes or id(c) not in res:
+        return
+    card = res[id(c)]
+    end = max(q.y + q.h for q in notes) + _pad(notes[0], card)
+    if card.y + card.h - end > lt.panel_end_air * full:
+        res[id(c)] = card.model_copy(update={"h": end - card.y})
 
 
 def _fill_panels(

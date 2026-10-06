@@ -17,7 +17,9 @@ def _parts(**tokens):
 
 
 def test_callout_follows_the_last_item_and_air_goes_below():
-    panel, body, note, theme, _ = _parts()
+    panel, body, note, theme, _ = _parts(
+        panel_end_air=0
+    )  # full-span variant (panel_end_air: test_layout_l3_fill)
     gap = note.y - (body.y + engine._text_h(body))
     size = (body.style.font_size or 18) * body.font_scale * 12700
     assert 0 <= gap <= 3.5 * size  # right after the list: no loose band

@@ -328,3 +328,17 @@ def test_chevron_row_fuzz_and_render(tmp_path):
         if s.width > 0.15 * prs.slide_width and s.top > 0.15 * prs.slide_height
     ]
     assert tops and min(tops) < 0.3 * prs.slide_height
+
+
+@pytest.mark.parametrize(("name", "n"), [("11-jp-consulting.md", 3)])
+def test_ruled_panel_ends_under_its_note_not_at_the_legend(name, n):
+    placed, _, theme = lay(name, n)
+    (panel,) = cards(placed)
+    chart = next(p for p in placed if isinstance(p.element, Chart))
+    note = max((p for p in inside(placed, panel)), key=lambda p: p.y)
+    pad = panel.y + panel.h - (note.y + note.h)
+    assert 0 <= pad <= 0.25 * 914400  # ends one padding under the note
+    assert panel.y + panel.h < chart.y + chart.h - 0.3 * 914400  # lines up with the plot, above the legend
+    assert panel.y == chart.y
+    off, _, _ = lay(name, n, panel_end_air=0)
+    assert cards(off)[0].h > panel.h  # token off: the panel spans the chart

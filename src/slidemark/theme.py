@@ -345,6 +345,9 @@ class LayoutTokens(BaseModel):
         0.8  # a stretched card filled less than this after growth spreads its items (0 = off)
     )
     card_spread_gap_max: float = 2.2  # ... with equal gaps of at most this many em; the rest centers the list
+    panel_end_air: float = (
+        0.08  # a ruled panel beside a chart ends under its note if > this share of its span is empty
+    )
     card_spread_ratio: float = 1.7  # ... a card's gap is at most this multiple of the smallest gap in its row
     card_spread_tail: float = 0.0  # ... em of air kept between the last item and the card bottom padding
     card_text_max: float = (
