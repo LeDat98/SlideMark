@@ -15,7 +15,7 @@ Never raises: anything unexpected returns the items unchanged.
 
 from __future__ import annotations
 
-from ..ir import Container, Placed, Shape, Table, Text
+from ..ir import Chart, Container, Image, Media, Placed, Shape, Table, Text
 from ..units import EMU_PER_PT
 from . import measure
 from .grid import Rect
@@ -96,6 +96,82 @@ def _grow_table(p: Placed, peer_pt: float = 0.0) -> Placed:
     return p
 
 
+def _fit_target(items: list[Placed], i: int, body: Rect, reserve: int) -> int | None:
+    """Height (EMU) table ``i`` should fill: down to a taller chart / image beside it, or, as the
+    lowest block of the body, down to one gutter (``reserve``) above the footnote. None = leave it."""
+    t = items[i]
+    others = [q for j, q in enumerate(items) if j != i and not _is_line(q) and _owner(items, j) is None]
+    beside = [
+        q
+        for q in others
+        if isinstance(q.element, (Chart, Image, Media))
+        and q.y <= t.y + 2
+        and q.y + q.h > t.y + 2
+        and (q.x + q.w <= t.x + 2 or q.x >= t.x + t.w - 2)
+    ]
+    if beside:
+        bottom = max(q.y + q.h for q in beside)
+        if bottom - t.y > t.h * 1.08:
+            return bottom - t.y
+        return None
+    if reserve <= 0 or any(q.y < t.y + t.h - 2 and q.y + q.h > t.y + 2 for q in others):
+        return None  # needs a footnote / conclusion below, and nothing beside it
+    if any(q.y + q.h > t.y + t.h + 2 for q in others):
+        return None  # not the lowest block
+    target = body.y + body.h - reserve - t.y
+    return target if target > t.h + 0.03 * body.h else None
+
+
+def _fit_table(p: Placed, target: int, peer_pt: float) -> Placed:
+    """Stretch table ``p`` to ``target`` EMU: its text grows first (``table_text_max``, ``table_peer_max`` /
+    ``table_box_max``, no new wrapped line), then its rows, which stay <= ``table_vrow_max_em`` x text
+    (the text has grown as far as it can by then); the table stays top-anchored when rows hit the cap."""
+    tk = measure.tokens()
+    t = p.element
+    rh, cw = t.attrs.get("_row_h"), t.attrs.get("_col_w")
+    nrows, _ncols, anchors = table_grid(t)
+    if not rh or not cw or len(rh) != nrows or t.attrs.get("_row_cap") is True or sum(rh) >= target:
+        return p
+    size = (p.style.font_size or 14) * p.font_scale
+    cap_pt = min(tk.sparse_text_max_pt, (p.style.font_size or 14) * tk.table_text_max)
+    if peer_pt > 0:
+        cap_pt = min(cap_pt, peer_pt)
+    growable = (
+        tk.table_vtext_max > 1.0  # `sizes: table=` pins the size
+        and tk.table_text_step > 0
+        and not any(c.style is not None and c.style.font_size is not None for row in t.rows for c in row)
+    )
+    top = max(cap_pt / max(size, 1e-6), 1.0) if growable else 1.0
+    narrow = [max(1, round(w * (1.0 - tk.l3_wrap_margin))) for w in cw]
+    old = row_heights(t, anchors, narrow, p.style, p.font_scale)
+    steps = int((top - 1.0) / max(tk.table_text_step, 1e-6) + 1e-9)
+    best = (1.0, row_heights(t, anchors, cw, p.style, p.font_scale))
+    for i in range(steps + 1):
+        f = round(top - tk.table_text_step * i, 3) if i < steps else 1.0
+        if f <= 1.0 + 1e-6:
+            f = 1.0
+        nat = row_heights(t, anchors, cw, p.style, p.font_scale * f)
+        if sum(nat) > target:
+            continue
+        if f > 1.0:
+            new = row_heights(t, anchors, narrow, p.style, p.font_scale * f)
+            if any(b > a * f * 1.02 for a, b in zip(old, new, strict=True)):
+                continue  # a cell would wrap earlier than before
+        best = (f, nat)
+        break
+    f, nat = best
+    em = max(tk.table_row_max_em, tk.table_vrow_max_em) if tk.table_row_max_em > 0 else 0  # text at its limit
+    cap = round(em * size * f * EMU_PER_PT) if em > 0 else 0
+    ratio = target / max(sum(nat), 1)
+    new = [round(h * ratio) for h in nat]
+    if cap:
+        new = [min(n, max(h, cap)) for n, h in zip(new, nat, strict=True)]
+    if f == 1.0 and sum(new) <= sum(rh) + 2:
+        return p
+    el = t.model_copy(update={"attrs": {**t.attrs, "_row_h": new, "_row_cap": True}})
+    return p.model_copy(update={"element": el, "font_scale": p.font_scale * f, "h": sum(new)})
+
+
 def _is_chevron(p: Placed) -> bool:
     return isinstance(p.element, Shape) and p.element.shape == "chevron"
 
@@ -167,10 +243,17 @@ def fill_body(
             elif isinstance(p.element, Text) and p.element.role == "body" and tk.table_box_max > 0:
                 caps.append(sz * tk.table_box_max)
         peer = min(caps, default=0.0)
+        items = list(items)
         items = [
             _grow_table(p, peer) if isinstance(p.element, Table) and _owner(items, i) is None else p
             for i, p in enumerate(items)
         ]
+        if tk.table_fit:
+            for i, p in enumerate(items):
+                if isinstance(p.element, Table) and _owner(items, i) is None:
+                    target = _fit_target(items, i, body, reserve)
+                    if target:
+                        items[i] = _fit_table(p, target, peer)
         return _fill(
             items,
             body,

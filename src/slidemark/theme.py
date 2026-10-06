@@ -313,6 +313,9 @@ class LayoutTokens(BaseModel):
         4.2  # a stretched table that cannot grow its text takes rows up to this x its text size
     )
     table_box_max: float = 1.0  # ... and within this x the box text of the slide (0 = no limit)
+    table_fit: bool = (
+        True  # a table beside a taller chart / image, or the last block above a footnote, fills to there
+    )
     badge_pad: int = 2  # a badge run of Latin text gets this many no-break spaces on each side
     badge_pad_cjk: int = 1  # ... of CJK text this many full-width spaces
     badge_headroom: float = 1.3  # a badge and the word before it keep this x their width in a table column

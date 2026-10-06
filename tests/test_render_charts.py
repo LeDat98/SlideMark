@@ -158,3 +158,14 @@ def test_pie_rows_as_slices(tmp_path):
     c, _ = chart_of(tmp_path, mk("doughnut", series=rows, cats=["Share"]))
     assert list(c.plots[0].categories) == ["APAC", "EU", "US"]
     assert list(c.plots[0].series[0].values) == [48, 30, 22]
+
+
+@pytest.mark.parametrize("kind", ["bar", "column", "stacked-column"])
+def test_negative_values_put_category_labels_low(tmp_path, kind):
+    neg = [Series(name="s", values=[4, -2, 3])]
+    chart, _ = chart_of(tmp_path, mk(kind, neg))
+    pos = chart.category_axis._element.find(qn("c:tickLblPos"))
+    assert pos is not None and pos.get("val") == "low"
+    chart, _ = chart_of(tmp_path, mk(kind, ONE))
+    pos = chart.category_axis._element.find(qn("c:tickLblPos"))
+    assert pos is None or pos.get("val") != "low"

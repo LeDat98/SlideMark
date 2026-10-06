@@ -7,7 +7,7 @@ from pathlib import Path
 from lxml import etree
 from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.dml.color import RGBColor
-from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION
+from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION, XL_TICK_LABEL_POSITION
 from pptx.enum.dml import MSO_LINE
 from pptx.enum.text import MSO_ANCHOR
 from pptx.oxml.ns import qn
@@ -576,6 +576,10 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             chart.category_axis.reverse_order = True
             va._element.find(qn("c:crosses")).set("val", "max")
         chart.category_axis.format.line.color.rgb = rgb(theme, "border")
+        if kind in _ZERO_BASE and any(
+            v < 0 for s in ch.series for v in s.values if v is not None
+        ):  # negative bars would cover the category labels
+            chart.category_axis.tick_label_position = XL_TICK_LABEL_POSITION.LOW
     except Exception:
         pass  # radar / scatter axes differ; defaults are fine
 
