@@ -138,7 +138,7 @@ def test_bar_shrinks_before_it_wraps():
     short = "> Approve"
     mid = "> " + "Approving the first phase budget this month keeps the pilot on schedule for the board " * 1
     placed, _, theme = lay("x", 1, src=_src(bar=mid.strip()), conclusion_min_ratio=0.0)
-    base = theme.sizes.get("conclusion", 18)
+    base = theme.sizes.get("conclusion", theme.sizes["lead"])
     size, bar = _bar_size(placed)
     one, _ = _bar_size(lay("x", 1, src=_src(bar=short))[0])
     assert one >= base
@@ -146,14 +146,17 @@ def test_bar_shrinks_before_it_wraps():
     # a sentence too long even at the floor keeps the theme size and wraps
     long = "> " + "word " * 60
     s_long, b_long = _bar_size(lay("x", 1, src=_src(bar=long.strip()))[0])
-    assert s_long == pytest.approx(base) and b_long.h > to_emu("0.5in")
+    assert b_long.style.font_size == pytest.approx(base) and b_long.h > to_emu(
+        "0.5in"
+    )  # (autofit may scale it)
+    assert s_long <= base + 1e-6
 
 
 def test_bar_floor_scale_is_token_driven():
     txt = "> " + "Approving the first phase budget this month keeps the pilot on track, " * 2
     p1, _, th = lay("x", 1, src=_src(bar=txt.strip()), conclusion_min_scale=1.0)
     p2, _, _ = lay("x", 1, src=_src(bar=txt.strip()), conclusion_min_scale=0.8)
-    base = th.sizes.get("conclusion", 18)
+    base = th.sizes.get("conclusion", th.sizes["lead"])
     s1, _ = _bar_size(p1)
     s2, _ = _bar_size(p2)
     assert s1 == pytest.approx(base)  # no shrink allowed: theme size

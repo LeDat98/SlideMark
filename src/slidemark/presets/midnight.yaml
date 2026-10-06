@@ -11,6 +11,7 @@ colors:
   danger: "#F87171"
   success: "#4ADE80"
 title_color: primary
+lead_color: fg
 table_header_fill: "#334155"
 classes:
   card: {radius: 8}

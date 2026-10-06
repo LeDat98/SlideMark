@@ -1220,18 +1220,166 @@ def _grow_chevron_text(
     return [c.model_copy(update={"font_scale": round(c.font_scale * best, 4)}) for c in chevs]
 
 
-# --------------------------------------------------------------------------- lone KPI row
+# --------------------------------------------------------------------------- KPI rows
+
+
+def _kpi_parts(items: list[Placed], cards: list[Placed]) -> list[tuple[Placed, Placed, Placed]] | None:
+    """``(card, label, value text)`` of each KPI card, ``None`` when a card holds anything else."""
+    parts: list[tuple[Placed, Placed, Placed]] = []
+    for c in cards:
+        inner = [p for p in items if p is not c and _contains(c, p)]
+        heads = [p for p in inner if getattr(p.element, "role", None) == "heading"]
+        mains = [p for p in inner if p not in heads]
+        if len(heads) != 1 or len(mains) != 1 or not isinstance(mains[0].element, Text):
+            return None
+        if not heads[0].element.paragraphs or not mains[0].element.paragraphs:
+            return None
+        if c.element.box is not None or mains[0].element.box is not None:
+            return None
+        parts.append((c, heads[0], mains[0]))
+    return parts
+
+
+def _value_pt(m: Placed) -> float:
+    return (m.element.paragraphs[0].style.font_size or 36) * m.font_scale
+
+
+def _value_fit(m: Placed, lt: LayoutTokens) -> float:
+    """Largest size (pt) at which the number of ``m`` stays on one line of its text width (CJK guard)."""
+    em = measure.text_em(m.element.paragraphs[0].plain, bold=True)
+    return m.w / EMU_PER_PT * lt.kpi_fit_margin * lt.kpi_lone_fit / max(em, 1e-6)
+
+
+def _hero_sizes(parts: list[tuple[Placed, Placed, Placed]], lt: LayoutTokens) -> list[float]:
+    """Number sizes of one KPI row after the width rule: a card k times wider than the narrowest gets
+    k^``kpi_value_exp`` times the narrowest card's number, within one line of its card, never smaller."""
+    cur = [_value_pt(m) for _, _, m in parts]
+    wmin = min(c.w for c, _, _ in parts)
+    if lt.kpi_value_exp <= 0 or len(parts) < 2 or max(c.w for c, _, _ in parts) < 1.15 * wmin:
+        return cur
+    base = min(cur)
+    return [
+        max(s, min(base * (c.w / wmin) ** lt.kpi_value_exp, _value_fit(m, lt)))
+        for (c, _h, m), s in zip(parts, cur, strict=True)
+    ]
+
+
+def _with_value(m: Placed, pt: float, cap_pt: float, lt: LayoutTokens) -> Placed:
+    """``m`` with its number at ``pt`` and caption lines at least ``cap_pt`` (absolute, when they fit)."""
+    paras = list(m.element.paragraphs)
+    paras[0] = paras[0].model_copy(
+        update={"style": paras[0].style.model_copy(update={"font_size": pt / m.font_scale})}
+    )
+    for i in range(1, len(paras)):
+        st = paras[i].style
+        size = (st.font_size or 12) * m.font_scale
+        if cap_pt > size and measure.text_em(paras[i].plain) * cap_pt <= m.w / EMU_PER_PT * lt.kpi_fit_margin:
+            paras[i] = paras[i].model_copy(
+                update={"style": st.model_copy(update={"font_size": cap_pt / m.font_scale})}
+            )
+    return m.model_copy(update={"element": m.element.model_copy(update={"paragraphs": paras})})
+
+
+def _kpi_text_h(m: Placed) -> float:
+    return measure.paragraphs_height(
+        m.element.paragraphs, m.w, m.style, m.font_scale, gap=m.element.attrs.get("para_gap")
+    )
+
+
+def _label_h(h: Placed, pt: float) -> int:
+    return round(
+        measure.paragraphs_height(h.element.paragraphs, h.w, h.style, pt / max(h.style.font_size or 11, 1e-6))
+    )
+
+
+def scale_kpi_values(out: list[Placed], body: Rect, lt: LayoutTokens, fixed: bool = False) -> list[Placed]:
+    """KPI cards that keep their (tall) row height, e.g. above a list: the card text uses the card.
+
+    A wider card gets a bigger number (the hero, ``kpi_value_exp``); then the numbers of the row grow by one
+    factor (at most ``kpi_lone_value_grow``) and label and caption step up (as in a lone row) as far as they
+    stay on one line and fill at most ``kpi_card_fill`` of the card. ``fixed`` (the author set the size):
+    unchanged. Never raises."""
+    try:
+        return _scale_kpi_values(out, body, lt, fixed)
+    except Exception:  # never raise on bad input
+        return out
+
+
+def _scale_kpi_values(out: list[Placed], body: Rect, lt: LayoutTokens, fixed: bool) -> list[Placed]:
+    if fixed or body.h <= 0:
+        return out
+    items = _body_items(out, body)
+    cards = [p for p in items if isinstance(p.element, Container) and "kpi" in p.element.classes]
+    res: dict[int, Placed] = {}
+    for y in {c.y for c in cards}:
+        parts = _kpi_parts(items, [c for c in cards if c.y == y])
+        if parts is None:
+            continue
+        cur = [_value_pt(m) for _, _, m in parts]
+        hero = _hero_sizes(parts, lt)
+        inner_pt = min(m.w for _, _, m in parts) / EMU_PER_PT
+        g_fit = min(_value_fit(m, lt) / s for (_, _, m), s in zip(parts, hero, strict=True))
+        gmax = max(min(lt.kpi_lone_value_grow, g_fit), 1.0)
+        label0 = min((h.style.font_size or 11) * h.font_scale for _, h, _ in parts)
+        label_hi = min(
+            _step_up(
+                h.element.paragraphs[0].plain, (h.style.font_size or 11) * h.font_scale, inner_pt, True, lt
+            )
+            for _, h, _ in parts
+        )
+        caps = [
+            (m.element.paragraphs[1].style.font_size or 12) * m.font_scale
+            for _, _, m in parts
+            if len(m.element.paragraphs) > 1
+        ]
+        cap0 = min(caps, default=0.0)
+        cap_hi = min(
+            (
+                _step_up(m.element.paragraphs[1].plain, c0, inner_pt, False, lt)
+                for (_, _, m), c0 in zip(
+                    [p for p in parts if len(p[2].element.paragraphs) > 1], caps, strict=True
+                )
+            ),
+            default=0.0,
+        )
+        grow_steps = (1.0, 0.75, 0.5, 0.25, 0.0) if lt.kpi_lone and lt.kpi_card_fill > 0 else (0.0,)
+        for k in grow_steps:  # the largest growth step whose cards still have air
+            sizes = [s * (1 + (gmax - 1) * k) for s in hero]
+            label_pt = label0 + (label_hi - label0) * k
+            cap_pt = cap0 + (cap_hi - cap0) * k
+            news = [
+                (_with_value(m, s, cap_pt, lt), _label_h(h, max(label_pt, 1.0)))
+                for (_c, h, m), s in zip(parts, sizes, strict=True)
+            ]
+            if all(
+                hh + _kpi_text_h(m2) <= (lt.kpi_card_fill or 1.0) * c.h
+                for (c, _h, _m), (m2, hh) in zip(parts, news, strict=True)
+            ):
+                break
+        else:
+            continue
+        if k == 0.0 and hero == cur:
+            continue
+        for (_c, h, m), (m2, hh) in zip(parts, news, strict=True):
+            lab = max(label_pt, (h.style.font_size or 11) * h.font_scale)
+            top = h.y + max(hh, h.h)
+            res[id(h)] = h.model_copy(
+                update={"font_scale": lab / max(h.style.font_size or 11, 1e-6), "h": max(hh, h.h)}
+            )
+            res[id(m)] = m2.model_copy(update={"y": max(m.y, top), "h": m.y + m.h - max(m.y, top)})
+    return _apply(out, res) if res else out
 
 
 def fit_lone_kpi(
     out: list[Placed], body: Rect, lt: LayoutTokens, on_bar: bool = False, fixed: bool = False
 ) -> list[Placed]:
-    """A body of nothing but KPI cards: content-sized cards (label, number, caption) at the optical center.
+    """A body of nothing but KPI cards: cards that use the body height in a balanced way, centred.
 
-    The number grows (``kpi_lone_value_max_pt``, never wraps), label and caption step up a little, the card is
-    content + padding tall (at most ``kpi_lone_h`` of the body) and the row sits with ``kpi_lone_center`` of
-    free height above it (``on_bar``: it ends one gutter above the conclusion bar).
-    ``fixed``: the author set the KPI text size (CSS, {size=}): only the card shrinks to its content.
+    The numbers grow together (``kpi_lone_value_grow``, at most ``kpi_lone_value_max_pt``, never wrap, ratios
+    between cards kept), label and caption step up, the card is content + padding tall, between
+    ``kpi_lone_min_h`` and ``kpi_lone_h`` of the body, and the row sits with ``kpi_lone_center`` of the free
+    height above it (``on_bar``: ``kpi_lone_bar_center``, nearer to the conclusion bar).
+    ``fixed``: the author set the KPI text size (CSS, {size=}): only the card height follows its content.
     Other blocks, icons, explicit sizes / heights: unchanged."""
     try:
         return _fit_lone_kpi(out, body, lt, on_bar, fixed)
@@ -1252,29 +1400,18 @@ def _fit_lone_kpi(out: list[Placed], body: Rect, lt: LayoutTokens, on_bar: bool,
     cards = [p for p in items if isinstance(p.element, Container)]
     if not cards or any("kpi" not in c.element.classes for c in cards) or len({c.y for c in cards}) != 1:
         return out
-    parts: list[tuple[Placed, Placed, Placed]] = []
-    seen = {id(c) for c in cards}
-    for c in cards:
-        inner = [p for p in items if p is not c and _contains(c, p)]
-        heads = [p for p in inner if getattr(p.element, "role", None) == "heading"]
-        mains = [p for p in inner if p not in heads]
-        if len(heads) != 1 or len(mains) != 1 or not isinstance(mains[0].element, Text):
-            return out
-        if not heads[0].element.paragraphs or not mains[0].element.paragraphs:
-            return out
-        if c.element.box is not None or mains[0].element.box is not None:
-            return out
-        parts.append((c, heads[0], mains[0]))
-        seen |= {id(heads[0]), id(mains[0])}
+    parts = _kpi_parts(items, cards)
+    if parts is None:
+        return out
+    seen = {id(c) for c in cards} | {id(p) for part in parts for p in part[1:]}
     if any(id(p) not in seen for p in items):
         return out  # icons, notes or other blocks share the body
 
     inner_pt = min(m.w for _, _, m in parts) / EMU_PER_PT
-    # the number: one size for the row, never wraps, never smaller than before
-    sizes0 = [(m.element.paragraphs[0].style.font_size or 36) * m.font_scale for _, _, m in parts]
-    em = max(measure.text_em(m.element.paragraphs[0].plain, bold=True) for _, _, m in parts)
-    fit = inner_pt * lt.kpi_fit_margin * lt.kpi_lone_fit / max(em, 1e-6)
-    value_hi = max(min(lt.kpi_lone_value_max_pt, max(sizes0) * lt.kpi_lone_value_grow, fit), min(sizes0))
+    # the numbers grow by one factor (the ratios between cards stay), never wrap, never get smaller
+    sizes0 = [_value_pt(m) for _, _, m in parts] if fixed else _hero_sizes(parts, lt)
+    fits = [_value_fit(m, lt) / s for (_, _, m), s in zip(parts, sizes0, strict=True)]
+    g = max(min(lt.kpi_lone_value_grow, min(fits), lt.kpi_lone_value_max_pt / max(sizes0)), 1.0)
     label_hi = min(
         _step_up(h.element.paragraphs[0].plain, (h.style.font_size or 11) * h.font_scale, inner_pt, True, lt)
         for _, h, _ in parts
@@ -1304,35 +1441,43 @@ def _fit_lone_kpi(out: list[Placed], body: Rect, lt: LayoutTokens, on_bar: bool,
     )
     limit = round(lt.kpi_lone_h * body.h)
     if fixed:
-        value_hi, label_hi, cap_hi = min(sizes0), label0, cap0
+        g, label_hi, cap_hi = 1.0, label0, cap0
     # largest step of the growth (1 = full, 0 = the sizes the slide had) whose card stays within the share
     for k in (1.0, 0.8, 0.6, 0.4, 0.2, 0.0):
-        value_pt = min(sizes0) + (value_hi - min(sizes0)) * k
+        values = [s * (1 + (g - 1) * k) for s in sizes0]
         label_pt = label0 + (label_hi - label0) * k
         cap_pt = cap0 + (cap_hi - cap0) * k
-        news, hh, mh, pad, gap = _lone_geometry(parts, value_pt, label_pt, cap_pt, lt)
+        news, hh, mh, pad, gap = _lone_geometry(parts, values, label_pt, cap_pt, lt)
         card_h = 2 * pad + hh + gap + mh
         if card_h <= limit:
             break
-    card_h = min(card_h, body.h)  # content is never cut: at the old sizes the card may pass its share
-    top = body.bottom - card_h if on_bar else body.y + round((body.h - card_h) * lt.kpi_lone_center)
+    floor = min(round(lt.kpi_lone_min_h * body.h), limit)
+    extra = max(
+        floor - card_h, 0
+    )  # a short row still fills its share of the body: the air goes into the card
+    card_h = min(
+        max(card_h, floor), body.h
+    )  # content is never cut: at the old sizes the card may pass its share
+    centre = lt.kpi_lone_bar_center if on_bar else lt.kpi_lone_center
+    top = body.y + round((body.h - card_h) * centre)
     top = max(body.y, min(top, body.bottom - card_h))
+    lab_y = top + pad + round(extra * lt.kpi_lone_label_air)
     res: dict[int, Placed] = {}
     for (c, h, m), (h2, m2) in zip(parts, news, strict=True):
         res[id(c)] = c.model_copy(update={"y": top, "h": card_h})
-        res[id(h)] = h2.model_copy(update={"y": top + pad, "h": hh})
-        res[id(m)] = m2.model_copy(update={"y": top + pad + hh + gap, "h": card_h - 2 * pad - hh - gap})
+        res[id(h)] = h2.model_copy(update={"y": lab_y, "h": hh})
+        res[id(m)] = m2.model_copy(update={"y": lab_y + hh + gap, "h": top + card_h - pad - lab_y - hh - gap})
     return _apply(out, res)
 
 
-def _lone_geometry(parts, value_pt: float, label_pt: float, cap_pt: float, lt: LayoutTokens):
+def _lone_geometry(parts, values: list[float], label_pt: float, cap_pt: float, lt: LayoutTokens):
     """(new label / text items, label height, text height, padding, gap) of a lone KPI row at these sizes."""
-    pad = round(lt.kpi_lone_pad_em * value_pt * EMU_PER_PT)
+    pad = round(lt.kpi_lone_pad_em * max(values) * EMU_PER_PT)
     gap = round(lt.kpi_lone_gap_em * label_pt * EMU_PER_PT)
     news: list[tuple[Placed, Placed]] = []
     hhs: list[int] = []
     mhs: list[int] = []
-    for _c, h, m in parts:
+    for (_c, h, m), value_pt in zip(parts, values, strict=True):
         hscale = label_pt / max(h.style.font_size or 11, 1e-6)
         hhs.append(round(measure.paragraphs_height(h.element.paragraphs, h.w, h.style, hscale)))
         paras = [

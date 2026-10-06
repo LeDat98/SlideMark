@@ -181,18 +181,36 @@ def row_heights(spec: GridSpec, area_h: int, gap: int, caps: list[int | None]) -
     return [round(h) for h in out]
 
 
+def snap_error(weights: list[float], tracks: list[int], columns: int) -> float:
+    """Largest relative deviation of a column's share after snapping to ``tracks`` (0 = exact ratios)."""
+    total = sum(weights)
+    if total <= 0 or min(weights) <= 0:
+        return float("inf")
+    return max(abs(k / columns - w / total) / (w / total) for k, w in zip(tracks, weights, strict=True))
+
+
 def cell_rects(
-    spec: GridSpec, n: int, area: Rect, gap: int, columns: int = 12, row_h: list[int] | None = None
+    spec: GridSpec,
+    n: int,
+    area: Rect,
+    gap: int,
+    columns: int = 12,
+    row_h: list[int] | None = None,
+    snap_tol: float = 0.1,
 ) -> list[Rect]:
     """Rect for each of ``n`` blocks in source order (areas map letters, otherwise row-major).
 
-    Ratio and area grids snap their column edges to ``columns`` tracks so edges line up across rows and boxes.
+    Ratio and area grids snap their column edges to ``columns`` tracks so edges line up across rows and boxes,
+    unless the snap would bend a column's share by more than ``snap_tol`` (``@2:1:1:1`` on 12 tracks would
+    come out 5:3:2:2): then the columns keep the exact ratios.
     """
     nc, nr = len(spec.cols), len(spec.rows)
     avail_w = max(area.w - gap * (nc - 1), nc)
     avail_h = max(area.h - gap * (nr - 1), nr)
     xs, ys = [], []
     tracks = track_counts(spec.cols, columns) if spec.snap else None
+    if tracks is not None and snap_error(spec.cols, tracks, columns) > snap_tol:
+        tracks = None
     if tracks is not None:
         tw = (area.w - gap * (columns - 1)) / columns
         t0 = 0

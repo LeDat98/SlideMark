@@ -431,17 +431,28 @@ class LayoutTokens(BaseModel):
     conclusion_min_scale: float = (
         0.8  # a bar that does not fit one line shrinks to this x its theme size (>= 12pt) before wrapping
     )
+    # --- KPI rows: hero card, value size by card width
+    kpi_hero_w: float = 2.0  # a `.kpi .hero` card weighs this x a normal one in an automatic row (1 = off)
+    kpi_value_exp: float = 0.6  # a card k x wider than the narrowest of its row gets a number k^exp x bigger
+    kpi_card_fill: float = (
+        0.7  # KPI cards beside free text: number + caption fill at most this share of the card
+    )
     # --- KPI rows alone on the slide (only KPI cards in the body): content-sized cards
     kpi_lone: bool = True  # a lone KPI row keeps cards as tall as their content (label, number, caption)
-    kpi_lone_value_max_pt: float = 66.0  # the number grows up to this size (never wraps, see kpi_fit_margin)
-    kpi_lone_value_grow: float = 1.35  # ... at most this x its size on the slide
-    kpi_lone_text_grow: float = 1.25  # label and caption step up by this factor (when they stay on one line)
-    kpi_lone_text_max_pt: float = 18.0  # ... to at most this size
+    kpi_lone_value_max_pt: float = 80.0  # the number grows up to this size (never wraps, see kpi_fit_margin)
+    kpi_lone_value_grow: float = 2.4  # ... at most this x its size on the slide
+    kpi_lone_text_grow: float = 1.6  # label and caption step up by this factor (when they stay on one line)
+    kpi_lone_text_max_pt: float = 24.0  # ... to at most this size
     kpi_lone_pad_em: float = 0.35  # card padding above the label and below the caption, x number size
     kpi_lone_gap_em: float = 0.35  # gap between the label and the number, x label size
-    kpi_lone_fit: float = 0.8  # the number fills at most this share of the card text width (CJK guard)
-    kpi_lone_h: float = 0.5  # a lone KPI card is at most this share of the body height
+    kpi_lone_fit: float = 0.88  # the number fills at most this share of the card text width (CJK guard)
+    kpi_lone_h: float = 0.65  # a lone KPI card is at most this share of the body height
+    kpi_lone_min_h: float = 0.5  # ... and at least this share (a short row gets air inside its cards)
+    kpi_lone_label_air: float = (
+        0.3  # ... of that air, this share goes above the label, the rest around the number
+    )
     kpi_lone_center: float = 0.42  # the row sits with this share of the free height above it (optical center)
+    kpi_lone_bar_center: float = 0.6  # ... with a conclusion bar under the row: nearer to the bar
     # --- band balance: a block of cards / columns that still leaves a band under it after the growth passes
     band_shift: float = (
         0.35  # normal density: the block sits with this share of the free height above it (0 = off)
@@ -548,7 +559,7 @@ DEFAULT_SIZES = {
     "subtitle": 20,
     "heading": 20,
     "body": 18,
-    "lead": 18,
+    "lead": 22,
     "quote": 20,
     "caption": 12,
     "footnote": 10,
@@ -618,7 +629,7 @@ class Theme(BaseModel):
     classes: dict[str, Style] = Field(default_factory=_base_classes)
     heading_color: str = "fg"
     title_color: str = "fg"
-    lead_color: str = "muted"
+    lead_color: str = "fg"
     title_band: str | None = None  # full-width band color behind the slide title (None = no band)
     title_band_color: str = "bg"  # title text color when a band is drawn
     # cover composition (cover.band_h=0: the legacy block centred on layout.cover_title_y)

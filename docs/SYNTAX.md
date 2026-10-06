@@ -114,7 +114,7 @@ Three things are not blocks and have fixed places:
 
 | Source | Position |
 |---|---|
-| `> text` right after the title | **lead**: the key message under the title |
+| `> text` right after the title | **lead**: the key message under the title (body ink, bigger than body text, below the title: `sizes: lead=` and `style: lead.color=` / CSS `.lead` override) |
 | `> text` as the last thing on the slide | **conclusion**: a bar at the bottom |
 | `※ text` or `^ text` | **footnote**: small text at the bottom (sources, notes) |
 
@@ -167,7 +167,7 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 |---|---|---|
 | `N` | N equal columns | `@3` |
 | `CxR` | grid with C columns and R rows | `@2x2` |
-| `a:b:...` | column width ratios | `@1:2` (one third / two thirds) |
+| `a:b:...` | column width ratios (kept exact; close ratios such as `1:2` snap to the 12-track grid) | `@1:2` (one third / two thirds), `@2:1:1:1` |
 | `rows/rows` | **areas**: block 1 = `a`, block 2 = `b`, ... in source order; repeat a letter to span; `.` = empty | `@aab/aac` |
 | `flow` | arrows between blocks in reading order (process diagrams) | `@4 flow` |
 | `chevron` | blocks drawn as chevrons (steps) | `@4 chevron` |
@@ -219,6 +219,24 @@ heading is the label. CSS: `.kpi { color; font-size; font-family; font-weight }`
 ## 売上 {.kpi}
 12.4億円
 前年比 +8%
+```
+
+**Hero KPI.** A wider card gets a bigger number (never wrapping), so a ratio grid makes one KPI the hero:
+`@2:1:1:1` before the cards gives the first twice the width. Shorter without an `@` line: add `.hero` to the
+card, `## 売上高 {.kpi .hero}` (a `.hero` card weighs `layout.kpi_hero_w` = 2 normal ones; an explicit `@` grid
+wins; on a box that is not `.kpi` the class stays free for your own `hero.fill=` style). A KPI row that stands
+alone (with a lead, a conclusion bar or a list after `@end`) grows to use the body: numbers up to
+`layout.kpi_lone_value_max_pt`, cards `kpi_lone_min_h`..`kpi_lone_h` of the body height. Sizes you set (`{size=}`,
+CSS `.kpi { font-size }`) are never changed. Tokens: `layout.kpi_hero_w`, `kpi_value_exp` (number size ~ card
+width^exp), `kpi_card_fill`, `kpi_lone_*`.
+
+```markdown
+@2:1:1:1
+## 売上高 {.kpi}
+1,280億円
+前年比 +8%
+## 営業利益 {.kpi}
+96億円
 ```
 
 **Callout.** A quote whose first word is `[!note]`, `[!tip]`, `[!warn]` or `[!caution]` is a callout box (tinted,

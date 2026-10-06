@@ -16,7 +16,7 @@ sizes:
   subtitle: 16
   heading: 13
   body: 11
-  lead: 13
+  lead: 16
   quote: 11
   caption: 9
   footnote: 9
@@ -37,6 +37,7 @@ heading_band_color: "#FFFFFF"
 table_header_fill: primary
 table_header_color: "#FFFFFF"
 dense_scale: 0.9
+lead_color: fg
 classes:
   card: {line_width: 0.5, radius: 0, padding: 7pt}
   callout: {fill: "#FDF2F2", line: danger, padding: 7pt}

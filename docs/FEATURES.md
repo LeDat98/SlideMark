@@ -23,6 +23,8 @@ step does not apply (no visual risk to lint, or no syntax).
 | Speaker notes | x | x | x | x | x | - | - | x |
 | `@end`, missing-end hint | x | x | x | x | x | x | x | x |
 | `.kpi` boxes | x | x | x | x | x | x | x | x |
+| Hero KPI (`@2:1:1:1` exact ratios, `{.kpi .hero}`, number scales with card width), KPI rows fill the body | x | x | x | x | x | x | - | x |
+| Lead as the slide's message (preset size / ink, `sizes: lead=`) | x | - | - | x | x | x | x | x |
 | Callouts `> [!note]` | x | x | x | x | x | x | x | x |
 | Badges `[x]{.badge}` | x | x | x | x | x | x | x | x |
 | Connectors `@ a>b` | x | x | x | x | x | x | x | x |

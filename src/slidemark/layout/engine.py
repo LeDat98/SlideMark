@@ -46,6 +46,7 @@ from .l3fill import (
     fill_row,
     fit_lone_kpi,
     grow_chevron_table,
+    scale_kpi_values,
 )
 from .pills import expand_pills, has_pills
 from .score import score as score_layout
@@ -1320,6 +1321,21 @@ def _box_nat0(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None
     return total + sum(nat) + _gap(ctx, _cgap(ctx, c), inner_w, small=True) * (len(nat) - 1)
 
 
+def _hero_cols(ctx: _Ctx, gs: GridSpec, blocks: list) -> None:
+    """A row of ``.kpi`` cards where some carry ``.hero`` (no ``@`` column token): hero columns weigh
+    ``layout.kpi_hero_w`` times a normal one, so ``{.kpi .hero}`` reads like ``@2:1:1``."""
+    if ctx.lt.kpi_hero_w <= 1.0 or len(blocks) < 2 or len(gs.rows) != 1 or gs.areas is not None:
+        return
+    if len(gs.cols) != len(blocks) or not all(
+        isinstance(b, Container) and "kpi" in b.classes for b in blocks
+    ):
+        return
+    heroes = ["hero" in b.classes for b in blocks]
+    if any(heroes) and not all(heroes):
+        gs.cols = [ctx.lt.kpi_hero_w if h else 1.0 for h in heroes]
+        gs.snap = True
+
+
 def _kpi_children(ctx: _Ctx, children: list, width: int, box: Container | None = None) -> list:
     """The first text child of a ``.kpi`` box: paragraph 0 = big number, the rest = muted caption."""
     i = next((k for k, c in enumerate(children) if isinstance(c, Text) and c.paragraphs), None)
@@ -1925,6 +1941,7 @@ def _place_blocks(
             callouts = []
         flow = [(i, b) for i, b in flow if (i, b) not in callouts]
     gs = parse_spec(grid, len(flow), classes)
+    auto_cols = gs is None or not gs.cols  # no explicit column token: `.hero` KPI cards may weigh the columns
     tables: list[tuple[int, object]] = []
     searchable = False
     if gs is None or not gs.cols:  # no explicit grid token: infer the arrangement from the blocks
@@ -1965,6 +1982,8 @@ def _place_blocks(
             ctx.alts = _search_tokens(flow, gs, classes, bool(tables), swapped)
     elif searchable and not ctx.arrange:
         ctx.alts = _search_tokens(flow, gs, classes, bool(tables), False)
+    if auto_cols and not gs.flags:
+        _hero_cols(ctx, gs, [b for _, b in flow])
     # blocks beyond the grid's cells are stacked full width below it
     extra: list[tuple[int, object]] = []
     if gs.capacity is not None and len(flow) > gs.capacity:
@@ -3887,7 +3906,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 isinstance(e, Container) and "kpi" in e.classes and _kpi_explicit(final_ctx, e)
                 for e in slide.elements
             )
-            final_ctx.out = fit_lone_kpi(final_ctx.out, body_now, ctx.lt, has_bar, fixed)
+            lone = fit_lone_kpi(final_ctx.out, body_now, ctx.lt, has_bar, fixed)
+            final_ctx.out = (
+                scale_kpi_values(final_ctx.out, body_now, ctx.lt, fixed) if lone is final_ctx.out else lone
+            )
         if (
             kind == "content"
             and not final_ctx.over

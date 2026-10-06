@@ -85,7 +85,7 @@ def test_lone_kpi_row_stays_at_its_optical_center():  # 17-editorial-css slide 3
     off = _slide("17-editorial-css", 3, "layout.band_shift=0")
     assert [p.y for p in on] == [p.y for p in off]  # fit_lone_kpi already centered it
     top, bottom = _above_below(on)
-    assert 0.3 * SLIDE_H < top and bottom < 0.75 * SLIDE_H
+    assert 0.3 * SLIDE_H < top and bottom < 0.8 * SLIDE_H
 
 
 def test_band_balance_never_raises_on_empty_input():

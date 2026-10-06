@@ -31,8 +31,11 @@ def test_sparse_slide_lead_and_boxes_are_readable():
 def test_lead_stays_secondary_to_the_title():
     lt = LayoutTokens()
     for number in (2, 3):
-        items, _b, _t = lay(JA, number)
-        assert _pt(items, "lead") <= _pt(items, "title") * lt.sparse_lead_title_max + 1e-6
+        items, _b, theme = lay(JA, number)
+        cap = max(
+            _pt(items, "title") * lt.sparse_lead_title_max, theme.sizes["lead"]
+        )  # growth stops at the cap
+        assert _pt(items, "lead") <= cap + 1e-6 < _pt(items, "title")
 
 
 def test_footnote_grows_a_little():
@@ -44,5 +47,5 @@ def test_footnote_grows_a_little():
 
 
 def test_tokens_switch_it_off():
-    off, _b, _t = lay(JA, 2, sparse_lead_grow=1.0, sparse_footnote_grow=1.0)
-    assert _pt(off, "lead") <= 13.01
+    off, _b, theme = lay(JA, 2, sparse_lead_grow=1.0, sparse_footnote_grow=1.0)
+    assert _pt(off, "lead") <= theme.sizes["lead"] + 0.01

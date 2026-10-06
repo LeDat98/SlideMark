@@ -7,6 +7,8 @@ import random
 import pytest
 
 from slidemark.ir import Container, Text
+from slidemark.layout import measure
+from slidemark.theme import LayoutTokens
 
 from .test_layout_l3_fill import EX, cards, lay, role
 
@@ -60,11 +62,12 @@ def test_lone_kpi_cards_are_content_sized_and_centered(src):
     bars = role(placed, "conclusion")
     body_bottom = bars[0].y if bars else 7.5 * EMU
     assert cs[0].h < cards(off)[0].h
-    assert cs[0].h <= 0.5 * (body_bottom - body_top) + 1
+    assert cs[0].h <= LayoutTokens().kpi_lone_h * (body_bottom - body_top) + 1
     assert _value_pt(placed) > _value_pt(off)
     mid = cs[0].y + cs[0].h / 2
     if bars:
-        assert 0 < bars[0].y - (cs[0].y + cs[0].h) <= 0.5 * EMU  # one gutter above the bar
+        below = bars[0].y - (cs[0].y + cs[0].h)
+        assert 0 < below <= cs[0].y - body_top  # nearer to the bar than to the lead
     else:
         assert body_top < cs[0].y and cs[0].y + cs[0].h < body_bottom
         assert abs(mid - (body_top + body_bottom) / 2) < 0.15 * (body_bottom - body_top)
@@ -76,8 +79,9 @@ def test_lone_kpi_cards_are_content_sized_and_centered(src):
 
 def test_value_never_wraps_cjk():
     placed, _, _ = lay("", 1, src=JA)
-    (b, *_) = role(placed, "body")
-    assert _value_pt(placed) * 3.2 <= b.w / 12700  # 3.2 em covers "38秒" with margin
+    for b in role(placed, "body"):
+        p0 = b.element.paragraphs[0]
+        assert measure.text_em(p0.plain, bold=True) * p0.style.font_size * b.font_scale <= b.w / 12700 * 0.9
 
 
 def test_kpi_followed_by_other_blocks_is_unchanged():

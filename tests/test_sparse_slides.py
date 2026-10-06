@@ -107,7 +107,11 @@ def test_no_empty_band_over_35_percent(name, number, what):
 
 def test_completion_is_what_closes_the_band():
     off = {"sparse_left_max": 0.0, "band_shift": 0.0}  # the band balance would also move the block
-    for name, number in ((JA, 2), (VI, 2), (VI, 4), (VI, 8)):
+    for name, number in (
+        (JA, 2),
+        (VI, 4),
+        (VI, 8),
+    ):  # (a lone KPI row fills its body by itself: test_l3_kpi_lone)
         a0, b0 = bands(name, number, **off)
         assert max(a0, b0) > LIMIT, (name, number)  # without the token the band is there
 
