@@ -166,3 +166,27 @@ def test_style_token_restyles_bars():
     placed = layout_slide(deck.slides[0], deck, theme, 0)
     bars = [p for p in placed if isinstance(p.element, Shape) and "gantt" in p.element.classes]
     assert bars and all(b.style.fill == "#00AA00" and b.style.radius == 9 for b in bars)
+
+
+def test_badge_in_same_color_bar_is_a_tinted_pill(tmp_path):
+    from pptx.oxml.ns import qn
+
+    from slidemark.contrast import ratio
+
+    md = GFM.replace("既設機へ", "既設機 [開始]{.badge} [完了]{.badge .success}")
+    out = tmp_path / "b.pptx"
+    build(md, out)
+    shapes = list(Presentation(str(out)).slides[0].shapes)
+    bar = next(s for s in shapes if s.has_text_frame and "既設機" in s.text_frame.text)
+    fill = str(bar.fill.fore_color.rgb)
+    pills = {}
+    for r in bar.text_frame._txBody.iter(qn("a:r")):
+        rpr = r.find(qn("a:rPr"))
+        hl = rpr.find(qn("a:highlight")) if rpr is not None else None
+        if hl is not None:
+            ink = rpr.find(qn("a:solidFill")).find(qn("a:srgbClr")).get("val")
+            pills[r.find(qn("a:t")).text.strip("\u3000\u00a0")] = (hl.find(qn("a:srgbClr")).get("val"), ink)
+    hl, ink = pills["開始"]
+    assert hl not in ("FFFFFF", fill) and ratio(hl, fill) > 1.5  # a tint, not white and not the bar color
+    assert ratio(ink, hl) >= 4.5
+    assert pills["完了"][0] != hl  # a success badge keeps its own color

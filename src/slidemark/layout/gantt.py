@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from ..contrast import mix, ratio
 from ..ir import Cell, Paragraph, Placed, Shape, Style, Table, fast_style
 from ..theme import Theme
 from ..units import EMU_PER_PT
@@ -49,15 +50,23 @@ def bar_cells(t: Table, anchors: list[tuple[int, int, Cell]]) -> list[tuple[int,
 
 
 def _bar_paragraphs(cell: Cell, theme: Theme, style: Style) -> list[Paragraph]:
-    """Cell paragraphs for a bar. A badge in the bar's own color would vanish: it is inverted (ink on the
-    badge, bar color as its text)."""
+    """Cell paragraphs for a bar. A badge that has the bar's own color (or hardly differs from it) would
+    vanish: it becomes a pill in ``render.gantt_badge`` (default: a tint of the bar fill) with the ink chosen
+    for contrast (``Theme.badge_ink``). Badges that read on the bar (success, danger...) stay."""
     fill = theme.hexval(style.fill)
-    ink = theme.hexval(style.color)
+    if not fill:
+        return list(cell.paragraphs)
+    rt = theme.render
+    pill = (
+        theme.hexval(rt.gantt_badge)
+        if rt.gantt_badge
+        else mix(fill, theme.hexval("bg") or rt.slide_bg, rt.gantt_badge_tint)
+    )
     out = []
     for p in cell.paragraphs:
         runs = [
-            r.model_copy(update={"highlight": ink, "color": fill})
-            if fill and ink and r.highlight and theme.hexval(r.highlight) == fill
+            r.model_copy(update={"highlight": pill, "color": None})
+            if r.highlight and ratio(theme.hexval(r.highlight) or fill, fill) < 1.5
             else r
             for r in p.runs
         ]

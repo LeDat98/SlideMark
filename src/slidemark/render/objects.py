@@ -22,7 +22,7 @@ from ..layout.css import border_spec, cell_insets
 from ..layout.tables import column_widths, compact_header, table_grid
 from ..theme import DEFAULT_SIZES, Theme
 from . import waterfall as wfall
-from .axis import auto_axis
+from .axis import auto_axis, neg_axis
 from .effects import apply_fill, apply_shadow
 from .text import _ANCHOR, fill_text
 from .util import RenderCtx, emu, hex6, rgb
@@ -736,6 +736,13 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 va.major_unit = wf["axis"][2]
             if wf["axis"][0] < 0:
                 chart.category_axis.tick_label_position = XL_TICK_LABEL_POSITION.LOW
+        neg = neg_axis(kind, [s.values for s in series], theme.render) if not wf else None
+        if neg:  # room for the outside-end label of the lowest bar (else it hits the category labels)
+            lo = neg[0] if lo is None else lo
+            if hi is None:
+                hi = neg[1]
+            if lo == neg[0] and hi == neg[1]:
+                va.major_unit = neg[2]
         if lo is None and kind in _ZERO_BASE and _all_nonneg(ch):
             lo = 0.0  # bars start at zero: an auto axis from 3.45 would exaggerate 3.6 vs 3.9
         if lo is not None:

@@ -493,9 +493,18 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
         zero_base = kind in ("column", "bar", "stacked-column", "stacked-bar", "area") and all(
             v is None or v >= 0 for _, vals in data for v in vals
         )
-        if va.minimum_scale is not None and not (zero_base and va.minimum_scale == 0):
+        neg = _auto_neg(kind, data, va)
+        if (
+            va.minimum_scale is not None
+            and not (zero_base and va.minimum_scale == 0)
+            and not (neg and abs(neg[0] - va.minimum_scale) < 1e-9)
+        ):
             opts["min"] = f"{va.minimum_scale:g}"  # a zero base on bars is the build default
-        if va.maximum_scale is not None and not _is_auto_max(kind, full_data, va):
+        if (
+            va.maximum_scale is not None
+            and not _is_auto_max(kind, full_data, va)
+            and not (neg and abs(neg[1] - va.maximum_scale) < 1e-9)
+        ):
             opts["max"] = f"{va.maximum_scale:g}"
     except Exception:
         pass
@@ -560,6 +569,17 @@ def _read_waterfall(chart, series) -> ChartT | None:
             options=opts,
             totals=totals,
         )
+    except Exception:
+        return None
+
+
+def _auto_neg(kind: str, data, va):
+    """The (min, max, unit) the renderer picks for bars with negatives, else None."""
+    try:
+        from ..render.axis import neg_axis
+        from ..theme import RenderTokens
+
+        return neg_axis(kind, [vals for _, vals in data], RenderTokens())
     except Exception:
         return None
 
