@@ -557,3 +557,10 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
   21 s2 / 20 s2 break at phrases ("点検技術者の / 平均年齢 54歳"). 1868 tests.
 - **Wave 4 A (`layout/jbreak.py`, `render/text.py`, `layout/chartnote.py`, `importer/`):** phrase breaks in chevrons and gantt
   bars; chart note never below the axis label size (22 s4).
+- **Re-score (run 9, same prompt, Sonnet, PNGs only):** 11 = 3.5, 16 = 3.5, 19 = 3, 20 = 4 "yes, borderline", 22 = 3.5 (new).
+  Top asks: action titles (content), card/panel dead space, chevrons vs table columns (16 s6 is 4 vs 5 by content), tiny
+  low-contrast status chips (→ wave 4 B native pills), chart emphasis/axes (callout touches bar tip, sparse 3-bar axes).
+- **Examples:** 19 s4 now a `{.gantt}` table, 16 s9 footnote no longer cites a missing symbol, 22 s3 header row is the regions,
+  22 s5 waterfall back to a zero axis.
+- **Wave 4 B (`layout/tables.py`, new `layout/pills.py`, engine hook, importer helper):** badge-only table cells become native
+  rounded pills with column-shared width and contrast ink.

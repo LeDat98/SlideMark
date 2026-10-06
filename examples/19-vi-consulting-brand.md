@@ -34,7 +34,7 @@ num: on
 
 # Kế hoạch triển khai
 > Thí điểm tại Bình Dương năm 2027, mở rộng toàn quốc năm 2028
-{header=2}
+{.gantt header=2}
 | Hạng mục | 2027 | < | 2028 | < | 2029 |
 |-|-|-|-|-|-|
 | ^ | H1 | H2 | H1 | H2 | Cả năm |

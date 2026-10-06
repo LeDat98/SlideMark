@@ -44,9 +44,8 @@ Q3 · Valley
 ## Wave 4
 Q4 · Metro
 @end
-| Wave 1 | Wave 2 | Wave 3 | Wave 4 |
+| North: 4 clinics | Coast: 6 clinics | Valley: 6 clinics | Metro: 8 clinics |
 |-|-|-|-|
-| 4 clinics | 6 clinics | 6 clinics | 8 clinics |
 | Hire 60 staff | Hire 90 staff | Hire 85 staff | Hire 120 staff |
 | Lab hub opens | App v2 | Shared triage | Metro flagship |
 | Capex $3.1M | Capex $4.4M | Capex $4.2M | Capex $6.3M |
@@ -80,7 +79,7 @@ of booked slots, from 64%
 26 mo
 per clinic, average
 @end
-```waterfall {title="Visit cost bridge ($)" labels=on min=100}
+```waterfall {title="Visit cost bridge ($)" labels=on}
 ,Today,Lab hub,Triage,App booking,Rent,Q4 FY2027
 Cost,142,-11,-8,-6,1,=
 ```
