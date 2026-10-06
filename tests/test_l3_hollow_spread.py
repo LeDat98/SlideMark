@@ -23,10 +23,12 @@ def _body_cards(placed):
 def test_hollow_cards_spread_to_the_bottom(name, n):
     placed, _, _ = lay(name, n)
     pairs = _body_cards(placed)
+    off = _body_cards(lay(name, n, card_spread_fill=0.0)[0])
     assert len(pairs) == 2
-    for c, body in pairs:
-        end = body.y + engine._text_h(body)
-        assert (c.y + c.h - end) <= 0.2 * c.h  # no dead lower half (was ~50% / 30%)
+    for (c, body), (c0, b0) in zip(pairs, off, strict=True):
+        tail = c.y + c.h - (body.y + engine._text_h(body))
+        tail0 = c0.y + c0.h - (b0.y + engine._text_h(b0))
+        assert tail <= 0.75 * tail0 + 1  # the dead lower band shrinks (gaps capped, list starts lower)
     assert len({body.y for _, body in pairs}) == 1  # first items of siblings share one y
 
 

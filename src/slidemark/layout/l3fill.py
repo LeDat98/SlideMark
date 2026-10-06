@@ -532,7 +532,7 @@ def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: L
             rest = max(av - measure.paragraphs_height(ps, w, m.style, m.font_scale, gap=g), 0)
         capped.append((c, m, g, rest, av))
     jobs = capped
-    lead = min(j[3] for j in jobs) // 2
+    lead = min(j[3] for j in jobs) // 2  # siblings share the first-item line
     for c, m, gap, _rest, _avail in jobs:
         el = m.element.model_copy(update={"attrs": {**m.element.attrs, "para_gap": gap}})
         res[id(_main_of(plan[id(c)]))] = m.model_copy(
