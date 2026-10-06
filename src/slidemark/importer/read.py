@@ -11,6 +11,7 @@ from lxml import etree
 from pptx.oxml.ns import qn
 
 from ..ir import Diagnostic
+from ..layout.jbreak import SOFT_BREAK_MARK
 
 _MISSING = re.compile(r"\[(image|video|audio): (.*)\]", re.S)
 MONO = ("consolas", "courier", "menlo", "monaco", "mono", "source code")
@@ -254,6 +255,9 @@ def read_paras(
             if tag == "r":
                 runs.append(_read_run(ch, ctx, part))
             elif tag == "br":
+                rp = ch.find(qn("a:rPr"))
+                if rp is not None and rp.get("bmk") == SOFT_BREAK_MARK:
+                    continue  # a phrase break the renderer inserted
                 runs.append(RunT(text="\n"))
             elif tag == "fld":
                 if (ch.get("type") or "").startswith("slidenum"):

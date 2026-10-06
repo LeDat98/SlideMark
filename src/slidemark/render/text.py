@@ -11,7 +11,7 @@ from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 
 from ..ir import Paragraph, Run, Style
-from ..layout import measure
+from ..layout import jbreak, measure
 from ..layout.css import insets, transform_text
 from ..units import EMU_PER_PT
 from .util import RenderCtx, hex6, rgb
@@ -160,6 +160,14 @@ def _format_run(
             r.hyperlink.address = run.link
 
 
+def _soft_break(para, size_pt: float) -> None:
+    para.add_line_break()
+    br = para._p[-1]
+    rpr = etree.SubElement(br, qn("a:rPr"))
+    rpr.set("sz", str(round(size_pt * 100)))
+    rpr.set("bmk", jbreak.SOFT_BREAK_MARK)
+
+
 def _set_bullet(para, p: Paragraph, size_pt: float) -> None:
     pPr = para._p.get_or_add_pPr()
     pPr.set("eaLnBrk", "1")  # kinsoku line breaking, no hanging punctuation: matches layout.measure
@@ -222,14 +230,17 @@ def fill_text(
         para.space_after = Pt(0)
         _set_bullet(para, p, size)
         sq = 0.0
+        cuts: dict[int, list[int]] = {}
         if box_w is not None and not field:
             wpt = (box_w - pl - pr - (measure.list_indent(size, p.level)[0] if p.marker else 0)) / EMU_PER_PT
             sq = measure.paragraph_squeeze(p, pst, wpt, size)
+            if plan := jbreak.plan_breaks(p, pst, wpt, size, sq):
+                cuts, sq = plan
         first_text = ""
         prev = ""
         prev_r = None
         bound = [r.text for r in p.runs] if field else measure.bound_texts(p.runs)
-        for run, run_text in zip(p.runs, bound, strict=True):
+        for ri, (run, run_text) in enumerate(zip(p.runs, bound, strict=True)):
             segs = run_text.replace("\r", "").replace("\v", "\n").split("\n")
             for k, seg in enumerate(segs):
                 if k > 0:
@@ -248,9 +259,14 @@ def fill_text(
                         prev_r.text = (
                             prev_r.text + " "
                         )  # a plain space keeps the badge off the text before it
-                r = para.add_run()
-                r.text = f"{pad}{_join_ranges(seg)}{pad}"
-                _format_run(rc, r, run, pst, size, seg, scale, sq)
+                ins = sorted({o for o in cuts.get(ri, []) if 0 < o < len(seg)}) if len(segs) == 1 else []
+                offs = [0, *ins, len(seg)]
+                for a, b in zip(offs, offs[1:], strict=False):
+                    if a > 0:
+                        _soft_break(para, size)  # phrase break (jbreak): the importer drops it
+                    r = para.add_run()
+                    r.text = f"{pad}{_join_ranges(seg[a:b])}{pad}"
+                    _format_run(rc, r, run, pst, size, seg[a:b], scale, sq)
                 prev = seg
                 prev_r = None if run.highlight else r  # a badge carries its own padding
                 first_text = first_text or seg

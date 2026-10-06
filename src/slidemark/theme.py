@@ -120,6 +120,9 @@ class LayoutTokens(BaseModel):
     cjk_latin_gap: float = (
         0.3  # LibreOffice adds this much space (em) where CJK and Latin text touch; the squeeze counts it
     )
+    cjk_phrase_break: bool = True  # CJK paragraphs wrap at phrase boundaries (soft breaks, render only)
+    cjk_phrase_margin: float = 0.02  # ... and every phrase line must fit this much narrower
+    cjk_phrase_slack: float = 0.07  # ... also when a viewer with this much more room would break inside one
     cjk_unit_join: bool = True  # Japanese numbers stay with their units (38万円, ▲8%): U+2060 joiners
     grow: bool = True  # sparse slides grow text / cards to fill the body (False = keep nominal sizes)
     box_pad: Length = "10pt"  # inner padding of a box whose style has none
