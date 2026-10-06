@@ -128,8 +128,27 @@ def _bindable(w: str) -> bool:
     )
 
 
+_UNITS = (
+    "ns|µs|us|ms|s|sec|min|h|hr|kg|g|mg|lb|lbs|oz|km|m|cm|mm|mi|ft|L|mL|GB|MB|KB|TB|kB|Gb|Mb|Gbps|Mbps|"
+    "Hz|kHz|MHz|GHz|W|kW|MW|GW|Wh|kWh|V|mA|kV|pt|px|bps|ppm|rpm|fps|nm|dB"
+)
+_NUM_UNIT = re.compile(rf"(?<=\d) (?=(?:{_UNITS})(?![A-Za-z0-9]))")
+
+
+def _bind_units(texts: tuple[str, ...], skip: tuple[bool, ...]) -> tuple[str, ...]:
+    """A number and its short unit ("2 ns", "5 GB") never split across lines."""
+    return tuple(
+        t if sk or not any(c.isdigit() for c in t) else _NUM_UNIT.sub(NBSP, t)
+        for t, sk in zip(texts, skip, strict=True)
+    )
+
+
 @cache
 def _bind_cached(texts: tuple[str, ...], skip: tuple[bool, ...]) -> tuple[str, ...]:
+    return _bind_units(_bind_orphans(texts, skip), skip)
+
+
+def _bind_orphans(texts: tuple[str, ...], skip: tuple[bool, ...]) -> tuple[str, ...]:
     full = "".join(texts)
     cut = max(full.rfind("\n"), full.rfind("\v"), full.rfind("\r")) + 1  # only the last line can orphan
     tail = full[cut:]
@@ -209,6 +228,37 @@ def _join_cached(texts: tuple[str, ...], skip: tuple[bool, ...], on: bool) -> tu
     if not on or not has_cjk("".join(texts)):
         return texts
     return tuple(t if sk or "://" in t else join_cjk_units(t) for t, sk in zip(texts, skip, strict=True))
+
+
+def loosen_wide_bindings(
+    originals: list[str], bound: list[str], width_pt: float, size_pt: float, font: str | None = None
+) -> list[str]:
+    """Undo an inserted no-break space whose bound chunk is wider than a line (render only).
+
+    A chunk wider than the line (less the viewer margin, ``bind_margin``) would break inside a word
+    ("unchange" / "d"), so its bindings go back to plain spaces."""
+    if not width_pt or all(o == b for o, b in zip(originals, bound, strict=True)):
+        return bound
+    full = "".join(bound)
+    orig = "".join(originals)
+    if len(full) != len(orig):
+        return bound
+    limit = width_pt * (1.0 - tokens().bind_margin)
+    drop: set[int] = set()
+    for m in re.finditer(rf"[^ \n\v\r\t]*{NBSP}[^ \n\v\r\t]*(?:{NBSP}[^ \n\v\r\t]*)*", full):
+        chunk = m.group()
+        if text_em(chunk, bold=True, font=font) * size_pt <= limit:
+            continue
+        for i in range(m.start(), m.end()):
+            if full[i] == NBSP and orig[i] == " ":
+                drop.add(i)
+    if not drop:
+        return bound
+    out, pos = [], 0
+    for b in bound:
+        out.append("".join(" " if pos + k in drop else c for k, c in enumerate(b)))
+        pos += len(b)
+    return out
 
 
 def bind_last_words(text: str) -> str:

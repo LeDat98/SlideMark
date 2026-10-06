@@ -599,10 +599,14 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             kind = MSO_SHAPE.RECTANGLE
         shp = _autoshape(rc, s, pl, kind, name)
         if el.paragraphs:
-            squeezable = el.shape != "chevron" and not el.attrs.get("icon_inset")
-            fill_text(
-                rc, shp.text_frame, el.paragraphs, st, pl.font_scale, box_w=pl.w if squeezable else None
-            )
+            chev = el.shape == "chevron"
+            box_w: int | None = pl.w
+            if chev:  # the preset text rectangle starts a point depth inside both ends
+                adj = float(el.attrs.get("adj", rc.theme.layout.chevron_adj))
+                box_w = pl.w - 2 * round(adj * min(pl.w, pl.h)) - int(el.attrs.get("icon_inset", 0))
+            elif el.attrs.get("icon_inset"):
+                box_w = None
+            fill_text(rc, shp.text_frame, el.paragraphs, st, pl.font_scale, box_w=box_w, squeeze=not chev)
             if inset := el.attrs.get("icon_inset"):  # room for the icon the layout placed before the text
                 shp.text_frame.margin_left = Emu(shp.text_frame.margin_left + int(inset))
         if el.shape == "chevron":

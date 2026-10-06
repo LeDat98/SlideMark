@@ -123,3 +123,72 @@ def test_import_keeps_user_breaks_drops_ours():
     )
     paras, _ = read_paras(etree.fromstring(xml), SimpleNamespace(slide_index={}), None)
     assert [r.text for r in paras[0].runs] == ["一行目", "\n", "二行目", "三行目"]
+
+
+CHEVRON_MD = """# 工程
+
+@4 chevron
+## 現場の課題を把握する
+点検技術者の平均年齢が上昇している
+## 施策の優先順位を決める
+投資対効果の高い順に実行する
+## 全社展開を進める
+標準化した手順を拠点へ広げる
+## 定着状況を確認する
+月次で稼働データを振り返る
+"""
+
+GANTT_MD = """theme: jp-business
+lang: ja
+
+# 実行スケジュール
+{.gantt header=2}
+| 施策 | 2027年度 | < | 2028年度 | < | 2029年度 |
+|-|-|-|-|-|-|
+| ^ | 上期 | 下期 | 上期 | 下期 | 通期 |
+| 店舗網再編 | 先行店舗で検証と評価を実施する | 近接店の統合を進める | 売場面積を半分に縮小する | 薬局併設へ業態を転換する | 継続改善を行う |
+"""  # noqa: E501
+
+
+def _shape_brs(path, preset):
+    out = []
+    for sl in Presentation(str(path)).slides:
+        for sh in sl.shapes:
+            g = sh._element.find(".//" + qn("a:prstGeom"))
+            if g is not None and g.get("prst") == preset:
+                out.append((sh, sh._element.findall(".//" + qn("a:br"))))
+    return out
+
+
+@pytest.mark.parametrize(("md", "preset"), [(CHEVRON_MD, "chevron"), (GANTT_MD, "roundRect")])
+def test_chevron_and_gantt_text_gets_phrase_breaks(tmp_path, md, preset):
+    path = tmp_path / "d.pptx"
+    build(md, path)
+    shapes = _shape_brs(path, preset)
+    assert shapes
+    total = 0
+    for sh, brs in shapes:
+        for br in brs:
+            assert br.find(qn("a:rPr")).get("bmk") == jbreak.SOFT_BREAK_MARK
+        total += len(brs)
+        assert len(sh.text_frame.text.replace("\x0b", "")) == len(sh.text_frame.text) - len(brs)
+    assert total, "wrapped CJK text in a chevron/gantt bar should get a phrase break"
+    text, _ = import_pptx(path)
+    assert "\x0b" not in text and "<br>" not in text
+
+
+def test_number_unit_stays_together():
+    out = measure.bound_texts([Run(text="Non-volatile, 2 ns access")])[0]
+    assert "2\u00a0ns" in out
+    assert "2\u00a0of" not in measure.bound_texts([Run(text="Take 2 of them")])[0]
+
+
+def test_binding_wider_than_the_line_is_undone():
+    runs = [Run(text="Runs today's models unchanged")]
+    bound = measure.bound_texts(runs)
+    assert "models\u00a0unchanged" in bound[0]
+    narrow = measure.loosen_wide_bindings([r.text for r in runs], bound, 150, 24)
+    assert "\u00a0" not in narrow[0]
+    wide = measure.loosen_wide_bindings([r.text for r in runs], bound, 900, 24)
+    assert wide == bound
+    assert measure.loosen_wide_bindings(["a b"], ["a b"], 0, 12) == ["a b"]
