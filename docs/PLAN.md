@@ -592,6 +592,11 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       content given word for word, T2/T3 extend T1 with more sections rather than a new subject. Report per brief:
       model calls, output tokens, cost above common start, ratio vs python-pptx, accepted yes/no. Hypothesis: the ratio
       falls with deck length (run 6 medians above start: 3 slides 55%, 5 slides 44%, 10 slides 32%).
+      Keep every artifact for side-by-side review (owner): `bench/lengthbench/<t1|t2|t3>/brief.md`,
+      `slidemark/deck.md`, `python-pptx/build.py` (exactly as the agents wrote them, never edited), one contact-sheet
+      PNG per arm (`sheet.png`), and the run numbers in `result.json`; no .pptx in git. Then generate
+      `docs/COMPARE.md` (English) with, per brief, the two sources side by side (collapsed blocks), their o200k token
+      counts, calls, output tokens, cost above start, ratio, and both contact sheets; link it from README (Vietnamese).
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or
