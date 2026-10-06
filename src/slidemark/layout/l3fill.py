@@ -459,7 +459,121 @@ def _fill_steps(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]
             new = {id(old): nw for old, nw in zip(keep, res, strict=False)}
             out = [new.get(id(p), p) for p in out] + res[len(keep) :]
             break
-    return _grow_step_arrows(out, arrows, lt)
+    out = _grow_step_arrows(out, arrows, lt)
+    return _compose_steps(out, body, lt)
+
+
+def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+    """A sparse steps group (a few short bullets) uses the body: bigger text, taller arrows, centred.
+
+    Only when the group (arrows to card bottoms) covers less than ``steps_sparse_below`` of the body and
+    every card holds one text of at most ``steps_sparse_items`` paragraphs. Card text grows first (up to
+    ``steps_text_max_pt``, never onto a new wrapped line), then the arrows (label up to
+    ``steps_arrow_text_max_pt``, never wrapped) and the card height (``steps_sparse_fill`` of the body, a
+    card at most ``steps_card_max_aspect`` x its width tall, text centred in it); the group sits with
+    ``steps_top_share`` of the leftover height above it. Dense steps are left as they are."""
+    if not lt.steps_sparse or body.h <= 0:
+        return out
+    items = _body_items(out, body)
+    arrows = [p for p in items if _is_step_arrow(p)]
+    cards = [p for p in items if isinstance(p.element, Container) and "steps-card" in p.element.classes]
+    if not arrows or not cards:
+        return out
+    inner: dict[int, Placed] = {}
+    for c in cards:
+        texts = [p for p in items if p is not c and _contains(c, p) and not _is_rule(p)]
+        if len(texts) != 1 or not isinstance(texts[0].element, Text) or texts[0].style.font_size is None:
+            return out
+        if len(texts[0].element.paragraphs) > lt.steps_sparse_items or texts[0].element.box is not None:
+            return out
+        inner[id(c)] = texts[0]
+    other = [
+        p
+        for p in items
+        if not _is_step_arrow(p) and not _is_rule(p) and p not in cards and p not in inner.values()
+    ]
+    if other:
+        return out  # something else (icons, a table under the cards) shares the body
+    top0 = min(a.y for a in arrows)
+    bottom0 = max(c.y + c.h for c in cards)
+    if (bottom0 - top0) >= lt.steps_sparse_below * body.h:
+        return out
+    mains = list(inner.values())
+    pad_v = max(min(m.y - c.y for c, m in zip(cards, mains, strict=True)), 0)
+    # 1. card text: the largest common growth that wraps nothing new and stays under the cap
+    cur_pt = max(m.style.font_size * m.font_scale for m in mains)  # type: ignore[operator]
+    s_top = max(lt.steps_text_max_pt / max(cur_pt, 1.0), 1.0)
+    step = max(lt.l3_grow_step, 0.01)
+    best, k = 1.0, 1
+    while True:
+        s = min(1.0 + k * step, s_top)
+        if s <= best + 1e-9 or any(_spread(m, 10**9, lt, _text_pad(m), s) is None for m in mains):
+            break
+        best, k = s, k + 1
+    grown = {id(m): m.model_copy(update={"font_scale": round(m.font_scale * best, 4)}) for m in mains}
+    # 2. arrows: taller for their text, label grown (no new wrap) to at least the card text x the ratio
+    arrow_pt = max(
+        min((a.style.font_size or 18) * a.font_scale for a in arrows),
+        cur_pt * best * lt.steps_arrow_text_ratio,
+    )
+    arrow_pt = min(arrow_pt, lt.steps_arrow_text_max_pt)
+    h_now = max(a.h for a in arrows)
+    h_arrow = min(
+        max(h_now, round(lt.steps_arrow_h_em * arrow_pt * EMU_PER_PT)), to_emu(lt.steps_arrow_sparse_max_h)
+    )
+    new_arrows = [_resize_chevron(a, 0, h_arrow - a.h, lt) if h_arrow != a.h else a for a in arrows]
+    cap = lt.model_copy(
+        update={"chevron_text_max_pt": arrow_pt, "chevron_text_fill": lt.steps_arrow_text_fill}
+    )
+    ga = _grow_chevron_text(new_arrows, cap, strict=True)
+    if ga:
+        new_arrows = ga
+    # 3. card height: the share of the body the group should cover, not taller than its width allows
+    gap = to_emu(lt.steps_gap)
+    text_h = max(
+        measure.paragraphs_height(
+            g.element.paragraphs,
+            g.w - 2 * _text_pad(g),
+            g.style,
+            g.font_scale,
+            gap=measure.element_gap(g.element),
+        )
+        for g in grown.values()
+    )
+    colw = min(c.w for c in cards)
+    want = round(lt.steps_sparse_fill * body.h) - h_arrow - gap
+    card_h = max(
+        round(text_h + 2 * _text_pad(mains[0]) + 2 * pad_v), min(want, round(lt.steps_card_max_aspect * colw))
+    )
+    group_h = h_arrow + gap + card_h
+    if group_h > body.h:
+        return out
+    top = body.y + round((body.h - group_h) * min(max(lt.steps_top_share, 0.0), 1.0))
+    res: dict[int, Placed] = {}
+    for a, na in zip(arrows, new_arrows, strict=True):
+        res[id(a)] = na.model_copy(update={"y": top})
+    ctop = top + h_arrow + gap
+    for c in cards:
+        m = inner[id(c)]
+        res[id(c)] = c.model_copy(update={"y": ctop, "h": card_h})
+        g = grown[id(m)]
+        el = g.element.model_copy(
+            update={"attrs": {k: v for k, v in g.element.attrs.items() if k != "para_gap"}}
+        )
+        res[id(m)] = g.model_copy(
+            update={
+                "y": ctop + pad_v,
+                "h": card_h - 2 * pad_v,
+                "element": el,
+                "style": g.style.model_copy(update={"valign": "middle"}),
+            }
+        )
+    inside = [p for p in items if _is_rule(p)]
+    return [res.get(id(p), p) for p in out if p not in inside]
+
+
+def _is_rule(p: Placed) -> bool:
+    return isinstance(p.element, Shape) and p.element.shape == "line"
 
 
 def _grow_step_arrows(out: list[Placed], arrows: list[Placed], lt: LayoutTokens) -> list[Placed]:

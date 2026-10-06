@@ -431,6 +431,16 @@ class LayoutTokens(BaseModel):
     steps_stretch: bool = True  # the cards grow down to the conclusion bar / footnote (items spread inside)
     steps_stretch_min: float = 0.4  # hollow at full height: cards are tried shorter, down to this share ...
     steps_stretch_step: float = 0.15  # ... in steps of this share of the free height
+    steps_sparse: bool = True  # a sparse group (a few short bullets) uses the body: see ``_compose_steps``
+    steps_sparse_below: float = 0.7  # ... when the arrows and cards cover less than this share of the body
+    steps_sparse_items: int = 2  # ... and every card holds at most this many paragraphs
+    steps_sparse_fill: float = 0.72  # ... then the group aims at this share of the body height
+    steps_text_max_pt: float = 24  # ... card text grows up to this size (pt)
+    steps_arrow_text_max_pt: float = 28  # ... arrow labels up to this size (pt)
+    steps_arrow_h_em: float = 3.0  # ... arrows are this many label heights tall ...
+    steps_arrow_sparse_max_h: Length = "1.5in"  # ... at most this tall
+    steps_card_max_aspect: float = 0.9  # ... cards at most this x their width tall (text centred)
+    steps_top_share: float = 0.4  # ... and sit with this share of the leftover height above them
     steps_arrow_text_ratio: float = 1.15  # arrow heading size >= this x the card text (0 = off) ...
     steps_arrow_text_fill: float = 0.7  # ... while the heading stays within this share of the arrow height
     # --- conclusion bar

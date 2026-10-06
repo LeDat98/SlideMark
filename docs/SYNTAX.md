@@ -206,7 +206,9 @@ Looks are tokens: `style: steps-arrow.fill=accent steps-card.fill=#EEF2FF` (clas
 or per step `## 設計 {.accent}`), `layout.steps_gap` (arrow row to cards), `layout.steps_arrow_aspect` /
 `steps_arrow_min_h` / `steps_arrow_max_h` (arrow height), `layout.steps_arrow_text_ratio` (arrow text vs card
 text), `layout.steps_stretch=off` (cards keep their content height). Fewer than two `##` steps: warning
-`steps-few`. Column ratios work (`@1:2:1 steps`).
+`steps-few`. Column ratios work (`@1:2:1 steps`). A sparse group (at most two short bullets per card) grows its text
+(`layout.steps_text_max_pt`, `steps_arrow_text_max_pt`), arrows and cards, and sits centred in the body
+(`layout.steps_sparse_fill`, `steps_top_share`; `layout.steps_sparse=off` keeps the compact strip).
 
 ## Attributes `{...}`
 

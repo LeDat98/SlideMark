@@ -150,3 +150,51 @@ def test_round_trip_gives_steps_back(tmp_path):
 def test_fuzz_never_raises(md, tmp_path):
     parse(md)
     build(md, tmp_path / "f.pptx")
+
+
+SPARSE = """theme: jp-business
+lang: ja
+
+# 年間スケジュール
+@4 steps
+## 4–6月
+- 価格改定
+## 7–9月
+- タイ工場着工
+## 10–12月
+- 北米発売
+## 1–3月
+- 効果検証
+"""
+
+
+def _max_pt(shape) -> float:
+    return max(r.font.size.pt for p in shape.text_frame.paragraphs for r in p.runs if r.text.strip())
+
+
+def test_sparse_steps_use_the_body(tmp_path):
+    out = tmp_path / "a.pptx"
+    build(SPARSE, out)
+    prs = Presentation(str(out))
+    sh = {s.name: s for s in prs.slides[0].shapes}
+    arrows = [sh[f"Step {i} arrow"] for i in range(1, 5)]
+    cards = [sh[f"Step {i} card"] for i in range(1, 5)]
+    texts = [s for n, s in sh.items() if n.startswith("Text")]
+    assert min(_max_pt(t) for t in texts) >= 20  # 11pt theme text grew (was 11)
+    assert min(_max_pt(a) for a in arrows) >= 22  # the label grew and stayed on one line
+    assert all(len(a.text_frame.text.splitlines()) == 1 for a in arrows)
+    span = max(c.top + c.height for c in cards) - min(a.top for a in arrows)
+    body = prs.slide_height - sh["Title"].top - sh["Title"].height
+    assert span >= 0.5 * body  # the group covers most of the body, not a strip at the top
+    top_gap = min(a.top for a in arrows) - (sh["Title"].top + sh["Title"].height)
+    bottom_gap = prs.slide_height - max(c.top + c.height for c in cards)
+    assert top_gap < bottom_gap  # centred a little above the middle
+    for a, c in zip(arrows, cards, strict=True):
+        assert (a.left, a.width) == (c.left, c.width)
+
+
+def test_sparse_composition_is_a_token(tmp_path):
+    out = tmp_path / "a.pptx"
+    build("style: layout.steps_sparse=off\n" + SPARSE, out)
+    sh = {s.name: s for s in Presentation(str(out)).slides[0].shapes}
+    assert _max_pt(sh["Text 1"]) <= 14
