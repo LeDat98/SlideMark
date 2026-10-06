@@ -13,3 +13,8 @@ colors:
   success: "#16A34A"
 classes:
   callout: {fill: "#EFF6FF"}
+cover_band_h: 0.58
+cover_pad: 0.5in
+cover_gap: 0.2in
+cover_rule: primary
+cover_rule_h: 0.05in

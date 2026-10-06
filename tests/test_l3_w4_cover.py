@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from slidemark.ir import Text
+from slidemark.layout import layout_slide
+from slidemark.parser import parse
+from slidemark.template import resolve_theme
 from tests.test_layout_l3_fill import lay
 
 H = 720 * 9525
+EX = Path(__file__).resolve().parent.parent / "examples"
 SRC = "theme: {theme}\n\n# {title}\n\n{sub}\n"
 
 
@@ -17,12 +23,24 @@ def _cover(theme: str, title: str = "Logistics DX Plan", sub: str = "FY2027 boar
     return t, (s[0] if s else None), th
 
 
+def _legacy(title: str = "Logistics DX Plan", **tokens):
+    """The centred cover (``cover.band_h=0``)."""
+    src = f"theme: jp-business\n\n# {title}\n\n## FY2027 board paper\n"
+    deck = parse(src)
+    theme, _ = resolve_theme(deck.theme, EX)
+    theme = theme.model_copy(update={"cover_band_h": 0, "layout": theme.layout.model_copy(update=tokens)})
+    placed = layout_slide(deck.slides[0], deck, theme, 0)
+    t = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
+    s = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "subtitle")
+    return t, s, theme
+
+
 def test_cover_title_grows_and_block_is_centred_on_the_token_line():
-    t, s, th = _cover("jp-business")
-    t0, _, _ = _cover("jp-business", cover_title_y=0.0)
+    t, s, th = _legacy()
+    t0, _, _ = _legacy(cover_title_y=0.0)
     assert t.font_scale * t.style.font_size > t0.font_scale * t0.style.font_size
     assert t.font_scale * t.style.font_size <= th.layout.cover_title_max_pt + 0.01
-    top, bottom = t.y, (s.y + s.h if s else t.y + t.h)
+    top, bottom = t.y, s.y + s.h
     assert abs((top + bottom) / 2 - th.layout.cover_title_y * H) <= 0.02 * H
 
 

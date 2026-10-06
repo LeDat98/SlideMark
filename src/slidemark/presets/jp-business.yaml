@@ -42,3 +42,8 @@ classes:
   callout: {fill: "#FDF2F2", line: danger, padding: 7pt}
   dense: {font_size: 10.5}
   kpi: {font_size: 26}
+cover_band_h: 0.6
+cover_pad: 0.55in
+cover_gap: 0.22in
+cover_rule: accent
+cover_rule_h: 0.06in

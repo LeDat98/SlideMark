@@ -133,6 +133,7 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
             or nm in ("footer", "slide number")
             or it.has_slidenum
             or nm.startswith("band")
+            or nm == "rule"
             or nm == "background"
             or nm.endswith(" accent")
             or (it.kind == "text" and it.y >= 0.85 * H and _norm(it.text) in deck.footers)
@@ -163,11 +164,21 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
                 for c in items
             )
 
+        reach = max(  # a title on a band anchored to the top (cover.band_h) may sit lower than 0.3 H
+            [
+                0.3 * H,
+                *(
+                    i.y + i.h
+                    for i in items
+                    if i.role == "decor" and i.name.lower().startswith("band") and i.y <= 0
+                ),
+            ]
+        )
         top = [
             i
             for i in live
             if i.kind == "text"
-            and i.y < 0.3 * H
+            and i.y < reach
             and len(i.paras) <= 2
             and len(i.text) <= 120
             and not in_card(i)
@@ -1123,8 +1134,16 @@ def build_slide(
             and (i.ph in ("ftr", "sldNum") or i.has_slidenum or i.name.lower() in ("footer", "slide number"))
             for i in data.items
         )
+        anchored = any(  # cover.band_h: a band anchored to the top or its rule marks the cover, not a section
+            i.role == "decor"
+            and (
+                i.name.lower() == "rule"
+                or (i.name.lower().startswith("band") and i.y <= 0 and i.h >= 0.3 * deck.height)
+            )
+            for i in data.items
+        )
         starts = {nums[0] for _, nums in deck.sections if nums}
-        if n == 1 and (footer_row or len(deck.sections) == 1):
+        if n == 1 and not anchored and (footer_row or len(deck.sections) == 1):
             extra.append("section")
         elif n > 1 and deck.sections and n not in starts:
             extra.append("cover")
