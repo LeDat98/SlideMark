@@ -415,6 +415,9 @@ class RenderTokens(BaseModel):
     chart_axis_headroom: float = (
         0.06  # an auto value axis ends this share above the data max (label room; 0 = off)
     )
+    chart_neg_pad: float = (
+        0.08  # bars / columns with a negative: label room below the lowest bar (span share)
+    )
     chart_total_pad: float = (
         0.08  # stack-total label room: the hidden carrier is this share of the longest stack
     )
@@ -428,6 +431,10 @@ class RenderTokens(BaseModel):
     waterfall_up: str = "success"  # waterfall bars: increase, decrease, total (theme color names or hex)
     waterfall_down: str = "danger"
     waterfall_total: str = "primary"
+    gantt_badge: str = (
+        ""  # badge pill inside a bar of the same color ("" = a tint of the bar fill, or a color)
+    )
+    gantt_badge_tint: float = 0.82  # that tint: share of the way from the bar fill toward white
     badge_cjk_bold: bool = False  # CJK badge text stays bold (synthetic bold smears small CJK glyphs)
 
 

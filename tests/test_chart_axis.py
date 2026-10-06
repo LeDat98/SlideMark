@@ -49,9 +49,9 @@ def test_explicit_max_wins_and_has_no_major_unit(tmp_path):
     assert chart._chartSpace.find(".//" + qn("c:majorUnit")) is None
 
 
-def test_negative_values_stay_auto(tmp_path):
+def test_negative_values_get_a_two_sided_axis(tmp_path):
     chart = build_chart(tmp_path, "column", ["a", "b"], [Series(name="s", values=[-3, 9])])
-    assert chart.value_axis.maximum_scale is None
+    assert chart.value_axis.minimum_scale < -3 and chart.value_axis.maximum_scale >= 9
 
 
 def test_nan_and_empty_series_do_not_crash(tmp_path):
@@ -86,3 +86,31 @@ def test_few_categories_get_a_wider_gap(tmp_path):
     assert many.plots[0].gap_width == rt.chart_gap
     opt = build_chart(tmp_path, "column", ["a", "b"], [Series(name="s", values=[1, 2])], gap_width="40")
     assert opt.plots[0].gap_width == 40
+
+
+def test_negative_bar_axis_has_label_room(tmp_path):
+    ch = build_chart(tmp_path, "bar", ["a", "b", "c"], [Series(name="s", values=[4.8, 1.2, -2.6])])
+    va = ch.value_axis
+    assert va.minimum_scale <= -2.6 - 0.05 * 7.4  # room below the lowest bar for its label
+    assert va.maximum_scale >= 4.8
+
+
+def test_negative_column_axis(tmp_path):
+    ch = build_chart(
+        tmp_path,
+        "column",
+        ["Q1", "Q2"],
+        [Series(name="a", values=[12, -8.5]), Series(name="b", values=[-3, 4])],
+    )
+    assert ch.value_axis.minimum_scale < -8.5 and ch.value_axis.maximum_scale > 12
+
+
+def test_neg_axis_edges():
+    from slidemark.render.axis import neg_axis
+
+    rt = RenderTokens()
+    assert neg_axis("bar", [[1, 2]], rt) is None
+    assert neg_axis("line", [[-1, 2]], rt) is None
+    assert neg_axis("bar", [[]], rt) is None
+    assert neg_axis("bar", [[None, "x", -1.0]], rt) is not None
+    assert neg_axis("bar", [[-5, -3]], rt)[1] == 0.0

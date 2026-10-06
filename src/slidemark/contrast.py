@@ -85,3 +85,11 @@ def best_ink(fill: str, candidates: list[str], need: float = 4.5) -> str:
         if ratio(c, fill) >= need:
             return c
     return max(candidates, key=lambda c: ratio(c, fill))
+
+
+def mix(a: str, b: str, t: float) -> str:
+    """``a`` moved ``t`` (0..1) of the way toward ``b``, ``#RRGGBB``; ``a`` unchanged on bad input."""
+    ra, rb = _rgb(a), _rgb(b)
+    if ra is None or rb is None:
+        return a
+    return _hex(*((x + (y - x) * t) / 255 for x, y in zip(ra, rb, strict=True)))
