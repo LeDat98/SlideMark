@@ -130,6 +130,13 @@ class LayoutTokens(BaseModel):
     table_text_max: float = (
         1.6  # a table with room grows its text first, up to this x the theme body size ...
     )
+    table_wrap_ratio: float = 1.0  # table text below this x body size may wrap cells at spaces (0 = off)
+    card_table_balance: bool = (
+        True  # normal density: cards above a table spread their items to the card height (no hollow cards)
+    )
+    sparse_cards_top: bool = (
+        True  # normal density: a sparse row of text cards is top-anchored under the lead (no floating block)
+    )
     table_text_step: float = 0.05  # ... in steps of this factor (never beyond sparse_text_max_pt; 0 = off)
     table_grow_roomy: float = 2.0  # table rows grow up to this factor when a quarter of the body stays empty
     tree_slack_roomy: float = 1.15  # org-tree boxes may be this much taller than their content (roomy slides)

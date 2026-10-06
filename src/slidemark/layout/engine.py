@@ -117,6 +117,7 @@ class _Ctx:
     head_grow: bool = False  # very sparse boxes: box headings grow with ``grow`` (up to ``GROW_HEAD``)
     grew: bool = False  # set when ``grow`` actually scaled some text
     tgrow: float = 1.0  # extra table text growth of a table that has room (``_table_text``)
+    twrap: bool = False  # ``_table_text`` wrap pass: the extra table growth may wrap cells at a space
     step: float = 1.0  # sparse step: padding, table / chevron text and paragraph gaps scale with it
     chev_adj: float | None = None  # point depth / shorter side of the chevron row being placed (None = token)
     chev_grow: float = 1.0  # a chevron row alone on the slide: its text grows with ``grow``
@@ -837,10 +838,17 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
         ):  # a table smaller than the card text beside it inverts the hierarchy: lift it to the same size
             eff *= box / have
     eff0 = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
-    if ctx.tgrow > 1.0 and ctx.scale >= 1.0 and not _table_size_explicit(ctx, el):
-        eff *= ctx.tgrow
     nrows, ncols, anchors = table_grid(el)
-    if eff > eff0 * 1.001:
+    if ctx.tgrow > 1.0 and ctx.scale >= 1.0 and not _table_size_explicit(ctx, el):
+        if ctx.twrap:  # tall free body: the extra growth may wrap a cell at a space (never mid-word)
+            if eff > eff0 * 1.001:
+                eff = _no_new_wraps(ctx, el, ncols, anchors, width, st, eff0, eff)
+            eff *= ctx.tgrow
+        else:
+            eff *= ctx.tgrow
+            if eff > eff0 * 1.001:
+                eff = _no_new_wraps(ctx, el, ncols, anchors, width, st, eff0, eff)
+    elif eff > eff0 * 1.001:
         eff = _no_new_wraps(ctx, el, ncols, anchors, width, st, eff0, eff)
     size = (st.font_size or 14) * eff
     b = getattr(el, "box", None)
@@ -952,6 +960,8 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
             attrs["_row_cap"] = (
                 True  # text grown by ``_table_text``: the vertical fill keeps rows <= row_max_em
             )
+            if ctx.twrap:
+                attrs["_twrap"] = True  # wrap pass: the vertical fill may still fit it to the gutter
         ctx.emit(
             (el if "gantt" in el.classes else right_align_numbers(el)).model_copy(update={"attrs": attrs}),
             Rect(rect.x, rect.y, min(rect.w, sum(cw)), min(total, rect.h) if total > rect.h else total),
@@ -3124,6 +3134,7 @@ def _table_text(ctx: _Ctx, fc: _Ctx, run, body: Rect, elements: list) -> _Ctx:
     top = min(cap_pt / max(s0, 1e-6), (h0 + free) / max(h0, 1))
     n = round((top - 1.0) / lt.table_text_step)
     base_tall = tall(fc)
+    first: _Ctx | None = None
     for i in range(n):
         f = round(top - lt.table_text_step * i, 3)
         if f <= 1.0 + 1e-6:
@@ -3139,8 +3150,32 @@ def _table_text(ctx: _Ctx, fc: _Ctx, run, body: Rect, elements: list) -> _Ctx:
         )
         if c.over or not c.out or tall(c) > base_tall or _bottom(c) > body.bottom or _rewraps(c, fc, lt):
             continue
+        first = c
+        break
+    got = max((size(p) for p in first.out if isinstance(p.element, Table)), default=0.0) if first else s0
+    want = body_pt * lt.table_wrap_ratio
+    if lt.table_wrap_ratio <= 0 or got >= want - 0.05 or s0 >= want:
+        return first or fc
+    # the table text is still below the body text of the deck: a tall free body lets cells wrap at a space
+    top = min(want / max(s0, 1e-6), cap_pt / max(s0, 1e-6))
+    for i in range(round((top - got / s0) / lt.table_text_step) + 1):
+        f = round(top - lt.table_text_step * i, 3)
+        if f * s0 <= got + 0.05:
+            break
+        c = run(
+            body,
+            grow=fc.grow,
+            step=fc.step,
+            roomy=fc.roomy,
+            grow_base=fc.grow_base,
+            expand=fc.expand,
+            tgrow=f,
+            twrap=True,
+        )
+        if c.over or not c.out or _bottom(c) > body.bottom:
+            continue
         return c
-    return fc
+    return first or fc
 
 
 def _rewraps(c: _Ctx, fc: _Ctx, lt) -> bool:
