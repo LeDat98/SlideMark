@@ -585,7 +585,7 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
 - [x] Owner decisions (PowerPoint check, PyPI deferred, AC4 on >= 5-slide briefs, L3 on content-rich decks) recorded
       in TARGETS.md and AGENT_COST.md (c22c3d7, 2026-10-06)
 - [ ] AC4 (open; >= 5-slide briefs at 41%, gate 35%)
-- [ ] Deck-length bench (owner, 2026-10-06; replaces the 20–30 slide brief idea): ONE shared topic for both arms,
+- [x] Deck-length bench (owner, 2026-10-06; replaces the 20–30 slide brief idea): ONE shared topic for both arms,
       three briefs of the same topic: T1 at most 5 slides, T2 at most 15, T3 at most 25. One run per arm per brief
       (SlideMark skill-only + python-pptx = 6 runs total), python-pptx numbers reused until the brief set changes.
       Topic: a fictional company's FY2027 business plan, Japanese business style (dense JA is the first-class target),
@@ -597,6 +597,11 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       PNG per arm (`sheet.png`), and the run numbers in `result.json`; no .pptx in git. Then generate
       `docs/COMPARE.md` (English) with, per brief, the two sources side by side (collapsed blocks), their o200k token
       counts, calls, output tokens, cost above start, ratio, and both contact sheets; link it from README (Vietnamese).
+- [ ] Deck-length bench result (2026-10-06, docs/COMPARE.md): SlideMark 4/5/7 calls vs 8/11/10, 18/40/70 s vs
+      86/140/198 s, cost 32%/40%/32%, all 6 accepted. Visual gap seen in the 25-slide sheets: the python-pptx arm
+      looks richer (accent-bar KPI cards, carded bullets, chevron + label boxes, footers); SlideMark KPI rows are small
+      with large empty bands (t3 s2/s9/s14/s20), bullet and chevron slides are sparse (s5/s8/s13/s16/s23/s25).
+      Fix the defaults (fill, size, card look) so a plain deck matches without more agent tokens.
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or

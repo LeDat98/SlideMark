@@ -50,6 +50,17 @@ slidemark skill install      # cài skill cho Claude Code
 Windows: `slidemark preview` / `review --png` tự tìm LibreOffice trong `C:\Program Files\LibreOffice`; nếu cài chỗ khác,
 đặt biến môi trường `SLIDEMARK_SOFFICE` trỏ tới `soffice.exe`. Build .pptx không cần LibreOffice.
 
+## So sánh với python-pptx (cùng đề, 5 / 15 / 25 slide)
+
+Cùng một agent (Sonnet), cùng đề bài, mỗi bên chạy 1 lần, đo từ lúc nhận yêu cầu đến lúc có file .pptx đạt yêu cầu
+(2026-10-06). Chi tiết, mã nguồn hai bên đặt cạnh nhau và ảnh slide: [docs/COMPARE.md](docs/COMPARE.md).
+
+| Số slide | Lần gọi model (SlideMark / python-pptx) | Thời gian | Token output | Chi phí |
+|---|---|---|---|---|
+| 5 | 4 / 8 | 18 s / 86 s | 1,4k / 10,1k | 32% |
+| 15 | 5 / 11 | 40 s / 140 s | 6,7k / 18,2k | 40% |
+| 25 | 7 / 10 | 70 s / 198 s | 7,5k / 41,5k | 32% |
+
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->

@@ -1,0 +1,28 @@
+{
+ "brief": "t2",
+ "slides": 15,
+ "slidemark": {
+  "calls": 5,
+  "output": 6733,
+  "thinking": 0,
+  "cost": 112982,
+  "cost_above_start": 84674,
+  "images": 2,
+  "builds": 2,
+  "wall_s": 40.367,
+  "accepted": true,
+  "source_tokens": 1271
+ },
+ "python-pptx": {
+  "calls": 11,
+  "output": 18168,
+  "thinking": 0,
+  "cost": 239943,
+  "cost_above_start": 211657,
+  "images": 10,
+  "builds": 5,
+  "wall_s": 140.239,
+  "accepted": true,
+  "source_tokens": 5263
+ }
+}
