@@ -32,7 +32,7 @@ title: Hiring Plan 2027
 
 # Attrition fell to 9%
 > Retention programs paid off in every team
-```table {align=lrr}
+```table {align=lrr hl=Platform}
 Team,2025,2026
 Platform,14%,8%
 Mobile,11%,10%
@@ -70,7 +70,7 @@ num: on
 
 # 主要指標
 > 商談化率が目標を上回った
-## 商談数 {.kpi}
+## 商談数 {.kpi .hero}
 420件
 前月比 +12%
 ## 商談化率 {.kpi}
@@ -96,7 +96,7 @@ num: on
 ※ 出所: 営業部アンケート（2026年9月）
 
 # 導入ステップ
-@chevron
+@steps
 ## 10月
 - 試験導入
 ## 11月
