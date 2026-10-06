@@ -1296,3 +1296,64 @@ def _lone_geometry(parts, value_pt: float, label_pt: float, cap_pt: float, lt: L
         )
         news.append((h.model_copy(update={"font_scale": hscale}), m2))
     return news, max(hhs), max(mhs), pad, gap
+
+
+# --------------------------------------------------------------------------- band balance
+
+
+def _draws(p: Placed) -> bool:
+    """True when a placed container paints something below its top rule (fill, outline, side borders)."""
+    st = p.style
+    fill = str(st.fill or "").lower()
+    painted = (
+        bool(fill) and fill not in ("none", "transparent") and not (len(fill) == 9 and fill.endswith("00"))
+    )
+    outlined = bool(st.line) and (st.line_width is None or st.line_width > 0)
+    sides = any((st.border_right, st.border_bottom, st.border_left))
+    return painted or outlined or sides or bool(st.shadow)
+
+
+def center_band(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+    """A block of cards / columns that leaves a band under it: the block sits at the optical center.
+
+    Normal-density slides only (the caller gates it). When more than ``band_max`` of the body is empty under
+    the block, it moves down until ``band_shift`` of the free height is above it, by at most
+    ``band_shift_max`` of the body. Cards and texts only: tables, charts, pictures, loose shapes and
+    blocks that already fill the body stay put. Never raises: anything unexpected returns the items."""
+    try:
+        return _center_band(out, body, lt)
+    except Exception:
+        return out
+
+
+def _center_band(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+    from .engine import _text_h
+
+    if lt.band_shift <= 0 or body.h <= 0:
+        return out
+    items = _body_items(out, body)
+    cards = [p for p in items if isinstance(p.element, Container)]
+    if not cards or any(isinstance(p.element, (Chart, Image, Media, Table)) for p in items):
+        return out
+    if any({"diagram", "flow", "chevron"} & set(c.element.classes) for c in cards):
+        return out  # diagrams own their labels and connectors
+    if any(isinstance(p.element, Shape) and not any(_contains(c, p) for c in cards) for p in items):
+        return out
+    top = min(p.y for p in items)
+    bottom = 0
+    for p in items:
+        if isinstance(p.element, Text) and p.element.paragraphs:
+            bottom = max(bottom, p.y + _text_h(p))
+        elif not isinstance(p.element, Container) or _draws(p):
+            bottom = max(bottom, p.y + p.h)
+    if bottom <= top:
+        return out
+    below = body.bottom - bottom
+    above = top - body.y
+    if below <= lt.band_max * body.h:
+        return out
+    dy = min(round((above + below) * lt.band_shift) - above, round(lt.band_shift_max * body.h), below)
+    if dy <= 0:
+        return out
+    ids = {id(p) for p in items}
+    return [p.model_copy(update={"y": p.y + dy}) if id(p) in ids else p for p in out]

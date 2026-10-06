@@ -38,6 +38,7 @@ from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
 from .l3fill import (
     align_chevron_table,
+    center_band,
     fill_cards_to_bar,
     fill_chevron_row,
     fill_panels,
@@ -3861,14 +3862,25 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             fin = fill_cards_to_bar(final_ctx.out, _shifted(body, edge, edge0), ctx.lt, *to_bar)
             if fin is not None:
                 final_ctx.out = fin
+        body_now = _shifted(
+            body, _edges(final_ctx.out, tail), edge0
+        )  # the body after the lead / footnote growth
         if kind == "content" and not final_ctx.over and final_ctx.out:  # a lone KPI row: content-sized cards
             fixed = any(
                 isinstance(e, Container) and "kpi" in e.classes and _kpi_explicit(final_ctx, e)
                 for e in slide.elements
             )
-            final_ctx.out = fit_lone_kpi(
-                final_ctx.out, _shifted(body, _edges(final_ctx.out, tail), edge0), ctx.lt, has_bar, fixed
-            )
+            final_ctx.out = fit_lone_kpi(final_ctx.out, body_now, ctx.lt, has_bar, fixed)
+        if (
+            kind == "content"
+            and not final_ctx.over
+            and final_ctx.out
+            and not slide.links
+            and not has_bar  # a conclusion bar anchors the block (fill_cards_to_bar owns that case)
+            and final_ctx.dense_k >= 1.0
+            and theme.sizes.get("body", DEFAULT_SIZES["body"]) > ctx.lt.grow_small_pt
+        ):  # normal density: a block that still leaves a band under it sits at the optical center
+            final_ctx.out = center_band(final_ctx.out, body_now, ctx.lt)
         ctx.diags += final_ctx.diags
         seen: set[str] = set()
         for lab in final_ctx.over:

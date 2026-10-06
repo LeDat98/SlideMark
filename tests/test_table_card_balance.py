@@ -84,12 +84,12 @@ def test_card_table_balance_off_restores_old_geometry():
 
 
 def test_sparse_cards_are_top_anchored_under_the_lead():
-    placed, _, _ = lay("21-jp-dark-pitch.md", 2)
+    placed, _, _ = lay("21-jp-dark-pitch.md", 2, band_shift=0.0)  # the band balance is tested apart
     lead = role(placed, "lead")[0]
     cs = cards(placed)
     assert min(c.y for c in cs) - (lead.y + lead.h) <= 30 * PT
     assert len({c.y for c in cs}) == 1 and len({c.h for c in cs}) == 1
-    off, _, _ = lay("21-jp-dark-pitch.md", 2, sparse_cards_top=False)
+    off, _, _ = lay("21-jp-dark-pitch.md", 2, sparse_cards_top=False, band_shift=0.0)
     assert min(c.y for c in cards(off)) > min(c.y for c in cs) + 20 * PT
 
 

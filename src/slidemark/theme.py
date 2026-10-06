@@ -428,6 +428,12 @@ class LayoutTokens(BaseModel):
     kpi_lone_fit: float = 0.8  # the number fills at most this share of the card text width (CJK guard)
     kpi_lone_h: float = 0.5  # a lone KPI card is at most this share of the body height
     kpi_lone_center: float = 0.42  # the row sits with this share of the free height above it (optical center)
+    # --- band balance: a block of cards / columns that still leaves a band under it after the growth passes
+    band_shift: float = (
+        0.35  # normal density: the block sits with this share of the free height above it (0 = off)
+    )
+    band_max: float = 0.25  # ... only when more than this share of the body stays empty below the block
+    band_shift_max: float = 0.15  # ... and it never moves down by more than this share of the body
 
 
 class RenderTokens(BaseModel):
