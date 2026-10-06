@@ -184,10 +184,10 @@ block: `x y w h` (`%` `in` `cm` `pt`), `size`, `color`, `fill`, `align`, `valign
 ## Tables and charts
 
 Table: ` ```table ` fence with CSV (first row = header; quote cells with commas: `"1,240"`), or a GFM table.
-Options on the fence or the line before: `{widths=3:1:1 align=lrr header=1 hcol=1 .zebra}`. Merge: a lone
+Options on the fence or the line before: `{widths=3:1:1 align=lrr header=1 hcol=1 .zebra}`; `.gantt` draws filled period cells as bars. Merge: a lone
 `<` joins the cell to the left, `^` the cell above. Numeric columns align right by themselves. ≤ 8 rows.
 
-Chart fence kinds: `column bar line area pie doughnut scatter radar stacked-column stacked-bar`. CSV body:
+Chart fence kinds: `column bar line area pie doughnut scatter radar stacked-column stacked-bar waterfall` (waterfall: one row, `=` cell = total). CSV body:
 first row = categories (first cell empty), then one row per series (name first). Options: `title="..."`
 `labels=on|percent|off` `legend=bottom|right|top|none` `fmt="0.0"|"#,##0"|"0%"` `min=` `max=`
 `colors=primary,accent,#888888` `axis=off`. Numbers may be `1,240`, `12%`, `▲3`; a decimal comma needs
