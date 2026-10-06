@@ -3245,10 +3245,16 @@ def _conclusion_style(ctx: _Ctx, slide: Slide, st: Style, index: int) -> Style:
     base = _role_style(ctx, "conclusion").font_size
     if "conclusion" in ctx.theme.sizes and st.font_size == base:  # `sizes: conclusion=N`
         return st.merged(fast_style(font_size=ctx.theme.sizes["conclusion"]))
-    if _CONC_TRIAL or not lt.conclusion_min_ratio or st.font_size != base:
+    if _CONC_TRIAL or st.font_size != base:
         return st
     if slide.layout in ("free", "cover", "section", "blank") or not slide.elements:
         return st
+    lines = ["".join(r.text for r in p.runs) for p in slide.conclusion.paragraphs] if slide.conclusion else []
+    em = max((measure.text_em(t, bold=True, font=st.font) for t in lines if t.strip()), default=0.0)
+    pad = 4 * measure.cell_pad()[0]  # text insets of the bar, generously
+    room = (ctx.W - 2 * to_emu(ctx.theme.margin_x) - pad) / EMU_PER_PT * (1.0 - lt.l3_wrap_margin)
+    if not lt.conclusion_min_ratio:
+        return _bar_shrink(st, base, em, room, base, lt)
     trial = ctx.deck.model_copy(update={"diagnostics": []})
     _CONC_TRIAL.append(True)
     try:
@@ -3261,16 +3267,25 @@ def _conclusion_style(ctx: _Ctx, slide: Slide, st: Style, index: int) -> Style:
         if isinstance(p.element, Text) and p.element.role == "body" and p.style.font_size
     ]
     if not sizes:
-        return st
+        return _bar_shrink(st, base, em, room, base, lt)
     want = min(max(base, max(sizes) * lt.conclusion_min_ratio), max(lt.conclusion_max_pt, base))
-    lines = ["".join(r.text for r in p.runs) for p in slide.conclusion.paragraphs] if slide.conclusion else []
-    em = max((measure.text_em(t, bold=True, font=st.font) for t in lines if t.strip()), default=0.0)
-    if em > 0:  # the bar stays one line when it fits at its theme size (no orphan word on a second line)
-        pad = 4 * measure.cell_pad()[0]  # text insets of the bar, generously
-        room = (ctx.W - 2 * to_emu(ctx.theme.margin_x) - pad) / EMU_PER_PT * (1.0 - lt.l3_wrap_margin)
-        if em * base <= room:
-            want = min(want, room / em)
-    return st if want <= base else st.merged(fast_style(font_size=want))
+    return _bar_shrink(st, base, em, room, want, lt)
+
+
+def _bar_shrink(st: Style, base: float, em: float, room: float, want: float, lt: LayoutTokens) -> Style:
+    """The bar text (``want`` pt, at least ``base``) stays on one line: it shrinks step by step to the floor
+    (``conclusion_min_scale`` x ``base``, never below 12pt) before the bar may wrap; a text that does not fit
+    even there wraps at the theme size."""
+    if em > 0 and em * want > room:
+        if room / em >= base:
+            want = room / em  # grown text shrinks to the line
+        else:  # even the theme size wraps: step down to the floor, else wrap at the theme size
+            floor = min(base, max(base * lt.conclusion_min_scale, 12.0))
+            size = base
+            while em * size > room and size > floor + 1e-6:
+                size = max(size - 0.5, floor)
+            want = size if em * size <= room else base
+    return st if abs(want - base) < 1e-6 else st.merged(fast_style(font_size=want))
 
 
 def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
@@ -3509,6 +3524,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             bottom = bottom - sum(hs) - foot_air
         if slide.conclusion is not None and slide.conclusion.paragraphs:
             c = slide.conclusion
+            if show_row and not notes:  # no footnote between them: one card gutter above the footer line
+                bottom -= max(0, max(sg, round(gap * ctx.lt.conclusion_gap)) - sg // 2)
             st = _styled(ctx, c, _role_style(ctx, "conclusion"))
             st = _conclusion_style(ctx, slide, st, index)
             h = max(round(_text_need(ctx, c, st, inner_w, 1.0)), round(0.4 * EMU_PER_INCH))

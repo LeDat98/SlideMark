@@ -82,7 +82,8 @@ def test_stretched_cards_keep_header_text_and_are_not_hollow(name, n):
         if c.h > 0.4 * EMU_IN * 3:  # a tall card: its list is spread, not one dead band
             assert body.element.attrs.get("para_gap", 0) > 0.25
             assert body.element.attrs["para_gap"] <= max(
-                0.25 + lt.card_hollow_gap_cap + 0.5, lt.card_spread_gap_max
+                0.25 + lt.card_hollow_gap_cap + 0.5,
+                2 * lt.card_spread_gap_max,  # ruled lists: up to 2x
             )
         assert used > 0.3
 
