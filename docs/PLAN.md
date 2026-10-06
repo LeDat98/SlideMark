@@ -503,3 +503,7 @@ Goal: run-7 leftovers (L3), then an independent re-score with a content-rich den
   bars put category labels low; tables fill to a visual's bottom / the footnote gutter (`table_fit`; 20 s8 325 → 489pt). 1707 tests.
 - **Wave 3 B (`layout/measure.py`, `render/text.py`):** JP numbers keep their units and signs (`38万円`, `▲8%`) via U+2060;
   generic on/off parsing for bool layout/render tokens. **Orchestrator:** independent L3 re-score (11, 16, 19, 20).
+- **Re-score (run 8, `bench/l3_review_prompt.md`, Sonnet, PNGs only):** 11 = 3.5, 16 = 3.5, 19 = 3, 20 = 3.5 (run 7: 3 / 3 / 2.5–3), "no".
+  Top asks: Gantt bars instead of text tables, bridge charts and totals, chevrons that map to table columns, composed
+  covers, chips on the text baseline, JP orphans in dense cards.
+- **Wave 4 A (`parser/blocks.py`, `render/objects.py`, `importer/`):** native `waterfall` chart (contract committed fd5c20f).

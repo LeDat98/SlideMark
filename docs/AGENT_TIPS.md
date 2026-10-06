@@ -28,3 +28,4 @@ Practical patterns that cut tokens and retries. Budget: keep this file under ~1,
 - Gradient cards need a text color that passes on every stop: lint checks each stop (`hero.fill` teal end failed 2.6:1 in examples/13).
 - Tables as a ```` ```table ```` CSV fence instead of GFM pipes: −7.1% tokens on the 66 eval decks with tables, merges (`<` `^`) and badges intact (run 4, `bench/token_floor.py`).
 - Model calls decide agent cost, not file size: one extra call re-reads the whole context (6–12k units). Write and build in one call (`slidemark build - -o deck.pptx --save deck.md <<'EOF'`), stop at 0 warnings (`docs/AGENT_COST.md`).
+- A chevron row lines up with the table under it only when the table has one column per chevron (`chevron_table_align`, test `tests/test_l3_w2a.py`); put steps as columns, or drop the chevrons when the table rows are the steps.
