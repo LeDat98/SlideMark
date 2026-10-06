@@ -375,15 +375,19 @@ def _name(pl: Placed, counters: dict[str, int]) -> str:
     elif isinstance(el, Container):
         base = "Card"
     else:
-        base = {
-            "table": "Table",
-            "chart": "Chart",
-            "image": "Image",
-            "media": "Media",
-            "code": "Code",
-            "raw": "Raw",
-            "shape": "Shape",
-        }[el.type]
+        base = (
+            "Pill"
+            if isinstance(el, Shape) and "pill" in el.classes
+            else {
+                "table": "Table",
+                "chart": "Chart",
+                "image": "Image",
+                "media": "Media",
+                "code": "Code",
+                "raw": "Raw",
+                "shape": "Shape",
+            }[el.type]
+        )
     counters[base] = counters.get(base, 0) + 1
     return f"{base} {counters[base]}"
 
@@ -599,10 +603,12 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             kind = MSO_SHAPE.RECTANGLE
         shp = _autoshape(rc, s, pl, kind, name)
         if el.paragraphs:
-            squeezable = el.shape != "chevron" and not el.attrs.get("icon_inset")
+            squeezable = el.shape != "chevron" and not el.attrs.get("icon_inset") and not el.attrs.get("pill")
             fill_text(
                 rc, shp.text_frame, el.paragraphs, st, pl.font_scale, box_w=pl.w if squeezable else None
             )
+            if el.attrs.get("pill"):  # a pill is one line: a wider substitute font spills over, never wraps
+                shp.text_frame.word_wrap = False
             if inset := el.attrs.get("icon_inset"):  # room for the icon the layout placed before the text
                 shp.text_frame.margin_left = Emu(shp.text_frame.margin_left + int(inset))
         if el.shape == "chevron":

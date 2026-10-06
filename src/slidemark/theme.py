@@ -401,6 +401,10 @@ class LayoutTokens(BaseModel):
     badge_pad: int = 2  # a badge run of Latin text gets this many no-break spaces on each side
     badge_pad_cjk: int = 1  # ... of CJK text this many full-width spaces
     badge_headroom: float = 1.3  # a badge and the word before it keep this x their width in a table column
+    table_pills: bool = True  # a table cell that holds only a badge becomes a native rounded pill shape
+    pill_h: float = (
+        1.5  # ... this x the cell text line high (capped by the row), pills of a column as wide as the widest
+    )
     badge_gap: bool = True  # a badge after text that does not end in a space gets a plain space before it
     # --- chevron rows: alone on the slide / above a table
     chevron_lone_h: float = 0.72  # a lone chevron row grows up to this share of the body height ...
@@ -557,6 +561,16 @@ def _base_classes() -> dict[str, Style]:
         "round": Style(radius=12),
         # `{.gantt}` table: every filled body cell becomes a bar of this look (fill primary, best ink)
         "gantt": Style(fill="primary", radius=4, padding="3pt", align="center", valign="middle"),
+        # a table cell that holds only a badge becomes a pill shape of this look (fill = the badge color)
+        "pill": Style(
+            radius=99,
+            padding_left="7pt",
+            padding_right="7pt",
+            padding_top="1pt",
+            padding_bottom="1pt",
+            align="center",
+            valign="middle",
+        ),
         "decision": Style(fill="bg", line="accent"),
         # `note=` of a chart: native callout inside the chart frame, pointing at the `hl=` point
         "chart-note": Style(
