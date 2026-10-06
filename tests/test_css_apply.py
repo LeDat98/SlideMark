@@ -551,7 +551,9 @@ def test_row_height_follows_cell_padding(tmp_path):
     prs1, _ = build(HEAD + css("td {padding: 14px}") + TABLE, tmp_path, "b.pptx")
     t0 = next(s for s in prs0.slides[0].shapes if s.has_table).table
     t1 = next(s for s in prs1.slides[0].shapes if s.has_table).table
-    assert t1.rows[1].height > t0.rows[1].height
+    # a stretched table shares its height among the body rows (compact header): padding can only raise them
+    assert t1.rows[1].height >= t0.rows[1].height
+    assert t1.cell(1, 0)._tc.tcPr.get("marT") != t0.cell(1, 0)._tc.tcPr.get("marT")
 
 
 def test_table_level_text_transform_reaches_cells(tmp_path):

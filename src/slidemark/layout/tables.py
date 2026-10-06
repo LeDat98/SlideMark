@@ -245,3 +245,39 @@ def row_heights(
         need = measure.paragraphs_height(cell.paragraphs, w, st, scale) + ct + cb
         heights[r] = max(heights[r], round(need))
     return heights
+
+
+def compact_header(
+    t: Table,
+    anchors: list[tuple[int, int, Cell]],
+    widths: list[int],
+    base: Style,
+    scale: float,
+    heights: list[int],
+    max_ratio: float,
+) -> list[int]:
+    """Stretched row heights with compact header rows: the slack goes to the body rows.
+
+    A header row never exceeds ``max_ratio`` x its natural height (text + padding); what it gives back is
+    shared by the body rows in proportion to their heights. No header, no body or ``max_ratio <= 0`` keeps
+    ``heights``. The total height is unchanged.
+    """
+    nh = min(max(t.header_rows, 0), len(heights))
+    if max_ratio <= 0 or nh == 0 or nh >= len(heights):
+        return heights
+    nat = row_heights(t, anchors, widths, base, scale)
+    out = list(heights)
+    freed = 0
+    for r in range(nh):
+        cap = max(round(nat[r] * max_ratio), 1)
+        if out[r] > cap:
+            freed += out[r] - cap
+            out[r] = cap
+    if freed <= 0:
+        return heights
+    body = sum(out[nh:]) or 1
+    add = [round(freed * h / body) for h in out[nh:]]
+    add[-1] += freed - sum(add)
+    for i, a in enumerate(add):
+        out[nh + i] += a
+    return out
