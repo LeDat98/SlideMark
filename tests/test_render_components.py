@@ -139,7 +139,7 @@ def test_cjk_badge_is_padded_so_bold_glyphs_stay_inside_the_highlight(tmp_path):
     tb = next(x for x in prs.slides[0].shapes if x.has_text_frame)
     cjk, latin = tb.text_frame.paragraphs[0].runs
     assert cjk.text == "\u3000好調\u3000"  # full-width space on both sides
-    assert latin.text == "OK"  # Latin glyphs fit; padding would leave a visible gap
+    assert latin.text == "\u00a0\u00a0OK\u00a0\u00a0"  # Latin: no-break spaces (layout.badge_pad), never bare
 
 
 def test_heading_band_drawn_on_jp_business(tmp_path):

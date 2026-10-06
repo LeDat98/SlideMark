@@ -198,22 +198,32 @@ def fill_text(
         para.space_after = Pt(0)
         _set_bullet(para, p, size)
         first_text = ""
+        prev = ""
+        prev_r = None
         for run in p.runs:
             segs = run.text.replace("\r", "").replace("\v", "\n").split("\n")
             for k, seg in enumerate(segs):
                 if k > 0:
                     para.add_line_break()
+                    prev = ""
+                    prev_r = None
                 if seg == "" and len(segs) > 1:
                     continue
                 seg = transform_text(seg, pst.text_transform)
-                r = para.add_run()
                 # badge: padding keeps bold CJK glyphs inside the highlight (LibreOffice clips them otherwise)
                 pad = ""
                 if run.highlight:
-                    cjk = measure.has_cjk(seg)
-                    pad = _BADGE_PAD if cjk else ("\u00a0\u00a0" if _cjk_lang(rc.deck.lang) else "")
+                    tk = measure.tokens()
+                    pad = _BADGE_PAD * tk.badge_pad_cjk if measure.has_cjk(seg) else "\u00a0" * tk.badge_pad
+                    if tk.badge_gap and prev_r is not None and not prev.endswith((" ", "\u00a0", "\u3000")):
+                        prev_r.text = (
+                            prev_r.text + " "
+                        )  # a plain space keeps the badge off the text before it
+                r = para.add_run()
                 r.text = f"{pad}{seg}{pad}"
                 _format_run(rc, r, run, pst, size, seg, scale)
+                prev = seg
+                prev_r = None if run.highlight else r  # a badge carries its own padding
                 first_text = first_text or seg
                 if field == "slide_number":
                     fld = r._r

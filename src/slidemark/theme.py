@@ -277,6 +277,24 @@ class LayoutTokens(BaseModel):
     table_header_max: float = (
         1.4  # a stretched table keeps header rows <= this x their natural height (0 = off)
     )
+    # --- stretched tables and badges (vfill / render)
+    table_comfort_em: float = (
+        2.7  # a table whose rows end up taller than this x text grows its text (0 = off) ...
+    )
+    table_vtext_max: float = (
+        1.4  # ... by at most this factor (header and body together, no new wrapped lines)
+    )
+    table_vtext_max_pt: float = 22  # ... and never beyond this size (pt)
+    table_vtext_min_rows: int = 2  # ... only tables with at least this many rows
+    table_vtext_max_rows: int = 6  # ... and at most this many (denser tables keep their size)
+    table_peer_max: float = 1.0  # ... and within this x the chevron text of the slide (0 = no limit)
+    table_vrow_max_em: float = (
+        4.2  # a stretched table that cannot grow its text takes rows up to this x its text size
+    )
+    table_box_max: float = 1.0  # ... and within this x the box text of the slide (0 = no limit)
+    badge_pad: int = 2  # a badge run of Latin text gets this many no-break spaces on each side
+    badge_pad_cjk: int = 1  # ... of CJK text this many full-width spaces
+    badge_gap: bool = True  # a badge after text that does not end in a space gets a plain space before it
 
 
 class RenderTokens(BaseModel):
@@ -767,7 +785,14 @@ def apply_tokens(theme: Theme, tokens: dict[str, str]) -> tuple[Theme, list[Diag
         data = trial
     _derive_muted(data, tokens)
     _derive_surface(data, tokens)
+    _derive_table_size(data, tokens)
     return Theme.model_validate(data), diags
+
+
+def _derive_table_size(data: dict, tokens: dict[str, str]) -> None:
+    """An explicit ``sizes: table=`` is final: the late text growth of stretched tables stays off."""
+    if "sizes.table" in tokens and "layout.table_vtext_max" not in tokens:
+        data.setdefault("layout", {})["table_vtext_max"] = 1.0
 
 
 def _hex_rgb(v: Any) -> tuple[float, float, float] | None:
