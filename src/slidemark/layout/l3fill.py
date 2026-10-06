@@ -512,13 +512,19 @@ def _card_share(res: dict[int, Placed], card: Placed, inner: list[Placed]) -> fl
     return (m.y + _text_h(m) - c.y) / max(c.h, 1) if m is not None else 1.0
 
 
-def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: LayoutTokens) -> list[Placed]:
+def _distribute_row(
+    res: dict[int, Placed], row: list[Placed], plan: dict, lt: LayoutTokens, follow: bool = False
+) -> list[Placed]:
     """Spread the paragraphs of every card of ``row`` over its body (equal gaps, capped).
 
     With ``card_spread_rules`` the items form a ruled list: every item sits in its own band (half a gap
     above and below), a thin rule in the gap centre separates consecutive items, and the cards of the row
     keep a similar rhythm. Otherwise the list stays top-anchored (first items share one y), the rest is air
-    at the card bottom. Returns the rule shapes (empty without ``card_spread_rules``)."""
+    at the card bottom. Returns the rule shapes (empty without ``card_spread_rules``).
+
+    ``follow`` (a panel beside a chart): the gap is capped at ``card_spread_gap_max`` em (the cards' ruled cap
+    is twice that), the list starts half a gap under the heading and a trailing note / callout follows the
+    last item one padding below it; the leftover air goes under the note (the panel keeps its height)."""
     ruled = lt.card_spread_rules
     jobs = []
     for c in row:
@@ -552,7 +558,10 @@ def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: L
             jobs.append((c, m, g0, 0, avail, paras, width, card, pad, tpad, true_w))
             continue
         # ruled: n bands (half a gap above the first and below the last item); plain: n - 1 gaps
-        gap = min(g0 + free / ((n if ruled else n - 1) * size), lt.card_spread_gap_max * (2 if ruled else 1))
+        gap = min(
+            g0 + free / ((n if ruled else n - 1) * size),
+            lt.card_spread_gap_max * (2 if ruled and not follow else 1),
+        )
         gap = max(gap, g0)
         for _ in range(12):  # the estimate has a safety factor: shrink until it surely fits
             used = measure.paragraphs_height(paras, width, m.style, m.font_scale, gap=gap)
@@ -572,6 +581,8 @@ def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: L
         if ruled and g > 0:
             used = measure.paragraphs_height(ps, tw, m.style, m.font_scale, gap=g)
             lead = max(round((av - used) / 2), 0)  # centred in the card body: equal air above and below
+            if follow:
+                lead = min(lead, round(g * (m.style.font_size or 18) * m.font_scale * EMU_PER_PT / 2))
             size = (m.style.font_size or 18) * m.font_scale * EMU_PER_PT
             for i in range(len(ps) - 1):
                 end = measure.paragraphs_height(ps[: i + 1], tw, m.style, m.font_scale, gap=g)
@@ -580,7 +591,28 @@ def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: L
         res[id(_main_of(plan[id(c)]))] = m.model_copy(
             update={"element": el, "y": m.y + lead, "h": m.h - lead}
         )
+        if follow and ruled and g > 0:
+            _follow_notes(res, plan[id(c)], m.y + lead + tpad + used, g, m, pad)
+            q = res[id(_main_of(plan[id(c)]))]  # the text box ends with its text, the note starts below it
+            res[id(_main_of(plan[id(c)]))] = q.model_copy(update={"h": min(q.h, round(used + 2 * tpad))})
     return rules
+
+
+def _follow_notes(
+    res: dict[int, Placed], inner: list[Placed], end: int, gap: float, main: Placed, pad: int
+) -> None:
+    """Move the trailing notes of a panel up so the first one starts ``pad`` (+ half a gap) below ``end``."""
+    notes = [res.get(id(p), p) for p in inner if p.element.role != "heading" and _is_note(p)]
+    if not notes:
+        return
+    top = min(q.y for q in notes)
+    half = round(gap * (main.style.font_size or 18) * main.font_scale * EMU_PER_PT / 2)
+    dy = min(round(end + pad + half - top), 0)  # never lower than the bottom-anchored position
+    if dy:
+        for p in inner:
+            if p.element.role != "heading" and _is_note(p):
+                q = res.get(id(p), p)
+                res[id(p)] = q.model_copy(update={"y": q.y + dy})
 
 
 def _rule(card: Placed, pad: int, y: int, style: Style) -> Placed:
@@ -731,7 +763,7 @@ def _fill_panel_span(
     res = dict(r[0])
     rules: list[Placed] = []
     if lt.card_spread_fill > 0 and _card_share(res, c, inner) < lt.card_spread_fill:
-        rules = _distribute_row(res, [c], {id(c): inner}, lt)
+        rules = _distribute_row(res, [c], {id(c): inner}, lt, follow=True)
     return res, rules
 
 
