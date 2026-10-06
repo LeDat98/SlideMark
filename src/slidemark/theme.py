@@ -320,6 +320,7 @@ class LayoutTokens(BaseModel):
     chart_note_edge_em: float = 1.0  # air at the left / right chart edge
     chart_note_max_w: float = 0.62  # a note is at most this share of the plot width
     chart_note_gap_em: float = 0.5  # air between the note and bars / labels
+    chart_note_inset_em: float = 1.0  # air between the note and the top of the plot (the chart title / axis)
     chart_note_slack: float = (
         1.12  # a note's text width is estimated this much wider (bold CJK + latin spacing)
     )

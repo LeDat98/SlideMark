@@ -484,7 +484,9 @@ def _plan(ch: Chart, pl: Placed, theme: Theme, note: str) -> NotePlan:
         plot = (edge, top, W - edge, H - edge)
     room = 0.3 * em
     maxw = min(lt.chart_note_max_w * (plot[2] - plot[0]), plot[2] - plot[0] - 2 * room)
-    area = (plot[0], plot[1], W - room, plot[3]) if horizontal and marks else plot  # may use the right margin
+    lift = max(lt.chart_note_inset_em * em - room, 0.0)  # clear of the title / top axis line
+    right = W - room if horizontal and marks else plot[2]  # horizontal bars may use the right margin
+    area = (plot[0], plot[1] + lift, right, plot[3])
     hl = resolve_hl(ch, d.cats if d else [str(c) for c in ch.categories])
     hi_ = hl[0] if hl else None
     tgt = marks.target[hi_] if marks and hi_ is not None and marks.target[hi_] else None

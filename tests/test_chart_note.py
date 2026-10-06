@@ -364,3 +364,24 @@ def test_note_is_never_smaller_than_the_axis_labels(tmp_path):
     }
     assert _note_pt(note) >= max(axis)
     assert inside(note, chart_of(prs))
+
+
+def test_note_keeps_its_gap_to_every_bar_and_clear_of_the_plot_top(tmp_path):
+    th = get_theme("default")
+    gap_em = th.layout.chart_note_gap_em
+    inset_em = th.layout.chart_note_inset_em
+    _, prs = build_md(tmp_path, fence("bar", 'hl=郊外大型 note="赤字42店の半数は郊外大型"'))
+    gf, note = chart_of(prs), the_note(prs)
+    lay = manual_layout(gf.chart)
+    pt = th.sizes["table"] * 12700
+    py = gf.top + lay["y"] * gf.height
+    assert note.top - py >= (inset_em - 0.3) * pt - 1000  # the planner keeps 0.3 em of its own room
+    for i, (x0, y0, x1, y1) in enumerate(_bar_rects(prs, [4.8, 3.1, 1.2, -2.6])):
+        hit_x = note.left < x1 + gap_em * pt and x0 < note.left + note.width + gap_em * pt
+        hit_y = note.top < y1 + gap_em * pt and y0 < note.top + note.height + gap_em * pt
+        assert not (hit_x and hit_y), f"note closer than the gap token to bar {i}"
+    body = ",A,B,C,D,E\nx,10,40,25,18,31"
+    _, prs = build_md(tmp_path, fence("column", 'hl=B note="B is the peak" labels=on', body), "col")
+    gf, note = chart_of(prs), the_note(prs)
+    py = gf.top + manual_layout(gf.chart)["y"] * gf.height
+    assert note.top - py >= (inset_em - 0.3) * pt - 1000

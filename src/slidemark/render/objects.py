@@ -767,7 +767,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         )
         if kind == "line" and lo is None and hi is None and not unit:
             la = line_axis([s.values for s in series], theme.render)
-            if la and la[0] > 0:  # data far from zero: the axis starts above it (a flat 0-9 axis hides the trend)
+            # data far from zero: the axis starts above it (a flat 0-9 axis hides the trend)
+            if la and la[0] > 0:
                 lo, hi, unit = la
         if note_plan and note_plan.axis:  # the pointer of a `note=` needs the exact scale
             lo, hi, unit = note_plan.axis
