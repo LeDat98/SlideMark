@@ -106,10 +106,23 @@ def _locale_profile(profile: str, locale: str) -> None:
     )
 
 
-def pptx_to_pdf(pptx: str | Path, out_dir: str | Path, timeout: int = 180) -> Path:
-    """Convert with an isolated LibreOffice profile so parallel runs and stale locks cannot interfere."""
+def pptx_to_pdf(pptx: str | Path, out_dir: str | Path, timeout: int = 180, tries: int = 3) -> Path:
+    """Convert with an isolated LibreOffice profile so parallel runs and stale locks cannot interfere.
+
+    Under load (several conversions at once) LibreOffice sometimes exits 0 without writing the PDF while it
+    initialises a fresh profile; a retry with a new profile succeeds.
+    """
     pptx, out_dir = Path(pptx), Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    pdf = out_dir / (pptx.stem + ".pdf")
+    for _ in range(max(1, tries)):
+        _convert_once(pptx, out_dir, timeout)
+        if pdf.exists():
+            return pdf
+    raise RuntimeError(f"LibreOffice produced no PDF for {pptx}")
+
+
+def _convert_once(pptx: Path, out_dir: Path, timeout: int) -> None:
     with tempfile.TemporaryDirectory(prefix="slidemark-lo-", ignore_cleanup_errors=True) as profile:
         # The profile must be a valid file URL: on Windows "file://C:\\..." makes LibreOffice refuse to
         # start with "bootstrap.ini is corrupt"; as_uri() gives "file:///C:/...".
@@ -130,10 +143,6 @@ def pptx_to_pdf(pptx: str | Path, out_dir: str | Path, timeout: int = 180) -> Pa
         if sys.platform.startswith("linux"):  # fontconfig aliases only matter where Office fonts are missing
             env["FONTCONFIG_FILE"] = _fonts_conf(profile)
         subprocess.run(cmd, check=True, capture_output=True, timeout=timeout, env=env)
-    pdf = out_dir / (pptx.stem + ".pdf")
-    if not pdf.exists():
-        raise RuntimeError(f"LibreOffice produced no PDF for {pptx}")
-    return pdf
 
 
 def pptx_to_pngs(

@@ -17,7 +17,7 @@ EOF
 ```
 
 `build` checks, fixes simple mistakes, builds and ends with a facts line (`wrote deck.pptx: 5 slides 16:9,
-1 chart, 1 table, notes on 1 slide, 0 warnings`) and, for your own design, a `look:` line (colours, fonts).
+1 chart, 1 table, notes on 1 slide, 0 warnings`) and, for your own design, a `look:` line.
 0 warnings and the counts your brief asks for = done: reply now, no render, re-open or other command.
 A warning names the slide, line and fix: edit `deck.md` once, run `slidemark build deck.md -o deck.pptx`.
 (No heredoc? Write `deck.md` and build it in the same turn.) To see slides: `--png sheet.png`, one image.
@@ -161,9 +161,8 @@ between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition �
 `@bg="linear-gradient(135deg,#1A0B2E,#7A1FA2)"` slide background (dark bg flips text light; `@dark`/`@light`
 force it) · `@free` absolute positions only.
 
-**Attributes** `{.class #id key=value}` at the end of a heading or image, or alone on the line before a
-block: `x y w h` (`%` `in` `cm` `pt`), `size`, `color`, `fill`, `align`, `valign`, `bold`, `radius`,
-`icon=name`. Classes: `.primary .accent .danger .success .muted` (colours), `.plain` (no card), `.kpi`,
+**Attributes** `{.class key=value}` at the end of a heading or image, or alone on the line before a
+block: `x y w h` (`%` `in` `cm` `pt`), `size`, `color`, `fill`, `align`, `valign`, `bold`, `icon=name`. Classes: `.primary .accent .danger .success .muted` (colours), `.plain` (no card), `.kpi`,
 `.zebra` (table rows), `.badge` (inline pill).
 
 **Inline:** `**b**` `*i*` `~~s~~` `` `code` `` `==accent==` `[text]{.danger}` `[済]{.badge .success}`
@@ -174,10 +173,9 @@ block: `x y w h` (`%` `in` `cm` `pt`), `size`, `color`, `fill`, `align`, `valign
 - **KPI card:** `## Label {.kpi icon=yen}` + value line + caption line. Up to 4 in a row; `@end` + a list or
   table below them.
 - **Callout:** `> [!note] text` (`tip` `warn` `caution`), at slide level or inside a box.
-- **Icons:** `icon=` on any box heading: `check x warning info user users building factory chart money yen
-  target rocket lightbulb gear clock calendar document mail phone globe lock shield cloud database search star
-  heart truck cart leaf arrow-up arrow-down arrow-right trophy briefcase chat bolt flag key code`, or
-  `icon=logo.svg`.
+- **Icons:** `icon=` on a box heading: `check warning info user users building chart money yen target rocket
+  lightbulb gear clock calendar document globe shield cloud database truck leaf trophy flag` (more exist; a
+  wrong name is fixed to the nearest), or `icon=logo.svg`.
 - **Flowchart:** ` ```mermaid ` with `graph TD` / `graph LR`, `A[申請] --> B{承認?}`, `B -->|yes| C`.
 - **Org chart:** `@.a./bcd a>b a>c a>d` then `## 社長` `## 営業` `## 開発` `## 管理`.
 - **Math:** ` ```math ` LaTeX → native equation. **Images:** `![what it shows](a.png)` (alt text required);
@@ -216,6 +214,6 @@ quotes (`"1,6"`) or `;` rows (`T1;1,6;1,9`). Charts show numbers in the viewer's
 
 - One message per slide (the `>` lead); at most 4 boxes × 6 bullets and 8 table rows, else split the slide.
 - Never set positions unless asked; the layout fits and sizes text by itself.
-- Every image has alt text. Keep text colours readable on their fill.
+- Every image has alt text.
 - Warnings: `overflow` (shorten or split), `contrast` (paste the colour from the hint), `missing-end` (add
   `@end`), `unknown-*` (follow the did-you-mean). Fix only the named line.
