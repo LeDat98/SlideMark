@@ -585,11 +585,13 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
 - [x] Owner decisions (PowerPoint check, PyPI deferred, AC4 on >= 5-slide briefs, L3 on content-rich decks) recorded
       in TARGETS.md and AGENT_COST.md (c22c3d7, 2026-10-06)
 - [ ] AC4 (open; >= 5-slide briefs at 41%, gate 35%)
-- [ ] Long briefs (owner, 2026-10-06): add 2–3 briefs of 20–30 slides (EN, dense JA, VI with brand colours) to the
-      agent-cost bench, all three arms, 3 runs each. Hypothesis to confirm: the ratio falls with deck length because
-      SlideMark's per-run cost is mostly fixed (SKILL.md + re-reads) while python-pptx output grows ~4–5x faster per
-      slide (run 6 medians above start: 3 slides 18.0k vs 32.8k = 55%, 5 slides 20.0k vs 45.7k = 44%, 10 slides
-      24.3k vs 75.3k = 32%). Record per-length ratios; watch for new fix loops on long decks.
+- [ ] Deck-length bench (owner, 2026-10-06; replaces the 20–30 slide brief idea): ONE shared topic for both arms,
+      three briefs of the same topic: T1 at most 5 slides, T2 at most 15, T3 at most 25. One run per arm per brief
+      (SlideMark skill-only + python-pptx = 6 runs total), python-pptx numbers reused until the brief set changes.
+      Topic: a fictional company's FY2027 business plan, Japanese business style (dense JA is the first-class target),
+      content given word for word, T2/T3 extend T1 with more sections rather than a new subject. Report per brief:
+      model calls, output tokens, cost above common start, ratio vs python-pptx, accepted yes/no. Hypothesis: the ratio
+      falls with deck length (run 6 medians above start: 3 slides 55%, 5 slides 44%, 10 slides 32%).
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or

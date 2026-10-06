@@ -214,9 +214,10 @@ chart XML), slide count, 16:9, native chart and table counts, notes where asked.
 sees only one contact sheet per deck, not the arm, and reports from a fixed list: overflow, overlap, cut-off
 text, tiny text beside a large empty area, a cover that is not a cover, missing data labels.
 
-**Size.** The six pilot runs cost 1.75M units. Per run day: a smoke test of 3 briefs × `skill-only` × 1.
-Full matrix (9 briefs × 2 SlideMark arms × 3) when SKILL.md, the CLI output or the lint rules change. Keep to
-two subagents at a time.
+**Size (owner, 2026-10-06: keep eval runs light, they spend the owner's account).** The six pilot runs cost
+1.75M units. Default eval: the deck-length bench in `docs/PLAN.md` (one shared topic, briefs of at most 5, 15 and
+25 slides, one run per arm per brief, python-pptx reused). Per run day at most one `skill-only` smoke run. The full
+matrix (9 briefs × 2 SlideMark arms × 3) only when the owner asks. Keep to two subagents at a time.
 
 ## Work packages, in order
 
