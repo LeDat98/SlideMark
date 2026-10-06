@@ -3256,6 +3256,13 @@ def _conclusion_style(ctx: _Ctx, slide: Slide, st: Style, index: int) -> Style:
     if not sizes:
         return st
     want = min(max(base, max(sizes) * lt.conclusion_min_ratio), max(lt.conclusion_max_pt, base))
+    lines = ["".join(r.text for r in p.runs) for p in slide.conclusion.paragraphs] if slide.conclusion else []
+    em = max((measure.text_em(t, bold=True, font=st.font) for t in lines if t.strip()), default=0.0)
+    if em > 0:  # the bar stays one line when it fits at its theme size (no orphan word on a second line)
+        pad = 4 * measure.cell_pad()[0]  # text insets of the bar, generously
+        room = (ctx.W - 2 * to_emu(ctx.theme.margin_x) - pad) / EMU_PER_PT * (1.0 - lt.l3_wrap_margin)
+        if em * base <= room:
+            want = min(want, room / em)
     return st if want <= base else st.merged(fast_style(font_size=want))
 
 
