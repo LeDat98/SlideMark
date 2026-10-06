@@ -19,7 +19,7 @@ from pygments.token import Comment, Keyword, Name, Number, Operator, String
 from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Series, Style, Table
 from ..layout import measure
 from ..layout.css import border_spec, cell_insets
-from ..layout.tables import column_widths, table_grid
+from ..layout.tables import column_widths, compact_header, table_grid
 from ..theme import DEFAULT_SIZES, Theme
 from .effects import apply_fill, apply_shadow
 from .text import _ANCHOR, fill_text
@@ -166,6 +166,10 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             tblPr.remove(child)
     cw = pl.element.attrs.get("_col_w") or column_widths(t, ncols, anchors, pl.w)
     rh = pl.element.attrs.get("_row_h") or [max(pl.h // nrows, 1)] * nrows
+    if pl.element.attrs.get(
+        "_row_h"
+    ):  # a stretched table: header rows stay compact, the body takes the slack
+        rh = compact_header(t, anchors, cw, pl.style, pl.font_scale, rh, measure.tokens().table_header_max)
     for i, w in enumerate(cw[:ncols]):
         tbl.columns[i].width = Emu(int(w))
     for i, h in enumerate(rh[:nrows]):
@@ -202,6 +206,7 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             )
             if fill.lower().startswith(("linear", "radial")):
                 _cell_fill(rc, cell, Style(fill=fill))
+    grouped = t.header_rows > 0 and any(ct.colspan > 1 for r, _c, ct in anchors if r < t.header_rows)
     for r, c, ct in anchors:
         cell = tbl.cell(r, c)
         rs = min(max(ct.rowspan, 1), nrows - r)
@@ -217,6 +222,10 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 )
         hdr = r < t.header_rows
         st = theme.table_cell_style(pl.style, hdr, c < t.header_cols, cs, ct.style)
+        if grouped and c >= t.header_cols and not (ct.style and ct.style.align) and (hdr or cs > 1):
+            st = st.merged(
+                Style(align="center")
+            )  # grouped header: sub-headers and spanning bars are centered
         if ct.style and (ct.style.fill or ct.style.opacity is not None):
             _cell_fill(rc, cell, Style(fill=ct.style.fill or fill_of[(r, c)], opacity=ct.style.opacity))
         for rr in range(r, r + rs):  # a merged cell: the covered cells share its borders

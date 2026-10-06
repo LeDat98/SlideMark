@@ -662,3 +662,236 @@ def _label_rect(
         ):
             return r
     return cands[0]
+
+
+# --------------------------------------------------------------------------- slide-level trees (a>b links)
+
+_CHROME_ROLES = ("title", "subtitle", "lead", "conclusion", "footnote", "caption")
+
+
+def fill_tree(items: list, body: Rect, lt, reserve: int = 0) -> list:
+    """Org chart / issue tree (``@a>b b>c`` boxes) on a slide with room: grow it down the body, top-anchored.
+
+    Box heights, the gaps between levels, the box text (heading + body) and a lone root box grow, each capped
+    by a ``layout.tree_*`` token; connectors are re-attached (bottom-middle to top-middle). Anything unusual
+    (side-by-side links, icons, other blocks on the slide, a slide that is already full) returns ``items``
+    unchanged. Never raises.
+    """
+    try:
+        return _fill_tree(items, body, lt, reserve)
+    except Exception:
+        return items
+
+
+def _rect4(p) -> tuple[int, int, int, int]:
+    return (p.x, p.y, p.w, p.h)
+
+
+def _tree_text_h(p, width: int, scale: float) -> float:
+    from . import css
+
+    ph, pv = css.inset_hv(p.style)
+    return measure.paragraphs_height(p.element.paragraphs, max(width - ph, 1), p.style, scale) + pv
+
+
+def _tree_stack(
+    items: list, b: int, ms: list[int], dw: int, tf: float
+) -> tuple[list[tuple[int, int, int]], int]:
+    """Text of box ``b`` at factor ``tf`` and ``dw`` more width: ([(item, y offset, height)], used height).
+
+    The heading band grows with its text; the gaps between paragraphs and the padding scale with ``tf``.
+    """
+    box = items[b]
+    res: list[tuple[int, int, int]] = []
+    cursor = 0
+    prev = box.y  # bottom of the previous member in the old geometry
+    for n, j in enumerate(ms):
+        q = items[j]
+        w = q.w + dw
+        grow = 0
+        if tf > 1.0:
+            grow = round(_tree_text_h(q, w, q.font_scale * tf) - _tree_text_h(q, w, q.font_scale))
+        head = n == 0 and getattr(q.element, "role", "") == "heading" and q.y - box.y <= 2
+        if not head:
+            cursor += round(max(q.y - prev, 0) * tf)
+        res.append((j, cursor, q.h + grow))
+        cursor += q.h + grow
+        prev = q.y + q.h
+    last = items[ms[-1]] if ms else None
+    tail = max(box.y + box.h - (last.y + last.h), 0) if last is not None else 0
+    return res, cursor + round(tail * tf)
+
+
+def _fill_tree(items: list, body: Rect, lt, reserve: int) -> list:
+    from ..ir import Container as C
+    from .vfill import _contains, _is_line
+
+    if lt.tree_fill <= 0 or body.h <= 0:
+        return items
+    lines = [i for i, p in enumerate(items) if _is_line(p) and p.element.attrs.get("src_box")]
+    if not lines:
+        return items
+    for i in lines:
+        a = items[i].element.attrs
+        sb, db = a["src_box"], a["dst_box"]
+        if a.get("route") != "v" or db[1] < sb[1] + sb[3]:
+            return items  # only downward links
+    by_rect = {_rect4(p): i for i, p in enumerate(items) if isinstance(p.element, C)}
+    boxes: dict[tuple, int] = {}
+    for i in lines:
+        for k in ("src_box", "dst_box"):
+            r = tuple(items[i].element.attrs[k])
+            if r not in by_rect:
+                return items
+            boxes[r] = by_rect[r]
+    members: dict[int, list[int]] = {b: [] for b in boxes.values()}
+    owned = set(lines) | set(boxes.values())
+    for j, p in enumerate(items):
+        if j in owned:
+            continue
+        for b in members:
+            if _contains(items[b], p):
+                if not isinstance(p.element, Text) or not p.element.paragraphs:
+                    return items  # icons, nested boxes, pictures: leave the tree alone
+                members[b].append(j)
+                break
+        else:
+            el = p.element
+            chrome = p.y < body.y - 2 or (
+                isinstance(el, Text) and (el.role in _CHROME_ROLES or el.attrs.get("field"))
+            )
+            if not chrome:
+                return items  # another block shares the slide: the tree does not own the body
+    for b in members:
+        members[b].sort(key=lambda j: items[j].y)
+    # ---- levels
+    order = sorted(boxes.values(), key=lambda i: (items[i].y, items[i].x))
+    rows: list[list[int]] = []
+    bottom = -1
+    for i in order:
+        p = items[i]
+        if rows and p.y < bottom - 2:
+            rows[-1].append(i)
+            bottom = max(bottom, p.y + p.h)
+        else:
+            rows.append([i])
+            bottom = p.y + p.h
+    top0 = min(items[i].y for i in order)
+    row_h = [max(items[i].h for i in r) for r in rows]
+    row_y = [min(items[i].y for i in r) for r in rows]
+    gaps = [row_y[k + 1] - (row_y[k] + row_h[k]) for k in range(len(rows) - 1)]
+    if any(g < 0 for g in gaps):
+        return items
+    cur = row_y[-1] + row_h[-1] - top0
+    target = min(round(lt.tree_fill * body.h), body.bottom - reserve - top0)
+    if target <= cur * 1.03:
+        return items  # no slack: dense trees stay as they are
+    hb, gs = sum(row_h), sum(gaps)
+    sb = min(target / cur, lt.tree_box_grow)
+    sg = 1.0
+    if gs > 0:
+        sg = max(1.0, min((target - hb * sb) / gs, lt.tree_gap_grow))
+    sb = max(1.0, min((target - gs * sg) / hb, lt.tree_box_grow))
+    # ---- widths: a lone box of a level (the root) may be wider
+    new_x: dict[int, tuple[int, int]] = {i: (items[i].x, items[i].w) for i in order}
+    for r in rows:
+        p = items[r[0]]
+        if len(r) == 1 and len(rows) > 1 and lt.tree_wide > 1.0 and p.w < lt.tree_wide_max * body.w:
+            w = min(round(p.w * lt.tree_wide), round(lt.tree_wide_max * body.w))
+            new_x[r[0]] = (min(max(p.x + p.w // 2 - w // 2, body.x), max(body.right - w, body.x)), w)
+    row_of = {b: k for k, r in enumerate(rows) for b in r}
+
+    def pt(p, tf: float) -> float:
+        return (p.style.font_size or 14) * p.font_scale * tf
+
+    def fits(tf: float) -> bool:
+        for b, ms in members.items():
+            dw = new_x[b][1] - items[b].w
+            stack, used = _tree_stack(items, b, ms, dw, tf)
+            if used > round(row_h[row_of[b]] * sb):
+                return False
+            for j in ms:
+                p = items[j]
+                cap = lt.sparse_text_max_pt if p.element.role == "heading" else lt.l3_text_max_pt
+                if pt(p, tf) > max(cap, pt(p, 1.0)):
+                    return False
+                w = p.w + dw
+                m0, m1 = _tree_text_h(p, w, p.font_scale), _tree_text_h(p, w, p.font_scale * tf)
+                if m1 > m0 * tf * 1.06:
+                    return False  # growing would add a wrapped line
+        return True
+
+    tf = 1.0
+    for k in range(max(round((lt.tree_text_max - 1.0) / 0.05), 0), 0, -1):
+        if fits(round(1.0 + 0.05 * k, 2)):
+            tf = round(1.0 + 0.05 * k, 2)
+            break
+    # ---- row heights: boxes keep an airy fit around their text, the rest of the growth goes to the gaps
+    nhs: list[int] = []
+    for k, r in enumerate(rows):
+        need = max(_tree_stack(items, b, members[b], new_x[b][1] - items[b].w, tf)[1] for b in r)
+        nhs.append(min(round(row_h[k] * sb), max(row_h[k], round(need * lt.tree_box_air))))
+    if gs > 0:
+        sg = max(1.0, min((target - sum(nhs)) / gs, lt.tree_gap_grow))
+    # ---- new geometry
+    out = list(items)
+    new_rect: dict[tuple, tuple[int, int, int, int]] = {}
+    y = top0
+    for k, r in enumerate(rows):
+        nh = nhs[k]
+        for b in r:
+            p = items[b]
+            bx, bw = new_x[b]
+            out[b] = p.model_copy(update={"x": bx, "y": y, "w": bw, "h": nh})
+            new_rect[_rect4(p)] = (bx, y, bw, nh)
+            stack, used = _tree_stack(items, b, members[b], bw - p.w, tf)
+            spare = max(nh - used, 0)
+            shift = round(spare * lt.tree_pad_share)  # part of the growth is padding above the body text
+            for n, (j, off, h) in enumerate(stack):
+                q = items[j]
+                head = n == 0 and q.element.role == "heading" and q.y - p.y <= 2
+                out[j] = q.model_copy(
+                    update={
+                        "x": q.x + (bx - p.x),
+                        "y": y + off + (0 if head else shift),
+                        "w": q.w + (bw - p.w),
+                        "h": h,
+                        "font_scale": q.font_scale * tf,
+                    }
+                )
+        y += nh + (round(gaps[k] * sg) if k < len(gaps) else 0)
+    # ---- connectors: bottom-middle of the parent to top-middle of the child
+    tol = round(0.03 * IN)
+    all_new = list(new_rect.values())
+    for i in lines:
+        p = items[i]
+        a = p.element.attrs
+        ra, rb = new_rect[tuple(a["src_box"])], new_rect[tuple(a["dst_box"])]
+        p0 = (ra[0] + ra[2] // 2, ra[1] + ra[3])
+        p1 = (rb[0] + rb[2] // 2, rb[1])
+        elbow = abs(p1[0] - p0[0]) > tol
+        if not elbow:
+            p1 = (p0[0], p1[1])
+        else:  # the bend must stay clear of every other box
+            cy = p0[1] + round((p1[1] - p0[1]) * a.get("adj", 0.5))
+            pts = [p0, (p0[0], cy), (p1[0], cy), p1]
+            if _poly_hits(pts, [Rect(*bx) for bx in all_new if bx not in (ra, rb)]):
+                return items
+        attrs = {
+            **a,
+            "flip_h": p1[0] < p0[0],
+            "flip_v": False,
+            "elbow": elbow,
+            "src_box": list(ra),
+            "dst_box": list(rb),
+        }
+        out[i] = p.model_copy(
+            update={
+                "element": p.element.model_copy(update={"attrs": attrs}),
+                "x": min(p0[0], p1[0]),
+                "y": p0[1],
+                "w": abs(p1[0] - p0[0]),
+                "h": p1[1] - p0[1],
+            }
+        )
+    return out

@@ -248,6 +248,22 @@ class LayoutTokens(BaseModel):
         0.9  # ... a sparse panel gives back this share of its empty height (ends at its content)
     )
     l3_short_items: int = 4  # ... before the row is shortened to meet l3_tail_max (top-anchored)
+    # --- org charts / issue trees (slide-level a>b links) and compact table headers
+    tree_fill: float = (
+        0.92  # a linked tree grows (top-anchored) until it fills this share of the body (0 = off)
+    )
+    tree_box_grow: float = 1.6  # ... its boxes become at most this much taller ...
+    tree_gap_grow: float = 3.0  # ... and the connector gaps between levels at most this much larger
+    tree_text_max: float = 1.4  # ... box text steps up by at most this factor (body <= l3_text_max_pt)
+    tree_box_air: float = (
+        1.15  # ... but a box is at most this much taller than its text (the rest goes to the gaps)
+    )
+    tree_pad_share: float = 0.5  # ... and this share of the height the text leaves free moves the body down
+    tree_wide: float = 1.3  # ... a lone box of a level (the root) may be this much wider ...
+    tree_wide_max: float = 0.6  # ... but never beyond this share of the body width
+    table_header_max: float = (
+        1.4  # a stretched table keeps header rows <= this x their natural height (0 = off)
+    )
 
 
 class RenderTokens(BaseModel):

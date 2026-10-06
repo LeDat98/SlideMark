@@ -31,6 +31,7 @@ from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import css, measure
+from .diagram import fill_tree
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
 from .l3fill import fill_chevron_row, fill_panels, fill_row
@@ -3420,6 +3421,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             if done.out and not done.over:
                 final_ctx = done
         if kind == "content" and not final_ctx.over and final_ctx.out:
+            if slide.links:  # org chart / issue tree: grow it down the body (diagram.fill_tree)
+                final_ctx.out = fill_tree(
+                    final_ctx.out,
+                    body,
+                    ctx.lt,
+                    _emu(ctx.lt.top_gap) if (slide.conclusion or slide.footnotes) else 0,
+                )
             final_ctx.out = fill_body(
                 final_ctx.out,
                 body,

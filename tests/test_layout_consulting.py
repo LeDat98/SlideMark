@@ -206,7 +206,7 @@ def test_org_tree_boxes_hug_their_text():
     placed, _ = lay(s, "jp-business")
     cs = cards(placed)
     assert len(cs) == 4
-    assert max(c.h for c in cs) < 0.2 * H  # one heading + one line, not 30% of the body
+    assert max(c.h for c in cs) < 0.25 * H  # one heading + one line (grown to use the body), not 30%
     ys = sorted({c.y for c in cs})
     assert len(ys) == 3
     gap = ys[1] - (ys[0] + cs[0].h)
