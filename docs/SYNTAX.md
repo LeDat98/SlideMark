@@ -331,7 +331,7 @@ Chart options go in the fence attributes:
 | `fmt` | Excel number format for labels and the value axis, e.g. `0.0`, `#,##0`, `0%` | general |
 | `min`, `max` | value axis bounds | auto |
 | `colors` | comma list of theme names or hex, one per series (per point for pie) | theme palette |
-| `axis` | `off` hides the value axis and gridlines | `on` |
+| `axis` | `off` hides the value axis and gridlines, `on` keeps them | auto: bar/column with `labels=on` and <= 4 categories hide them (the labels carry the numbers) |
 | `hl` | comma list of categories to emphasise: their points take `render.chart_hl` (default `accent`); on a one-series bar/column/waterfall the other points keep their color | none |
 | `note` | one-line takeaway: a native callout (class `.chart-note`) inside the chart frame, pointing at the first `hl` point when there is one | none |
 

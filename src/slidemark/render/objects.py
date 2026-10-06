@@ -10,6 +10,7 @@ from pptx.dml.color import RGBColor
 from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION, XL_TICK_LABEL_POSITION
 from pptx.enum.dml import MSO_LINE
 from pptx.enum.text import MSO_ANCHOR
+from pptx.oxml import parse_xml
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 from pygments import lex
@@ -22,7 +23,7 @@ from ..layout.css import border_spec, cell_insets
 from ..layout.tables import column_widths, compact_header, table_grid
 from ..theme import DEFAULT_SIZES, Theme
 from . import waterfall as wfall
-from .axis import resolve_axis
+from .axis import axis_shown, label_pt, line_axis, resolve_axis
 from .charthl import apply_hl, pin_plot
 from .effects import apply_fill, apply_shadow
 from .text import _ANCHOR, fill_text
@@ -481,6 +482,17 @@ def _style_waterfall_series(ser, si: int, plan: dict, theme: Theme, size: float,
         dl.position = XL_LABEL_POSITION.INSIDE_BASE
 
 
+def _hide_labels(sdl, idxs: list[int]) -> None:
+    """Delete the data labels of the points ``idxs`` (a label that cannot fit its segment is hidden)."""
+    dls = sdl._element
+    for k, i in enumerate(sorted(idxs)):
+        dl = parse_xml(
+            f'<c:dLbl xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">'
+            f'<c:idx val="{i}"/><c:delete val="1"/></c:dLbl>'
+        )
+        dls.insert(k, dl)
+
+
 def _hide_legend_entry(chart, idx: int) -> None:
     leg = chart._chartSpace.find(".//" + qn("c:legend"))
     if leg is None:
@@ -635,7 +647,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     if lab_on and kind not in ("scatter", "waterfall"):  # python-pptx has no data labels for XY series
         plot.has_data_labels = True
         dl = plot.data_labels
-        dl.font.size = Pt(size * theme.render.chart_label_scale)
+        dl.font.size = Pt(label_pt(kind, ncat, size, theme.render))
         dl.font.color.rgb = fg
         if lab_pct and pie:
             dl.show_value, dl.show_percentage = False, True
@@ -652,6 +664,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             dl.position = XL_LABEL_POSITION.OUTSIDE_END
         elif kind == "line":
             dl.position = XL_LABEL_POSITION.ABOVE
+    seg_fits_cache: dict = {}
     for plot in chart.plots:
         for si, ser in enumerate(plot.series):
             color = pal[si % len(pal)]
@@ -691,7 +704,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 if lab_on and kind in ("stacked-bar", "stacked-column"):  # labels sit inside the fill
                     sdl = ser.data_labels
                     sdl.show_value = True
-                    sdl.font.size = Pt(size * theme.render.chart_label_scale)
+                    seg_pt = label_pt(kind, ncat, size, theme.render)
+                    sdl.font.size = Pt(seg_pt)
                     sdl.font.color.rgb = RGBColor.from_string(
                         _ink_hex(theme, color, label_color_on(color, theme))
                     )
@@ -701,6 +715,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                         f"{nf};-{nf};;" if nf and ";" not in nf else (nf or "General;-General;;")
                     )
                     sdl.number_format_is_linked = False
+                    fits = seg_fits_cache.setdefault("f", chartnote.seg_fits(ch, pl, theme, seg_pt))
+                    _hide_labels(sdl, [ci for ci in range(ncat) if fits.get((si, ci)) is False])
     if kind == "doughnut":
         hole = chart.plots[0]._element.find(qn("c:holeSize"))
         if hole is not None:
@@ -726,7 +742,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         return
     try:
         va = chart.value_axis
-        if str(opts.get("axis", "on")).lower() in ("off", "false", "no", "0"):
+        if not axis_shown(opts, kind, ncat, lab_on, theme.render):
             va.visible = False
             va.has_major_gridlines = False
         else:
@@ -746,7 +762,14 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             wf["axis"] if wf else None,
             _all_nonneg(ch),
             wf["top"] if wf else None,
+            ncat=ncat,
+            tight=not axis_shown(opts, kind, ncat, lab_on, theme.render),
         )
+        if kind == "line" and lo is None and hi is None and not unit:
+            la = line_axis([s.values for s in series], theme.render)
+            # data far from zero: the axis starts above it (a flat 0-9 axis hides the trend)
+            if la and la[0] > 0:
+                lo, hi, unit = la
         if note_plan and note_plan.axis:  # the pointer of a `note=` needs the exact scale
             lo, hi, unit = note_plan.axis
         if wf and wf["axis"] and wf["axis"][0] < 0:

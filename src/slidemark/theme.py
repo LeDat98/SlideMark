@@ -320,6 +320,7 @@ class LayoutTokens(BaseModel):
     chart_note_edge_em: float = 1.0  # air at the left / right chart edge
     chart_note_max_w: float = 0.62  # a note is at most this share of the plot width
     chart_note_gap_em: float = 0.5  # air between the note and bars / labels
+    chart_note_inset_em: float = 1.0  # air between the note and the top of the plot (the chart title / axis)
     chart_note_slack: float = (
         1.12  # a note's text width is estimated this much wider (bold CJK + latin spacing)
     )
@@ -486,6 +487,16 @@ class RenderTokens(BaseModel):
         180  # ... for a chart with at most `chart_gap_few_cats` categories (fat bars look crude)
     )
     chart_gap_few_cats: int = 3
+    chart_axis_lines_min_few: int = 3  # ... a chart with at most `chart_gap_few_cats` categories needs fewer
+    chart_axis_off_cats: int = 4  # `labels=on` bar / column charts with at most this many categories drop the
+    # value axis and gridlines (the labels carry the numbers; `axis=on` keeps them); 0 = never
+    chart_label_scale_few: float = (
+        1.2  # value labels of a sparse chart (<= `chart_gap_few_cats`): x chart text
+    )
+    chart_seg_label_scale: float = 1.1  # labels inside stacked segments: x chart text size (never below it)
+    chart_seg_pad: float = 1.3  # a segment label needs this multiple of its font size as height
+    chart_line_zero_max: float = 0.4  # a line chart axis starts above zero when its lowest value is above
+    # this share of its highest
     chart_hl: str = "accent"  # `hl=` points: fill (bar / column / pie / waterfall), outline, line marker
     chart_hl_line: float = 2.25  # pt, outline of an `hl=` bar in a multi-series chart
     chart_hl_marker: int = 11  # pt, marker of an `hl=` point in a line chart

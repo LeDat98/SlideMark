@@ -88,17 +88,17 @@ def test_legend_defaults_and_positions(tmp_path):
 
 
 def test_labels_fmt_and_axis_bounds(tmp_path):
-    c, _ = chart_of(tmp_path, mk(labels="on", fmt="#,##0.0", min=0, max=10))
+    c, _ = chart_of(tmp_path, mk(labels="on", fmt="#,##0.0", min=0, max=10, axis="on"))
     dl = c.plots[0].data_labels
     assert dl.show_value and dl.number_format == "#,##0.0" and not dl.number_format_is_linked
-    assert dl.font.size.pt < 14
+    assert dl.font.size.pt < 18
     va = c.value_axis
     assert va.minimum_scale == 0 and va.maximum_scale == 10
     assert va.tick_labels.number_format == "#,##0.0" and not va.tick_labels.number_format_is_linked
 
 
 def test_percent_flag_default_format(tmp_path):
-    c, _ = chart_of(tmp_path, mk(labels="on", percent=True))
+    c, _ = chart_of(tmp_path, mk(labels="on", percent=True, axis="on"))
     assert c.plots[0].data_labels.number_format == '0"%"'
     assert c.value_axis.tick_labels.number_format == '0"%"'
     c, _ = chart_of(tmp_path, mk(labels="on", percent=True, fmt="0.0"))

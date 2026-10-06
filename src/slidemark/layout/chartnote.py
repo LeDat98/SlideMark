@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 from ..ir import Chart, Paragraph, Placed, Run, Shape, Text, fast_style
 from ..render import waterfall as wfall
-from ..render.axis import line_axis, resolve_axis
+from ..render.axis import axis_shown, label_pt, line_axis, resolve_axis
 from ..theme import DEFAULT_SIZES, Theme
 from ..units import EMU_PER_PT
 from . import css, measure
@@ -141,7 +141,7 @@ def _data(ch: Chart, theme: Theme) -> _Data | None:
             ext[i] = (blo, bhi)
             neg = bhi <= 0 and blo < 0
             above[i], below[i] = lab_on and not neg, lab_on and neg
-        axis = resolve_axis(kind, [], rt, lo, hi, wf_axis, True)
+        axis = resolve_axis(kind, [], rt, lo, hi, wf_axis, True, ncat=n)
         return _Data(kind, cats, ext, above, below, 1, axis, lab_on, fmt, 1)
     drawn = stack_totals(ch, series, lab_on, opts, rt) if kind.startswith("stacked") else series
     vals = [[_num(v) for v in s.values] + [None] * (n - len(s.values)) for s in series]
@@ -167,7 +167,8 @@ def _data(ch: Chart, theme: Theme) -> _Data | None:
     if not stacked and kind != "area":
         nser = len(series)
     nonneg = all(v is None or v >= 0 for s in vals for v in s)
-    axis = resolve_axis(kind, [s.values for s in drawn], rt, lo, hi, None, nonneg and bool(vals))
+    tight = not axis_shown(opts, kind, n, lab_on, rt)
+    axis = resolve_axis(kind, [s.values for s in drawn], rt, lo, hi, None, nonneg and bool(vals), n, tight)
     if kind == "line" and (axis[0] is None or axis[1] is None):
         la = line_axis(vals, rt)
         if la:
@@ -195,7 +196,7 @@ def plot_fractions(
     top = (lt.chart_note_title_em if ch.title else lt.chart_note_top_em) * em
     bottom = lt.chart_note_axis_em * em
     left = right = lt.chart_note_edge_em * em
-    axis_on = str(ch.options.get("axis", "on")).strip().lower() not in ("off", "false", "no", "0")
+    axis_on = axis_shown(ch.options, d.kind, len(d.cats), d.labels, theme.render)
     lo, hi, _ = d.axis
     ticks = [_num_text(v, d.fmt) for v in (lo, hi) if v is not None]
     tick_w = max((_text_w(t, size) for t in ticks), default=0.0)
@@ -246,7 +247,7 @@ def _marks(ch: Chart, d: _Data, frac, W: int, H: int, size: float, theme: Theme)
         return None
     px, py, pw, ph = frac[0] * W, frac[1] * H, frac[2] * W, frac[3] * H
     n = len(d.cats)
-    lab = size * rt.chart_label_scale
+    lab = label_pt(d.kind, n, size, rt)
     lab_h = lab * 1.45 * EMU_PER_PT
     lab_w = [
         _text_w(_num_text(max(abs(e[0]), abs(e[1])), d.fmt), lab) + 0.8 * lab * EMU_PER_PT if e else 0.0
@@ -313,6 +314,47 @@ def _marks(ch: Chart, d: _Data, frac, W: int, H: int, size: float, theme: Theme)
         rects.append((cx - half, yt, cx + half, yb))
         target.append((cx, yt - air))
     return _Marks((px, py, px + pw, py + ph), rects, target, [None] * n, lambda v: 0.0, vy2)
+
+
+# --------------------------------------------------------------------------- segment labels
+
+
+def seg_fits(ch: Chart, pl: Placed, theme: Theme, pt: float) -> dict[tuple[int, int], bool]:
+    """(series, category) -> whether a ``pt`` label fits inside its segment of a stacked chart (estimated
+    from the same plot geometry as the note). Absent keys: no segment (missing or zero value)."""
+    out: dict[tuple[int, int], bool] = {}
+    d = _data(ch, theme)
+    if d is None or not ch.kind.startswith("stacked") or pl.w <= 0 or pl.h <= 0:
+        return out
+    lo, hi, _ = d.axis
+    if lo is None or hi is None or hi <= lo:
+        return out
+    rt = theme.render
+    size = chart_size(pl, theme)
+    px, py, pw, ph = plot_fractions(ch, d, pl.w, pl.h, size, theme)
+    px, py, pw, ph = px * pl.w, py * pl.h, pw * pl.w, ph * pl.h
+    n = len(d.cats)
+    gw = ch.options.get("gap_width")
+    gap = (
+        _num(gw)
+        if _num(gw) is not None
+        else (rt.chart_gap_few if n <= rt.chart_gap_few_cats else rt.chart_gap)
+    )
+    thick = (ph if ch.kind in HORIZONTAL else pw) / max(n, 1) / (1 + gap / 100)
+    along = pw if ch.kind in HORIZONTAL else ph
+    lab_h = pt * rt.chart_seg_pad * EMU_PER_PT
+    for si, s in enumerate(ch.series):
+        for ci, v in enumerate(s.values):
+            f = _num(v)
+            if not f:
+                continue
+            seg = abs(f) / (hi - lo) * along
+            text_w = _text_w(_num_text(f, d.fmt), pt) + 0.6 * pt * EMU_PER_PT
+            if ch.kind in HORIZONTAL:
+                out[(si, ci)] = seg >= text_w and thick >= lab_h
+            else:
+                out[(si, ci)] = seg >= lab_h and thick >= text_w
+    return out
 
 
 # --------------------------------------------------------------------------- the note itself
@@ -442,7 +484,9 @@ def _plan(ch: Chart, pl: Placed, theme: Theme, note: str) -> NotePlan:
         plot = (edge, top, W - edge, H - edge)
     room = 0.3 * em
     maxw = min(lt.chart_note_max_w * (plot[2] - plot[0]), plot[2] - plot[0] - 2 * room)
-    area = (plot[0], plot[1], W - room, plot[3]) if horizontal and marks else plot  # may use the right margin
+    lift = max(lt.chart_note_inset_em * em - room, 0.0)  # clear of the title / top axis line
+    right = W - room if horizontal and marks else plot[2]  # horizontal bars may use the right margin
+    area = (plot[0], plot[1] + lift, right, plot[3])
     hl = resolve_hl(ch, d.cats if d else [str(c) for c in ch.categories])
     hi_ = hl[0] if hl else None
     tgt = marks.target[hi_] if marks and hi_ is not None and marks.target[hi_] else None
