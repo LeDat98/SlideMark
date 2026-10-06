@@ -3224,6 +3224,41 @@ def _layout_free(ctx: _Ctx, elements: list, body: Rect, slide: Slide, theme: The
     return c
 
 
+_CONC_TRIAL: list[bool] = []  # non-empty while a trial layout (bar at its theme size) is measuring the body
+
+
+def _conclusion_style(ctx: _Ctx, slide: Slide, st: Style, index: int) -> Style:
+    """The conclusion bar is never smaller than the largest card / box body text of its slide.
+
+    A trial layout with the bar at its theme size measures that text (after sparse growth); the bar then takes
+    ``conclusion_min_ratio`` x that size, clamped to [theme size, ``conclusion_max_pt``]. Explicit sizes
+    (``sizes: conclusion=``, CSS, ``{size=}``) win.
+    """
+    lt = ctx.lt
+    base = _role_style(ctx, "conclusion").font_size
+    if "conclusion" in ctx.theme.sizes and st.font_size == base:  # `sizes: conclusion=N`
+        return st.merged(fast_style(font_size=ctx.theme.sizes["conclusion"]))
+    if _CONC_TRIAL or not lt.conclusion_min_ratio or st.font_size != base:
+        return st
+    if slide.layout in ("free", "cover", "section", "blank") or not slide.elements:
+        return st
+    trial = ctx.deck.model_copy(update={"diagnostics": []})
+    _CONC_TRIAL.append(True)
+    try:
+        placed = _layout(slide, trial, ctx.theme, index)
+    finally:
+        _CONC_TRIAL.pop()
+    sizes = [
+        p.style.font_size * p.font_scale
+        for p in placed
+        if isinstance(p.element, Text) and p.element.role == "body" and p.style.font_size
+    ]
+    if not sizes:
+        return st
+    want = min(max(base, max(sizes) * lt.conclusion_min_ratio), max(lt.conclusion_max_pt, base))
+    return st if want <= base else st.merged(fast_style(font_size=want))
+
+
 def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     try:
         W, H = slide_size(deck.size)
@@ -3461,6 +3496,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         if slide.conclusion is not None and slide.conclusion.paragraphs:
             c = slide.conclusion
             st = _styled(ctx, c, _role_style(ctx, "conclusion"))
+            st = _conclusion_style(ctx, slide, st, index)
             h = max(round(_text_need(ctx, c, st, inner_w, 1.0)), round(0.4 * EMU_PER_INCH))
             h = min(h, round(H * ctx.lt.footnote_max))
             eff = fit_text(c, Rect(0, 0, inner_w, h), st)
