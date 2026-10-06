@@ -274,6 +274,7 @@ class LayoutTokens(BaseModel):
     tree_pad_share: float = 0.5  # ... and this share of the height the text leaves free moves the body down
     tree_wide: float = 1.3  # ... a lone box of a level (the root) may be this much wider ...
     tree_wide_max: float = 0.6  # ... but never beyond this share of the body width
+    tree_head_fit: float = 0.75  # ... unless its heading needs more to stay on one line (share of body width)
     table_header_max: float = (
         1.4  # a stretched table keeps header rows <= this x their natural height (0 = off)
     )
@@ -294,6 +295,7 @@ class LayoutTokens(BaseModel):
     table_box_max: float = 1.0  # ... and within this x the box text of the slide (0 = no limit)
     badge_pad: int = 2  # a badge run of Latin text gets this many no-break spaces on each side
     badge_pad_cjk: int = 1  # ... of CJK text this many full-width spaces
+    badge_headroom: float = 1.3  # a badge and the word before it keep this x their width in a table column
     badge_gap: bool = True  # a badge after text that does not end in a space gets a plain space before it
 
 

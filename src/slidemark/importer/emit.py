@@ -110,7 +110,7 @@ def inline(
             elif r.color and not r.badge and (cname := (classes or {}).get(r.color)) in ("success", "danger"):
                 body = f"[{body}]{{.{cname}}}"
         if r.badge:
-            cls = (classes or {}).get(r.badge, "")
+            cls = _badge_class(r.badge, classes or {})
             body = f"[{body}]{{.badge{(' .' + cls) if cls else ''}}}"
         if r.link:
             body = f"[{body}]({_url(r.link)})"
@@ -222,8 +222,47 @@ def detect_lang(paras: list[ParaT]) -> str | None:
 # --------------------------------------------------------------------------- table
 
 
-def table_lines(rows: list[list[CellT]], *, accent=None, classes=None) -> tuple[list[str], int]:
-    """GFM table with ``<`` / ``^`` merge markers. Returns (lines, merged cells dropped)."""
+_NEAR = 48.0  # RGB distance within which a badge fill still counts as a class color (darkened for contrast)
+
+
+def _badge_class(color: str, classes: dict[str, str]) -> str:
+    """Class name of a badge fill: exact color, else the closest class color (badges use a legible shade)."""
+    if color in classes:
+        return classes[color]
+    try:
+        rgb = [int(color[i : i + 2], 16) for i in (0, 2, 4)]
+        best = min(
+            (
+                (sum((a - int(k[i : i + 2], 16)) ** 2 for a, i in zip(rgb, (0, 2, 4), strict=True)) ** 0.5, v)
+                for k, v in classes.items()
+            ),
+            default=(_NEAR + 1, ""),
+        )
+    except ValueError:
+        return ""
+    return best[1] if best[0] <= _NEAR else ""
+
+
+def header_rows_of(rows: list[list[CellT]]) -> int:
+    """Header rows of an imported table: 1, plus every bold row that continues a header cell (``^``)."""
+
+    def bold_row(row: list[CellT]) -> bool:
+        texts = [p for c in row if not (c.hmerge or c.vmerge) for p in c.paras if p.plain.strip()]
+        return bool(texts) and all(p.all_bold for p in texts)
+
+    n = 1
+    while n < len(rows) - 1 and any(c.vmerge and not c.hmerge for c in rows[n]) and bold_row(rows[n]):
+        n += 1
+    return n
+
+
+def table_lines(
+    rows: list[list[CellT]], *, accent=None, classes=None, header_rows: int = 1
+) -> tuple[list[str], int]:
+    """GFM table with ``<`` / ``^`` merge markers. Returns (lines, merged cells dropped).
+
+    The first ``header_rows`` rows are header rows: their plain text is bold by default (no ``**``).
+    """
     if not rows:
         return [], 0
     ncols = max(len(r) for r in rows)
@@ -244,7 +283,7 @@ def table_lines(rows: list[list[CellT]], *, accent=None, classes=None) -> tuple[
                     [r for p in c.paras for r in (p.runs + [RunT(text="\n")])][:-1] if c.paras else [],
                     accent=accent,
                     classes=classes,
-                    plain_bold=(ri == 0),
+                    plain_bold=(ri < header_rows),
                     cell=True,
                 )
                 cells.append(txt)

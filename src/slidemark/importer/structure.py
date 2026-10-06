@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from functools import cmp_to_key
 
 from ..ir import Diagnostic
-from .emit import chart_lines, detect_lang, one_line, table_lines, text_lines
+from .emit import chart_lines, detect_lang, header_rows_of, one_line, table_lines, text_lines
 from .links import find_links, recover_diagram
 from .links import tokens as link_tokens
 from .read import Item, ParaT, RunT, SlideData
@@ -785,21 +785,26 @@ def _head(paras: list[ParaT], out: Out) -> str:
     return txt[:-1] + "\\}" if txt.endswith("}") else txt
 
 
-def _table_align(rows) -> str | None:
-    """``lrrl`` when the body columns are aligned differently from the automatic rule (figures right)."""
+def _table_align(rows, hdr: int = 1) -> str | None:
+    """``lrrl`` when the body columns are aligned differently from the automatic rule (figures right).
+
+    Spanning cells of a grouped header table are centered by default: they do not vote.
+    """
     from ..layout.tables import NUMERIC_SHARE, is_numeric
 
     ncols = max((len(r) for r in rows), default=0)
     if ncols < 2 or len(rows) < 2:
         return None
+    grouped = any(cell.hmerge for row in rows[:hdr] for cell in row)
     letters, differs = [], False
     for c in range(ncols):
         body = [
             row[c]
-            for row in rows[1:]
+            for row in rows[hdr:]
             if c < len(row)
             and not row[c].hmerge
             and not row[c].vmerge
+            and not (grouped and c + 1 < len(row) and row[c + 1].hmerge)
             and any(p.plain.strip() for p in row[c].paras)
         ]
         if not body:
@@ -865,7 +870,8 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
         lines[0] = f"[!{b.callout}] {lines[0]}"
         return [("quote", ["> " + ln for ln in lines])]
     if b.kind == "table":
-        lines, lost = table_lines(b.item.rows, accent=acc, classes=cls)
+        hdr = header_rows_of(b.item.rows)
+        lines, lost = table_lines(b.item.rows, accent=acc, classes=cls, header_rows=hdr)
         if lost:
             out.diags.append(
                 Diagnostic(
@@ -876,9 +882,10 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
                     hint="< and ^ cannot be combined in one cell; check the table",
                 )
             )
-        align = _table_align(b.item.rows)
-        if align and lines:
-            lines = ["{align=" + align + "}", *lines]
+        align = _table_align(b.item.rows, hdr)
+        attrs = ([f"header={hdr}"] if hdr > 1 else []) + ([f"align={align}"] if align else [])
+        if attrs and lines:
+            lines = ["{" + " ".join(attrs) + "}", *lines]
         return [("table", lines)] if lines else []
     if b.kind == "chart":
         return [("fence", chart_lines(b.item.chart))]
