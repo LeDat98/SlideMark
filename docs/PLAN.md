@@ -453,3 +453,13 @@ Goal: L3 consulting-grade per the run-6 designer review; AC4 gate text unchanged
 - **Wave 3 B2 (`layout/diagram.py`, `layout/tables.py`, `render/text.py`, `importer/`):** `@.a./bcd` area-grid org charts
   fill the body like `@a>b` trees (19 s3) and a lone root box widens until its heading fits on one line; a badge never
   wraps alone onto its own line in a table cell; importer keeps centered merged header cells (19 s4 round trip).
+- **Wave 3 status:** lone chevron rows taller + optically centered, chevrons above tables grow text (11 s4 14.2 → 19.1pt),
+  area-grid org charts widen a lone root, badges measured unbreakable, importer `header=2`; orchestrator: table growth
+  never wraps a one-line cell (narrow-column guard), `2027–2029` kept together (U+2060 in render). 1640 tests.
+- **Designer re-score (run 7, Sonnet, PNGs only):** 11 = 3–3.5, 16 = 3–3.5, 19 = 3; still "no". Top asks: gaps around the
+  conclusion bar, floating text in tall decision cards, empty bands, chips (clipped/tight), chart axis max near the data,
+  fat bars for 2–3 categories, deliberate covers.
+- **Wave 4 B1 (`layout/engine.py`, `layout/l3fill.py`):** conclusion bar keeps one card gutter above it and below it
+  (to the footnote); spread hollow cards stay top-anchored (no lead air); covers: larger title in the band.
+- **Wave 4 B2 (`render/`):** value axis max = a nice number just above the data max (stacked: category sums) unless
+  `max=`; bar gap width scales with few categories; CJK badges never clip glyphs.
