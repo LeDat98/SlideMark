@@ -64,7 +64,7 @@ Cùng một agent (Sonnet), cùng đề bài, mỗi bên chạy 1 lần, đo t�
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-06 · commit `ec8652a` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-06 · commit `c86eaa4` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
