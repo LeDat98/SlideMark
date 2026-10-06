@@ -60,7 +60,7 @@ def test_box_links_are_imported(tmp_path: Path):
     assert _connectors(tmp_path / "a.pptx") == _connectors(tmp_path / "b.pptx") == [1]
 
 
-LINKED = [p for p in EXAMPLES if "@a" in p.read_text(encoding="utf-8")]
+LINKED = [p for p in EXAMPLES if re.search(r"^@.*\b\w+[>-]\w+\b", p.read_text(encoding="utf-8"), re.M)]
 
 
 @pytest.mark.parametrize("path", LINKED, ids=lambda p: p.stem)
