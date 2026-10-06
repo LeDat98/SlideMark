@@ -313,6 +313,8 @@ class LayoutTokens(BaseModel):
         1.12  # a note's text width is estimated this much wider (bold CJK + latin spacing)
     )
     chart_note_line_em: float = 1.2  # shortest pointer line (x chart text size)
+    chart_note_land_em: float = 1.0  # a pointer dropping onto a horizontal bar lands this far inside its end
+    chart_note_shrink_pt: float = 1.0  # a note may shrink this much (pt) to sit clearly nearer its bar
     panel_to_visual: bool = (
         True  # a hollow panel beside a chart spans it: top at the plot top, bottom at the chart's
     )

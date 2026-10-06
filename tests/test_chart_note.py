@@ -185,6 +185,57 @@ def test_note_pointer_hits_the_hl_bar(tmp_path):
     assert abs(ex - zero_x) < 0.1 * pw  # the negative bar ends at the zero line, facing the note
 
 
+def _bar_rects(prs, vals):
+    """Absolute (left, top, right, bottom) EMU of the bars of a horizontal bar chart, first on top."""
+    gf = chart_of(prs)
+    lay = manual_layout(gf.chart)
+    va = gf.chart.value_axis
+    lo, hi = va.minimum_scale, va.maximum_scale
+    px, pw = gf.left + lay["x"] * gf.width, lay["w"] * gf.width
+    py, ph = gf.top + lay["y"] * gf.height, lay["h"] * gf.height
+    n = len(vals)
+    out = []
+    for i, v in enumerate(vals):
+        cy, half = py + (i + 0.5) * ph / n, ph / n * 0.3
+        x0, x1 = sorted((px + pw * (0 - lo) / (hi - lo), px + pw * (v - lo) / (hi - lo)))
+        out.append((x0, cy - half, x1, cy + half))
+    return out
+
+
+LAUNCH = ",North,Coast,Valley,Metro\nVisits,64,108,72,166"
+
+
+def test_note_pointer_ends_on_the_longest_horizontal_bar(tmp_path):
+    attrs = 'labels=on hl=Metro note="Metro alone: 40% of visits" title="Expected visits per year (k)"'
+    _, prs = build_md(tmp_path, fence("bar", attrs, LAUNCH))
+    line = shapes_named(prs, "ChartNoteLine")[0]
+    ex, ey = line.end_x, line.end_y
+    x0, y0, x1, y1 = _bar_rects(prs, [64, 108, 72, 166])[3]
+    tol = 4 * 12700
+    assert x0 - tol <= ex <= x1 + tol, "the pointer ends beside the value label, not on the bar"
+    assert y0 - tol <= ey <= y1 + tol
+    assert ex < x1  # lands inside the bar's end, not past it
+
+
+def test_note_beside_horizontal_bars_covers_no_bar(tmp_path):
+    attrs = 'labels=on hl=Metro note="Metro alone: 40% of visits" title="Expected visits per year (k)"'
+    _, prs = build_md(tmp_path, fence("bar", attrs, LAUNCH))
+    note = the_note(prs)
+    for i, (x0, y0, x1, y1) in enumerate(_bar_rects(prs, [64, 108, 72, 166])):
+        hit = note.left < x1 and x0 < note.left + note.width and note.top < y1 and y0 < note.top + note.height
+        assert not hit, f"note covers bar {i}"
+    assert note.top + note.height <= _bar_rects(prs, [64, 108, 72, 166])[3][1]  # above the highlighted bar
+
+
+def test_note_pointer_of_the_top_horizontal_bar_comes_from_below(tmp_path):
+    body = ",Metro,North,Coast\nVisits,166,64,108"
+    _, prs = build_md(tmp_path, fence("bar", 'labels=on hl=Metro note="Metro alone: 40%"', body))
+    line = shapes_named(prs, "ChartNoteLine")[0]
+    x0, y0, x1, y1 = _bar_rects(prs, [166, 64, 108])[0]
+    tol = 4 * 12700
+    assert x0 - tol <= line.end_x <= x1 + tol and y0 - tol <= line.end_y <= y1 + tol
+
+
 def test_note_column_pointer_lands_above_the_bar(tmp_path):
     body = ",Q1,Q2,Q3,Q4\n売上,10,40,25,18"
     _, prs = build_md(tmp_path, fence("column", 'hl=Q2 note="Q2 is the peak"', body))
