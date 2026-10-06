@@ -342,6 +342,7 @@ class LayoutTokens(BaseModel):
     )
     gantt_pad: float = 3.0  # pt: a `.gantt` bar is inset this much from its cell range (left / right)
     gantt_bar: float = 0.66  # a `.gantt` bar is this share of its row high, centered in the row
+    gantt_even: bool = True  # `.gantt` period columns get equal widths (label column kept) when text fits
     # --- stretched tables and badges (vfill / render)
     table_comfort_em: float = (
         2.7  # a table whose rows end up taller than this x text grows its text (0 = off) ...
