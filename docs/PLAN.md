@@ -572,12 +572,13 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
 - **Wave 5 status:** sparse-chart axes/labels, segment labels scale + hide, line axes above zero, note inset; tree boxes hug
   content (2pt connectors), ruled panels end under their note, card rows aligned; lone chart text scales with the frame,
   lone chevron rows capped. 1913 tests. Smoke c05 skill-only: 3 calls, 0 images, accepted, cost above start 20.0k (19.8–20.0k).
+- **Wave 6 status:** gantt bar badges are native pills inside the bar (16 s9, 19 s4, 20 s10). 1917 tests.
 - **Re-score 2 (same prompt):** 11 = 3.5, 16 = 3.5, 19 = 3.5, 20 = 3.5, 22 = 4 "yes (nearly)" (reviewer variance: 20 was 4 in
   re-score 1). Top asks: dead space in panels, flat badge tags inside rounded gantt bars, tall one-line table rows / 9pt
   headers on dense slides, chart callouts touching bars, small-delta waterfalls, covers.
 
 ## Leftovers for the next run
-- [ ] L3: gantt bar badges as native pills (like table pills); callout clearance from bars (20 s3/s8, 22 s4); dense table
+- [ ] L3: callout clearance from bars (20 s3/s8, 22 s4); dense table
       rows too tall for one line + 9pt headers (20 s3/s5/s7); waterfall with small deltas (break or delta mode); covers
 - [ ] U+2060 number+unit joiners break Ctrl+F/copy in PowerPoint → replace by phrase packing for CJK where possible
 - [ ] 16 s9: a badge in the first gantt column still pins that column wider than the rest
