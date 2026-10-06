@@ -32,7 +32,7 @@ The product metric is the cost of the agent run that ends with an accepted deck:
 - [x] AC1 Harness: `bench/agent_cost.py` reads subagent transcripts and prints calls, output, cost, cost above start, images viewed, docs attempts (run 5: + `bench/agent_accept.py`, `bench/briefs/` 9 briefs, python-pptx baseline for all 9)
 - [x] AC2 SKILL only: with reference pages unavailable ≥ 90% accepted over ≥ 27 runs (9 briefs × 3); with them available median 0 lookups (run 6, brief set 2: skill-only 27/27 accepted, blind review 1 defect / 54 slides; skill-open 27/27, 0 lookups in all 27 runs)
 - [x] AC3 Calls: median ≤ 4 model calls from brief to hand-back, p90 ≤ 6 (run 6: median 3, p90 4 in both arms; python-pptx median 4)
-- [ ] AC4 Cost: median cost above common start ≤ 35% of the python-pptx arm, ≤ 30% on briefs of ≥ 5 slides (run 6 matrix: 47%, ≥ 5 slides 41%; 3-slide briefs 49–69%, 10-slide 28–41%; a 3-call run has a ≈ 12k-unit floor from re-reads + SKILL.md, see AGENT_COST.md "Run 6 findings": owner decision needed)
+- [ ] AC4 Cost: median cost above common start ≤ 35% of the python-pptx arm, measured on briefs of ≥ 5 slides only (owner decision 2026-10-06: 3-slide briefs are excluded because a 3-call run has a fixed ≈ 12k-unit floor; run 6 matrix: 47%, ≥ 5 slides 41%; 3-slide briefs 49–69%, 10-slide 28–41%; see AGENT_COST.md "Run 6 findings")
 - [x] AC5 Output: median output tokens (thinking included) ≤ 30% of the python-pptx arm (run 6: 21% skill-only, 22% skill-open over 27 runs each)
 - [x] AC6 Trust: median 0 images viewed per run; reviewer-found defects in zero-warning decks ≤ 0.02 per slide (run 6: median 0 images in both arms (4 / 9 of 27 runs looked); blind review 1 verified defect / 54 slides = 0.019, a JA chevron word break, fixed in run 6)
 
@@ -65,15 +65,15 @@ The product metric is the cost of the agent run that ends with an accepted deck:
 
 ## L5: Full PowerPoint
 - [x] HTML → native shapes (Chromium measurement) with image fallback; Mermaid → native shapes (`slidemark.htmlnative`: grid/flex cards, runs, lists, tables → native, canvas/svg/gradients → image; 2026-10-05)
-- [ ] Transitions, build animations, hyperlinks/slide jumps, sections, hidden slides, video/audio (all ✓ incl. native video/audio since run 2026-10-05b; PowerPoint repair check of the timing XML pending, owner)
+- [x] Transitions, build animations, hyperlinks/slide jumps, sections, hidden slides, video/audio (all ✓ incl. native video/audio since run 2026-10-05b; owner verified in real PowerPoint 2026-10-06: no repair prompt)
 - [x] User templates `.potx`/`.pptx`: placeholders, masters, theme colors/fonts reused (examples/10-template)
 - [x] Feature matrix (`docs/FEATURES.md`) ≥ 90% of rows fully Done (all 8 DoD steps): 32/34 = 94% (2026-10-05, run 2)
 
 ## L6: Production grade
-- [ ] 0 "repair" prompts: XSD-valid on 10k fuzzed decks + spot-checked in real PowerPoint each release (XSD half ✓: `bench/xsd_fuzz.py` 10k decks seed 7 → 0 invalid, 2026-10-05; real-PowerPoint spot check pending, owner)
+- [x] 0 "repair" prompts: XSD-valid on 10k fuzzed decks + spot-checked in real PowerPoint each release (XSD half ✓: `bench/xsd_fuzz.py` 10k decks seed 7 → 0 invalid, 2026-10-05; owner verified in real PowerPoint 2026-10-06: no repair prompt; gradients, shadows, animation, waterfall/stacked labels fine)
 - [x] Import `.pptx → Markdown` (edit existing decks); build → import → build is stable (all 9 examples, 2026-10-05)
 - [x] Build ≤ 50 ms/slide, import time ≤ 300 ms, slidemark's own package ≤ 2 MB and core install ≤ python-pptx's own install + 20 MB (gate changed by the owner 2026-10-05: python-pptx alone is 34 MB; build 27 ms/slide ✓, `import slidemark` 165–240 ms ✓, package 1 MB ✓, core 50 MB = +16 MB ✓)
-- [ ] Published on PyPI with semver, changelog, CI on 3 Python versions, coverage ≥ 90% (CI 3.10–3.12 ✓, coverage 93% ✓, changelog ✓; PyPI publish needs the owner's token)
+- [ ] Published on PyPI with semver, changelog, CI on 3 Python versions, coverage ≥ 90% (CI 3.10–3.12 ✓, coverage 93% ✓, changelog ✓; PyPI publish deferred by the owner until every other gate is done)
 
 ## L7: Breakthrough
 - [ ] Blind review: agent-made decks preferred or tied against professional human decks in ≥ 50% of pairs

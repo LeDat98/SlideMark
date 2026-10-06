@@ -309,3 +309,7 @@ So a 3-slide deck cannot go below ≈ 12k units (≈ 37% of the cheapest python-
 SKILL.md, and halving SKILL.md moves the median ratio by only ≈ 6 points. The gate is reachable on 10-slide briefs
 (28–41%) but not on 3-slide ones (49–69%). Options for the owner: measure AC4 on briefs of ≥ 5 slides only, or
 state it against the python-pptx arm's cost excluding the shared per-call re-reads; or accept ≈ 40% as the floor.
+
+**Owner decision (2026-10-06):** AC4 is measured on briefs of ≥ 5 slides only, with the 35% threshold. 3-slide
+briefs stay in the matrix for AC2, AC3, AC5 and AC6 but not for AC4. On the run 6 numbers (≥ 5 slides: 41%) AC4 is
+still open.
