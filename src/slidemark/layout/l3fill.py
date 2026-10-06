@@ -483,8 +483,8 @@ def _card_share(res: dict[int, Placed], card: Placed, inner: list[Placed]) -> fl
 
 
 def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: LayoutTokens) -> None:
-    """Spread the paragraphs of every card of ``row`` over its body (equal gaps, capped); the rest is air
-    above the first item, equal for the whole row so the first items share one y."""
+    """Spread the paragraphs of every card of ``row`` over its body (equal gaps, capped); the list stays
+    top-anchored (the first items of the row share one y), the rest is air at the card bottom."""
     jobs = []
     for c in row:
         main = _main_of(plan[id(c)])
@@ -532,7 +532,7 @@ def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: L
             rest = max(av - measure.paragraphs_height(ps, w, m.style, m.font_scale, gap=g), 0)
         capped.append((c, m, g, rest, av))
     jobs = capped
-    lead = min(j[3] for j in jobs) // 2  # siblings share the first-item line
+    lead = 0  # top-anchored: every first item stays at the normal padding under the header band
     for c, m, gap, _rest, _avail in jobs:
         el = m.element.model_copy(update={"attrs": {**m.element.attrs, "para_gap": gap}})
         res[id(_main_of(plan[id(c)]))] = m.model_copy(
