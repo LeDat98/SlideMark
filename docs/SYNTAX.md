@@ -325,9 +325,13 @@ Chart options go in the fence attributes:
 | `min`, `max` | value axis bounds | auto |
 | `colors` | comma list of theme names or hex, one per series (per point for pie) | theme palette |
 | `axis` | `off` hides the value axis and gridlines | `on` |
+| `hl` | comma list of categories to emphasise: their points take `render.chart_hl` (default `accent`); on a one-series bar/column/waterfall the other points keep their color | none |
+| `note` | one-line takeaway: a native callout (class `.chart-note`) inside the chart frame, pointing at the first `hl` point when there is one | none |
 
 CSV cells may be quoted (`"1,240"`), may carry `%` or thousands separators (`1,240`, `12%` → number), and may
 use full-width digits; an empty cell is a gap. A cell that is not a number becomes a gap plus a warning.
+A takeaway is two attributes: `` ```bar {hl=郊外大型 note="赤字42店の半数は郊外大型"} ``.
+
 Whole numbers written with thousands separators (`1,240`, `2.100` with `lang: vi`) keep them: labels and the
 axis use `#,##0` (shown in the viewer's locale) unless `fmt` is set.
 

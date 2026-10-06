@@ -132,3 +132,12 @@ Run goal:
   (Inter/Montserrat present) → 19 goldens regenerated; my own gantt equal-column tweak fought growth passes (reverted).
 - Next: L3 gate on content-rich decks (owner: accept 20 at 4?), JP orphans where LibreOffice and the model disagree, Gantt
   equal time columns after the last growth pass, AC4 owner decision.
+
+## 2026-10-06 (run 9, chained manual, L3 leftovers + re-score, 09:19 UTC–)
+Run goal:
+- [ ] Gantt time columns even, decided after the last text-growth pass (16 s9, 20 s10)
+- [ ] Tighter ruled panels: callout follows the list, not pushed to the panel bottom (11 s3); tables beside charts reach the chart bottom (20 s3)
+- [ ] Chart takeaways: `hl=` highlighted points + `note=` native callout (contract in SYNTAX.md)
+- [ ] CJK orphans where LibreOffice wraps earlier than the measure model
+- [ ] Example with a chevron row matching its table's columns
+- [ ] L3 re-score with the same prompt (`bench/l3_review_prompt.md`); AC4 gate text unchanged (owner)

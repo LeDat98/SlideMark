@@ -527,3 +527,13 @@ Goal: run-7 leftovers (L3), then an independent re-score with a content-rich den
 - [ ] AC4 (owner decision on the gate wording still pending)
 - [ ] Owner: real PowerPoint check (waterfall carrier labels, stacked totals legend on bars, U+2060 between ideographs,
       gradients, customXml); PyPI token; L7 token gate
+
+## Run 2026-10-06 (run 9, chained, 09:19 UTC) work packages
+Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4 gate text unchanged (owner).
+- **Wave 1 A (`parser/tabular.py`, `parser/blocks.py`, `render/objects.py`, new `layout/chartnote.py`, `importer/`, one hook in
+  `layout/engine.py`):** chart takeaways: `hl=` emphasised points (`render.chart_hl`), `note=` native callout (`.chart-note`)
+  inside the chart frame pointing at the first `hl` point; round trip.
+- **Wave 1 B (`layout/gantt.py`, `layout/tables.py`, `layout/vfill.py`, `layout/l3fill.py`, `layout/engine.py`):** gantt time
+  columns equal after the last growth pass (bars still fit, else nearest feasible); ruled panels keep the callout right after
+  the list (11 s3); a table beside a taller chart reaches the chart bottom (20 s3).
+- **Orchestrator:** examples with a chevron row over a matching table; contact-sheet review.
