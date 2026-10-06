@@ -443,3 +443,13 @@ Goal: L3 consulting-grade per the run-6 designer review; AC4 gate text unchanged
 - **Wave 2 B2 (`layout/tables.py`, `layout/vfill.py`, `render/objects.py`):** stretched tables grow their text with
   the row height (16 s9 rows ≈ 3 lines tall at 13pt; 11 s4 / 16 s6 chevron + table leave a 100px band), capped by
   `layout.table_text_max`; badges in table cells keep side padding.
+- **Wave 2 status:** hollow stretched cards spread their items (gap cap tuned 5.5 → 2.2 em by the orchestrator: wide gaps
+  read as broken lists); stretched tables grow text (16 s9 14.2 → 16.8pt) and reach the footnote; padded badges;
+  examples/19 (VI, custom brand) added as a stress deck. 1620 tests; round trip 116/119 (16 s3, 58-html pre-existing; 19 s4 new).
+- **Wave 3 B1 (`layout/l3fill.py`, `layout/engine.py`, `layout/measure.py`):** lone chevron rows (19 s2: 60% of the body
+  empty) grow taller (capped share of the body) with text, and the row sits in the body's optical center; thin chevrons
+  above a table (11 s4) grow their text so the table text cap rises too; no line break after an en dash between digits
+  (`2027–2029` on 19 s1 cover).
+- **Wave 3 B2 (`layout/diagram.py`, `layout/tables.py`, `render/text.py`, `importer/`):** `@.a./bcd` area-grid org charts
+  fill the body like `@a>b` trees (19 s3) and a lone root box widens until its heading fits on one line; a badge never
+  wraps alone onto its own line in a table cell; importer keeps centered merged header cells (19 s4 round trip).

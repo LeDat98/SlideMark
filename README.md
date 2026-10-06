@@ -53,7 +53,7 @@ Windows: `slidemark preview` / `review --png` tự tìm LibreOffice trong `C:\Pr
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-06 · commit `37ff9c2` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-06 · commit `cfb6995` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -210,6 +210,16 @@ Nguồn: [`examples/18-brand-lime.md`](examples/18-brand-lime.md)
 ![18-brand-lime slide 2](docs/gallery/18-brand-lime/slide-02.png)
 ![18-brand-lime slide 3](docs/gallery/18-brand-lime/slide-03.png)
 ![18-brand-lime slide 4](docs/gallery/18-brand-lime/slide-04.png)
+
+### 19-vi-consulting-brand
+
+Nguồn: [`examples/19-vi-consulting-brand.md`](examples/19-vi-consulting-brand.md)
+
+![19-vi-consulting-brand slide 1](docs/gallery/19-vi-consulting-brand/slide-01.png)
+![19-vi-consulting-brand slide 2](docs/gallery/19-vi-consulting-brand/slide-02.png)
+![19-vi-consulting-brand slide 3](docs/gallery/19-vi-consulting-brand/slide-03.png)
+![19-vi-consulting-brand slide 4](docs/gallery/19-vi-consulting-brand/slide-04.png)
+![19-vi-consulting-brand slide 5](docs/gallery/19-vi-consulting-brand/slide-05.png)
 <!-- gallery:end -->
 
 ## Tài liệu
