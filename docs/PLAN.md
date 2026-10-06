@@ -434,3 +434,12 @@ Goal: L3 consulting-grade per the run-6 designer review; AC4 gate text unchanged
   step, level gaps, top-anchored); table header rows stay compact (body rows take the slack); multi-row headers with
   `<`/`^` merges render as merged, centered header cells (roadmap: year over halves).
 - **Orchestrator:** SKILL.md cut (≤ 2,700 tokens, same patterns), examples/16 s9 two-row roadmap header, designer re-score.
+- **Wave 1 status:** B1 cards/grids reach the conclusion bar, bar–footnote gap 4 → 13px, lone chevron text 19.7 → 26pt
+  (JA 3 steps); B2 trees fill the body (top-anchored, bigger boxes/text, wider lone nodes), compact table headers,
+  centered merged sub-headers; examples/16 roadmap uses `{header=2}`. 1607 tests.
+- **Wave 2 B1 (`layout/l3fill.py`, `layout/engine.py`):** stretched cards that stay hollow (16 s10 left card: 3 items
+  in the top half) spread their items over the card height (equal gaps, capped) instead of a dead lower half;
+  sibling cards in a row share the rhythm.
+- **Wave 2 B2 (`layout/tables.py`, `layout/vfill.py`, `render/objects.py`):** stretched tables grow their text with
+  the row height (16 s9 rows ≈ 3 lines tall at 13pt; 11 s4 / 16 s6 chevron + table leave a 100px band), capped by
+  `layout.table_text_max`; badges in table cells keep side padding.
