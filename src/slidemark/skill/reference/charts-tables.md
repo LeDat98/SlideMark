@@ -20,6 +20,8 @@ SaaS,30,34,38
 | `min` `max` | value axis bounds |
 | `colors` | `primary,accent,#888888` (per series; per slice for pie) |
 | `axis` | `off` hides the value axis |
+| `hl` | categories to emphasise (accent color), e.g. `hl=Metro` |
+| `note` | one-line takeaway callout in the chart, pointing at the first `hl` bar: `note="Metro: 40%"` |
 
 CSV cells: `"1,240"`, `1,240`, `12%`, full-width digits, `▲3` (= -3) are numbers; an empty cell is a gap.
 Category labels are always text (years stay `2024`). Scatter: first row = x values.

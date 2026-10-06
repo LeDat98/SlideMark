@@ -537,3 +537,12 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
   columns equal after the last growth pass (bars still fit, else nearest feasible); ruled panels keep the callout right after
   the list (11 s3); a table beside a taller chart reaches the chart bottom (20 s3).
 - **Orchestrator:** examples with a chevron row over a matching table; contact-sheet review.
+- **Wave 1 status:** `hl=`/`note=` chart takeaways (manualLayout plot, `ChartNote` shapes, round trip), gantt period columns
+  even after growth (`gantt_even`; badge bars may pin a column), ruled panels keep the callout after the list (11 s3), tables
+  beside charts reach the chart bottom (`table_fit_row_max_em`), first-slide long taglines are covers, `min=` axes use the
+  visible span, examples/22 (English, chevrons over matching columns). 1831 tests.
+- **Wave 2 A (`layout/measure.py`, `render/text.py`, `layout/chartnote.py`, `render/charthl.py`):** CJK near-full lines squeezed
+  so LibreOffice keeps them whole (21 s2, 20 s2, 11 s2); horizontal-bar note pointer ends on the bar (22 s4).
+- **Wave 2 B (`layout/engine.py`, `l3fill.py`, `vfill.py`, `tables.py`):** Latin/default-theme fill: lone table grows and reaches
+  the footnote gutter (22 s6), cards over a table hug content and the table takes the height (22 s2), dark-pitch cards
+  top-anchored and grown (21 s2).

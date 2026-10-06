@@ -190,7 +190,7 @@ Options on the fence or the line before: `{widths=3:1:1 align=lrr header=1 hcol=
 Chart fence kinds: `column bar line area pie doughnut scatter radar stacked-column stacked-bar waterfall` (waterfall: one row, `=` cell = total). CSV body:
 first row = categories (first cell empty), then one row per series (name first). Options: `title="..."`
 `labels=on|percent|off` `legend=bottom|right|top|none` `fmt="0.0"|"#,##0"|"0%"` `min=` `max=`
-`colors=primary,accent,#888888` `axis=off`. Numbers may be `1,240`, `12%`, `▲3`; a decimal comma needs
+`colors=primary,accent,#888888` `axis=off`; takeaway: `hl=Metro note="Metro: 40% of visits"`. Numbers may be `1,240`, `12%`, `▲3`; a decimal comma needs
 quotes (`"1,6"`) or `;` rows (`T1;1,6;1,9`). Charts show numbers in the viewer's locale. One value axis.
 
 ## Design tokens (header lines)
