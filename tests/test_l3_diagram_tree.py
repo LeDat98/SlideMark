@@ -168,3 +168,29 @@ def test_tree_parent_span_token_off_keeps_old_widths():
     th.layout.tree_parent_span = 0
     pl = layout_slide(deck.slides[0], deck, th, 0)
     assert len(boxes(pl)) == 5
+
+
+def test_tree_boxes_hug_their_text_and_gaps_take_the_height():
+    deck = parse(TREE)
+    th = get_theme(deck.theme).model_copy(deep=True)
+    pl = layout_slide(deck.slides[0], deck, th, 0)
+    th.layout.tree_hug = False
+    old = layout_slide(deck.slides[0], deck, th, 0)
+    assert max(p.h for p in boxes(pl)) < max(p.h for p in boxes(old)) * 0.9
+    for b in boxes(pl):
+        ts = [
+            p
+            for p in pl
+            if isinstance(p.element, Text)
+            and p.element.role in ("heading", "body")
+            and b.x <= p.x < b.x + b.w
+            and b.y <= p.y < b.y + b.h
+        ]
+        content = sum(p.h for p in ts)
+        assert b.h <= content * 1.25  # hugs: heading band + one body line + even padding
+        body = next(p for p in ts if p.element.role == "body")
+        head = next(p for p in ts if p.element.role == "heading")
+        above, below = body.y - (head.y + head.h), b.y + b.h - (body.y + body.h)
+        assert abs(above - below) <= 0.06 * 914400  # even air around the body text
+    assert span(pl) > 0.65 * 7.5 * 914400  # the tree still fills the body
+    assert th.render.connector_width >= 2  # jp-business: visible connectors

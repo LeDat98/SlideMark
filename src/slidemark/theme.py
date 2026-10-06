@@ -359,10 +359,11 @@ class LayoutTokens(BaseModel):
         0.92  # a linked tree grows (top-anchored) until it fills this share of the body (0 = off)
     )
     tree_box_grow: float = 1.6  # ... its boxes become at most this much taller ...
-    tree_gap_grow: float = 3.0  # ... and the connector gaps between levels at most this much larger
+    tree_gap_grow: float = 6.0  # ... and the connector gaps between levels at most this much larger
     tree_text_max: float = 1.4  # ... box text steps up by at most this factor (body <= l3_text_max_pt)
+    tree_hug: bool = True  # ... a box hugs its text (even padding above and below); the rest goes to the gaps
     tree_box_air: float = (
-        1.15  # ... but a box is at most this much taller than its text (the rest goes to the gaps)
+        1.08  # ... but a box is at most this much taller than its text (the rest goes to the gaps)
     )
     tree_box_air_max: float = (
         1.2  # ... up to this much once the gaps are at their cap (the tree then fills the body)
