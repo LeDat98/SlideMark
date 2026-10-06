@@ -553,3 +553,7 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
   breaks at phrase boundaries when the line count is unchanged; importer strips them.
 - **Wave 3 B (`layout/engine.py`, `l3fill.py`, `vfill.py`, `tables.py`, `grid.py`):** sparse brand/CSS slides (13 s2, 17 s2/s3,
   14 s1, 21 s2, 22 s2) grow un-sized text and balance leftover bands; explicit CSS sizes never change.
+- **Wave 3 A status:** BudouX phrase breaks (`cjk_phrase_break`), soft breaks marked `bmk="sm"`, importer strips them;
+  21 s2 / 20 s2 break at phrases ("点検技術者の / 平均年齢 54歳"). 1868 tests.
+- **Wave 4 A (`layout/jbreak.py`, `render/text.py`, `layout/chartnote.py`, `importer/`):** phrase breaks in chevrons and gantt
+  bars; chart note never below the axis label size (22 s4).
