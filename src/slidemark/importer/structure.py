@@ -5,11 +5,20 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cmp_to_key
 
 from ..ir import Diagnostic
-from .emit import chart_lines, detect_lang, header_rows_of, one_line, table_lines, text_lines
+from .emit import (
+    _attr,
+    chart_lines,
+    detect_lang,
+    header_rows_of,
+    hl_row_set,
+    one_line,
+    table_lines,
+    text_lines,
+)
 from .links import find_links, recover_diagram
 from .links import tokens as link_tokens
 from .read import Item, ParaT, RunT, SlideData
@@ -48,6 +57,7 @@ class Block:
     paras: list[ParaT] = field(default_factory=list)
     sub: bool = False
     chevron: bool = False
+    steps: bool = False  # chevron box of an ``@steps`` slide (the card text is its content)
     callout: str = "note"
     icon: str | None = None
     lines: list[str] = field(default_factory=list)  # kind "fence": the fence lines (a recovered diagram)
@@ -334,6 +344,42 @@ def _is_code(it: Item) -> bool:
     )
 
 
+_STEP = re.compile(r"Step (\d+) (arrow|card)")
+
+
+def fold_steps(pool: list[Item]) -> list[Item]:
+    """``@steps`` arrows (shape names ``Step N arrow``) take the text of their ``Step N card`` as content.
+
+    The card and the texts inside it leave the pool; the arrow becomes one chevron item (``steps``), which
+    the usual chevron path turns into a ``##`` box with its bullets. Without a second arrow nothing changes.
+    """
+    named = {(m.group(2), int(m.group(1))): it for it in pool if (m := _STEP.fullmatch(it.name or ""))}
+    arrows = sorted(k[1] for k in named if k[0] == "arrow")
+    if len(arrows) < 2 or any(not named[("arrow", n)].paras for n in arrows):
+        return pool
+    drop: set[int] = set()
+    new: dict[int, Item] = {}
+    for n in arrows:
+        arrow, card = named[("arrow", n)], named.get(("card", n))
+        paras = list(arrow.paras)
+        if card is not None:
+            inside = [
+                i
+                for i in pool
+                if i is not card
+                and i is not arrow
+                and i.kind == "text"
+                and card.x - 2 <= i.cx <= card.x + card.w + 2
+                and card.y - 2 <= i.cy <= card.y + card.h + 2
+            ]
+            for i in sorted(inside, key=lambda i: (i.y, i.x)):
+                paras += i.paras
+                drop.add(i.uid)
+            drop.add(card.uid)
+        new[arrow.uid] = replace(arrow, paras=paras, steps=True)
+    return [new.get(i.uid, i) for i in pool if i.uid not in drop]
+
+
 def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = None) -> list[Block]:
     W, H = deck.width, deck.height
     slide_area = W * H
@@ -405,6 +451,7 @@ def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = Non
                     heading=[it.paras[0]],
                     paras=it.paras[1:],
                     chevron=True,
+                    steps=it.steps,
                     sub=nested,
                 )
             ]
@@ -761,6 +808,7 @@ def plan_grid(
     ordered = [grid[i] for i in seen]
     n = len(grid)
     chev = all(b.kind == "box" and b.chevron for b in grid)
+    flag = "steps" if chev and all(b.steps for b in grid) else "chevron"
     full_cells = single and n == C * R
     ncols = n
     if equal and margin and C == n and abs(x0 - margin) <= tolx:
@@ -771,7 +819,7 @@ def plan_grid(
             ncols = total
     if R == 1 and single:
         if chev:
-            return [str(ncols), "chevron"], ordered, extras
+            return [str(ncols), flag], ordered, extras
         if not equal:
             return [":".join(map(str, _units(cw)))], ordered, extras
         if not extras and n in (2, 3) and ncols == n:
@@ -812,7 +860,7 @@ def plan_grid(
         area_rows.append(s)
     tokens = ["/".join(area_rows)]
     if chev:
-        tokens.append("chevron")
+        tokens.append(flag)
     return tokens, ordered, extras
 
 
@@ -951,7 +999,14 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
         return [("quote", ["> " + ln for ln in lines])]
     if b.kind == "table":
         hdr = header_rows_of(b.item.rows)
-        lines, lost = table_lines(b.item.rows, accent=acc, classes=cls, header_rows=hdr)
+        hl = b.item.hl.strip()
+        lines, lost = table_lines(
+            b.item.rows,
+            accent=acc,
+            classes=cls,
+            header_rows=hdr,
+            hl_rows=hl_row_set(b.item.rows, hl, hdr) if hl else set(),
+        )
         if lost:
             out.diags.append(
                 Diagnostic(
@@ -967,6 +1022,7 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
             ([".gantt"] if b.item.gantt else [])
             + ([f"header={hdr}"] if hdr > 1 else [])
             + ([f"align={align}"] if align else [])
+            + ([_attr("hl", hl)] if hl else [])
         )
         if attrs and lines:
             lines = ["{" + " ".join(attrs) + "}", *lines]
@@ -1047,6 +1103,7 @@ def build_slide(
 ) -> list[str]:
     fold_into_tables(data)
     title, pool = classify(data, deck)
+    pool = fold_steps(pool)
     by_role = {r: [i for i in data.items if i.role == r] for r in ("lead", "conclusion", "footnote")}
     icons = [i for i in data.items if i.role == "icon"]
     blocks = make_blocks(pool, deck, icons)

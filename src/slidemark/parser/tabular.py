@@ -251,11 +251,48 @@ def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) ->
 # --------------------------------------------------------------------------- table attributes
 
 
+def _apply_table_hl(t: Table, value: str, ctx: Ctx, line: int | None) -> None:
+    """``hl=a,b``: body rows whose first cell equals a name are emphasised; unknown names warn."""
+    from ..layout.tablehl import first_cells, norm_key, split_names
+
+    firsts = first_cells(t)
+    cells = list(dict.fromkeys(text for _r, text in firsts if text))
+    by_key = {norm_key(c): c for c in cells}
+    whole = norm_key(value.strip().strip("\"'"))
+    names = [value.strip().strip("\"'")] if whole in by_key else split_names(value)
+    if not names:
+        ctx.warn(
+            f"bad table option hl='{value}'",
+            line,
+            "table-hl",
+            "hl is the first-cell values of the rows to emphasise, e.g. hl=Metro,East",
+        )
+        return
+    good: list[str] = []
+    for n in names:
+        hit = by_key.get(norm_key(n))
+        if hit is None:
+            near = closest(norm_key(n), list(by_key), 0.5)
+            hint = (
+                f"did you mean '{by_key[near]}'?"
+                if near
+                else "first cells are: " + ", ".join(cells[:8]) + (" ..." if len(cells) > 8 else "")
+            )
+            ctx.warn(f"hl row '{n}' is not a first-cell value of the table", line, "table-hl", hint)
+        elif hit not in good:
+            good.append(hit)
+    if good:
+        t.attrs["hl"] = good
+
+
 def apply_table_kv(t: Table, kv: dict[str, str], ctx: Ctx, line: int | None) -> dict[str, str]:
-    """Consume widths/align/header/hcol from ``kv``; returns the remaining keys."""
+    """Consume widths/align/header/hcol/hl from ``kv``; returns the remaining keys."""
     rest: dict[str, str] = {}
     n = max((len(r) for r in t.rows), default=0)
+    hl = kv.get("hl")  # last: header= decides which rows are body rows
     for k, v in kv.items():
+        if k == "hl":
+            continue
         if k == "widths":
             try:
                 w = [float(x) for x in re.split(r"[:,]", v.strip()) if x.strip()]
@@ -324,4 +361,6 @@ def apply_table_kv(t: Table, kv: dict[str, str], ctx: Ctx, line: int | None) -> 
                 t.header_cols = num
         else:
             rest[k] = v
+    if hl is not None:
+        _apply_table_hl(t, hl, ctx, line)
     return rest

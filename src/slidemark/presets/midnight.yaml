@@ -17,3 +17,5 @@ classes:
   card: {radius: 8}
   callout: {fill: surface, line_width: 1.25}
   chart-note: {fill: surface}
+table_hl_fill: accent
+table_hl_strength: 0.2

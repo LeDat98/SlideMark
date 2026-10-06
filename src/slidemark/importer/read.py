@@ -93,6 +93,8 @@ class Item:
     sid: int = 0  # shape id in the slide (what ``a:stCxn``/``a:endCxn`` point at)
     col_w: list[int] = field(default_factory=list)  # table: column widths (EMU)
     row_h: list[int] = field(default_factory=list)  # table: row heights (EMU)
+    steps: bool = False  # chevron: an ``@steps`` arrow with the text of its card folded in
+    hl: str = ""  # table: the `hl=` first-cell values (the renderer appends them to the shape name)
     gantt: bool = False  # table: bars (filled shapes over body cells) were folded into it (`{.gantt}`)
     cropped: bool = False  # image: a:srcRect crop (``fit=cover``)
     latex: str | None = None  # math: the equation as LaTeX (``` math fence)
@@ -931,6 +933,8 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
                     )
                 rows.append(row)
             tit = _new(ctx, "table", box, sid=sh.shape_id, name=name, rows=rows)
+            if m := _HL.search(name):
+                tit.hl = m.group(1)
             try:
                 sx = box[2] / (sum(c.width for c in sh.table.columns) or 1)
                 sy = box[3] / (sum(r.height for r in sh.table.rows) or 1)

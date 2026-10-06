@@ -44,6 +44,7 @@ from .l3fill import (
     fill_chevron_row,
     fill_panels,
     fill_row,
+    fill_steps,
     fit_lone_kpi,
     grow_chevron_table,
     scale_kpi_values,
@@ -125,6 +126,7 @@ class _Ctx:
     step: float = 1.0  # sparse step: padding, table / chevron text and paragraph gaps scale with it
     chev_adj: float | None = None  # point depth / shorter side of the chevron row being placed (None = token)
     chev_grow: float = 1.0  # a chevron row alone on the slide: its text grows with ``grow``
+    steps_row: bool = False  # the chevron row being placed is the arrow row of an ``@steps`` slide
     fill: float | None = None  # natural content height / grid height of the slide-level grid, if known
     expand: int = 0  # extra height (EMU) the capped rows of the slide-level grid may take
     arrange: str | None = None  # layout search: a grid token that replaces the rule-based arrangement
@@ -1202,6 +1204,8 @@ def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> Non
 
 
 def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> None:
+    if "steps" in c.classes and _place_steps(ctx, c, rect, inherit):
+        return
     style, pad, (pl, pt, pr, pb) = _cpads(ctx, c)
     if "diagram" in c.classes and c.title is None:
         from .diagram import place_diagram  # flowcharts size and route their own nodes
@@ -1274,6 +1278,92 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
         ids = [id(ch) for ch in children if _spreadable(ch) and id(ch) in ctx.text_out]
         if ids:
             ctx.boxes[id(c)] = ids
+
+
+def _steps_parts(c: Container) -> tuple[list[Container], list[Container | None]]:
+    """The arrow (heading only) and the card (the rest) of every ``##`` step of an ``@steps`` group.
+
+    Both keep the step's classes and CSS identity (``_css_src``); a step without content has no card."""
+    arrows: list[Container] = []
+    cards: list[Container | None] = []
+    for i, b in enumerate(b for b in c.children if isinstance(b, Container) and b.title is not None):
+        src = b.attrs.get("_css_src", id(b))
+        keep = {k: v for k, v in b.attrs.items() if k == "icon"}
+        arrows.append(
+            Container(
+                title=b.title,
+                id=b.id,
+                line=b.line,
+                classes=[*(k for k in b.classes if k not in ("kpi", "plain", "card")), "steps-arrow"],
+                attrs={**keep, "_css_src": src, "shape_name": f"Step {i + 1} arrow"},
+            )
+        )
+        if b.children:
+            cards.append(
+                Container(
+                    line=b.line,
+                    grid=b.grid,
+                    gap=b.gap,
+                    links=b.links,
+                    style=b.style,
+                    children=b.children,
+                    classes=[*b.classes, "steps-card"],
+                    attrs={
+                        **{k: v for k, v in b.attrs.items() if k != "icon"},
+                        "_css_src": src,
+                        "shape_name": f"Step {i + 1} card",
+                    },
+                )
+            )
+        else:
+            cards.append(None)
+    return arrows, cards
+
+
+def _place_steps(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> bool:
+    """``@steps``: a chevron row of the step headings, and under every arrow its card (same columns).
+
+    The cards start ``steps_gap`` under the arrows and are as tall as their content here; the slide's
+    growth passes then enlarge their text and ``fill_steps`` stretches them to the conclusion bar /
+    footnote. ``False`` = not a steps group (fewer than two headed boxes): placed like any other box."""
+    arrows, cards = _steps_parts(c)
+    n = len(arrows)
+    if n < 2 or n != len(c.children):  # other blocks in the group: a plain row of boxes
+        return False
+    gap = _gap(ctx, _cgap(ctx, c), rect.w)
+    grid = _cgrid(ctx, c) or str(n)
+    present = [k for k in cards if k is not None]
+    letters, nxt = [], 0
+    for k in cards:  # areas grid: the present cards keep their column, a step without content leaves a gap
+        letters.append(chr(97 + nxt) if k is not None else ".")
+        nxt += k is not None
+    card_grid = grid if len(present) == n else "".join(letters)
+    saved = (ctx.depth, ctx.steps_row)
+    ctx.depth += 1
+    try:
+        start = len(ctx.out)
+        ctx.steps_row = True
+        _place_blocks(ctx, arrows, rect, inherit, grid, ["chevron", "steps"], gap, c)
+        ctx.steps_row = False
+        bottom = max((p.y + p.h for p in ctx.out[start:]), default=rect.y)
+        if not present:
+            return True
+        top = bottom + _emu(ctx.lt.steps_gap)
+        area = Rect(rect.x, top, rect.w, max(rect.bottom - top, 0))
+        gs = parse_spec(card_grid, len(present), [])
+        h = area.h
+        if gs is not None and gs.cols:
+            cells = cell_rects(gs, len(present), area, gap, ctx.theme.columns)
+            nat = [_box_nat(ctx, k, r.w, inherit) for k, r in zip(present, cells, strict=True)]
+            if all(v is not None for v in nat):
+                h = min(h, max(nat))  # type: ignore[type-var]
+        if area.h <= 0:
+            ctx.over.append(_label(c))
+            return True
+        _place_blocks(ctx, present, Rect(area.x, area.y, area.w, h), inherit, card_grid, [], gap, c)
+    finally:
+        ctx.depth, ctx.steps_row = saved
+    return True
 
 
 def _box_nat(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None:
@@ -1539,7 +1629,10 @@ def _chevron_shape_raw(blk) -> Shape:
     return Shape(
         shape="chevron",
         paragraphs=paras,
-        attrs={"_css_src": id(blk)},  # css matching: this shape is the box ``blk``
+        attrs={
+            "_css_src": blk.attrs.get("_css_src", id(blk)),  # css matching: this shape is the box ``blk``
+            **({"shape_name": blk.attrs["shape_name"]} if blk.attrs.get("shape_name") else {}),
+        },
         id=getattr(blk, "id", None),
         classes=[c for c in blk.classes if c not in ("card", "plain")],
         style=getattr(blk, "style", None),
@@ -1756,6 +1849,8 @@ def _group_nat(ctx: _Ctx, g: Container, width: int, inherit: Style) -> tuple[int
 
 def _cell_nat(ctx: _Ctx, blk, width: int, inherit: Style) -> tuple[int | None, str]:
     """(natural height, kind) of a grid cell; kind is ``kpi``, ``table`` or ``other``."""
+    if isinstance(blk, Container) and "steps" in blk.classes:
+        return None, "other"  # arrows over cards: takes the body, the cards hug their content inside
     if isinstance(blk, Container) and "group" in blk.classes:
         return _group_nat(ctx, blk, width, inherit)
     if isinstance(blk, Container):
@@ -1992,7 +2087,7 @@ def _place_blocks(
     extra = sorted(extra + tables, key=lambda t: t[0]) + callouts
     if "flow" in flags:
         gap = max(gap, round(0.45 * EMU_PER_INCH))
-    elif "chevron" in flags:
+    elif "chevron" in flags and "steps" not in flags:  # step arrows share the card columns: the same gap
         gap = max(round(gap / 4), 0)
     elif links and len(gs.cols) > 1:
         gap = max(gap, round(0.4 * EMU_PER_INCH))
@@ -2468,7 +2563,11 @@ def _chevron_row_h(ctx: _Ctx, blocks: list, width: int, inherit: Style, alone_h:
     ``CHEVRON_MAX_ALONE``.
     """
     lo, hi = _emu(ctx.lt.chevron_min_h), _emu(ctx.lt.chevron_max_h)
-    if alone_h is not None:
+    if ctx.steps_row:  # step arrows: tall enough to read as the head of a column of cards
+        s_hi = _emu(ctx.lt.steps_arrow_max_h)
+        lo = min(max(round(ctx.lt.steps_arrow_aspect * width), _emu(ctx.lt.steps_arrow_min_h)), s_hi)
+        hi = max(hi, s_hi)
+    elif alone_h is not None:
         many = len(blocks) >= ctx.lt.chevron_head_min_steps  # narrow chevrons wrap into many lines: go tall
         hi = _emu(ctx.lt.chevron_max_alone_sparse if ctx.chev_air or many else ctx.lt.chevron_max_alone)
         share = ctx.lt.chevron_alone_share_sparse if ctx.chev_air else ctx.lt.chevron_alone_share
@@ -3836,6 +3935,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     ctx.lt,
                     _emu(ctx.lt.top_gap) if (slide.conclusion or slide.footnotes) else 0,
                 )
+            final_ctx.out = fill_steps(final_ctx.out, body, ctx.lt)
             final_ctx.out = align_chevron_table(final_ctx.out, body, ctx.lt)
             final_ctx.out = grow_chevron_table(final_ctx.out, body, ctx.lt)
             final_ctx.out = fill_body(

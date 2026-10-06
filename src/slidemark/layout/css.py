@@ -40,6 +40,7 @@ from ..ir import (
     fast_style,
 )
 from ..units import EMU_PER_PT, to_emu
+from .tablehl import hl_rows
 
 INHERITED = ("color", "font", "font_ea", "letter_spacing", "text_transform")
 _CSS_FIELDS = tuple(Style.model_fields)
@@ -530,7 +531,11 @@ class CssIndex:
             return t
         tbl_own = self.own(t)
         tbl_text = fast_style(letter_spacing=tbl_own.letter_spacing, text_transform=tbl_own.text_transform)
-        row_nodes = [Node(frozenset({"tr"}), frozenset(), "row", None, tn) for _ in t.rows]
+        hl = hl_rows(t)  # `tr.hl` styles the rows an `hl=` emphasises
+        row_nodes = [
+            Node(frozenset({"tr"}), frozenset({"hl"}) if ri in hl else frozenset(), "row", None, tn)
+            for ri in range(len(t.rows))
+        ]
         self._number(row_nodes)
         rows = []
         for ri, row in enumerate(t.rows):

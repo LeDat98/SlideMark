@@ -23,6 +23,7 @@ from .contrast import ratio as _ratio
 from .ir import Chart, Container, Deck, Diagnostic, Image, Media, Placed, Shape, Table, Text
 from .layout import css, measure
 from .layout.chartnote import chart_size
+from .layout.tablehl import hl_rows
 from .layout.tables import table_grid
 from .theme import Theme
 from .units import EMU_PER_PT, slide_size
@@ -259,15 +260,18 @@ def _table_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
     _rows, _cols, anchors = table_grid(t)
     zebra = "zebra" in t.classes or flag(t.attrs.get("zebra"))
     body_fill = theme.table_body_fill_of(p.style.fill)
+    hl = hl_rows(t)
     top = behind[0] if behind else None
     # per kind: (ratio, need, ink, backs, explicit run color, explicit cell color)
     groups: dict[str, list[tuple[float, float, str, list[str], bool, bool]]] = {}
     for r, c, ct in anchors:
         hdr, fcol = r < t.header_rows, c < t.header_cols
         kind = "header" if hdr else "first column" if fcol else "body"
-        if kind == "body" and zebra and (r - t.header_rows) % 2 == 1:
+        if kind != "header" and r in hl:
+            kind = "emphasised rows"
+        elif kind == "body" and zebra and (r - t.header_rows) % 2 == 1:
             kind = "banded rows"
-        fill = theme.table_cell_fill(r, c, t.header_rows, t.header_cols, body_fill, zebra)
+        fill = theme.table_cell_fill(r, c, t.header_rows, t.header_cols, body_fill, zebra, r in hl)
         cst = ct.style
         if cst and cst.fill:
             fill = cst.fill
@@ -276,7 +280,9 @@ def _table_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
         backs = _backs(fill, theme, top)
         if cst and cst.opacity is not None and 0 <= cst.opacity < 1:
             backs = [_blend((b, cst.opacity), top) for b in backs]
-        st = theme.table_cell_style(p.style, hdr, fcol, ct.colspan, cst)
+        st = theme.table_cell_style(
+            p.style, hdr, fcol, ct.colspan, cst, theme.table_hl_fill_of(body_fill) if r in hl else None
+        )
         for q in ct.paragraphs:
             pst = st.merged(q.style)
             size = (pst.font_size or 18) * p.font_scale

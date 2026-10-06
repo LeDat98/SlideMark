@@ -20,6 +20,7 @@ from pygments.token import Comment, Keyword, Name, Number, Operator, String
 from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Series, Style, Table
 from ..layout import chartnote, measure
 from ..layout.css import border_spec, cell_insets
+from ..layout.tablehl import hl_names, hl_rows, join_names
 from ..layout.tables import column_widths, compact_header, table_grid
 from ..theme import Theme
 from . import waterfall as wfall
@@ -183,7 +184,8 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     theme = rc.theme
     nrows, ncols, anchors = table_grid(t)
     gf = slide.shapes.add_table(nrows, ncols, Emu(pl.x), Emu(pl.y), Emu(pl.w), Emu(max(pl.h, nrows * 100000)))
-    gf.name = name
+    hl = hl_rows(t)
+    gf.name = name + (f" hl={join_names(hl_names(t))}" if hl else "")  # the importer reads it back
     tbl = gf.table
     tblPr = tbl._tbl.tblPr
     for attr in ("firstRow", "bandRow", "firstCol", "lastRow", "lastCol", "bandCol"):
@@ -217,7 +219,7 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         for c in range(ncols):
             cell = tbl.cell(r, c)
             hdr = r < t.header_rows
-            fill = theme.table_cell_fill(r, c, t.header_rows, t.header_cols, body_fill, zebra)
+            fill = theme.table_cell_fill(r, c, t.header_rows, t.header_cols, body_fill, zebra, r in hl)
             fill_of[(r, c)] = fill
             cell.fill.solid()
             cell.fill.fore_color.rgb = (
@@ -250,7 +252,14 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     "check the < and ^ markers",
                 )
         hdr = r < t.header_rows
-        st = theme.table_cell_style(pl.style, hdr, c < t.header_cols, cs, ct.style)
+        st = theme.table_cell_style(
+            pl.style,
+            hdr,
+            c < t.header_cols,
+            cs,
+            ct.style,
+            theme.table_hl_fill_of(body_fill) if r in hl else None,
+        )
         if grouped and c >= t.header_cols and not (ct.style and ct.style.align) and (hdr or cs > 1):
             st = st.merged(
                 Style(align="center")
