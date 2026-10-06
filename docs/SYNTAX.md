@@ -87,6 +87,10 @@ skipped with a `bad-token` warning. A theme file is the same tokens as YAML (`co
   (when it is the first slide) or a section divider. Those lines become the subtitle.
   On a cover or section slide (`@cover`, `@section`, or inferred) a `## line` is one more subtitle line, not a
   box (info `cover-heading`); `##` boxes belong on content slides.
+  Cover tokens (`style:`): `cover.band_h=60%` (band anchored to the top, filled by `title.band`; title block
+  bottom-aligned in it; `0` = the older centred block), `cover.pad=0.55in` (air under the block), `cover.gap=0.2in`
+  (title to subtitle), `cover.rule=accent` + `cover.rule_h=0.06in` (rule on the band edge, `none` = off),
+  `cover.footer=off` (the deck `footer:` shows on the cover as a bottom caption). `{size=}` or CSS on the cover keeps the old look.
 - **Dark slides pick their own ink.** A slide `bg=` (color, token name or `linear-gradient(...)`, every stop
   judged) that gives the theme `fg` less than 4.5:1 turns the text on the slide (title, lead, subtitle, footnote,
   loose paragraphs) to `render.ink_light` or `render.ink_dark`, whichever contrasts more; lead, subtitle and

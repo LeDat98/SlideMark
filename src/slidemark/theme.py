@@ -15,7 +15,7 @@ from functools import cache
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .contrast import best_ink, nearest_passing, ratio
 from .ir import Diagnostic, Length, Style
@@ -495,6 +495,15 @@ class Theme(BaseModel):
     lead_color: str = "muted"
     title_band: str | None = None  # full-width band color behind the slide title (None = no band)
     title_band_color: str = "bg"  # title text color when a band is drawn
+    # cover composition (cover.band_h=0: the legacy block centred on layout.cover_title_y)
+    cover_band_h: float = Field(
+        0, ge=0, le=0.9
+    )  # share of the slide height of the cover band anchored to the top (0 = off)
+    cover_pad: Length = "0.6in"  # air between the cover title block and the bottom edge of the band
+    cover_gap: Length = "0.2in"  # air between the cover title and its subtitle
+    cover_rule: str | None = None  # color of a thin rule along the band edge (None = no rule)
+    cover_rule_h: Length = "0.05in"  # ... its thickness
+    cover_footer: bool = True  # the deck footer (organisation) shows on the cover as a quiet caption
     conclusion_fill: str = "primary"
     conclusion_color: str = "bg"
     table_header_fill: str = "surface"
@@ -512,6 +521,22 @@ class Theme(BaseModel):
         default_factory=lambda: ["primary", "secondary", "accent", "danger", "success", "muted"]
     )
     layout: LayoutTokens = Field(default_factory=LayoutTokens)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _bools(cls, data):  # `style: cover.footer=off`
+        return _coerce_bools(cls, data)
+
+    @field_validator("cover_band_h", mode="before")
+    @classmethod
+    def _share(cls, v):  # `cover.band_h=60%` (or 0.6)
+        if isinstance(v, str) and v.strip().endswith("%"):
+            try:
+                return float(v.strip()[:-1]) / 100
+            except ValueError:
+                return v
+        return v
+
     render: RenderTokens = Field(default_factory=RenderTokens)
 
     def color(self, value: str | None) -> str | None:
@@ -1060,7 +1085,7 @@ _KEYWORDS = {"none", "hidden", "solid", "dashed", "dotted", "double", "thin", "m
 _PT_FIELDS = {"font_size", "line_width", "radius", "letter_spacing"}
 _PT_PATHS = {"min_font_size", "render.line_width", "render.connector_width", "render.chart_line_width"}
 _THEME_COLOR_SUFFIX = ("_fill", "_color", "_band", "_border")
-_OPTIONAL_COLORS = {"title_band", "heading_band", "muted_band", "table_zebra_fill"}
+_OPTIONAL_COLORS = {"title_band", "heading_band", "muted_band", "table_zebra_fill", "cover_rule"}
 _MEDIUM_PT = 2.25  # CSS `medium` border width (3px)
 
 

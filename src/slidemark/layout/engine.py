@@ -3294,6 +3294,69 @@ def _bar_shrink(st: Style, base: float, em: float, room: float, want: float, lt:
     return st if abs(want - base) < 1e-6 else st.merged(fast_style(font_size=want))
 
 
+def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, fit_text, dims) -> Rect | None:
+    """Cover composed from tokens: a band (``cover.band_h`` of the height, filled when ``title.band`` is set)
+    anchored to the top, the title (+ subtitle) bottom-aligned in it ``cover.pad`` above its edge, a thin
+    ``cover.rule`` along that edge and the deck footer as a quiet caption at the bottom (``cover.footer``)."""
+    W, H, Mx, My, sg, inner_w = dims
+    theme, deck = ctx.theme, ctx.deck
+    bh = round(H * theme.cover_band_h)
+    rh = _emu(theme.cover_rule_h) if theme.cover_rule else 0
+    if theme.title_band:
+        put(
+            head,
+            Shape(shape="rect", id="band"),
+            Rect(0, 0, W, bh),
+            fast_style(fill=theme.title_band, line=None),
+        )
+    bottom = bh - _emu(theme.cover_pad)
+    air = _emu(theme.cover_gap)
+    s_r = None
+    sh = 0
+    if sub:
+        s_st = _role_style(ctx, "subtitle", cover=True)
+        if theme.title_band:
+            s_st = s_st.merged(fast_style(color=theme.title_band_color))
+        s_st = _styled(ctx, sub, s_st.merged(fast_style(valign="top")), classes=False)
+        s_fs = fit_text(sub, Rect(Mx, 0, inner_w, round(bh * 0.25)), s_st)
+        sh = round(_text_need(ctx, sub, s_st, inner_w, s_fs))
+        s_r = Rect(Mx, bottom - sh, inner_w, sh)
+    if slide.title:
+        t_st = _role_style(ctx, "title", cover=True).merged(fast_style(valign="bottom"))
+        if theme.title_band:
+            t_st = t_st.merged(fast_style(color=theme.title_band_color))
+        t_st = _styled(ctx, slide.title, t_st, classes=False)
+        room = max(bottom - sh - (air if sh else 0) - My, 1)
+        t_r = Rect(Mx, bottom - sh - (air if sh else 0) - room, inner_w, room)
+        t_fs = fit_text(slide.title, t_r, t_st)
+        t_fs = _grow_cover_title(ctx, slide.title, t_st, t_r, t_fs)
+        th = round(_text_need(ctx, slide.title, t_st, inner_w, t_fs))
+        put(head, slide.title, Rect(Mx, t_r.bottom - th, inner_w, th), t_st, t_fs)
+    if s_r is not None:
+        put(head, sub, s_r, s_st, s_fs)
+    if rh:
+        full = theme.title_band is not None
+        put(
+            head,
+            Shape(shape="rect", id="rule"),
+            Rect(0 if full else Mx, bh, W if full else inner_w, rh),
+            fast_style(fill=theme.cover_rule, line=None),
+        )
+    foot_h = round(0.26 * EMU_PER_INCH)
+    foot_y = H - foot_h - round(0.1 * EMU_PER_INCH)
+    if theme.cover_footer and deck.footer:
+        put(
+            tail,
+            _text_el("caption", deck.footer, {"field": "footer"}),
+            Rect(Mx, foot_y, round(inner_w * 0.7), foot_h),
+            _role_style(ctx, "caption").merged(fast_style(valign="middle")),
+        )
+    if not slide.elements:
+        return None
+    top = bh + rh + sg
+    return Rect(Mx, top, inner_w, max(foot_y - top - sg, 0))
+
+
 def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     try:
         W, H = slide_size(deck.size)
@@ -3352,55 +3415,63 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
 
     body: Rect | None
     if kind in ("cover", "section"):
-        band_h = round(H * 0.34)
-        by = round(H * 0.24)
         sub = slide.subtitle or slide.lead
-        composed = kind == "cover" and ctx.lt.cover_title_y > 0 and not _cover_explicit(ctx, slide.title, sub)
-        if composed:
-            by = (
-                round(H * ctx.lt.cover_title_y) - band_h // 2
-            )  # the band (or its title block) is centred here
-        if theme.title_band:
-            put(
-                head,
-                Shape(shape="rect", id="band"),
-                Rect(0, by, W, band_h),
-                fast_style(fill=theme.title_band, line=None),
+        if kind == "cover" and theme.cover_band_h > 0 and not _cover_explicit(ctx, slide.title, sub):
+            body = _anchored_cover(ctx, slide, sub, head, tail, put, fit_text, (W, H, Mx, My, sg, inner_w))
+            y_top = 0
+        else:
+            band_h = round(H * 0.34)
+            by = round(H * 0.24)
+            composed = (
+                kind == "cover" and ctx.lt.cover_title_y > 0 and not _cover_explicit(ctx, slide.title, sub)
             )
-        t_st = s_st = None
-        t_r = s_r = None
-        t_fs = s_fs = 1.0
-        if slide.title:
-            t_st = _role_style(ctx, "title", cover=True)
-            t_st = t_st.merged(fast_style(valign="bottom"))
-            if theme.title_band:
-                t_st = t_st.merged(fast_style(color=theme.title_band_color))
-            t_r = Rect(Mx, by, inner_w, round(band_h * 0.65))
-            t_st = _styled(ctx, slide.title, t_st, classes=False)
-            t_fs = fit_text(slide.title, t_r, t_st)
             if composed:
-                t_fs = _grow_cover_title(ctx, slide.title, t_st, t_r, t_fs)
-        if sub:
-            s_st = _role_style(ctx, "subtitle", cover=True)
+                by = (
+                    round(H * ctx.lt.cover_title_y) - band_h // 2
+                )  # the band (or its title block) is centred here
             if theme.title_band:
-                s_st = s_st.merged(fast_style(color=theme.title_band_color))
-            s_r = Rect(Mx, by + round(band_h * 0.68), inner_w, round(band_h * 0.3))
-            s_st = _styled(ctx, sub, s_st.merged(fast_style(valign="top")), classes=False)
-            s_fs = fit_text(sub, s_r, s_st)
-        if composed and t_r is not None:  # title + subtitle: one block, centred on the token line
-            th = round(_text_need(ctx, slide.title, t_st, t_r.w, t_fs))
-            sh = round(_text_need(ctx, sub, s_st, s_r.w, s_fs)) if s_r is not None else 0
-            sp = sg if sh else 0
-            top = round(H * ctx.lt.cover_title_y) - (th + sp + sh) // 2
-            t_r = Rect(Mx, top, inner_w, th)
+                put(
+                    head,
+                    Shape(shape="rect", id="band"),
+                    Rect(0, by, W, band_h),
+                    fast_style(fill=theme.title_band, line=None),
+                )
+            t_st = s_st = None
+            t_r = s_r = None
+            t_fs = s_fs = 1.0
+            if slide.title:
+                t_st = _role_style(ctx, "title", cover=True)
+                t_st = t_st.merged(fast_style(valign="bottom"))
+                if theme.title_band:
+                    t_st = t_st.merged(fast_style(color=theme.title_band_color))
+                t_r = Rect(Mx, by, inner_w, round(band_h * 0.65))
+                t_st = _styled(ctx, slide.title, t_st, classes=False)
+                t_fs = fit_text(slide.title, t_r, t_st)
+                if composed:
+                    t_fs = _grow_cover_title(ctx, slide.title, t_st, t_r, t_fs)
+            if sub:
+                s_st = _role_style(ctx, "subtitle", cover=True)
+                if theme.title_band:
+                    s_st = s_st.merged(fast_style(color=theme.title_band_color))
+                s_r = Rect(Mx, by + round(band_h * 0.68), inner_w, round(band_h * 0.3))
+                s_st = _styled(ctx, sub, s_st.merged(fast_style(valign="top")), classes=False)
+                s_fs = fit_text(sub, s_r, s_st)
+            if composed and t_r is not None:  # title + subtitle: one block, centred on the token line
+                th = round(_text_need(ctx, slide.title, t_st, t_r.w, t_fs))
+                sh = round(_text_need(ctx, sub, s_st, s_r.w, s_fs)) if s_r is not None else 0
+                sp = sg if sh else 0
+                top = round(H * ctx.lt.cover_title_y) - (th + sp + sh) // 2
+                t_r = Rect(Mx, top, inner_w, th)
+                if s_r is not None:
+                    s_r = Rect(Mx, top + th + sp, inner_w, sh)
+            if t_r is not None:
+                put(head, slide.title, t_r, t_st, t_fs)
             if s_r is not None:
-                s_r = Rect(Mx, top + th + sp, inner_w, sh)
-        if t_r is not None:
-            put(head, slide.title, t_r, t_st, t_fs)
-        if s_r is not None:
-            put(head, sub, s_r, s_st, s_fs)
-        body = Rect(Mx, by + band_h + sg, inner_w, H - (by + band_h + sg) - My) if slide.elements else None
-        y_top = 0
+                put(head, sub, s_r, s_st, s_fs)
+            body = (
+                Rect(Mx, by + band_h + sg, inner_w, H - (by + band_h + sg) - My) if slide.elements else None
+            )
+            y_top = 0
     else:
         y = My
         head_bottom: int | None = (
