@@ -632,6 +632,15 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       jp-business charts, no closing slide. Wave 2 candidates: give `@chevron` the same sparse composition as
       `@steps`; sparse bullet/box slides compose (grow text, balance); tables grow text to fill; chart palettes
       keep the accent for emphasis (`hl=`) rather than as a series colour; then re-judge with 3 runs per arm.
+- [ ] Design experiment 2 (2026-10-06, not adopted): SKILL.md + the "Design Ideas" section of Anthropic's pptx
+      skill (read in place; its licence forbids copying it into this repo). 15-slide brief: 13 calls, 6 builds,
+      120 s, cost 230k (more than python-pptx 212k); the agent guessed undocumented layout tokens to stretch cards.
+      Blind judge round 3: python-pptx 3.5, this run 3.0, wave-1 run 3.0 (same deck scored 2.5 in round 2: judge
+      noise is about ±0.5). Verdict: external design prose adds cost, not score. Defects the judge named in all
+      three rounds (fix as defaults, wave 2): accent red used as a data series colour in jp-business charts; pie
+      without % labels and a tiny legend; line labels overlapping at the last point; sparse slides that float
+      (chevron strip, mid-slide bullets, cards in the top third); takeaway bar detached far below its table;
+      equal-weight KPI rows when no hero is set; a list of policies could read as a numbered list.
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or
