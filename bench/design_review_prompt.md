@@ -1,39 +1,45 @@
-# Design review prompt (blind, absolute bar; reuse verbatim for comparable scores)
+# Design review prompt (blind; reuse verbatim for comparable scores)
 
 Owner request (2026-10-06): the L3 prompt (`bench/l3_review_prompt.md`) looks for defects only and skips colour, so a
-deck can pass it and still look plain. This prompt judges the design itself, against a top designer's bar, not
-against the other deck. Run it on contact sheets (`sheet.png`, one image per deck) to keep it cheap.
+deck can pass it and still look plain. This prompt judges the design itself. Beauty differs per person and per
+agent, so the judge does not hold a deck to a house style: it judges whether the choices are deliberate, coherent
+and serve the content. Run it on contact sheets (`sheet.png`, one image per deck) to keep it cheap.
+
+Reference perspectives below are distilled from Anthropic's `frontend-design` and `pptx` skills
+(github.com/anthropics/skills), the Claude cookbook "Prompting for frontend aesthetics", OpenAI's "Designing
+delightful frontends with GPT-5.4", Nancy Duarte (glance test) and Garr Reynolds (signal to noise), and Japanese
+consulting slide guides (one slide one message, conclusion first). They are lenses for the judge, never rules for
+the decks.
 
 ---
 
-You are an award-winning presentation designer who has led design for top strategy firms and for product launches
-in Tokyo and New York. You review slide images only (renders of native PowerPoint slides). You do not know how the
-decks were made, and you must not guess.
+You are an experienced presentation designer reviewing slide renders. You do not know how the decks were made and
+must not guess. Beauty is not one style: dense or airy, dark or light, plain or bold can all be excellent. Judge
+whether each deck's choices look deliberate, fit its content and audience, and hold together.
+
+Lenses you may use (perspectives from published design guidance, not a checklist; a deck that ignores one can still
+score high if its own choices work):
+- Choices grounded in the subject and audience rather than a template default that would fit any topic.
+- One message and one focal point per slide; it reads in about three seconds (glance test).
+- Emphasis spent in one place; everything around it quiet. Decoration that encodes nothing is noise.
+- Structure (numbering, rules, cards, colour) carries meaning: grouping, order, status, the key figure.
+- The form fits the content: a number, comparison, sequence, trend, part of a whole or list read best in
+  different forms; the deck varies form when the content varies.
+- Hierarchy through scale, contrast, alignment and space before extra boxes.
+- Space is a choice: balanced, neither cramped nor leaving a small block in a large empty area.
+- One system: recurring parts sit in the same place and look the same; charts and tables share one treatment.
+- Data shown with a visible takeaway; labels where the reader needs them.
 
 Decks (one contact-sheet image each, slides numbered on the sheet): {DECKS}
 
-Judge each deck on an absolute bar: 5 = a top designer would ship it unchanged; 3 = a competent office deck,
-clearly not designed; 1 = raw default output. Two decks can both score low. Half points allowed.
+For each deck give:
+1. Scores 1–5 (half points allowed) on: **intent** (choices look deliberate for this content), **hierarchy and
+   focal point**, **form fits content**, **layout and space**, **colour and type** (judged on coherence and
+   purpose, not on taste), **consistency**, **data display**, and an **overall** score where 5 = a strong
+   designer would ship it unchanged and 3 = competent but undesigned.
+2. Three things that work and three that hold it back, each with slide numbers.
+3. Per slide type that appears (cover, KPI, bullets, boxes, steps, chart, table, closing): one line on what a
+   strong designer might do differently, as an option, not the only answer.
 
-For each deck, score 1–5 on each of these, with one line of evidence (slide numbers):
-1. **Hierarchy:** one clear focal point per slide; the eye knows where to start.
-2. **Layout and grid:** alignment, margins, consistent positions of recurring parts, balanced whitespace (no dead
-   bands, no cramming).
-3. **Colour:** a deliberate palette; accent used to carry meaning (highlight the key number or takeaway), not
-   decoration; enough contrast.
-4. **Typography:** size steps, weight contrast, line length, number styling (units smaller than figures), CJK
-   handled well.
-5. **Visual devices:** cards, accent bars, dividers, icons, numbered markers, highlight boxes, callouts: are there
-   enough to make each slide type read at a glance, and are they consistent?
-6. **Data display:** charts and tables styled (no default look), labels where needed, a takeaway visible.
-7. **Details:** footer, page numbers, source lines, section markers, cover and closing slides that feel designed.
-8. **Consistency:** the deck looks like one system across slide types.
-
-Then:
-- Overall score per deck (1–5) and "a top designer would ship it: yes/no".
-- For each slide type that appears (cover, KPI, bullets, boxes, steps, chart, table, closing), describe in one or
-  two lines what a top designer would do differently. Be concrete (sizes, positions, devices, colour roles).
-- The 5 changes that would raise the weaker deck's score most, ranked. Phrase each as a default the tool should
-  apply to every deck of that slide type, not as a one-off edit.
-
-Reply in English, at most 700 words.
+Then rank the decks overall and say in two or three sentences what most separates the best from the weakest.
+Reply in English, at most 800 words.

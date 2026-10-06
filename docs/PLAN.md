@@ -611,6 +611,18 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       extra agent tokens, by richer defaults per slide type (KPI cards with accent bars and unit styling, carded
       bullets, chevrons with label boxes, accent on the key number/takeaway, footer + page number + source line,
       designed cover and closing), all as tokens/presets an agent can override (design freedom).
+- [ ] Design experiment 1 (2026-10-06, reverted): a neutral "Design is yours" section in SKILL.md (decide a look
+      up front, one focal point, form fits content, space as a choice, one system, use css/@html instead of
+      dropping an idea). 15-slide brief, one run: 11 calls / 6 builds / 99 s / cost 171k vs 5 / 2 / 40 s / 85k
+      before, and the blind judge (`bench/design_review_prompt.md`, scores in `bench/design_review.jsonl`) ranked
+      it lowest: python-pptx 3.5, SlideMark baseline 3.0, SlideMark + advice 2.5 (generic icons, hollow cards).
+      The agent read the advice, tried to design, then fought the tool (asked for 48pt KPI values, got 30pt from
+      fitting; "could not enlarge those blocks"; read SlideMark source). Lesson: advice without matching
+      capability adds calls and decoration. Next, capability before advice: what the judge says separates the
+      decks is structure that carries meaning (one hero metric, a step paired with its outcome, the growth rows
+      highlighted, cards that hug their text, the plan bar highlighted, a closing slide). Check which of these the
+      syntax already has (`hl=`/`note=`, `.accent`, chevron bullets) and why agents do not reach for them; add the
+      missing ones as syntax, then document them as capabilities (not rules) in SKILL.md and re-run the judge.
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or
