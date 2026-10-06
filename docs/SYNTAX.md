@@ -299,6 +299,8 @@ and each following row is one series.
 A `waterfall` (bridge) takes one series: the first value is the starting total, the next values are changes,
 and a lone `=` cell is a total bar (the running sum). Up, down and total bars use `render.waterfall_up`,
 `render.waterfall_down` and `render.waterfall_total` (theme color names or hex); the bars are native and editable.
+It is drawn as a stacked column chart with a hidden `base` series; bars may cross zero. Labels show `+18` / `-33` / the total,
+formatted by `fmt`, above each bar.
 
 ````markdown
 ```waterfall {title="営業利益の増減（億円）" labels=on}
