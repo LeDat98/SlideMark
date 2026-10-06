@@ -834,3 +834,134 @@ def _grow_chevron_text(
     if best <= 1.0 + 1e-9:
         return None
     return [c.model_copy(update={"font_scale": round(c.font_scale * best, 4)}) for c in chevs]
+
+
+# --------------------------------------------------------------------------- lone KPI row
+
+
+def fit_lone_kpi(
+    out: list[Placed], body: Rect, lt: LayoutTokens, on_bar: bool = False, fixed: bool = False
+) -> list[Placed]:
+    """A body of nothing but KPI cards: content-sized cards (label, number, caption) at the optical center.
+
+    The number grows (``kpi_lone_value_max_pt``, never wraps), label and caption step up a little, the card is
+    content + padding tall (at most ``kpi_lone_h`` of the body) and the row sits with ``kpi_lone_center`` of
+    free height above it (``on_bar``: it ends one gutter above the conclusion bar).
+    ``fixed``: the author set the KPI text size (CSS, {size=}): only the card shrinks to its content.
+    Other blocks, icons, explicit sizes / heights: unchanged."""
+    try:
+        return _fit_lone_kpi(out, body, lt, on_bar, fixed)
+    except Exception:  # never raise on bad input
+        return out
+
+
+def _step_up(plain: str, pt: float, wpt: float, bold: bool, lt: LayoutTokens) -> float:
+    """``pt`` stepped up (``kpi_lone_text_grow``, max ``kpi_lone_text_max_pt``) while it stays on one line."""
+    big = min(pt * lt.kpi_lone_text_grow, max(lt.kpi_lone_text_max_pt, pt))
+    return big if measure.text_em(plain, bold=bold) * big <= wpt * lt.kpi_fit_margin else pt
+
+
+def _fit_lone_kpi(out: list[Placed], body: Rect, lt: LayoutTokens, on_bar: bool, fixed: bool) -> list[Placed]:
+    if not lt.kpi_lone or body.h <= 0:
+        return out
+    items = _body_items(out, body)
+    cards = [p for p in items if isinstance(p.element, Container)]
+    if not cards or any("kpi" not in c.element.classes for c in cards) or len({c.y for c in cards}) != 1:
+        return out
+    parts: list[tuple[Placed, Placed, Placed]] = []
+    seen = {id(c) for c in cards}
+    for c in cards:
+        inner = [p for p in items if p is not c and _contains(c, p)]
+        heads = [p for p in inner if getattr(p.element, "role", None) == "heading"]
+        mains = [p for p in inner if p not in heads]
+        if len(heads) != 1 or len(mains) != 1 or not isinstance(mains[0].element, Text):
+            return out
+        if not heads[0].element.paragraphs or not mains[0].element.paragraphs:
+            return out
+        if c.element.box is not None or mains[0].element.box is not None:
+            return out
+        parts.append((c, heads[0], mains[0]))
+        seen |= {id(heads[0]), id(mains[0])}
+    if any(id(p) not in seen for p in items):
+        return out  # icons, notes or other blocks share the body
+
+    inner_pt = min(m.w for _, _, m in parts) / EMU_PER_PT
+    # the number: one size for the row, never wraps, never smaller than before
+    sizes0 = [(m.element.paragraphs[0].style.font_size or 36) * m.font_scale for _, _, m in parts]
+    em = max(measure.text_em(m.element.paragraphs[0].plain, bold=True) for _, _, m in parts)
+    fit = inner_pt * lt.kpi_fit_margin * lt.kpi_lone_fit / max(em, 1e-6)
+    value_hi = max(min(lt.kpi_lone_value_max_pt, max(sizes0) * lt.kpi_lone_value_grow, fit), min(sizes0))
+    label_hi = min(
+        _step_up(h.element.paragraphs[0].plain, (h.style.font_size or 11) * h.font_scale, inner_pt, True, lt)
+        for _, h, _ in parts
+    )
+    cap_hi = min(
+        (
+            _step_up(
+                m.element.paragraphs[1].plain,
+                (m.element.paragraphs[1].style.font_size or 12) * m.font_scale,
+                inner_pt,
+                False,
+                lt,
+            )
+            for _, _, m in parts
+            if len(m.element.paragraphs) > 1
+        ),
+        default=0.0,
+    )
+    label0 = min((h.style.font_size or 11) * h.font_scale for _, h, _ in parts)
+    cap0 = min(
+        (
+            (m.element.paragraphs[1].style.font_size or 12) * m.font_scale
+            for _, _, m in parts
+            if len(m.element.paragraphs) > 1
+        ),
+        default=0.0,
+    )
+    limit = round(lt.kpi_lone_h * body.h)
+    if fixed:
+        value_hi, label_hi, cap_hi = min(sizes0), label0, cap0
+    # largest step of the growth (1 = full, 0 = the sizes the slide had) whose card stays within the share
+    for k in (1.0, 0.8, 0.6, 0.4, 0.2, 0.0):
+        value_pt = min(sizes0) + (value_hi - min(sizes0)) * k
+        label_pt = label0 + (label_hi - label0) * k
+        cap_pt = cap0 + (cap_hi - cap0) * k
+        news, hh, mh, pad, gap = _lone_geometry(parts, value_pt, label_pt, cap_pt, lt)
+        card_h = 2 * pad + hh + gap + mh
+        if card_h <= limit:
+            break
+    card_h = min(card_h, body.h)  # content is never cut: at the old sizes the card may pass its share
+    top = body.bottom - card_h if on_bar else body.y + round((body.h - card_h) * lt.kpi_lone_center)
+    top = max(body.y, min(top, body.bottom - card_h))
+    res: dict[int, Placed] = {}
+    for (c, h, m), (h2, m2) in zip(parts, news, strict=True):
+        res[id(c)] = c.model_copy(update={"y": top, "h": card_h})
+        res[id(h)] = h2.model_copy(update={"y": top + pad, "h": hh})
+        res[id(m)] = m2.model_copy(update={"y": top + pad + hh + gap, "h": card_h - 2 * pad - hh - gap})
+    return _apply(out, res)
+
+
+def _lone_geometry(parts, value_pt: float, label_pt: float, cap_pt: float, lt: LayoutTokens):
+    """(new label / text items, label height, text height, padding, gap) of a lone KPI row at these sizes."""
+    pad = round(lt.kpi_lone_pad_em * value_pt * EMU_PER_PT)
+    gap = round(lt.kpi_lone_gap_em * label_pt * EMU_PER_PT)
+    news: list[tuple[Placed, Placed]] = []
+    hhs: list[int] = []
+    mhs: list[int] = []
+    for _c, h, m in parts:
+        hscale = label_pt / max(h.style.font_size or 11, 1e-6)
+        hhs.append(round(measure.paragraphs_height(h.element.paragraphs, h.w, h.style, hscale)))
+        paras = [
+            p.model_copy(
+                update={"style": p.style.model_copy(update={"font_size": value_pt if i == 0 else cap_pt})}
+            )
+            for i, p in enumerate(m.element.paragraphs)
+        ]
+        m2 = m.model_copy(
+            update={"font_scale": 1.0, "element": m.element.model_copy(update={"paragraphs": paras})}
+        )
+        mhs.append(
+            round(measure.paragraphs_height(paras, m.w, m.style, 1.0, gap=m.element.attrs.get("para_gap")))
+        )
+        news.append((h.model_copy(update={"font_scale": hscale}), m2))
+    return news, max(hhs), max(mhs), pad, gap

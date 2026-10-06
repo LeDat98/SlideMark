@@ -94,6 +94,11 @@ SPARSE = [
 @pytest.mark.parametrize(("name", "number", "what"), SPARSE)
 def test_no_empty_band_over_35_percent(name, number, what):
     above, below = bands(name, number)
+    if (
+        what == "4 KPI cards alone"
+    ):  # a lone KPI row is content-sized at the optical center (test_l3_kpi_lone)
+        assert max(above, below) <= 0.45
+        return
     assert max(above, below) <= LIMIT, f"{what}: above {above:.0%}, below {below:.0%}"
 
 
@@ -132,8 +137,8 @@ def test_dense_kpi_cards_taller_than_before():
 
 
 def test_kpi_cards_alone_grow():
-    before, _, _ = lay(VI, 2, sparse_left_max=0.0)
-    after, _, _ = lay(VI, 2)
+    before, _, _ = lay(VI, 2, sparse_left_max=0.0, kpi_lone=False)
+    after, _, _ = lay(VI, 2, kpi_lone=False)
     h0 = max(c.h for c in cards(before))
     h1 = max(c.h for c in cards(after))
     assert h1 >= 1.15 * h0 * 0.99

@@ -159,7 +159,7 @@ lang: ja
 
 
 def test_kpi_row_is_top_anchored_and_values_stay_centred():
-    placed, _, _ = lay("", 1, KPI)
+    placed, _, _ = lay("", 1, KPI, kpi_lone=False)  # (a lone KPI row is content-sized: test_l3_kpi_lone.py)
     title = role(placed, "title")[0]
     cs = cards(placed)
     assert len(cs) == 3 and len({c.h for c in cs}) == 1
