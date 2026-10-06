@@ -704,7 +704,60 @@ def _fill_panels(
         r = _fill_panel(c, inner, lt, consulting)
         if r is not None:
             res.update(_align_plot(c, r, items, visuals, lt, title_scale) if consulting else r)
-    return _apply(out, res) if res else out
+    rules = _spread_stack(items, visuals, res, lt)
+    return _apply(out, res) + rules if res or rules else out
+
+
+def _spread_stack(
+    items: list[Placed], visuals: list[Placed], res: dict[int, Placed], lt: LayoutTokens
+) -> list[Placed]:
+    """Hollow cards stacked in a column beside a chart / image (together as tall as the visual): their items
+    are spread like cards above a conclusion bar (ruled list, siblings share one rhythm). Cards that are
+    ``card_spread_fill`` full keep their layout. Fills ``res``; returns the rule shapes."""
+    if lt.card_spread_fill <= 0:
+        return []
+    rules: list[Placed] = []
+    for v in visuals:
+        col = [
+            c
+            for c in items
+            if isinstance(c.element, Container)
+            and id(c) not in res
+            and "kpi" not in c.element.classes
+            and (v.x + v.w <= c.x + 2 or c.x + c.w <= v.x + 2)
+            and c.y >= v.y - 2
+            and c.y + c.h <= v.y + v.h + 2
+        ]
+        col = [c for c in col if not any(q is not c and _contains(q, c) for q in col)]
+        if len(col) < 2 or any(abs(c.x - col[0].x) > 2 or abs(c.w - col[0].w) > 2 for c in col):
+            continue
+        col.sort(key=lambda c: c.y)
+        if sum(c.h for c in col) < v.h * 0.8 or any(
+            col[i + 1].y < col[i].y + col[i].h - 2 for i in range(len(col) - 1)
+        ):
+            continue
+        plan = {id(c): _inner_texts(c, items, deco=True) for c in col}
+        if any(inner is None for inner in plan.values()):
+            continue
+        local: dict[int, Placed] = {}
+        for c in col:
+            r = _fill_card(c, plan[id(c)], c.y, c.y + c.h, lt)
+            if r is None:
+                local = {}
+                break
+            local.update(r[0])
+        if not local or min(_card_share(local, c, plan[id(c)]) for c in col) >= lt.card_spread_fill:
+            continue
+        new_rules = _distribute_row(local, col, plan, lt)
+        if not new_rules:
+            continue
+        for c in col:  # decoration inside a card (icons, header bars) keeps its place
+            for q in items:
+                if q is not c and id(q) not in local and _contains(c, q):
+                    local[id(q)] = q
+        res.update(local)
+        rules += new_rules
+    return rules
 
 
 def fill_chevron_row(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
@@ -766,6 +819,80 @@ def _resize_chevron(p: Placed, dy: int, grow: int, lt: LayoutTokens) -> Placed:
     adj = p.element.attrs.get("adj", lt.chevron_adj) * short / max(min(p.w, p.h + grow), 1)
     el = p.element.model_copy(update={"attrs": {**p.element.attrs, "adj": round(adj, 4)}})
     return p.model_copy(update={"y": p.y + dy, "h": p.h + grow, "element": el})
+
+
+def align_chevron_table(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+    """A chevron row right above a table with as many columns as chevrons: chevron i spans table column i
+    (point depth and the gap between chevrons stay). Skipped when a text would wrap more in its new width."""
+    try:
+        return _align_chevron_table(out, body, lt)
+    except Exception:  # never raise on bad input
+        return out
+
+
+def _align_chevron_table(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
+    from .engine import _chevron_text_w, _longest_word_em
+
+    if not lt.chevron_table_align or body.h <= 0:
+        return out
+    items = _body_items(out, body)
+    chevs = sorted(
+        (p for p in items if isinstance(p.element, Shape) and p.element.shape == "chevron"),
+        key=lambda p: p.x,
+    )
+    tables = [p for p in items if isinstance(p.element, Table)]
+    if len(chevs) < 2 or len(tables) != 1:
+        return out
+    tp = tables[0]
+    cw = tp.element.attrs.get("_col_w")
+    if not cw or len(cw) != len(chevs) or abs(sum(cw) - tp.w) > 2 + len(cw):
+        return out
+    ids = {id(c) for c in chevs} | {id(tp)}
+    for p in items:  # nothing else may share the body (icons on a chevron excepted)
+        if id(p) not in ids and not (
+            isinstance(p.element, Shape) and p.element.shape == "icon" and any(_contains(c, p) for c in chevs)
+        ):
+            return out
+    if min(c.y + c.h for c in chevs) <= max(c.y for c in chevs) or tp.y < max(c.y + c.h for c in chevs) - 2:
+        return out
+    gap = max(chevs[i + 1].x - (chevs[i].x + chevs[i].w) for i in range(len(chevs) - 1))
+    gap = min(max(gap, 0), min(cw) // 4)
+    res: dict[int, Placed] = {}
+    left = tp.x
+    for i, (c, w) in enumerate(zip(chevs, cw, strict=True)):
+        nw = w if i == len(chevs) - 1 else w - gap
+        depth = c.element.attrs.get("adj", lt.chevron_adj) * min(c.w, c.h)
+        adj = round(depth / max(min(nw, c.h), 1), 4)
+        el = c.element.model_copy(update={"attrs": {**c.element.attrs, "adj": adj}})
+        new = c.model_copy(update={"x": left, "w": nw, "element": el})
+        if not _chevron_text_ok(c, new, _chevron_text_w, _longest_word_em, lt):
+            return out
+        res[id(c)] = new
+        for p in items:  # an icon keeps its place relative to the chevron's left end
+            if id(p) not in ids and _contains(c, p):
+                res[id(p)] = p.model_copy(update={"x": p.x + left - c.x})
+        left += w
+    return _apply(out, res)
+
+
+def _chevron_text_ok(old: Placed, new: Placed, text_w, longest_word_em, lt: LayoutTokens) -> bool:
+    """The text of chevron ``new`` wraps like it did in ``old`` and its longest word still fits."""
+    sz = (old.style.font_size or 18) * old.font_scale
+    paras = old.element.paragraphs
+    areas = []
+    for c in (old, new):
+        adj = c.element.attrs.get("adj")
+        areas.append(text_w(Rect(c.x, c.y, c.w, c.h), c.style, c.element, adj) / EMU_PER_PT)
+    if areas[1] <= 0 or longest_word_em(paras) * sz * lt.chevron_word_slack > areas[1]:
+        return False
+    for i, para in enumerate(paras):
+        cjk = measure.has_cjk(para.plain)
+        slack = max(lt.chevron_cjk_slack if cjk else lt.chevron_head_slack, 1.0)
+        segs = measure.para_segments(para, i == 0 and bool(para.runs) and all(r.bold for r in para.runs))
+        was = measure.count_lines(segs, areas[0] / slack, sz, old.style.font)
+        if measure.count_lines(segs, areas[1] / slack, sz, new.style.font) > max(was, 1):
+            return False
+    return True
 
 
 def grow_chevron_table(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
