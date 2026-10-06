@@ -717,7 +717,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             chart.plots[0].gap_width = max(0, min(500, round(gw)))
         except Exception:
             pass
-    apply_hl(ch, chart, cats, real_series, wf, theme)
+    if hl_names := apply_hl(ch, chart, cats, real_series, wf, theme):
+        gf.name = f"{name} hl={','.join(hl_names)}"  # the importer reads it back
     if note_plan and note_plan.plot:
         pin_plot(chart, note_plan.plot)
     if pie:

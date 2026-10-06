@@ -59,7 +59,7 @@ def chart_size(pl: Placed, theme: Theme) -> float:
 
 
 def resolve_hl(ch: Chart, cats: list[str]) -> list[int]:
-    """Indexes of the ``hl=`` categories in ``cats`` (exact, else case-insensitive); unknown ones are skipped."""
+    """Indexes of the ``hl=`` categories in ``cats`` (exact, else case-insensitive); others are skipped."""
     raw = ch.options.get("hl") or []
     names = [raw] if isinstance(raw, str) else list(raw)
     stripped = [str(c).strip() for c in cats]

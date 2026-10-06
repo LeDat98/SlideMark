@@ -21,11 +21,11 @@ def hl_color(theme: Theme) -> RGBColor:
     return RGBColor.from_string(hex6(theme, theme.render.chart_hl))
 
 
-def apply_hl(ch: Chart, chart, cats: list[str], real_series: int, wf: dict | None, theme: Theme) -> None:
-    """Emphasise the ``hl=`` categories (never raises: a point that does not exist is skipped)."""
+def apply_hl(ch: Chart, chart, cats: list[str], real_series: int, wf: dict | None, theme: Theme) -> list[str]:
+    """Emphasise the ``hl=`` categories; returns their names. Never raises: a missing point is skipped."""
     idx = chartnote.resolve_hl(ch, cats)
     if not idx:
-        return
+        return []
     color, rt = hl_color(theme), theme.render
     kind = ch.kind
     for plot in chart.plots:
@@ -59,6 +59,7 @@ def apply_hl(ch: Chart, chart, cats: list[str], real_series: int, wf: dict | Non
                             pt.format.line.width = Pt(rt.chart_hl_line)
                 except (IndexError, KeyError, AttributeError, ValueError):
                     continue
+    return [cats[i] for i in idx]
 
 
 def pin_plot(chart, frac: tuple[float, float, float, float]) -> None:
