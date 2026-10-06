@@ -114,3 +114,17 @@ def test_neg_axis_edges():
     assert neg_axis("bar", [[]], rt) is None
     assert neg_axis("bar", [[None, "x", -1.0]], rt) is not None
     assert neg_axis("bar", [[-5, -3]], rt)[1] == 0.0
+
+
+def test_axis_with_min_uses_the_visible_span(tmp_path):
+    wf = build_chart(
+        tmp_path,
+        "waterfall",
+        ["a", "b", "c", "d"],
+        [Series(name="s", values=[142, -11, -13, None])],
+        min=100,
+        totals=[3],
+    )
+    assert wf.value_axis.minimum_scale == 100 and wf.value_axis.maximum_scale == 160  # not 200
+    col = build_chart(tmp_path, "column", ["a", "b"], [Series(name="s", values=[3.6, 3.9])], min=3)
+    assert col.value_axis.minimum_scale == 3 and col.value_axis.maximum_scale <= 4.5

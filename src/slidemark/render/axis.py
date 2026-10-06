@@ -51,6 +51,19 @@ def nice_axis(top: float, rt: RenderTokens) -> tuple[float, float] | None:
     return fallback
 
 
+def axis_from(lo: float, top: float, rt: RenderTokens) -> tuple[float, float] | None:
+    """(max, major unit) for an axis that starts at the author's ``min`` (``lo``) below the data top: the nice
+    steps are chosen over the visible span, so ``min=100`` with a top of 142 ends at 150, not 200."""
+    if not (math.isfinite(lo) and math.isfinite(top)) or top <= lo:
+        return None
+    span = nice_axis(top - lo, rt)
+    if not span:
+        return None
+    unit = span[1]
+    hi = lo + math.ceil((top * (1 + rt.chart_axis_headroom) - lo) / unit - 1e-9) * unit
+    return round(hi, 10), unit
+
+
 def auto_axis(kind: str, series_values: list[list], rt: RenderTokens) -> tuple[float, float] | None:
     top = data_top(kind, series_values)
     return nice_axis(top, rt) if top else None

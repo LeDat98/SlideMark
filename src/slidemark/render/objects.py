@@ -22,7 +22,7 @@ from ..layout.css import border_spec, cell_insets
 from ..layout.tables import column_widths, compact_header, table_grid
 from ..theme import DEFAULT_SIZES, Theme
 from . import waterfall as wfall
-from .axis import auto_axis, neg_axis
+from .axis import auto_axis, axis_from, data_top, neg_axis
 from .effects import apply_fill, apply_shadow
 from .text import _ANCHOR, fill_text
 from .util import RenderCtx, emu, hex6, rgb
@@ -441,6 +441,7 @@ def _waterfall_plan(ch: Chart, ser: Series, opts: dict, theme: Theme) -> dict:
     return {
         "bars": bs,
         "axis": got,
+        "top": max((b[2] for b in bs if b[0] != "gap"), default=0.0),
         "colors": colors,
         "series": [
             Series(name=(ser.name if i == wfall.PAD else n), values=c)
@@ -731,10 +732,13 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 va.tick_labels.number_format_is_linked = False
         lo, hi = _num(opts.get("min")), _num(opts.get("max"))
         if wf and wf["axis"]:
+            above = (
+                axis_from(lo, wf["top"], theme.render) if lo is not None and hi is None and lo > 0 else None
+            )
             lo = lo if lo is not None else wf["axis"][0]
-            hi = hi if hi is not None else wf["axis"][1]
-            if wf["axis"][2]:
-                va.major_unit = wf["axis"][2]
+            hi = hi if hi is not None else (above[0] if above else wf["axis"][1])
+            if above or wf["axis"][2]:
+                va.major_unit = above[1] if above else wf["axis"][2]
             if wf["axis"][0] < 0:
                 chart.category_axis.tick_label_position = XL_TICK_LABEL_POSITION.LOW
         neg = neg_axis(kind, [s.values for s in series], theme.render) if not wf else None
@@ -755,6 +759,12 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             if auto:  # LibreOffice / PowerPoint round the auto max far up (117 -> 140)
                 va.maximum_scale = auto[0]
                 va.major_unit = auto[1]
+        elif kind in ("bar", "column", "stacked-column", "stacked-bar", "area") and lo is not None and lo > 0:
+            top = data_top(kind, [s.values for s in series])
+            above = axis_from(lo, top, theme.render) if top else None
+            if above:  # `min=100`: nice steps over the visible span
+                va.maximum_scale = above[0]
+                va.major_unit = above[1]
         if kind in ("bar", "stacked-bar"):  # first category on top, value axis stays at the bottom
             chart.category_axis.reverse_order = True
             va._element.find(qn("c:crosses")).set("val", "max")
