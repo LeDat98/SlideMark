@@ -291,6 +291,19 @@ class LayoutTokens(BaseModel):
     chart_plot_top_em: float = (
         3.5  # ... a chart with a title: its plot area starts this many title sizes below the chart top
     )
+    # --- chart takeaway (`note=` / `hl=`): the plot area is pinned (manualLayout): the pointer hits the bar
+    chart_note_title_em: float = 3.0  # plot top below the chart top with a title (x chart text size)
+    chart_note_top_em: float = 1.0  # ... without a title
+    chart_note_legend_em: float = 1.8  # room a top / bottom legend takes
+    chart_note_axis_em: float = 2.0  # room of the labels under the plot
+    chart_note_val_em: float = 1.2  # air beside the axis labels at the left (axis on)
+    chart_note_edge_em: float = 1.0  # air at the left / right chart edge
+    chart_note_max_w: float = 0.62  # a note is at most this share of the plot width
+    chart_note_gap_em: float = 0.5  # air between the note and bars / labels
+    chart_note_slack: float = (
+        1.12  # a note's text width is estimated this much wider (bold CJK + latin spacing)
+    )
+    chart_note_line_em: float = 1.2  # shortest pointer line (x chart text size)
     panel_to_visual: bool = (
         True  # a hollow panel beside a chart spans it: top at the plot top, bottom at the chart's
     )
@@ -437,6 +450,11 @@ class RenderTokens(BaseModel):
         180  # ... for a chart with at most `chart_gap_few_cats` categories (fat bars look crude)
     )
     chart_gap_few_cats: int = 3
+    chart_hl: str = "accent"  # `hl=` points: fill (bar / column / pie / waterfall), outline, line marker
+    chart_hl_line: float = 2.25  # pt, outline of an `hl=` bar in a multi-series chart
+    chart_hl_marker: int = 11  # pt, marker of an `hl=` point in a line chart
+    chart_note_size_add: float = 1.0  # pt, a `note=` is this much larger than the data labels
+    chart_note_line_width: float = 1.0  # pt, the pointer of a `note=`
     waterfall_up: str = "success"  # waterfall bars: increase, decrease, total (theme color names or hex)
     waterfall_down: str = "danger"
     waterfall_total: str = "primary"
@@ -509,6 +527,10 @@ def _base_classes() -> dict[str, Style]:
         # `{.gantt}` table: every filled body cell becomes a bar of this look (fill primary, best ink)
         "gantt": Style(fill="primary", radius=4, padding="3pt", align="center", valign="middle"),
         "decision": Style(fill="bg", line="accent"),
+        # `note=` of a chart: native callout inside the chart frame, pointing at the `hl=` point
+        "chart-note": Style(
+            fill="surface", line="accent", line_width=1, radius=3, padding="5pt", bold=True, valign="middle"
+        ),
     }
 
 

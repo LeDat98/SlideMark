@@ -11,7 +11,7 @@ from ..ir import Chart, Style, Table
 from .ctx import Ctx, closest
 
 LEGEND = ("bottom", "right", "top", "left", "none")
-CHART_KEYS = ("title", "legend", "labels", "fmt", "min", "max", "colors", "axis")
+CHART_KEYS = ("title", "legend", "labels", "fmt", "min", "max", "colors", "axis", "hl", "note")
 THEME_COLORS = (
     "bg",
     "fg",
@@ -141,6 +141,43 @@ def _bad(ctx: Ctx, key: str, value: str, valid: str, line: int | None) -> None:
     ctx.warn(f"bad chart option {key}='{value}'", line, "bad-chart-option", f"{key} is one of: {valid}")
 
 
+_HL_KINDS = ("bar", "column", "stacked-bar", "stacked-column", "line", "pie", "doughnut", "waterfall")
+
+
+def _apply_hl(ch: Chart, value: str, ctx: Ctx, line: int | None) -> None:
+    """``hl=a,b``: emphasised categories. Unknown names warn (listing the valid ones) and are dropped."""
+    names = [p.strip() for p in re.split(r"[,;]", value) if p.strip()]
+    if not names:
+        _bad(ctx, "hl", value, "a comma list of category names", line)
+        return
+    if ch.kind not in _HL_KINDS:
+        ctx.warn(
+            f"hl is not drawn on {ch.kind} charts",
+            line,
+            "chart-hl",
+            "hl works on bar, column, stacked-*, line, pie, doughnut and waterfall charts",
+        )
+        return
+    cats = [str(c).strip() for c in ch.categories]
+    if ch.kind in ("pie", "doughnut") and len(ch.series) > 1 and len(cats) <= 1:
+        cats = [s.name.strip() for s in ch.series]  # one slice per CSV row
+    folded = [c.casefold() for c in cats]
+    good: list[str] = []
+    for n in names:
+        i = cats.index(n) if n in cats else folded.index(n.casefold()) if n.casefold() in folded else -1
+        if i < 0:
+            ctx.warn(
+                f"hl category '{n}' is not in the chart",
+                line,
+                "chart-hl",
+                "categories are: " + ", ".join(cats[:12]) + (" ..." if len(cats) > 12 else ""),
+            )
+        elif cats[i] not in good:
+            good.append(cats[i])
+    if good:
+        ch.options["hl"] = good
+
+
 def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) -> dict[str, str]:
     """Consume chart option keys from ``kv`` into ``ch``; returns the keys left for the generic path."""
     from .attrs import VALID_KEYS
@@ -194,6 +231,14 @@ def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) ->
                     "bad-chart-option",
                     "colors is a comma list of #hex or theme names: " + "/".join(THEME_COLORS),
                 )
+        elif k == "hl":
+            _apply_hl(ch, v, ctx, line)
+        elif k == "note":
+            text = " ".join(v.split())
+            if text:
+                o["note"] = text
+            else:
+                _bad(ctx, k, v, "a one-line takeaway text", line)
         else:
             rest[k] = v
             if k not in VALID_KEYS:

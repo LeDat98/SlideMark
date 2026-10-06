@@ -17,12 +17,13 @@ from pygments.lexers import TextLexer, get_lexer_by_name
 from pygments.token import Comment, Keyword, Name, Number, Operator, String
 
 from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Series, Style, Table
-from ..layout import measure
+from ..layout import chartnote, measure
 from ..layout.css import border_spec, cell_insets
 from ..layout.tables import column_widths, compact_header, table_grid
 from ..theme import DEFAULT_SIZES, Theme
 from . import waterfall as wfall
-from .axis import auto_axis, neg_axis
+from .axis import resolve_axis
+from .charthl import apply_hl, pin_plot
 from .effects import apply_fill, apply_shadow
 from .text import _ANCHOR, fill_text
 from .util import RenderCtx, emu, hex6, rgb
@@ -595,6 +596,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             data.add_series(s.name, vals)
         if not series:
             data.add_series("", [None] * (len(cats) or 1))
+    note_plan = chartnote.plan(ch, pl, theme)
     gf = slide.shapes.add_chart(ctype, Emu(pl.x), Emu(pl.y), Emu(pl.w), Emu(pl.h), data)
     gf.name = name
     chart = gf.chart
@@ -715,6 +717,9 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             chart.plots[0].gap_width = max(0, min(500, round(gw)))
         except Exception:
             pass
+    apply_hl(ch, chart, cats, real_series, wf, theme)
+    if note_plan and note_plan.plot:
+        pin_plot(chart, note_plan.plot)
     if pie:
         return
     try:
@@ -730,31 +735,25 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 va.tick_labels.number_format = nf
                 va.tick_labels.number_format_is_linked = False
         lo, hi = _num(opts.get("min")), _num(opts.get("max"))
-        if wf and wf["axis"]:
-            lo = lo if lo is not None else wf["axis"][0]
-            hi = hi if hi is not None else wf["axis"][1]
-            if wf["axis"][2]:
-                va.major_unit = wf["axis"][2]
-            if wf["axis"][0] < 0:
-                chart.category_axis.tick_label_position = XL_TICK_LABEL_POSITION.LOW
-        neg = neg_axis(kind, [s.values for s in series], theme.render) if not wf else None
-        if neg:  # room for the outside-end label of the lowest bar (else it hits the category labels)
-            lo = neg[0] if lo is None else lo
-            if hi is None:
-                hi = neg[1]
-            if lo == neg[0] and hi == neg[1]:
-                va.major_unit = neg[2]
-        if lo is None and kind in _ZERO_BASE and _all_nonneg(ch):
-            lo = 0.0  # bars start at zero: an auto axis from 3.45 would exaggerate 3.6 vs 3.9
+        lo, hi, unit = resolve_axis(
+            kind,
+            [s.values for s in series] if not wf else [],
+            theme.render,
+            lo,
+            hi,
+            wf["axis"] if wf else None,
+            _all_nonneg(ch),
+        )
+        if note_plan and note_plan.axis:  # the pointer of a `note=` needs the exact scale
+            lo, hi, unit = note_plan.axis
+        if wf and wf["axis"] and wf["axis"][0] < 0:
+            chart.category_axis.tick_label_position = XL_TICK_LABEL_POSITION.LOW
+        if unit:
+            va.major_unit = unit
         if lo is not None:
             va.minimum_scale = lo
         if hi is not None:
             va.maximum_scale = hi
-        elif kind in ("bar", "column", "stacked-column", "stacked-bar", "area") and lo in (None, 0.0):
-            auto = auto_axis(kind, [s.values for s in series], theme.render)
-            if auto:  # LibreOffice / PowerPoint round the auto max far up (117 -> 140)
-                va.maximum_scale = auto[0]
-                va.major_unit = auto[1]
         if kind in ("bar", "stacked-bar"):  # first category on top, value axis stays at the bottom
             chart.category_axis.reverse_order = True
             va._element.find(qn("c:crosses")).set("val", "max")

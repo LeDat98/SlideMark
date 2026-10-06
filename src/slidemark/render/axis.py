@@ -83,3 +83,73 @@ def neg_axis(kind: str, series_values: list[list], rt: RenderTokens) -> tuple[fl
                 return cand
             fallback = fallback or cand
     return fallback
+
+
+ZERO_BASE = ("column", "bar", "stacked-column", "stacked-bar", "area")
+
+
+def resolve_axis(
+    kind: str,
+    series_values: list[list],
+    rt: RenderTokens,
+    lo: float | None,
+    hi: float | None,
+    wf_axis: tuple[float, float, float] | None,
+    all_nonneg: bool,
+) -> tuple[float | None, float | None, float | None]:
+    """(min, max, major unit) the renderer sets on the value axis; ``None`` leaves the auto value.
+
+    ``lo`` / ``hi`` are the author's ``min`` / ``max``; ``wf_axis`` the waterfall's own axis (None otherwise).
+    """
+    unit: float | None = None
+    if wf_axis:
+        lo = lo if lo is not None else wf_axis[0]
+        hi = hi if hi is not None else wf_axis[1]
+        if wf_axis[2]:
+            unit = wf_axis[2]
+    neg = neg_axis(kind, series_values, rt) if not wf_axis else None
+    if neg:  # room for the outside-end label of the lowest bar
+        lo = neg[0] if lo is None else lo
+        if hi is None:
+            hi = neg[1]
+        if lo == neg[0] and hi == neg[1]:
+            unit = neg[2]
+    if lo is None and kind in ZERO_BASE and all_nonneg:
+        lo = 0.0  # bars start at zero: an auto axis from 3.45 would exaggerate 3.6 vs 3.9
+    if (
+        hi is None
+        and kind in ("bar", "column", "stacked-column", "stacked-bar", "area")
+        and lo in (None, 0.0)
+    ):
+        auto = auto_axis(kind, series_values, rt)
+        if auto:  # LibreOffice / PowerPoint round the auto max far up (117 -> 140)
+            hi, unit = auto
+    return lo, hi, unit
+
+
+def line_axis(series_values: list[list], rt: RenderTokens) -> tuple[float, float, float] | None:
+    """(min, max, major unit) of a line chart whose axis is pinned (a ``note=`` needs known plot geometry).
+
+    Zero based unless the data sits far above it; ``chart_axis_headroom`` above the highest point."""
+    flat = [v for vals in series_values for v in (_num(x) for x in vals) if v is not None]
+    if not flat:
+        return None
+    top, bot = max(flat), min(flat)
+    base = 0.0 if bot >= 0 and bot <= 0.6 * top else bot
+    span = (top - base) or abs(top) or 1.0
+    want_hi = top + span * rt.chart_axis_headroom
+    want_lo = base - span * rt.chart_neg_pad if base < 0 or base == bot else base
+    exp = math.floor(math.log10(span)) - 1
+    fallback = None
+    for k in range(exp, exp + 4):
+        for s in _STEPS:
+            step = s * 10.0**k
+            lo = math.floor(want_lo / step + 1e-9) * step
+            n = math.ceil((want_hi - lo) / step - 1e-9)
+            cand = (round(lo, 10), round(lo + n * step, 10), round(step, 10))
+            if n > rt.chart_axis_lines_max:
+                continue
+            if n >= rt.chart_axis_lines_min:
+                return cand
+            fallback = fallback or cand
+    return fallback

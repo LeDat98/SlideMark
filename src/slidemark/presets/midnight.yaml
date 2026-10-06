@@ -15,3 +15,4 @@ table_header_fill: "#334155"
 classes:
   card: {radius: 8}
   callout: {fill: surface, line_width: 1.25}
+  chart-note: {fill: surface}
