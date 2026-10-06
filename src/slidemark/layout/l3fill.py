@@ -157,6 +157,7 @@ def _fill_card(
     short: bool = False,
     cap_to: float | None = None,
     gap_cap: float | None = None,
+    head_air: bool = True,
 ) -> tuple[dict[int, Placed], float, float, float] | None:
     """New geometry of ``card`` and its texts for the box ``top..bottom``; ``None`` = leave it alone.
 
@@ -187,7 +188,7 @@ def _fill_card(
         res[id(main)] = m.model_copy(update={"h": avail})
         return res, 0.0, avail, 0.0
     sp = None
-    if heads:  # air between the heading band and the first item
+    if heads and head_air:  # air between the heading band and the first item
         size = (m.style.font_size or 18) * m.font_scale * EMU_PER_PT
         gap = round(lt.l3_head_pad * size)
         if gap and avail - gap >= main.h - 2:
@@ -258,19 +259,21 @@ def _fill_row(
     cards = [p for p in items if isinstance(p.element, Container)]
     if not cards or any(isinstance(p.element, (Chart, Image, Media)) for p in items):
         return out
-    if not consulting and not all("kpi" in c.element.classes for c in cards):
-        return out  # normal-density themes keep their hugging cards (only KPI rows are top-anchored)
     bounded = any(isinstance(p.element, Table) for p in items)  # a table below: keep top, shrink only
+    if not consulting and not all("kpi" in c.element.classes for c in cards):
+        if not ((bounded and lt.card_table_balance) or (sparse and lt.sparse_cards_top)):
+            return out  # normal-density themes keep their hugging cards (only KPI rows are top-anchored)
     if not sparse and not bounded:
         return out
+    deco = bounded or not consulting
     plan: dict[int, list[Placed]] = {}
     for c in cards:
-        inner = _inner_texts(c, items, deco=bounded)
+        inner = _inner_texts(c, items, deco=deco)
         if inner is None:
             return out
         plan[id(c)] = inner
     covered = {id(p) for ps in plan.values() for p in ps} | set(plan)
-    if bounded:  # decoration inside the cards (header bars, icons) is covered too
+    if deco:  # decoration inside the cards (header bars, icons) is covered too
         covered |= {id(p) for p in items if any(_contains(c, p) for c in cards)}
     extras = _row_extras(items, cards, covered)
     if extras is None:  # free text / tables / shapes next to the cards
@@ -293,15 +296,35 @@ def _fill_row(
         return out
     kpi = all("kpi" in c.element.classes for c in cards)
     full = bottom - top
+    top_only = not consulting and not bounded and not kpi  # normal density: top-anchored, same card height
+    reach = full
+    if top_only:  # cards keep their height (hugging); they may grow toward the completion's band target
+        reach = min(full, body.bottom - round(lt.sparse_left_target * body.h) - top)
+        full = max(c.h for c in cards)
 
     def run(h: int, s: float, short: bool):
         """(placed items, free heights, text ends) of every card at row height ``h``; ``None`` = refused."""
+        air = True
         rs = [_fill_card(c, plan[id(c)], top, top + h, lt, s, short) for c in cards]
         if any(r is None for r in rs):
             return None
+        starts = {  # first item of every card sits at the same offset below its heading band
+            round((r[0][id(m)].y - c.y) / EMU_PER_PT)
+            for c, r in zip(cards, rs, strict=True)
+            for m in plan[id(c)]
+            if m.element.role != "heading" and not _is_note(m) and id(m) in r[0]
+        }
+        if len(starts) > 1:  # one card could not take the heading air: none does
+            air = False
+            rs = [_fill_card(c, plan[id(c)], top, top + h, lt, s, short, head_air=False) for c in cards]
+            if any(r is None for r in rs):
+                return None
         extras = [r[3] for r in rs]
         if max(extras) - min(extras) > 0.01:  # one rhythm for every card of the row
-            rs = [_fill_card(c, plan[id(c)], top, top + h, lt, s, short, min(extras)) for c in cards]
+            rs = [
+                _fill_card(c, plan[id(c)], top, top + h, lt, s, short, min(extras), head_air=air)
+                for c in cards
+            ]
             if any(r is None for r in rs):
                 return None
         res: dict[int, Placed] = {}
@@ -313,9 +336,20 @@ def _fill_row(
     if r is None:
         return out  # one card refuses: the row stays as it was
     h, s_ok = full, 1.0
+    if top_only:  # taller cards only while their emptiest card keeps its tail within the rule
+        for k in range(1, 40):
+            hh = round(full * (1.0 + 0.03 * k))
+            if hh > reach:
+                break
+            nxt = run(hh, 1.0, False)
+            if nxt is None or max(nxt[1]) > lt.l3_tail_max * hh:
+                break
+            r, h = nxt, hh
     tail_max = lt.l3_tail_max * full
-    if not kpi and max(r[1]) > tail_max:  # (a) grow the text (capped gaps), (c) shorter cards
-        s_top = min(_max_step(c, plan[id(c)], lt) for c in cards)
+    if (
+        not kpi and not top_only and (max(r[1]) > tail_max or (bounded and not consulting))
+    ):  # (a) grow the text (capped gaps), (c) shorter cards
+        s_top = min(_max_step(c, plan[id(c)], lt) for c in cards) if consulting else 1.0
         k = 1
         while s_top > 1.0 + 1e-6 and max(r[1]) > tail_max:
             s = min(1.0 + k * lt.l3_grow_step, s_top)
@@ -326,9 +360,15 @@ def _fill_row(
             k += 1
             if s >= s_top:
                 break
-        if max(r[1]) > tail_max:  # (c) the shortest row whose emptiest card keeps its tail within the limit
+        if max(r[1]) > tail_max or (
+            bounded and not consulting
+        ):  # (c) the shortest row whose emptiest card keeps its tail within the limit
             nat = max(c.h for c in cards)
+            if not consulting:  # table below, normal density: the cards hug their tallest content
+                nat = min(nat, _hug_height(cards, plan, top, lt))
             h0 = max((full - max(r[1])) / (1.0 - lt.l3_tail_aim), nat)
+            if not consulting:
+                h0 = nat
             for k in range(0, 40):
                 h = round(min(h0 * (1.0 + 0.03 * k), full))
                 nxt = run(h, s_ok, True)
@@ -339,6 +379,12 @@ def _fill_row(
             else:
                 h = full
     res = dict(r[0])
+    if deco:  # header bars / icons inside a card travel with it
+        for c in cards:
+            dy = top - c.y
+            for p in items:
+                if p is not c and id(p) not in res and _contains(c, p) and dy:
+                    res[id(p)] = p.model_copy(update={"y": p.y + dy})
     if arrows:  # keep the arrows on the middle of the new card row
         old_mid = (min(c.y for c in cards) + old_bottom) / 2
         for a in arrows:
@@ -346,6 +392,19 @@ def _fill_row(
     for p in tails:
         res[id(p)] = p.model_copy(update={"y": top + h + (p.y - old_bottom)})
     return _apply(out, res)
+
+
+def _hug_height(cards: list[Placed], plan: dict[int, list[Placed]], top: int, lt: LayoutTokens) -> int:
+    """Height of a card row that just holds the tallest card content: heading band, text, one inset below."""
+    best = 0
+    for c in cards:
+        inner = plan[id(c)]
+        main = [p for p in inner if p.element.role != "heading" and not _is_note(p)]
+        if len(main) != 1:
+            return max(x.h for x in cards)
+        m = main[0]
+        best = max(best, m.y + m.h + _pad(m, c) - c.y)
+    return best
 
 
 def fill_cards_to_bar(

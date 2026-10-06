@@ -133,7 +133,13 @@ def _fit_table(p: Placed, target: int, peer_pt: float, beside: bool = False) -> 
     t = p.element
     rh, cw = t.attrs.get("_row_h"), t.attrs.get("_col_w")
     nrows, _ncols, anchors = table_grid(t)
-    if not rh or not cw or len(rh) != nrows or t.attrs.get("_row_cap") is True or sum(rh) >= target:
+    if (
+        not rh
+        or not cw
+        or len(rh) != nrows
+        or (t.attrs.get("_row_cap") is True and not t.attrs.get("_twrap"))
+        or sum(rh) >= target
+    ):
         return p
     size = (p.style.font_size or 14) * p.font_scale
     cap_pt = min(tk.sparse_text_max_pt, (p.style.font_size or 14) * tk.table_text_max)
