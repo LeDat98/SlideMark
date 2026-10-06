@@ -35,6 +35,7 @@ from .diagram import fill_tree
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
 from .l3fill import (
+    align_chevron_table,
     fill_cards_to_bar,
     fill_chevron_row,
     fill_panels,
@@ -72,6 +73,7 @@ _INHERIT_FIELDS = (
 )
 _VISUALS = (Image, Media, Chart, Table, Code)
 _TOL = 1.01
+_SPAN_BLOCKS = (Image, Media, Chart, Code, Raw)  # a lone one after a full box row spans the width
 SPARSE_LINES = 2
 SPARSE_LINE_EM = 22  # a "short" line
 SHORT_EM = 30  # boxes with at most this much text (in em) are "short": four of them stay in one row
@@ -1867,6 +1869,8 @@ def _place_blocks(
         k = len(flow)  # `@4` / `@1:2`: tables closing a row of boxes (a `.kpi` row) are not grid cells
         while k > 0 and isinstance(flow[k - 1][1], Table):
             k -= 1
+        if k == len(flow) and len(flow) - 1 >= len(gs.cols) and isinstance(flow[-1][1], _SPAN_BLOCKS):
+            k = len(flow) - 1  # a lone chart / image / code / diagram after a full box row spans the width
         if k >= 2 and all(isinstance(b, Container) for _, b in flow[:k]):
             tables, flow = flow[k:], flow[:k]
             gs = parse_spec(grid, len(flow), classes)
@@ -3640,6 +3644,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     ctx.lt,
                     _emu(ctx.lt.top_gap) if (slide.conclusion or slide.footnotes) else 0,
                 )
+            final_ctx.out = align_chevron_table(final_ctx.out, body, ctx.lt)
             final_ctx.out = grow_chevron_table(final_ctx.out, body, ctx.lt)
             final_ctx.out = fill_body(
                 final_ctx.out,

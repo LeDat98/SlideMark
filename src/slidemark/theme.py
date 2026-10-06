@@ -323,6 +323,7 @@ class LayoutTokens(BaseModel):
     chevron_lone_top: float = 0.4  # ... and sits with this share of the leftover above it (optical center)
     chevron_table_fill: float = 0.72  # above a table the chevron text may fill this share of its height ...
     chevron_table_grow: Length = "0.3in"  # ... and the row may grow this much taller at the table's expense
+    chevron_table_align: bool = True  # chevron i spans column i of the table below (equal counts only)
     # --- conclusion bar
     conclusion_min_ratio: float = (
         1.0  # the bar text is at least this x the largest card / box body text (0 = off)
