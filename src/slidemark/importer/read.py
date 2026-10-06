@@ -179,7 +179,7 @@ def _hex(el) -> str | None:
 
 def _read_run(r, ctx: ReadCtx, part) -> RunT:
     t = r.find(qn("a:t"))
-    text = (t.text or "") if t is not None else ""
+    text = ((t.text or "") if t is not None else "").replace("\u2060", "")  # render's range joiners
     run = RunT(text=text)
     rpr = r.find(qn("a:rPr"))
     if rpr is None:

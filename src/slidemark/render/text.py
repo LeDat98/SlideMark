@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 
 from lxml import etree
@@ -54,6 +55,15 @@ _LANG = {
     "fr": "fr-FR",
     "de": "de-DE",
 }
+
+
+_RANGE = re.compile(r"(?<=\d)([\u2013\u2014\-/~\uff5e])(?=\d)")
+
+
+def _join_ranges(text: str) -> str:
+    """Keep number ranges (``2027–2029``, ``10-12``, ``1/2027``) on one line: viewers break after a dash or
+    slash, so a WORD JOINER (U+2060, invisible) sits on both sides when the mark is between two digits."""
+    return _RANGE.sub("\u2060\\1\u2060", text) if any(c.isdigit() for c in text) else text
 
 
 def _cjk_lang(lang: str | None) -> bool:
@@ -220,7 +230,7 @@ def fill_text(
                             prev_r.text + " "
                         )  # a plain space keeps the badge off the text before it
                 r = para.add_run()
-                r.text = f"{pad}{seg}{pad}"
+                r.text = f"{pad}{_join_ranges(seg)}{pad}"
                 _format_run(rc, r, run, pst, size, seg, scale)
                 prev = seg
                 prev_r = None if run.highlight else r  # a badge carries its own padding

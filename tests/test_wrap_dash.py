@@ -28,3 +28,19 @@ def test_word_joiner_is_zero_width():
     seg = [("x 2027⁠–⁠2029", False, False)]
     width = (measure.text_em("x 2027–2029") - 0.3) * 20  # the whole text just does not fit
     assert measure.count_lines(seg, width, 20) == 2  # the word wraps whole, never inside
+
+
+def test_render_joins_number_ranges_and_import_strips_the_joiner(tmp_path):
+    from slidemark import build
+    from slidemark.importer import import_pptx
+
+    src = tmp_path / "d.md"
+    src.write_text("# Plan 2027–2029\n- Q1 10-12 and 1/2027\n", encoding="utf-8")
+    out = tmp_path / "d.pptx"
+    build(str(src), str(out))
+    import zipfile
+
+    xml = zipfile.ZipFile(out).read("ppt/slides/slide1.xml").decode()
+    assert "2027⁠–⁠2029" in xml and "10⁠-⁠12" in xml
+    md, _ = import_pptx(str(out))
+    assert "⁠" not in md and "2027–2029" in md

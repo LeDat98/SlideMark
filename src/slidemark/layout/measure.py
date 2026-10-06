@@ -178,7 +178,8 @@ def _units(
     segments: list[Segment], font: str | None = None, extra: float = 0.0
 ) -> list[tuple[float, float, str, bool, str]]:
     """Memoised ``_units0``: the same text is measured at many widths and sizes (units are width-free)."""
-    key = (tuple(segments), font, extra, _default_font)
+    tk = tokens()
+    key = (tuple(segments), font, extra, _default_font, tk.badge_pad, tk.badge_pad_cjk)
     hit = _UNITS_CACHE.get(key)
     if hit is None:
         if len(_UNITS_CACHE) > 100_000:
@@ -213,7 +214,9 @@ def _units0(
         kind = "mono" if mono else ("bold" if bold else "regular")
         if len(seg) > 3 and seg[3] and text.strip() and "\n" not in text and "\v" not in text:
             flush()
-            w = sum(_char_em(c, kind, key) for c in text) + (2.0 if has_cjk(text) else 0.0)
+            tk = tokens()  # the padding the renderer adds on both sides (full-width or no-break spaces)
+            pad = tk.badge_pad_cjk * 1.0 if has_cjk(text) else tk.badge_pad * _char_em(" ", kind, key)
+            w = sum(_char_em(c, kind, key) for c in text) + 2 * pad
             units.append((w, 0.0, "", False, ""))
             continue
         for ch in text:

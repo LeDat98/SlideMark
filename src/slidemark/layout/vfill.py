@@ -79,12 +79,14 @@ def _grow_table(p: Placed, peer_pt: float = 0.0) -> Placed:
         cap_pt = min(cap_pt, peer_pt)
     top = min(tk.table_vtext_max, cap_pt / max(size, 1e-6), avg / tk.table_comfort_em)
     base = row_heights(t, anchors, cw, p.style, p.font_scale)
+    # renders wrap earlier than the model (fallback fonts, diacritics): test the growth on narrower columns
+    narrow = [max(1, round(w * (1.0 - tk.l3_wrap_margin))) for w in cw]
     n = int((top - 1.0) / _VTEXT_STEP + 1e-9)
     for i in range(n):
         f = round(top - _VTEXT_STEP * i, 3) if i else top
         if f <= 1.0 + 1e-6:
             break
-        nat = row_heights(t, anchors, cw, p.style, p.font_scale * f)
+        nat = row_heights(t, anchors, narrow, p.style, p.font_scale * f)
         if all(a <= b * f * 1.02 and a <= h for a, b, h in zip(nat, base, rh, strict=True)):
             el = t.model_copy(update={"attrs": {**t.attrs, "_row_cap": True, "_vgrown": True}})
             return p.model_copy(update={"element": el, "font_scale": p.font_scale * f})

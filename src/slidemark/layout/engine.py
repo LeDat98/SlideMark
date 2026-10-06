@@ -737,9 +737,12 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
             and box / have <= ctx.lt.unify_max
         ):  # a table smaller than the card text beside it inverts the hierarchy: lift it to the same size
             eff *= box / have
+    eff0 = measure.effective_scale(st.font_size or 14, ctx.scale, ctx.theme.min_font_size)
     if ctx.tgrow > 1.0 and ctx.scale >= 1.0 and not _table_size_explicit(ctx, el):
         eff *= ctx.tgrow
     nrows, ncols, anchors = table_grid(el)
+    if eff > eff0 * 1.001:
+        eff = _no_new_wraps(ctx, el, ncols, anchors, width, st, eff0, eff)
     size = (st.font_size or 14) * eff
     b = getattr(el, "box", None)
     if (
@@ -752,6 +755,40 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
     cw = column_widths(el, ncols, anchors, width, size)
     rh = row_heights(el, anchors, cw, st, eff)
     return st, eff, anchors, cw, rh
+
+
+def _no_new_wraps(ctx: _Ctx, el: Table, ncols: int, anchors, width: int, st: Style, eff0: float, eff: float):
+    """The largest table text scale <= ``eff`` at which no cell that fits one line at ``eff0`` on a column
+    ``l3_wrap_margin`` narrower (renders wrap earlier than the model: fonts, diacritics) wraps there."""
+    pad = 2 * measure.cell_pad()[0]
+    k = 1.0 - ctx.lt.l3_wrap_margin
+    cells = []
+    for r, c, cell in anchors:
+        if len(cell.paragraphs) != 1:
+            continue
+        text = "".join(run.text for run in cell.paragraphs[0].runs)
+        if " " not in text.strip():  # a single word cannot gain a break; CJK guards live elsewhere
+            continue
+        bold = r < el.header_rows or any(run.bold for run in cell.paragraphs[0].runs)
+        cells.append((c, cell.colspan, measure.text_em(text, bold=bold, font=st.font)))
+    if not cells:
+        return eff
+
+    def inner(cw, c, span):
+        return sum(cw[c : c + span]) / EMU_PER_PT - pad / EMU_PER_PT
+
+    base = st.font_size or 14
+    cw0 = column_widths(el, ncols, anchors, width, base * eff0)
+    one = [(c, n, em) for c, n, em in cells if em * base * eff0 <= inner(cw0, c, n) * k]
+    if not one:
+        return eff
+    f = eff
+    while f > eff0 * 1.001:
+        cw = column_widths(el, ncols, anchors, width, base * f)
+        if all(em * base * f <= inner(cw, c, n) * k for c, n, em in one):
+            return f
+        f = max(eff0, f - 0.05 * eff0)
+    return eff0
 
 
 def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
@@ -2995,10 +3032,32 @@ def _table_text(ctx: _Ctx, fc: _Ctx, run, body: Rect, elements: list) -> _Ctx:
             expand=fc.expand,
             tgrow=f,
         )
-        if c.over or not c.out or tall(c) > base_tall or _bottom(c) > body.bottom:
+        if c.over or not c.out or tall(c) > base_tall or _bottom(c) > body.bottom or _rewraps(c, fc, lt):
             continue
         return c
     return fc
+
+
+def _rewraps(c: _Ctx, fc: _Ctx, lt) -> bool:
+    """A grown table whose rows would wrap more lines on columns ``l3_wrap_margin`` narrower (renders wrap
+    earlier than the model: fallback fonts, Vietnamese diacritics) than the same table before growing."""
+    olds = [p for p in fc.out if isinstance(p.element, Table)]
+    news = [p for p in c.out if isinstance(p.element, Table)]
+    if len(olds) != len(news):
+        return False
+    k = 1.0 - lt.l3_wrap_margin
+    for a, b in zip(olds, news, strict=True):
+        cw = b.element.attrs.get("_col_w")
+        if not cw:
+            continue
+        _n, _m, anchors = table_grid(b.element)
+        narrow = [max(1, round(w * k)) for w in cw]
+        f = b.font_scale / max(a.font_scale, 1e-6)
+        old = row_heights(b.element, anchors, narrow, a.style, a.font_scale)
+        new = row_heights(b.element, anchors, narrow, b.style, b.font_scale)
+        if any(y > x * f * 1.02 for x, y in zip(old, new, strict=False)):
+            return True
+    return False
 
 
 def _panel_step(ctx: _Ctx, fc: _Ctx, run, body: Rect, stepped: list[float], panel: float) -> _Ctx:
