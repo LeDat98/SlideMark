@@ -2438,7 +2438,9 @@ def _chevron_row_h(ctx: _Ctx, blocks: list, width: int, inherit: Style, alone_h:
             )
             need = max(
                 need,
-                measure.paragraphs_height(sh.paragraphs, _chevron_text_w(rect, st, sh, _cadj(ctx)), st, eff),
+                measure.paragraphs_height(
+                    sh.paragraphs, _chevron_text_w(rect, st, sh, _cadj(ctx)), st, eff, squeeze=False
+                ),
             )
         h = min(max(round(need / 0.8), round(need + 2 * _emu(ctx.lt.chevron_vpad)), lo), hi)
     return h
@@ -2456,8 +2458,8 @@ def _chevron_eff(ctx: _Ctx, blk, rect: Rect, inherit: Style, hcap: int | None = 
     first = measure.effective_scale(base, ctx.scale, ctx.theme.min_font_size) * ctx.chev_grow
     for m in (1.0, 0.95, 0.9, 0.85, 0.8):
         eff = measure.effective_scale(base, ctx.scale * m, ctx.theme.min_font_size) * ctx.chev_grow
-        wide = measure.paragraphs_height(sh.paragraphs, width, st, eff)
-        narrow = measure.paragraphs_height(sh.paragraphs, round(width * 0.88), st, eff)
+        wide = measure.paragraphs_height(sh.paragraphs, width, st, eff, squeeze=False)
+        narrow = measure.paragraphs_height(sh.paragraphs, round(width * 0.88), st, eff, squeeze=False)
         if narrow <= wide * 1.001:
             return eff
     return first
@@ -2472,7 +2474,9 @@ def _place_chevron(
     if eff_cap is not None:
         eff = min(eff, eff_cap)
     # centered text may use the middle 80% of the height
-    need = measure.paragraphs_height(sh.paragraphs, _chevron_text_w(rect, st, sh, _cadj(ctx)), st, eff)
+    need = measure.paragraphs_height(
+        sh.paragraphs, _chevron_text_w(rect, st, sh, _cadj(ctx)), st, eff, squeeze=False
+    )
     if need > rect.h * 0.8:
         ctx.over.append(_label(blk))
     if ctx.chev_adj is not None:  # the renderer draws this point depth (default: the token)

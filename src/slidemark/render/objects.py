@@ -258,6 +258,7 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         for rr in range(r, r + rs):  # a merged cell: the covered cells share its borders
             for cc in range(c, c + cs):
                 _cell_borders(rc, tbl.cell(rr, cc)._tc.get_or_add_tcPr(), ct.style)
+        cl, ctp, cr, cb = cell_insets(ct.style, *measure.cell_pad())
         fill_text(
             rc,
             cell.text_frame,
@@ -265,9 +266,9 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             st.merged(Style(valign=st.valign or "middle")),
             pl.font_scale,
             inset=0,
+            box_w=round(sum(cw[c : c + cs]) - cl - cr),
         )
         cell.vertical_anchor = _ANCHOR.get(st.valign or "middle", MSO_ANCHOR.MIDDLE)
-        cl, ctp, cr, cb = cell_insets(ct.style, *measure.cell_pad())
         cell.margin_left, cell.margin_right = Emu(cl), Emu(cr)
         cell.margin_top, cell.margin_bottom = Emu(ctp), Emu(cb)
 
