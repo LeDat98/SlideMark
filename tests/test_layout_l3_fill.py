@@ -342,3 +342,10 @@ def test_ruled_panel_ends_under_its_note_not_at_the_legend(name, n):
     assert panel.y == chart.y
     off, _, _ = lay(name, n, panel_end_air=0)
     assert cards(off)[0].h > panel.h  # token off: the panel spans the chart
+
+
+def test_a_much_emptier_panel_keeps_the_chart_span():
+    placed, _, _ = lay("16-jp-strategy.md", 3)
+    (panel,) = cards(placed)
+    chart = next(p for p in placed if isinstance(p.element, Chart))
+    assert abs(panel.y + panel.h - (chart.y + chart.h)) <= 3 * 12700

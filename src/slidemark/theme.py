@@ -348,6 +348,8 @@ class LayoutTokens(BaseModel):
     panel_end_air: float = (
         0.08  # a ruled panel beside a chart ends under its note if > this share of its span is empty
     )
+    panel_end_max: float = 0.2  # ... but only up to this share (a much emptier panel keeps the chart's span)
+    card_align_rows: bool = True  # ... cards in one row share gap and lead: item / rule k sits at one height
     card_spread_ratio: float = 1.7  # ... a card's gap is at most this multiple of the smallest gap in its row
     card_spread_tail: float = 0.0  # ... em of air kept between the last item and the card bottom padding
     card_text_max: float = (

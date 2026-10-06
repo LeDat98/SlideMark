@@ -39,7 +39,9 @@ def test_decision_cards_share_one_capped_rhythm_and_a_head_pad(name, n):
 
 @pytest.mark.parametrize(("name", "n"), [("16-jp-strategy.md", 3), ("11-jp-consulting.md", 3)])
 def test_panel_spans_the_chart_beside_it(name, n):
-    placed, _, theme = lay(name, n)
+    placed, _, theme = lay(
+        name, n, panel_end_air=0
+    )  # the full-span variant (panel_end_air: test_layout_l3_fill)
     (panel,) = cards(placed)
     chart = next(p for p in placed if isinstance(p.element, Chart))
     tol = 3 * 12700

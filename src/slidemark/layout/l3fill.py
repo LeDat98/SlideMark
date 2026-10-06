@@ -548,7 +548,7 @@ def _cards_to_bar(
     if lt.card_spread_fill > 0:
         for row in rows:
             if min(_card_share(res, c, plan[id(c)]) for c in row) < lt.card_spread_fill:
-                rules += _distribute_row(res, row, plan, lt)
+                rules += _distribute_row(res, row, plan, lt, align=True)
     for c in cards:  # decoration inside a card (icons, header bars) follows the card top
         dy = res[id(c)].y - c.y
         for p in items:
@@ -572,7 +572,12 @@ def _card_share(res: dict[int, Placed], card: Placed, inner: list[Placed]) -> fl
 
 
 def _distribute_row(
-    res: dict[int, Placed], row: list[Placed], plan: dict, lt: LayoutTokens, follow: bool = False
+    res: dict[int, Placed],
+    row: list[Placed],
+    plan: dict,
+    lt: LayoutTokens,
+    follow: bool = False,
+    align: bool = False,
 ) -> list[Placed]:
     """Spread the paragraphs of every card of ``row`` over its body (equal gaps, capped).
 
@@ -583,7 +588,11 @@ def _distribute_row(
 
     ``follow`` (a panel beside a chart): the gap is capped at ``card_spread_gap_max`` em (the cards' ruled cap
     is twice that), the list starts half a gap under the heading and a trailing note / callout follows the
-    last item one padding below it; the leftover air goes under the note (the panel keeps its height)."""
+    last item one padding below it; the leftover air goes under the note (the panel keeps its height).
+
+    ``align`` (cards side by side, ``card_align_rows``): every card takes the smallest gap of the row and
+    the smallest lead, so item ``k`` and rule ``k`` sit at the same height in every card; a card with fewer
+    items just ends earlier."""
     ruled = lt.card_spread_rules
     jobs = []
     for c in row:
@@ -629,9 +638,23 @@ def _distribute_row(
             gap = max(g0, gap - 0.05)
         used = measure.paragraphs_height(paras, width, m.style, m.font_scale, gap=gap)
         jobs.append((c, m, round(gap, 3), max(avail - used, 0), avail, paras, width, card, pad, tpad, true_w))
-    top_gap = min(j[2] for j in jobs) * lt.card_spread_ratio  # siblings keep a similar rhythm
+    shared = align and ruled and not follow and lt.card_align_rows and len(jobs) > 1
+    top_gap = min(j[2] for j in jobs) * (1.0 if shared else lt.card_spread_ratio)  # similar rhythm
     rules: list[Placed] = []
     line = Style(line="border", line_width=0.75)
+
+    def lead_of(g: float, m, av: int, ps, tw: int) -> int:
+        used = measure.paragraphs_height(ps, tw, m.style, m.font_scale, gap=g)
+        lead = max(round((av - used) / 2), 0)  # centred in the card body: equal air above and below
+        if follow:
+            lead = min(lead, round(g * (m.style.font_size or 18) * m.font_scale * EMU_PER_PT / 2))
+        return lead
+
+    shared_lead = (
+        min(lead_of(min(j[2], top_gap), j[1], j[4], j[5], j[10]) for j in jobs)
+        if shared and top_gap > 0
+        else None
+    )
     for c, m, g, _rest, av, ps, _w, card, pad, tpad, tw in jobs:
         if g > top_gap:
             g = top_gap
@@ -639,9 +662,7 @@ def _distribute_row(
         lead = 0
         if ruled and g > 0:
             used = measure.paragraphs_height(ps, tw, m.style, m.font_scale, gap=g)
-            lead = max(round((av - used) / 2), 0)  # centred in the card body: equal air above and below
-            if follow:
-                lead = min(lead, round(g * (m.style.font_size or 18) * m.font_scale * EMU_PER_PT / 2))
+            lead = lead_of(g, m, av, ps, tw) if shared_lead is None else shared_lead
             size = (m.style.font_size or 18) * m.font_scale * EMU_PER_PT
             for i in range(len(ps) - 1):
                 end = measure.paragraphs_height(ps[: i + 1], tw, m.style, m.font_scale, gap=g)
@@ -828,14 +849,15 @@ def _fill_panel_span(
 
 
 def _end_at_note(res: dict[int, Placed], c: Placed, inner: list[Placed], lt: LayoutTokens, full: int) -> None:
-    """A ruled panel whose trailing note now follows the list ends one padding below that note when the rest
-    of its span would stay empty (``panel_end_air``): it lines up with the chart's plot, not its legend."""
+    """A ruled panel whose trailing note follows the list ends one padding below that note when the rest
+    of its span would stay empty (``panel_end_air`` to ``panel_end_max``): it lines up with the chart plot,
+    not its legend. A much emptier panel keeps the chart span (a shrunk one would leave a hole)."""
     notes = [res[id(p)] for p in inner if p.element.role != "heading" and _is_note(p) and id(p) in res]
     if lt.panel_end_air <= 0 or not notes or id(c) not in res:
         return
     card = res[id(c)]
     end = max(q.y + q.h for q in notes) + _pad(notes[0], card)
-    if card.y + card.h - end > lt.panel_end_air * full:
+    if lt.panel_end_air * full < card.y + card.h - end <= lt.panel_end_max * full:
         res[id(c)] = card.model_copy(update={"h": end - card.y})
 
 

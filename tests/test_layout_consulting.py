@@ -210,7 +210,7 @@ def test_org_tree_boxes_hug_their_text():
     ys = sorted({c.y for c in cs})
     assert len(ys) == 3
     gap = ys[1] - (ys[0] + cs[0].h)
-    assert 0.3 * 914400 <= gap <= 0.55 * 914400
+    assert 0.3 * 914400 <= gap <= 1.3 * 914400  # the height boxes give back goes to the gaps (tree_gap_grow)
 
 
 def test_numeric_columns_stay_close_to_content_width():
