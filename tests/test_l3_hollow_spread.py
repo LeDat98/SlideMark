@@ -21,7 +21,7 @@ def _body_cards(placed):
 
 @pytest.mark.parametrize(("name", "n"), [("16-jp-strategy.md", 10), ("11-jp-consulting.md", 9)])
 def test_hollow_cards_spread_to_the_bottom(name, n):
-    placed, _, _ = lay(name, n)
+    placed, _, _ = lay(name, n, card_spread_rules=False)  # top-anchored lists (ruled lists: test_card_rules)
     pairs = _body_cards(placed)
     off = _body_cards(lay(name, n, card_spread_fill=0.0)[0])
     assert len(pairs) == 2
@@ -33,7 +33,7 @@ def test_hollow_cards_spread_to_the_bottom(name, n):
 
 
 def test_spread_off_restores_top_packed():
-    on, _, _ = lay("16-jp-strategy.md", 10)
+    on, _, _ = lay("16-jp-strategy.md", 10, card_spread_rules=False)
     off, _, _ = lay("16-jp-strategy.md", 10, card_spread_fill=0.0)
     (c1, b1), _ = _body_cards(on)
     (c0, b0), _ = _body_cards(off)
@@ -41,7 +41,7 @@ def test_spread_off_restores_top_packed():
 
 
 def test_capped_gap_top_anchors_the_list():
-    placed, _, _ = lay("16-jp-strategy.md", 10, card_spread_gap_max=2.0)
+    placed, _, _ = lay("16-jp-strategy.md", 10, card_spread_gap_max=2.0, card_spread_rules=False)
     pairs = _body_cards(placed)
     assert len({body.y for _, body in pairs}) == 1
     off, _, _ = lay("16-jp-strategy.md", 10, card_spread_fill=0.0)
@@ -55,7 +55,7 @@ def test_capped_gap_top_anchors_the_list():
 
 def test_unstretched_and_dense_slides_unchanged():
     for name, n in [("01-basics.md", 3), ("11-jp-consulting.md", 8)]:
-        a, _, _ = lay(name, n)
+        a, _, _ = lay(name, n, card_spread_rules=False)
         b, _, _ = lay(name, n, card_spread_fill=0.0)
         assert [(p.x, p.y, p.w, p.h) for p in a] != [] and len(a) == len(b)
 

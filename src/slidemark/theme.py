@@ -15,7 +15,7 @@ from functools import cache
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from .contrast import best_ink, nearest_passing, ratio
 from .ir import Diagnostic, Length, Style
@@ -40,6 +40,11 @@ class LayoutTokens(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("card_spread_rules", mode="before")
+    @classmethod
+    def _rules_off(cls, v):  # `style: layout.card_spread_rules=off` reaches the model as None (see _value)
+        return False if v is None else v
 
     top_gap: Length = "0.25in"  # title band (or lead) -> body, the same on every slide
     line_latin: float = 1.2  # line height / font size for Latin text
@@ -269,6 +274,12 @@ class LayoutTokens(BaseModel):
     card_spread_gap_max: float = 2.2  # ... with equal gaps of at most this many em; the rest centers the list
     card_spread_ratio: float = 1.7  # ... a card's gap is at most this multiple of the smallest gap in its row
     card_spread_tail: float = 0.0  # ... em of air kept between the last item and the card bottom padding
+    card_text_max: float = (
+        18  # ... card list / paragraph text grows at most to this size (pt), never below the theme size
+    )
+    card_spread_rules: bool = (
+        True  # ... spread items of a stretched card get a thin rule (theme border) between them
+    )
     l3_short_items: int = 4  # ... before the row is shortened to meet l3_tail_max (top-anchored)
     # --- org charts / issue trees (slide-level a>b links) and compact table headers
     tree_fill: float = (
@@ -317,6 +328,9 @@ class LayoutTokens(BaseModel):
         1.0  # the bar text is at least this x the largest card / box body text (0 = off)
     )
     conclusion_max_pt: float = 28  # ... and grows to at most this size (pt)
+    conclusion_min_scale: float = (
+        0.8  # a bar that does not fit one line shrinks to this x its theme size (>= 12pt) before wrapping
+    )
     # --- KPI rows alone on the slide (only KPI cards in the body): content-sized cards
     kpi_lone: bool = True  # a lone KPI row keeps cards as tall as their content (label, number, caption)
     kpi_lone_value_max_pt: float = 66.0  # the number grows up to this size (never wraps, see kpi_fit_margin)

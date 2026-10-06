@@ -18,7 +18,7 @@ unchanged.
 
 from __future__ import annotations
 
-from ..ir import Chart, Container, Image, Media, Placed, Shape, Table, Text
+from ..ir import Chart, Container, Image, Media, Placed, Shape, Style, Table, Text
 from ..theme import LayoutTokens
 from ..units import EMU_PER_PT, to_emu
 from . import measure
@@ -128,8 +128,10 @@ def _spread(
     return p, max(avail - 2 * pad - need, 0.0), extra
 
 
-def _max_step(card: Placed, inner: list[Placed], lt: LayoutTokens) -> float:
-    """Largest text growth factor a card's body text may take (explicit sizes never grow)."""
+def _max_step(card: Placed, inner: list[Placed], lt: LayoutTokens, to_bar: bool = False) -> float:
+    """Largest text growth factor a card's body text may take (explicit sizes never grow).
+
+    ``to_bar``: cards stretched to a conclusion bar also respect ``card_text_max``."""
     heads = [p for p in inner if p.element.role == "heading"]
     mains = [p for p in inner if p.element.role != "heading" and not _is_note(p)]
     if len(mains) != 1 or getattr(mains[0].element, "style", None) and mains[0].element.style.font_size:
@@ -137,6 +139,8 @@ def _max_step(card: Placed, inner: list[Placed], lt: LayoutTokens) -> float:
     m = mains[0]
     pt = (m.style.font_size or 18) * m.font_scale
     cap = lt.l3_text_max_pt
+    if to_bar and lt.card_text_max > 0:
+        cap = min(cap, lt.card_text_max)
     if heads:
         hp = max((h.style.font_size or 18) * h.font_scale for h in heads)
         cap = min(cap, hp * lt.l3_body_head_max)
@@ -370,6 +374,26 @@ def _card_rows(cards: list[Placed]) -> list[list[Placed]]:
     return rows
 
 
+def _cap_card_text(plan: dict[int, list[Placed]], lt: LayoutTokens) -> dict[int, Placed]:
+    """Body text of the cards that grew beyond ``card_text_max`` (pt), back at that size.
+
+    Never below the theme size (font scale 1) and never larger than it is; explicit sizes are left alone."""
+    caps: dict[int, Placed] = {}
+    if lt.card_text_max <= 0:
+        return caps
+    for inner in plan.values():
+        m = _main_of(inner)
+        if m is None or (getattr(m.element, "style", None) and m.element.style.font_size):
+            continue
+        pt = (m.style.font_size or 18) * m.font_scale
+        if pt <= lt.card_text_max + 0.01 or m.style.font_size is None:
+            continue
+        fs = max(lt.card_text_max / m.style.font_size, min(m.font_scale, 1.0))
+        if fs < m.font_scale - 1e-6:
+            caps[id(m)] = m.model_copy(update={"font_scale": round(fs, 4)})
+    return caps
+
+
 def _cards_to_bar(
     out: list[Placed], body: Rect, lt: LayoutTokens, bar: bool, anchored: bool, foot: bool
 ) -> list[Placed] | None:
@@ -391,6 +415,11 @@ def _cards_to_bar(
     covered = {id(p) for p in items if any(_contains(c, p) for c in cards)}
     if any(id(p) not in covered for p in items):  # arrows, charts, tables, loose text share the body
         return None
+    caps = _cap_card_text(plan, lt)
+    if caps:  # growth stays within card_text_max: the stretch below spreads the (now shorter) text
+        out = _apply(out, caps)
+        items = _apply(items, caps)
+        plan = {k: _apply(v, caps) for k, v in plan.items()}
     rows = _card_rows(cards)
     nat = [max(c.h for c in r) for r in rows]
     gaps = [min(q.y for q in rows[i + 1]) - max(q.y + q.h for q in rows[i]) for i in range(len(rows) - 1)]
@@ -438,7 +467,7 @@ def _cards_to_bar(
     if r is None:
         return None
     s_ok = 1.0
-    s_top = min(_max_step(c, plan[id(c)], lt) for c in cards)
+    s_top = min(_max_step(c, plan[id(c)], lt, True) for c in cards)
     k = 1
     while s_top > 1.0 + 1e-6 and max(r[2]) > tail_max:
         s = min(1.0 + k * lt.l3_grow_step, s_top)
@@ -456,16 +485,17 @@ def _cards_to_bar(
     if min(r[1]) < lt.card_stretch_min_fill:  # even spread out, a card would stay a mostly empty box
         return None
     res = dict(r[0])
+    rules: list[Placed] = []
     if lt.card_spread_fill > 0:
         for row in rows:
             if min(_card_share(res, c, plan[id(c)]) for c in row) < lt.card_spread_fill:
-                _distribute_row(res, row, plan, lt)
+                rules += _distribute_row(res, row, plan, lt)
     for c in cards:  # decoration inside a card (icons, header bars) follows the card top
         dy = res[id(c)].y - c.y
         for p in items:
             if p is not c and id(p) not in res and _contains(c, p):
                 res[id(p)] = p.model_copy(update={"y": p.y + dy})
-    return _apply(out, res)
+    return _apply(out, res) + rules
 
 
 def _main_of(inner: list[Placed]) -> Placed | None:
@@ -482,14 +512,19 @@ def _card_share(res: dict[int, Placed], card: Placed, inner: list[Placed]) -> fl
     return (m.y + _text_h(m) - c.y) / max(c.h, 1) if m is not None else 1.0
 
 
-def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: LayoutTokens) -> None:
-    """Spread the paragraphs of every card of ``row`` over its body (equal gaps, capped); the list stays
-    top-anchored (the first items of the row share one y), the rest is air at the card bottom."""
+def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: LayoutTokens) -> list[Placed]:
+    """Spread the paragraphs of every card of ``row`` over its body (equal gaps, capped).
+
+    With ``card_spread_rules`` the items form a ruled list: every item sits in its own band (half a gap
+    above and below), a thin rule in the gap centre separates consecutive items, and the cards of the row
+    keep a similar rhythm. Otherwise the list stays top-anchored (first items share one y), the rest is air
+    at the card bottom. Returns the rule shapes (empty without ``card_spread_rules``)."""
+    ruled = lt.card_spread_rules
     jobs = []
     for c in row:
         main = _main_of(plan[id(c)])
         if main is None or len(main.element.paragraphs) < 2:
-            return
+            return []
         m = res[id(main)]
         card = res[id(c)]
         pad = _pad(main, card)
@@ -503,19 +538,21 @@ def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: L
         n = len(paras)
         size = (m.style.font_size or 18) * m.font_scale * EMU_PER_PT
         if size <= 0:
-            return
+            return []
         avail = floor - m.y - 2 * tpad - round(lt.card_spread_tail * size)
         g0 = m.element.attrs.get("para_gap")
         if g0 is None:
             g0 = measure.element_gap(m.element)
             g0 = measure.para_gap() if g0 is None else g0
+        true_w = width  # rules and the centring use the real wrap width, the fit the narrower one
         width = min(width, round(width * (1.0 - lt.l3_wrap_margin)))  # renders wrap earlier: fit that
         need = measure.paragraphs_height(paras, width, m.style, m.font_scale, gap=g0)
         free = avail - need
         if free <= 0:
-            jobs.append((c, m, g0, 0, avail, paras, width))
+            jobs.append((c, m, g0, 0, avail, paras, width, card, pad, tpad, true_w))
             continue
-        gap = min(g0 + free / ((n - 1) * size), lt.card_spread_gap_max)
+        # ruled: n bands (half a gap above the first and below the last item); plain: n - 1 gaps
+        gap = min(g0 + free / ((n if ruled else n - 1) * size), lt.card_spread_gap_max * (2 if ruled else 1))
         gap = max(gap, g0)
         for _ in range(12):  # the estimate has a safety factor: shrink until it surely fits
             used = measure.paragraphs_height(paras, width, m.style, m.font_scale, gap=gap)
@@ -523,21 +560,39 @@ def _distribute_row(res: dict[int, Placed], row: list[Placed], plan: dict, lt: L
                 break
             gap = max(g0, gap - 0.05)
         used = measure.paragraphs_height(paras, width, m.style, m.font_scale, gap=gap)
-        jobs.append((c, m, round(gap, 3), max(avail - used, 0), avail, paras, width))
+        jobs.append((c, m, round(gap, 3), max(avail - used, 0), avail, paras, width, card, pad, tpad, true_w))
     top_gap = min(j[2] for j in jobs) * lt.card_spread_ratio  # siblings keep a similar rhythm
-    capped = []
-    for c, m, g, rest, av, ps, w in jobs:
+    rules: list[Placed] = []
+    line = Style(line="border", line_width=0.75)
+    for c, m, g, _rest, av, ps, _w, card, pad, tpad, tw in jobs:
         if g > top_gap:
             g = top_gap
-            rest = max(av - measure.paragraphs_height(ps, w, m.style, m.font_scale, gap=g), 0)
-        capped.append((c, m, g, rest, av))
-    jobs = capped
-    lead = 0  # top-anchored: every first item stays at the normal padding under the header band
-    for c, m, gap, _rest, _avail in jobs:
-        el = m.element.model_copy(update={"attrs": {**m.element.attrs, "para_gap": gap}})
+        el = m.element.model_copy(update={"attrs": {**m.element.attrs, "para_gap": g}})
+        lead = 0
+        if ruled and g > 0:
+            used = measure.paragraphs_height(ps, tw, m.style, m.font_scale, gap=g)
+            lead = max(round((av - used) / 2), 0)  # centred in the card body: equal air above and below
+            size = (m.style.font_size or 18) * m.font_scale * EMU_PER_PT
+            for i in range(len(ps) - 1):
+                end = measure.paragraphs_height(ps[: i + 1], tw, m.style, m.font_scale, gap=g)
+                y = m.y + lead + tpad + round(end + g * size / 2)
+                rules.append(_rule(card, pad, y, line))
         res[id(_main_of(plan[id(c)]))] = m.model_copy(
             update={"element": el, "y": m.y + lead, "h": m.h - lead}
         )
+    return rules
+
+
+def _rule(card: Placed, pad: int, y: int, style: Style) -> Placed:
+    """A thin horizontal rule inside ``card`` (native line shape), inset by the card padding."""
+    return Placed(
+        element=Shape(shape="line", attrs={"head": "none", "flip_h": False, "flip_v": False}),
+        x=card.x + pad,
+        y=y,
+        w=max(card.w - 2 * pad, 0),
+        h=0,
+        style=style,
+    )
 
 
 def _fill_share(card: Placed, inner: list[Placed]) -> float:
