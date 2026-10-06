@@ -602,6 +602,15 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       looks richer (accent-bar KPI cards, carded bullets, chevron + label boxes, footers); SlideMark KPI rows are small
       with large empty bands (t3 s2/s9/s14/s20), bullet and chevron slides are sparse (s5/s8/s13/s16/s23/s25).
       Fix the defaults (fill, size, card look) so a plain deck matches without more agent tokens.
+- [ ] Design reviewer (owner, 2026-10-06): add a design-review agent next to the cost bench. Prompt:
+      `bench/design_review_prompt.md` (blind, absolute top-designer bar, 8 criteria incl. colour, visual devices,
+      details; the L3 prompt skipped colour and only listed defects). Run it on the contact sheets of every
+      deck-length bench run and after each wave's gallery; record per-criterion scores in `bench/design_review.jsonl`.
+      Owner verdict on the first bench: both arms still look plain; SlideMark has fewer components, less colour and
+      fewer details than python-pptx. Goal: SlideMark's default output scores >= 4 overall on the absolute bar with no
+      extra agent tokens, by richer defaults per slide type (KPI cards with accent bars and unit styling, carded
+      bullets, chevrons with label boxes, accent on the key number/takeaway, footer + page number + source line,
+      designed cover and closing), all as tokens/presets an agent can override (design freedom).
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or
