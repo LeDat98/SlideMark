@@ -510,3 +510,10 @@ Goal: run-7 leftovers (L3), then an independent re-score with a content-rich den
 - **Wave 3/4A status:** JP number + unit/sign groups joined with U+2060 (`layout.cjk_unit_join`), generic on/off for bool
   tokens; native `waterfall` (bridge) chart with totals (`=`), importer round trip (118/121). 1728 tests.
 - **Wave 4B:** `{.gantt}` tables draw native bars (16 s9, 20 s10); composed covers via cover tokens (jp-business, default).
+- **Wave 4B/5 status:** `{.gantt}` bars (16 s9, 20 s10), composed covers (`cover.*` tokens), stacked totals (`totals=`),
+  distinct jp-business palette, callouts inside panels at body size, panels beside charts span the chart. 1764 tests.
+- **Re-score 2 (same prompt):** 11 = 3.5, 16 = 3.5, 19 = 3.5, 20 = 4 "yes (with polish)"; others "no". Top asks: badge
+  boxes (white inverted badge in gantt bars), loose panels, cover bottom, JP orphans in narrow cards, chart takeaways.
+- **Wave 6 A (`render/objects.py`, `layout/gantt.py`):** badges inside gantt bars read as pills (no hard white boxes);
+  negative bar labels never collide with category labels. **Wave 6 B (`layout/diagram.py`, `layout/engine.py`):** org
+  charts keep the body gutter under the lead and use the body height (19 s3, 11 s6 level widths).
