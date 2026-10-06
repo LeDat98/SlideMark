@@ -133,11 +133,19 @@ Run goal:
 - Next: L3 gate on content-rich decks (owner: accept 20 at 4?), JP orphans where LibreOffice and the model disagree, Gantt
   equal time columns after the last growth pass, AC4 owner decision.
 
-## 2026-10-06 (run 9, chained manual, L3 leftovers + re-score, 09:19 UTC–)
+## 2026-10-06 (run 9, chained manual, L3 leftovers + re-score, 09:19–12:20 UTC)
 Run goal:
-- [ ] Gantt time columns even, decided after the last text-growth pass (16 s9, 20 s10)
-- [ ] Tighter ruled panels: callout follows the list, not pushed to the panel bottom (11 s3); tables beside charts reach the chart bottom (20 s3)
-- [ ] Chart takeaways: `hl=` highlighted points + `note=` native callout (contract in SYNTAX.md)
-- [ ] CJK orphans where LibreOffice wraps earlier than the measure model
-- [ ] Example with a chevron row matching its table's columns
-- [ ] L3 re-score with the same prompt (`bench/l3_review_prompt.md`); AC4 gate text unchanged (owner)
+- [x] Gantt time columns even, decided after the last text-growth pass (20 s10 even; 16 s9 one badge column pinned)
+- [x] Tighter ruled panels (11 s3 callout follows the list, panel ends under it); tables beside charts reach the chart bottom (20 s3)
+- [x] Chart takeaways: `hl=` highlighted points + `note=` native callout (20 s3/s8, 22 s4)
+- [x] CJK orphans: render-only viewer model squeeze + BudouX phrase breaks ("点検技術者の / 平均年齢 54歳")
+- [x] Example with a chevron row matching its table's columns (examples/22, English launch plan)
+- [ ] L3 re-scored twice (same prompt): 20 = 4 then 3.5, 22 = 4 "yes (nearly)", others 3.5 → gate still open; AC4 unchanged
+- Done: 5 waves, 11 Sonnet coding agents + 2 review + 1 eval agent. Also native table pills, Latin/brand-deck fill (tables wrap-grow,
+  cards hug, sparse rows centred), sparse-chart axes and segment labels, lone chart text scale, lone chevron cap, tree boxes hug
+  content, first-slide long taglines become covers, `min=` axes use the visible span, orphan binding never breaks a word.
+- Metrics: tests 1913 passed (1780 at start); q3 155 tokens = 30% of python-pptx, markup 13–27%, design paths 35/38% (unchanged);
+  round trip 119/122 (3 pre-existing); smoke c05 skill-only 3 calls, 0 images, accepted, cost unchanged.
+- Problems: smoke run first "rejected" by invisible U+2060 joiners (acceptance now strips them; Ctrl+F issue open); a relayed
+  owner-decision message from another session was not applied (permission check) → owner to confirm.
+- Next: gantt bar badges as pills, callout clearance, dense table row height/headers, small-delta waterfalls, U+2060 → phrase packing.
