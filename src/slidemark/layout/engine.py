@@ -34,7 +34,7 @@ from . import css, measure
 from .diagram import fill_tree
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
-from .l3fill import fill_chevron_row, fill_panels, fill_row
+from .l3fill import fill_cards_to_bar, fill_chevron_row, fill_panels, fill_row
 from .score import score as score_layout
 from .search import alternatives
 from .tables import capped_width, column_widths, right_align_numbers, row_heights, table_grid
@@ -2926,6 +2926,23 @@ def _grow_head(
         return
 
 
+def _edges(out: list[Placed], tail: list[Placed]) -> tuple[int, int]:
+    """(top of the body block, top of the conclusion / footnote zone): the lead growth moves them."""
+    top = min((p.y for p in out), default=0)
+    zone = min(
+        (p.y for p in tail if isinstance(p.element, Text) and p.element.role in ("conclusion", "footnote")),
+        default=0,
+    )
+    return top, zone
+
+
+def _shifted(body: Rect, now: tuple[int, int], before: tuple[int, int]) -> Rect:
+    """``body`` after the lead grew (top moves down) and the footnotes grew (bottom moves up)."""
+    dtop = max(now[0] - before[0], 0)
+    dbot = min(now[1] - before[1], 0)
+    return Rect(body.x, body.y + dtop, body.w, body.h - dtop + dbot)
+
+
 def _table_text(ctx: _Ctx, fc: _Ctx, run, body: Rect, elements: list) -> _Ctx:
     """A table that leaves the body mostly empty grows its text first, then its rows (``table_row_max_em``).
 
@@ -3310,11 +3327,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             for f, st, h, e in zip(notes, sts, hs, effs, strict=True):
                 put(tail, f, Rect(Mx, fy0, inner_w, h), st, e)
                 fy0 += h
-            bottom = (
-                bottom
-                - sum(hs)
-                - (max(sg // 2, _emu(ctx.lt.footnote_gap)) if _has_chart(slide.elements) else sg // 2)
-            )
+            foot_air = max(sg // 2, _emu(ctx.lt.footnote_gap)) if _has_chart(slide.elements) else sg // 2
+            if slide.conclusion is not None and slide.conclusion.paragraphs:
+                foot_air = max(foot_air, _emu(ctx.lt.conclusion_foot_gap))  # bar and footnote never touch
+            bottom = bottom - sum(hs) - foot_air
         if slide.conclusion is not None and slide.conclusion.paragraphs:
             c = slide.conclusion
             st = _styled(ctx, c, _role_style(ctx, "conclusion"))
@@ -3441,19 +3457,29 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 ctx.lt.card_stretch_share,
                 ctx.lt.table_row_max_em,
             )
+        to_bar: tuple[bool, bool, bool] | None = None
         if kind == "content" and not final_ctx.over and final_ctx.out:
             linked_sparse = bool(slide.links) and (
                 body.bottom - _content_bottom(final_ctx.out) > round(ctx.lt.sparse_left_max * body.h)
             )  # a flow row: the sparse completion skips linked slides, the row fill does not
             # a sparse row of text cards: top-anchored, tall, spread; above a table it only shrinks to content
             small = theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
-            final_ctx.out = fill_row(
-                final_ctx.out,
-                body,
-                ctx.lt,
-                consulting=final_ctx.dense_k < 1.0 or small,
-                sparse=bool(final_ctx.completed or linked_sparse),
+            has_bar = slide.conclusion is not None and bool(slide.conclusion.paragraphs)
+            to_bar_args = (
+                has_bar,
+                bool(final_ctx.completed) or _block_h(final_ctx.out) < ctx.lt.center_min_fill * body.h,
+                bool(slide.footnotes),
             )
+            if fill_cards_to_bar(final_ctx.out, body, ctx.lt, *to_bar_args) is not None:
+                to_bar = to_bar_args  # applied after the lead / footnote growth (it moves the body edges)
+            else:
+                final_ctx.out = fill_row(
+                    final_ctx.out,
+                    body,
+                    ctx.lt,
+                    consulting=final_ctx.dense_k < 1.0 or small,
+                    sparse=bool(final_ctx.completed or linked_sparse),
+                )
             small_body = theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
             final_ctx.out = fill_panels(
                 final_ctx.out,
@@ -3463,6 +3489,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 title_scale=theme.render.chart_title_scale,
             )
             final_ctx.out = fill_chevron_row(final_ctx.out, body, ctx.lt)
+        edge0 = _edges(final_ctx.out, tail)
         if (
             ctx.dense_k >= 1.0
             and ctx.lt.grow
@@ -3472,6 +3499,11 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             _grow_head(
                 ctx, final_ctx, head, tail, body, inner_w, reserved
             )  # dense decks keep their size ratios
+        if to_bar is not None:  # cards reach the conclusion bar (replaces the sparse row fill)
+            edge = _edges(final_ctx.out, tail)
+            fin = fill_cards_to_bar(final_ctx.out, _shifted(body, edge, edge0), ctx.lt, *to_bar)
+            if fin is not None:
+                final_ctx.out = fin
         ctx.diags += final_ctx.diags
         seen: set[str] = set()
         for lab in final_ctx.over:

@@ -76,6 +76,7 @@ def _spread(
     s: float = 1.0,
     short: bool = False,
     cap_to: float | None = None,
+    gap_cap: float | None = None,
 ) -> tuple[Placed, float, float] | None:
     """Text of ``p`` grown by ``s`` and its paragraph gaps spread (capped) to span ``avail`` EMU.
 
@@ -104,7 +105,7 @@ def _spread(
     cap = lt.l3_gap_extra_numbered if paras[0].marker == "number" else lt.l3_gap_extra
     if short and n <= lt.l3_short_items:
         cap = max(cap, lt.l3_gap_extra_short)
-    cap = min(cap, lt.l3_gap_cap)  # one even rhythm, never a stretched list
+    cap = min(cap, lt.l3_gap_cap if gap_cap is None else gap_cap)  # one even rhythm, never a stretched list
     if cap_to is not None:
         cap = min(cap, cap_to)  # sibling cards share the smallest rhythm
     extra = min(max(cap, 0.0), free / ((n - 1) * size))
@@ -151,6 +152,7 @@ def _fill_card(
     s: float = 1.0,
     short: bool = False,
     cap_to: float | None = None,
+    gap_cap: float | None = None,
 ) -> tuple[dict[int, Placed], float, float, float] | None:
     """New geometry of ``card`` and its texts for the box ``top..bottom``; ``None`` = leave it alone.
 
@@ -186,11 +188,11 @@ def _fill_card(
         gap = round(lt.l3_head_pad * size)
         if gap and avail - gap >= main.h - 2:
             mg = m.model_copy(update={"y": m.y + gap})
-            sp = _spread(mg, avail - gap, lt, pad, s, short, cap_to)
+            sp = _spread(mg, avail - gap, lt, pad, s, short, cap_to, gap_cap)
             if sp is not None:
                 m, avail = mg, avail - gap
     if sp is None:
-        sp = _spread(m, avail, lt, pad, s, short, cap_to)
+        sp = _spread(m, avail, lt, pad, s, short, cap_to, gap_cap)
     if sp is None:
         return None
     res[id(main)], free, extra = sp
@@ -342,6 +344,126 @@ def _fill_row(
     return _apply(out, res)
 
 
+def fill_cards_to_bar(
+    out: list[Placed], body: Rect, lt: LayoutTokens, bar: bool, anchored: bool, foot: bool
+) -> list[Placed] | None:
+    """A body of text cards (one row or a grid) above a conclusion bar: top-anchored, stretched to the bar.
+
+    ``None`` = not this case (caller continues with the other fills). Applies with a conclusion bar, or with
+    a footnote when the block is already top-anchored (``anchored``)."""
+    try:
+        return _cards_to_bar(out, body, lt, bar, anchored, foot)
+    except Exception:  # never raise on bad input
+        return None
+
+
+def _card_rows(cards: list[Placed]) -> list[list[Placed]]:
+    rows: list[list[Placed]] = []
+    bottom = -1
+    for c in sorted(cards, key=lambda p: (p.y, p.x)):
+        if rows and c.y < bottom - 2:
+            rows[-1].append(c)
+            bottom = max(bottom, c.y + c.h)
+        else:
+            rows.append([c])
+            bottom = c.y + c.h
+    return rows
+
+
+def _cards_to_bar(
+    out: list[Placed], body: Rect, lt: LayoutTokens, bar: bool, anchored: bool, foot: bool
+) -> list[Placed] | None:
+    if not lt.l3_fill or not lt.cards_to_bar or lt.body_valign == "top" or body.h <= 0:
+        return None
+    if not (bar or (foot and anchored)):
+        return None
+    items = _body_items(out, body)
+    boxes = [p for p in items if isinstance(p.element, Container)]
+    cards = [p for p in boxes if not any(q is not p and _contains(q, p) for q in boxes)]
+    if len(cards) < 2 or any("kpi" in c.element.classes for c in cards):
+        return None
+    plan: dict[int, list[Placed]] = {}
+    for c in cards:
+        inner = _inner_texts(c, items, deco=True)
+        if inner is None:
+            return None
+        plan[id(c)] = inner
+    covered = {id(p) for p in items if any(_contains(c, p) for c in cards)}
+    if any(id(p) not in covered for p in items):  # arrows, charts, tables, loose text share the body
+        return None
+    rows = _card_rows(cards)
+    nat = [max(c.h for c in r) for r in rows]
+    gaps = [min(q.y for q in rows[i + 1]) - max(q.y + q.h for q in rows[i]) for i in range(len(rows) - 1)]
+    if any(g < 0 for g in gaps):
+        return None
+    gap = min(gaps, default=0)
+    top, bottom = body.y, body.bottom
+    slack = (bottom - top) - sum(nat) - gap * (len(rows) - 1)
+    if slack < 0:
+        return None
+    if not bar and (max(c.y + c.h for c in cards) - min(c.y for c in cards)) >= (bottom - top) * 0.97:
+        return None
+    heights = [h + slack // len(rows) for h in nat]
+    heights[-1] += slack - (slack // len(rows)) * len(rows)
+    tops = [top]
+    for h in heights[:-1]:
+        tops.append(tops[-1] + h + gap)
+    tail_max = lt.l3_tail_max
+
+    def run(s: float, hollow_cap: float | None):
+        res: dict[int, Placed] = {}
+        shares: list[float] = []
+        for row, t, h in zip(rows, tops, heights, strict=True):
+            rs = [_fill_card(c, plan[id(c)], t, t + h, lt, s) for c in row]
+            if any(r is None for r in rs):
+                return None
+            sh = [r[2] / max(h, 1) for r in rs]
+            if hollow_cap is not None and min(sh) < lt.card_hollow_fill:  # one larger rhythm for the row
+                rs = [_fill_card(c, plan[id(c)], t, t + h, lt, s, False, None, hollow_cap) for c in row]
+                if any(r is None for r in rs):
+                    return None
+            ex = [r[3] for r in rs]
+            if max(ex) - min(ex) > 0.01:  # one rhythm for every card of the row
+                cap = hollow_cap if hollow_cap is not None and min(sh) < lt.card_hollow_fill else None
+                rs = [_fill_card(c, plan[id(c)], t, t + h, lt, s, False, min(ex), cap) for c in row]
+                if any(r is None for r in rs):
+                    return None
+            sh = [r[2] / max(h, 1) for r in rs]
+            for r in rs:
+                res.update(r[0])
+            shares += sh
+        return res, shares, [1.0 - x for x in shares]
+
+    r = run(1.0, None)
+    if r is None:
+        return None
+    s_ok = 1.0
+    s_top = min(_max_step(c, plan[id(c)], lt) for c in cards)
+    k = 1
+    while s_top > 1.0 + 1e-6 and max(r[2]) > tail_max:
+        s = min(1.0 + k * lt.l3_grow_step, s_top)
+        nxt = run(s, None)
+        if nxt is None:
+            break
+        r, s_ok = nxt, s
+        k += 1
+        if s >= s_top:
+            break
+    if min(r[1]) < lt.card_hollow_fill:  # an obviously hollow card: its items spread further (token cap)
+        nxt = run(s_ok, lt.card_hollow_gap_cap)
+        if nxt is not None:
+            r = nxt
+    if min(r[1]) < lt.card_stretch_min_fill:  # even spread out, a card would stay a mostly empty box
+        return None
+    res = dict(r[0])
+    for c in cards:  # decoration inside a card (icons, header bars) follows the card top
+        dy = res[id(c)].y - c.y
+        for p in items:
+            if p is not c and id(p) not in res and _contains(c, p):
+                res[id(p)] = p.model_copy(update={"y": p.y + dy})
+    return _apply(out, res)
+
+
 def _fill_share(card: Placed, inner: list[Placed]) -> float:
     from .engine import _text_h
 
@@ -463,7 +585,7 @@ def fill_chevron_row(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Pl
 
 
 def _fill_chevron_row(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
-    if not lt.l3_fill or lt.sparse_left_max <= 0 or lt.body_valign == "top" or body.h <= 0:
+    if not lt.l3_fill or lt.body_valign == "top" or body.h <= 0:
         return out
     items = _body_items(out, body)
     chevs = [p for p in items if isinstance(p.element, Shape) and p.element.shape == "chevron"]
@@ -477,23 +599,82 @@ def _fill_chevron_row(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[P
             return out
     if min(c.y + c.h for c in chevs) <= max(c.y for c in chevs):  # not one row
         return out
+    res: dict[int, Placed] = {}
     top = min(c.y for c in chevs)
     h0 = max(c.h for c in chevs)
-    if body.bottom - (body.y + h0) <= round(lt.sparse_left_max * body.h):
-        return out  # the row already fills the body (a conclusion bar may sit below it)
-    grow = max(round(lt.chevron_fill_share * body.h) - h0, 0)
-    if grow > body.bottom - (top + h0):  # never past the body
-        grow = max(body.bottom - (top + h0), 0)
-    dy = body.y - top
-    if dy >= 0 and not grow:
-        return out
-    dy = min(dy, 0)
-    res: dict[int, Placed] = {}
-    for p in items:
-        if id(p) in ids:  # the point depth (adj x shorter side) stays, so the text area keeps its width
-            adj = p.element.attrs.get("adj", lt.chevron_adj) * min(p.w, p.h) / max(min(p.w, p.h + grow), 1)
-            el = p.element.model_copy(update={"attrs": {**p.element.attrs, "adj": round(adj, 4)}})
-            res[id(p)] = p.model_copy(update={"y": p.y + dy, "h": p.h + grow, "element": el})
-        else:  # an icon stays centred on its chevron
-            res[id(p)] = p.model_copy(update={"y": p.y + dy + grow // 2})
-    return _apply(out, res)
+    if lt.sparse_left_max > 0 and body.bottom - (body.y + h0) > round(lt.sparse_left_max * body.h):
+        grow = max(round(lt.chevron_fill_share * body.h) - h0, 0)
+        if grow > body.bottom - (top + h0):  # never past the body
+            grow = max(body.bottom - (top + h0), 0)
+        dy = min(body.y - top, 0)
+        if body.y - top < 0 or grow:
+            for p in items:
+                if (
+                    id(p) in ids
+                ):  # the point depth (adj x shorter side) stays, so the text area keeps its width
+                    short = min(p.w, p.h)
+                    adj = p.element.attrs.get("adj", lt.chevron_adj) * short / max(min(p.w, p.h + grow), 1)
+                    el = p.element.model_copy(update={"attrs": {**p.element.attrs, "adj": round(adj, 4)}})
+                    res[id(p)] = p.model_copy(update={"y": p.y + dy, "h": p.h + grow, "element": el})
+                else:  # an icon stays centred on its chevron
+                    res[id(p)] = p.model_copy(update={"y": p.y + dy + grow // 2})
+    grown = _grow_chevron_text([res.get(id(c), c) for c in chevs], lt)
+    if grown:
+        res.update({id(c): g for c, g in zip(chevs, grown, strict=True)})
+    return _apply(out, res) if res else out
+
+
+def _grow_chevron_text(chevs: list[Placed], lt: LayoutTokens) -> list[Placed] | None:
+    """Text of a lone chevron row grows to fill the chevron: one factor for the whole row, capped by
+    ``chevron_text_max_pt`` and ``chevron_text_fill`` of the height. A word never breaks (it fits one line
+    ``chevron_word_slack`` narrower) and no paragraph wraps onto more lines than it did (in an area
+    ``chevron_cjk_slack`` / ``chevron_head_slack`` narrower). Rows with icons keep their size. ``None`` =
+    unchanged."""
+    from .engine import _chevron_text_w, _longest_word_em
+
+    if lt.chevron_text_max_pt <= 0 or any("icon_side" in c.element.attrs for c in chevs):
+        return None
+    sizes = [(c.style.font_size or 18) * c.font_scale for c in chevs]
+    s_top = min(lt.chevron_text_max_pt / max(sz, 1.0) for sz in sizes)
+    step = max(lt.l3_grow_step, 0.01)
+
+    def fits(s: float) -> bool:
+        for c, sz in zip(chevs, sizes, strict=True):
+            paras = c.element.paragraphs
+            rect = Rect(c.x, c.y, c.w, c.h)
+            adj = c.element.attrs.get("adj")
+            avail = _chevron_text_w(rect, c.style, c.element, adj) / EMU_PER_PT
+            if avail <= 0:
+                return False
+            new_fs = c.font_scale * s
+            if measure.paragraphs_height(paras, round(avail * EMU_PER_PT), c.style, new_fs) > (
+                lt.chevron_text_fill * c.h
+            ):
+                return False
+            em = _longest_word_em(paras)
+            if em * sz * s * lt.chevron_word_slack > avail:
+                return False
+            for i, para in enumerate(paras):
+                cjk = measure.has_cjk(para.plain)
+                slack = lt.chevron_cjk_slack if cjk else lt.chevron_head_slack
+                segs = measure.para_segments(
+                    para, i == 0 and bool(para.runs) and all(r.bold for r in para.runs)
+                )
+                narrow = avail / max(slack, 1.0)
+                if measure.count_lines(segs, narrow, sz * s, c.style.font) > max(
+                    measure.count_lines(segs, narrow, sz, c.style.font), 1
+                ):
+                    return False
+        return True
+
+    best = 1.0
+    k = 1
+    while True:
+        s = min(1.0 + k * step, s_top)
+        if s <= best + 1e-9 or not fits(s):
+            break
+        best = s
+        k += 1
+    if best <= 1.0 + 1e-9:
+        return None
+    return [c.model_copy(update={"font_scale": round(c.font_scale * best, 4)}) for c in chevs]
