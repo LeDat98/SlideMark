@@ -108,6 +108,8 @@ def _format_run(
     f = r.font
     f.size = Pt(size_pt)
     bold = bool(run.bold or style.bold or run.highlight)
+    if run.highlight and not style.bold and not theme.render.badge_cjk_bold and measure.has_cjk(text):
+        bold = False  # synthetic bold smears small CJK glyphs inside the highlight
     italic = bool(run.italic or style.italic)
     f.bold = True if bold else None
     f.italic = True if italic else None

@@ -477,13 +477,29 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
         )
         if va.minimum_scale is not None and not (zero_base and va.minimum_scale == 0):
             opts["min"] = f"{va.minimum_scale:g}"  # a zero base on bars is the build default
-        if va.maximum_scale is not None:
+        if va.maximum_scale is not None and not _is_auto_max(kind, data, va):
             opts["max"] = f"{va.maximum_scale:g}"
     except Exception:
         pass
     if fmt:
         opts["fmt"] = fmt
     return ChartT(kind=kind, title=title, categories=cats, series=data, options=opts)
+
+
+def _is_auto_max(kind: str, data, va) -> bool:
+    """True when ``c:max`` is the nice max the renderer writes by itself (no `max=` needed on re-build)."""
+    try:
+        from ..render.axis import auto_axis
+        from ..theme import RenderTokens
+
+        if kind not in ("column", "bar", "stacked-column", "stacked-bar", "area"):
+            return False
+        if va.minimum_scale not in (None, 0):
+            return False
+        auto = auto_axis(kind, [vals for _, vals in data], RenderTokens())
+        return bool(auto) and abs(auto[0] - va.maximum_scale) < 1e-9
+    except Exception:
+        return False
 
 
 # --------------------------------------------------------------------------- shapes
