@@ -58,8 +58,8 @@ def test_grid_tree_connectors_attach():
 
 
 def test_head_fit_off_keeps_the_old_width():
-    _, on = lay()
-    _, off = lay(tree_head_fit=0)
+    _, on = lay(tree_parent_span=0)
+    _, off = lay(tree_head_fit=0, tree_parent_span=0)
     w_on = next(p for p in on if isinstance(p.element, Container)).w
     w_off = next(p for p in off if isinstance(p.element, Container)).w
     assert w_on > w_off

@@ -120,3 +120,51 @@ def test_tree_odd_inputs_do_not_crash():
     ):
         _, _, pl = lay(md)
         assert pl
+
+
+VI = """theme: none
+
+# Cơ cấu điều hành
+> Ban chỉ đạo do Tổng giám đốc trực tiếp phụ trách
+@a>b a>c a>d
+## Ban chỉ đạo chuyển đổi số
+- Trưởng ban: Tổng giám đốc
+## Kho vận
+- 6 thành viên
+## Vận tải
+- 5 thành viên
+## Công nghệ
+- 8 thành viên
+"""
+
+
+def _lead(placed):
+    return next(p for p in placed if isinstance(p.element, Text) and p.element.role == "lead")
+
+
+def test_tree_keeps_gutter_under_lead_and_fills_body():
+    deck, th, pl = lay(VI)
+    lead = _lead(pl)
+    top = min(p.y for p in boxes(pl))
+    assert top - (lead.y + lead.h) >= 0.2 * 914400  # the normal body gutter
+    assert max(p.y + p.h for p in boxes(pl)) > 0.62 * 7.5 * 914400  # no empty band at the bottom
+
+
+def test_tree_siblings_equal_width_parent_centered_and_within_span():
+    _, _, pl = lay(TREE)
+    bx = sorted(boxes(pl), key=lambda p: (p.y, p.x))
+    kids = [p for p in bx if p.y == bx[-1].y]
+    assert len({p.w for p in kids}) == 1
+    left, right = min(p.x for p in kids), max(p.x + p.w for p in kids)
+    for parent in bx[:-3]:
+        assert parent.w <= right - left
+        assert abs((parent.x + parent.w / 2) - (left + right) / 2) <= 2
+    assert bx[0].w == bx[1].w  # a chain of single children matches its child
+
+
+def test_tree_parent_span_token_off_keeps_old_widths():
+    deck = parse(TREE)
+    th = get_theme(deck.theme).model_copy(deep=True)
+    th.layout.tree_parent_span = 0
+    pl = layout_slide(deck.slides[0], deck, th, 0)
+    assert len(boxes(pl)) == 5
