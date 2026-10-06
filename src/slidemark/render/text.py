@@ -212,8 +212,9 @@ def fill_text(
         first_text = ""
         prev = ""
         prev_r = None
-        for run in p.runs:
-            segs = run.text.replace("\r", "").replace("\v", "\n").split("\n")
+        bound = [r.text for r in p.runs] if field else measure.bound_texts(p.runs)
+        for run, run_text in zip(p.runs, bound, strict=True):
+            segs = run_text.replace("\r", "").replace("\v", "\n").split("\n")
             for k, seg in enumerate(segs):
                 if k > 0:
                     para.add_line_break()

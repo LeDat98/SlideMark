@@ -766,11 +766,11 @@ def _kpi(b: Block, css_heading: bool = False) -> bool:
 
 
 def _box_class(b: Block, out: Out) -> str | None:
-    """The color class of a box: its card border in a class color, or body text all in the muted color."""
+    """A box color class: card border in a class color (`.muted` too), or all-muted body text (old decks)."""
     cols = out.deck.colors
     lc = b.item.line_color if b.item is not None else None
     if lc and lc != cols.get("border"):
-        for cname in ("primary", "success", "danger", "accent"):
+        for cname in ("primary", "success", "danger", "accent", "muted"):
             if cols.get(cname) == lc:
                 return cname
     muted = cols.get("muted")

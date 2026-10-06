@@ -112,6 +112,71 @@ def _tables() -> dict[str, dict[str, dict[int, int]]]:
     return out
 
 
+NBSP = "\u00a0"
+BIND_MAX = 12  # orphan control: both of the last two words must be at most this many characters
+
+
+def _bindable(w: str) -> bool:
+    return (
+        0 < len(w) <= BIND_MAX
+        and not has_cjk(w)
+        and NBSP not in w
+        and "://" not in w
+        and "www." not in w
+        and "@" not in w
+    )
+
+
+@cache
+def _bind_cached(texts: tuple[str, ...], skip: tuple[bool, ...]) -> tuple[str, ...]:
+    full = "".join(texts)
+    cut = max(full.rfind("\n"), full.rfind("\v"), full.rfind("\r")) + 1  # only the last line can orphan
+    tail = full[cut:]
+    end = len(tail.rstrip(" \t"))
+    words = tail[:end].split(" ")
+    if sum(1 for w in words if w) < 3 or "\t" in tail[:end]:
+        return texts
+    w2 = words[-1]
+    w1 = words[-2]  # an empty w1 means a double space: leave it alone
+    if not (_bindable(w1) and _bindable(w2)):
+        return texts
+    gap = cut + end - len(w2) - 1  # index of the single space between the last two words
+    first = gap - len(w1)
+    stop = gap + 1 + len(w2)
+    out, pos, hit = [], 0, False
+    for t, sk in zip(texts, skip, strict=True):
+        a, b = pos, pos + len(t)
+        pos = b
+        if sk and a < stop and b > first:
+            return texts  # the words sit in a code run or a badge: never touch it
+        if a <= gap < b:
+            t = t[: gap - a] + NBSP + t[gap - a + 1 :]
+            hit = True
+        out.append(t)
+    return tuple(out) if hit else texts
+
+
+def bound_texts(runs) -> list[str]:
+    """Run texts of a paragraph with its last two short words joined by a no-break space (orphan control).
+
+    A paragraph that ends in a lone word wraps ugly ("... 2027–2029" alone on a line). When the paragraph
+    has at least three words and both of the last two are at most ``BIND_MAX`` characters, the space
+    between them becomes U+00A0. Never for CJK words, URLs, code runs or badges; text that already has a
+    no-break space there is left as is. Layout (``para_segments``) and renderer both call this, so line
+    counts agree; the importer turns U+00A0 back into a space.
+    """
+    texts = tuple(r.text for r in runs)
+    if not texts or " " not in "".join(texts):
+        return list(texts)
+    skip = tuple(bool(getattr(r, "code", False) or getattr(r, "highlight", None)) for r in runs)
+    return list(_bind_cached(texts, skip))
+
+
+def bind_last_words(text: str) -> str:
+    """:func:`bound_texts` for one plain string."""
+    return _bind_cached((text,), (False,))[0]
+
+
 def is_cjk(ch: str) -> bool:
     if ch < "\u1100":  # nothing below the Hangul Jamo block is wide or full-width
         return False
@@ -135,6 +200,8 @@ def _base_em(ch: str, kind: str, font: str) -> float:
         return 0.5
     if unicodedata.combining(ch) or ch in "\u200b\u200c\u200d\u2060\ufeff":
         return 0.0
+    if ch == NBSP:
+        ch = " "
     if font == "wide":
         return _base_em(ch, kind, "arial") * (UNKNOWN_FONT_WIDEN + (0.06 if kind == "bold" else 0.0))
     tabs = _tables()
@@ -311,12 +378,12 @@ def para_segments(
 
     return [
         (
-            transform_text(r.text, transform),
+            transform_text(t, transform),
             bold or r.bold or bool(r.highlight),
             mono or r.code,
             bool(r.highlight),
         )
-        for r in p.runs
+        for r, t in zip(p.runs, bound_texts(p.runs), strict=True)
     ]
 
 
