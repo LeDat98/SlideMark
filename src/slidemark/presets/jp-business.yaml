@@ -40,6 +40,7 @@ dense_scale: 0.9
 classes:
   card: {line_width: 0.5, radius: 0, padding: 7pt}
   callout: {fill: "#FDF2F2", line: danger, padding: 7pt}
+  chart-note: {fill: "#FFF5F5"}
   dense: {font_size: 10.5}
   kpi: {font_size: 26}
 cover_band_h: 0.6

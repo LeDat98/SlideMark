@@ -145,6 +145,7 @@ class SlideData:
     num_field: bool = False
     transition: str | None = None  # ``t=`` value: "fade", "push:0.5", ...
     build: bool = False  # click-by-click appear animations on shapes
+    chart_notes: list[tuple[tuple[int, int, int, int], str]] = field(default_factory=list)  # `note=` callouts
 
 
 @dataclass
@@ -656,11 +657,16 @@ def read_sections(prs) -> list[tuple[str, list[int]]]:
         return []
 
 
+CHART_NOTE = "ChartNote"  # shape names the renderer gives a `note=` callout and its pointer
+_HL = re.compile(r" hl=(.+)$")  # the renderer appends the `hl=` categories to a chart's shape name
+
+
 def read_slide(slide, ctx: ReadCtx) -> SlideData:
     data = SlideData()
     data.hidden = slide._element.get("show") in ("0", "false")
     part = slide.part
     _walk(slide.shapes, Tf(), data, ctx, part)
+    _attach_notes(data)
     try:
         data.transition = read_transition(slide._element)
         data.build = bool(
@@ -678,6 +684,31 @@ def read_slide(slide, ctx: ReadCtx) -> SlideData:
     except Exception:
         data.notes = None
     return data
+
+
+def _attach_notes(data: SlideData) -> None:
+    """The callouts SlideMark draws for ``note=`` belong to the chart whose frame holds them."""
+    for box, text in data.chart_notes:
+        cx, cy = box[0] + box[2] / 2, box[1] + box[3] / 2
+        for it in data.items:
+            if it.kind == "chart" and it.chart and it.x <= cx <= it.x + it.w and it.y <= cy <= it.y + it.h:
+                it.chart.options["note"] = text
+                if (
+                    it.chart.kind == "line"
+                ):  # a note pins the line axis: that scale is not an author's min / max
+                    _drop_pinned_axis(it.chart)
+                break
+
+
+def _drop_pinned_axis(ch: ChartT) -> None:
+    from ..render.axis import line_axis
+    from ..theme import RenderTokens
+
+    got = line_axis([v for _, v in ch.series], RenderTokens())
+    if got and "min" in ch.options and abs(float(ch.options["min"]) - got[0]) < 1e-9:
+        del ch.options["min"]
+    if got and "max" in ch.options and abs(float(ch.options["max"]) - got[1]) < 1e-9:
+        del ch.options["max"]
 
 
 def _walk(shapes, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
@@ -760,6 +791,13 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
     name = sh.name or ""
     if tag == "grpSp":
         _walk(sh.shapes, tf.child(el), data, ctx, part)
+        return
+    if name.startswith(CHART_NOTE):  # the pointer of a `note=` is not content
+        if tag == "sp":
+            text = " ".join("".join(el.xpath(".//a:t/text()")).replace("\u2060", "").split())
+            box = tf.box(sh.left or 0, sh.top or 0, sh.width or 0, sh.height or 0)
+            if text and name.startswith(CHART_NOTE) and not name.startswith(CHART_NOTE + "Line"):
+                data.chart_notes.append((box, text))
         return
     if tag == "cxnSp":
         data.connectors += 1
@@ -886,6 +924,9 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
         elif sh.has_chart:
             ch = read_chart(sh, ctx)
             if ch is not None:
+                m = _HL.search(name)
+                if m:
+                    ch.options["hl"] = m.group(1)
                 data.items.append(_new(ctx, "chart", box, sid=sh.shape_id, name=name, chart=ch))
         else:
             ctx.skip(f"object {name!r} (SmartArt, OLE or other)")

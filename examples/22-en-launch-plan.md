@@ -55,7 +55,7 @@ Q4 · Metro
 # Demand by city
 > Metro and Coast carry 58% of the expected visits
 @1:1
-```bar {title="Expected visits per year (k)" labels=on}
+```bar {title="Expected visits per year (k)" labels=on hl=Metro note="Metro alone: 40% of visits"}
 ,North,Coast,Valley,Metro
 Visits,64,108,72,166
 ```

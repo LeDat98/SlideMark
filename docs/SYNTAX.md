@@ -330,7 +330,7 @@ Chart options go in the fence attributes:
 
 CSV cells may be quoted (`"1,240"`), may carry `%` or thousands separators (`1,240`, `12%` → number), and may
 use full-width digits; an empty cell is a gap. A cell that is not a number becomes a gap plus a warning.
-A takeaway is two attributes: `` ```bar {hl=郊外大型 note="赤字42店の半数は郊外大型"} ``.
+A takeaway is two attributes: `` ```bar {hl=郊外大型 note="赤字42店の半数は郊外大型"} ``. Several series keep their colors: an `hl` category gets a `render.chart_hl` outline in each; a line gets a larger marker. A `note` pins the plot area and value axis so the pointer hits the bar; a too-long note shrinks, wraps, then warns (`chart-note`).
 
 Whole numbers written with thousands separators (`1,240`, `2.100` with `lang: vi`) keep them: labels and the
 axis use `#,##0` (shown in the viewer's locale) unless `fmt` is set.
