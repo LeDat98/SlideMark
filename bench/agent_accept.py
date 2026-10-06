@@ -19,6 +19,7 @@ from pathlib import Path
 
 
 def _norm(s: str) -> str:
+    s = s.replace("\u2060", "").replace("\ufeff", "")  # render-only joiners (number + unit) are invisible
     return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", s)).strip().lower()
 
 
