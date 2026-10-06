@@ -320,6 +320,8 @@ class LayoutTokens(BaseModel):
     table_header_max: float = (
         1.4  # a stretched table keeps header rows <= this x their natural height (0 = off)
     )
+    gantt_pad: float = 3.0  # pt: a `.gantt` bar is inset this much from its cell range (left / right)
+    gantt_bar: float = 0.66  # a `.gantt` bar is this share of its row high, centered in the row
     # --- stretched tables and badges (vfill / render)
     table_comfort_em: float = (
         2.7  # a table whose rows end up taller than this x text grows its text (0 = off) ...
@@ -391,6 +393,9 @@ class RenderTokens(BaseModel):
     code_style: str = "default"  # pygments style for code blocks
     shadow: str = "0 2 6 #00000040"  # `shadow: true`: CSS-like "x y blur [spread] color" (pt)
     slide_bg: str = "#FFFFFF"  # slide background when neither the slide nor the theme has `bg`
+    gantt_grid: float = (
+        0.45  # `.gantt` table: body vertical lines keep this share of the border color (rest = fill)
+    )
     ink_auto: bool = True  # derive readable text colors the deck did not set (`style: ink.auto=off` disables)
     contrast_min: float = 4.5  # contrast ratio auto ink aims for (normal text)
     contrast_large: float = 3.0  # ... for large text (>= `large_pt`, e.g. KPI numbers)
@@ -471,6 +476,8 @@ def _base_classes() -> dict[str, Style]:
             fill="surface", line="primary", line_width=1, padding="6pt", align="center", valign="middle"
         ),
         "round": Style(radius=12),
+        # `{.gantt}` table: every filled body cell becomes a bar of this look (fill primary, best ink)
+        "gantt": Style(fill="primary", radius=4, padding="3pt", align="center", valign="middle"),
         "decision": Style(fill="bg", line="accent"),
     }
 

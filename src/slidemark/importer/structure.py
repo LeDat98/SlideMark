@@ -61,6 +61,35 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+_BAR_FILL = 0.85  # a filled shape this much of the width of the cells it covers is a Gantt bar
+
+
+def _fold_bars(data: SlideData, t: Item, xs: list[int], ys: list[int]) -> None:
+    """Filled shapes with text spanning body cells (a ``{.gantt}`` table's bars) become cell text; a bar over
+    several columns restores the ``<`` merge. The table is flagged ``gantt``."""
+    nc, nr = len(t.col_w), len(t.row_h)
+    for it in list(data.items):
+        if it.kind != "text" or it.ph or it.role or not it.fill or not it.text:
+            continue
+        r = next((k for k in range(nr) if ys[k] <= it.cy < ys[k + 1]), None)
+        c0 = next((k for k in range(nc) if xs[k] <= it.x + it.w * 0.15 < xs[k + 1]), None)
+        c1 = next((k for k in range(nc) if xs[k] < it.x + it.w * 0.85 <= xs[k + 1]), None)
+        if r is None or c0 is None or c1 is None or r < 1 or c0 < 1 or c1 < c0 or r >= len(t.rows):
+            continue
+        row = t.rows[r]
+        if c1 >= len(row) or it.h > 1.0 * t.row_h[r] or it.w < _BAR_FILL * (xs[c1 + 1] - xs[c0]):
+            continue
+        if any(row[k].paras or row[k].vmerge for k in range(c0, c1 + 1)):
+            continue
+        if row[c0].hmerge:
+            continue
+        row[c0].paras = it.paras
+        for k in range(c0 + 1, c1 + 1):
+            row[k].hmerge = True
+        t.gantt = True
+        data.items.remove(it)
+
+
 def fold_into_tables(data: SlideData) -> None:
     """Text drawn on top of an empty table cell (status pills, tags) becomes that cell's text."""
     for t in [i for i in data.items if i.kind == "table" and i.col_w and i.row_h]:
@@ -70,6 +99,7 @@ def fold_into_tables(data: SlideData) -> None:
         ys = [t.y]
         for h in t.row_h:
             ys.append(ys[-1] + h)
+        _fold_bars(data, t, xs, ys)
         for it in list(data.items):
             if it.kind != "text" or it.ph or it.role:
                 continue
@@ -882,8 +912,12 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
                     hint="< and ^ cannot be combined in one cell; check the table",
                 )
             )
-        align = _table_align(b.item.rows, hdr)
-        attrs = ([f"header={hdr}"] if hdr > 1 else []) + ([f"align={align}"] if align else [])
+        align = None if b.item.gantt else _table_align(b.item.rows, hdr)
+        attrs = (
+            ([".gantt"] if b.item.gantt else [])
+            + ([f"header={hdr}"] if hdr > 1 else [])
+            + ([f"align={align}"] if align else [])
+        )
         if attrs and lines:
             lines = ["{" + " ".join(attrs) + "}", *lines]
         return [("table", lines)] if lines else []
