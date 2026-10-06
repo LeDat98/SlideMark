@@ -295,3 +295,15 @@ def test_box_color_classes_survive_import(tmp_path):
     build(src, tmp_path / "a.pptx")
     md, _ = import_pptx(tmp_path / "a.pptx")
     assert "## 市場 {.muted}" in md and "## 課題 {.danger}" in md and "## 方針 {.primary}" in md
+
+
+@pytest.mark.parametrize("opts", ["labels=on", "labels=on totals=off", "totals=on", "totals=bogus labels=on"])
+def test_stack_totals_roundtrip(opts: str, tmp_path: Path):
+    src = f"# C\n```stacked-column {{{opts}}}\n,x,y\nA,4,5\nB,7,8\n```\n"
+    text, _, _, _ = _roundtrip(tmp_path, src)
+    a = next(e for e in parse(src).slides[0].elements if isinstance(e, Chart))
+    b = next(e for e in parse(text).slides[0].elements if isinstance(e, Chart))
+    assert [s.name for s in b.series] == ["A", "B"]  # the hidden carrier is dropped
+    assert b.options.get("labels") == a.options.get("labels")
+    want = a.options.get("totals")
+    assert b.options.get("totals") == (want if want in ("on", "off") else None)

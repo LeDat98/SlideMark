@@ -320,6 +320,7 @@ Chart options go in the fence attributes:
 | `title` | text | none |
 | `legend` | `bottom`, `right`, `top`, `left`, `none` | `bottom` when >1 series, else `none` |
 | `labels` | `on` (values), `percent` (pie/doughnut), `off` | `off` |
+| `totals` | stacked kinds: `off` drops, `on` forces the stack total at the end of each stack (default: shown with `labels=on`) | `on` with labels |
 | `fmt` | Excel number format for labels and the value axis, e.g. `0.0`, `#,##0`, `0%` | general |
 | `min`, `max` | value axis bounds | auto |
 | `colors` | comma list of theme names or hex, one per series (per point for pie) | theme palette |

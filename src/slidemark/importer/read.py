@@ -433,6 +433,14 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
     else:
         cats = [str(c) for c in plot.categories]
     data = [(s.name or "", [_num(v) for v in s.values]) for s in series]
+    carrier = False
+    if kind in ("stacked-bar", "stacked-column") and len(series) > 1 and _is_total_carrier(series[-1]):
+        carrier = True  # the hidden series of the stack-total labels: the build recreates it
+        series = series[:-1]
+        full_data = data
+        data = data[:-1]
+    else:
+        full_data = data
     opts: dict[str, str] = {}
     title = None
     try:
@@ -460,6 +468,10 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
         pass
     fmt = None
     try:
+        if kind in ("stacked-bar", "stacked-column") and carrier != bool(plot.has_data_labels):
+            nonneg = all(v is None or v >= 0 for _, vals in data for v in vals)
+            if carrier or nonneg:  # totals follow the segment labels by default
+                opts["totals"] = "on" if carrier else "off"
         if plot.has_data_labels:
             dl = plot.data_labels
             if kind in ("pie", "doughnut") and dl.show_percentage:
@@ -483,13 +495,24 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
         )
         if va.minimum_scale is not None and not (zero_base and va.minimum_scale == 0):
             opts["min"] = f"{va.minimum_scale:g}"  # a zero base on bars is the build default
-        if va.maximum_scale is not None and not _is_auto_max(kind, data, va):
+        if va.maximum_scale is not None and not _is_auto_max(kind, full_data, va):
             opts["max"] = f"{va.maximum_scale:g}"
     except Exception:
         pass
     if fmt:
         opts["fmt"] = fmt
     return ChartT(kind=kind, title=title, categories=cats, series=data, options=opts)
+
+
+def _is_total_carrier(ser) -> bool:
+    """The last series is SlideMark's invisible stack-total carrier (no fill, a name marker)."""
+    from ..render.objects import BLANK_CARRIER, TOTAL_CARRIER
+
+    el = ser._element
+    sp = el.find(qn("c:spPr"))
+    return (ser.name or "") in (TOTAL_CARRIER, BLANK_CARRIER) and (
+        sp is not None and sp.find(qn("a:noFill")) is not None
+    )
 
 
 def _wf():

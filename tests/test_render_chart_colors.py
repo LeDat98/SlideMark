@@ -25,14 +25,16 @@ def build_chart(tmp_path, kind, nseries=2, theme="default", **opts):
 
 def test_series_colors_are_distinct_for_the_jp_business_palette(tmp_path):
     chart = build_chart(tmp_path, "stacked-bar", nseries=4, theme="jp-business", labels="on")
-    fills = [str(s.format.fill.fore_color.rgb) for s in chart.plots[0].series]
+    fills = [
+        str(s.format.fill.fore_color.rgb) for s in list(chart.plots[0].series)[:4]
+    ]  # then the total carrier
     assert len(set(fills)) == 4, fills
 
 
 def test_stacked_labels_are_white_on_dark_fills_and_dark_on_light(tmp_path):
     chart = build_chart(tmp_path, "stacked-column", labels="on", colors="#1E3A5F,#FFE9A8")
     colors = []
-    for ser in chart.plots[0].series:
+    for ser in list(chart.plots[0].series)[:2]:  # the third is the hidden total carrier
         d_lbls = ser._element.find(qn("c:dLbls"))
         assert d_lbls is not None
         colors.append(d_lbls.find(qn("c:txPr")).find(".//" + qn("a:srgbClr")).get("val"))
@@ -58,6 +60,6 @@ def test_axis_ids_are_positive_and_consistent(tmp_path):
 
 def test_stacked_labels_hide_zero_segments(tmp_path):
     chart = build_chart(tmp_path, "stacked-bar", labels="on")
-    for ser in chart.plots[0].series:
+    for ser in list(chart.plots[0].series)[:2]:  # the third is the hidden total carrier
         fmt = ser._element.find(qn("c:dLbls")).find(qn("c:numFmt")).get("formatCode")
         assert fmt.split(";")[2] == "", fmt  # empty zero section: no clipped "0" in a zero-width segment
