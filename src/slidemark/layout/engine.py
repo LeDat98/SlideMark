@@ -34,7 +34,14 @@ from . import css, measure
 from .diagram import fill_tree
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
-from .l3fill import fill_cards_to_bar, fill_chevron_row, fill_panels, fill_row, grow_chevron_table
+from .l3fill import (
+    fill_cards_to_bar,
+    fill_chevron_row,
+    fill_panels,
+    fill_row,
+    fit_lone_kpi,
+    grow_chevron_table,
+)
 from .score import score as score_layout
 from .search import alternatives
 from .tables import capped_width, column_widths, right_align_numbers, row_heights, table_grid
@@ -3632,6 +3639,14 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             fin = fill_cards_to_bar(final_ctx.out, _shifted(body, edge, edge0), ctx.lt, *to_bar)
             if fin is not None:
                 final_ctx.out = fin
+        if kind == "content" and not final_ctx.over and final_ctx.out:  # a lone KPI row: content-sized cards
+            fixed = any(
+                isinstance(e, Container) and "kpi" in e.classes and _kpi_explicit(final_ctx, e)
+                for e in slide.elements
+            )
+            final_ctx.out = fit_lone_kpi(
+                final_ctx.out, _shifted(body, _edges(final_ctx.out, tail), edge0), ctx.lt, has_bar, fixed
+            )
         ctx.diags += final_ctx.diags
         seen: set[str] = set()
         for lab in final_ctx.over:

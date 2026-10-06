@@ -153,7 +153,7 @@ def test_kpi_number_and_caption(theme):
     texts = [p for p in of(placed, Text) if p.element.paragraphs and p.element.role == "body"]
     assert len(texts) == 3
     big, cap = texts[0].element.paragraphs
-    assert big.style.font_size == th.classes["kpi"].font_size and big.style.bold
+    assert big.style.font_size >= th.classes["kpi"].font_size and big.style.bold  # a lone row may grow
     assert big.style.color == "primary" and big.style.align == "center"
     assert cap.style.color == "muted" and cap.style.font_size < big.style.font_size
     assert cap.style.align == "center"

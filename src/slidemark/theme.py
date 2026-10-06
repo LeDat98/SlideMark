@@ -312,6 +312,17 @@ class LayoutTokens(BaseModel):
     chevron_lone_top: float = 0.4  # ... and sits with this share of the leftover above it (optical center)
     chevron_table_fill: float = 0.72  # above a table the chevron text may fill this share of its height ...
     chevron_table_grow: Length = "0.3in"  # ... and the row may grow this much taller at the table's expense
+    # --- KPI rows alone on the slide (only KPI cards in the body): content-sized cards
+    kpi_lone: bool = True  # a lone KPI row keeps cards as tall as their content (label, number, caption)
+    kpi_lone_value_max_pt: float = 66.0  # the number grows up to this size (never wraps, see kpi_fit_margin)
+    kpi_lone_value_grow: float = 1.35  # ... at most this x its size on the slide
+    kpi_lone_text_grow: float = 1.25  # label and caption step up by this factor (when they stay on one line)
+    kpi_lone_text_max_pt: float = 18.0  # ... to at most this size
+    kpi_lone_pad_em: float = 0.35  # card padding above the label and below the caption, x number size
+    kpi_lone_gap_em: float = 0.35  # gap between the label and the number, x label size
+    kpi_lone_fit: float = 0.8  # the number fills at most this share of the card text width (CJK guard)
+    kpi_lone_h: float = 0.5  # a lone KPI card is at most this share of the body height
+    kpi_lone_center: float = 0.42  # the row sits with this share of the free height above it (optical center)
 
 
 class RenderTokens(BaseModel):
