@@ -1,6 +1,6 @@
 colors: fg=#122B4A primary=#122B4A secondary=#1F5FA8 accent=#E08A1E teal=#1B8A8F muted=#6B7582 tint=#EEF2F7
 fonts: body=Meiryo heading=Meiryo
-style: title_band=primary table_header_fill=primary radius=0 s1.border-top="9pt solid secondary" s2.border-top="9pt solid teal" s3.border-top="9pt solid accent" ls1.border-left="9pt solid secondary" rows.fill=tint steps-arrow.fill=secondary,teal,accent steps-arrow.size=24 steps-card.size=26
+style: title_band=primary table_header_fill=primary radius=0 s1.border-top="9pt solid secondary" s2.border-top="9pt solid teal" s3.border-top="9pt solid accent" ls1.border-left="9pt solid secondary" rows.fill=tint steps-arrow.fill=secondary,teal,accent steps-arrow.size=24 steps-arrow.color=bg steps-arrow.bold=on steps-arrow.align=left steps-card.size=26 steps-arrow.h=0.75in steps.gap=0.2in
 style: cover.band=none cover.band_h=66% cover.bar=accent cover.bottom_bar=secondary cover.bottom_bar_h=0.6in title.height=0.95in title.rule=accent title.rule_h=0.06in render.chevron_shape=pentagon
 lang: ja
 footer: 北斗クラウド株式会社　取締役会資料
@@ -63,6 +63,7 @@ style: rows.stripe=secondary
 その他 [**12%**]{size=26 .secondary}
 
 # 3年間のプロダクト計画
+style: steps-card.h=2.7in conclusion.h=1.05in
 @3 steps
 ## 2027年度：
 **在庫管理と請求書の自動照合をリリース**
@@ -82,7 +83,7 @@ style: table.hl.fill=#FDF1DE table.hl.strength=1 table.zebra.fill=tint
 | [**B社：**]{size=20} | [月額]{.muted}<br>[**7,500円**]{size=26 .secondary} | [導入日数]{.muted}<br>[**5日**]{size=26 .secondary} | [サポート満足度]{.muted}<br>[**78%**]{size=26 .secondary} | [API連携数]{.muted}<br>[**45**]{size=26 .secondary} |
 
 # 価格改定の方針
-style: box.num.fill=secondary
+style: box.num.fill=secondary,teal,accent,muted box.num.shape=square
 @ab/ac/ad/ae num
 ## [スタンダードプラン]{size=16 color=#C9D6E6} {.kpi fill=primary align=left}
 [9,800円]{size=40 .white bold}
@@ -148,13 +149,14 @@ sizes: heading=18!
 ## 女性管理職比率を2029年度に25%へ（2026年度 14%） {fill=primary}
 
 # お客様の声
+style: quote.bar=accent quote.bar_w=0.15in quote.h=4.9in quote.width=0.98 quote.by.align=right
 @quote fill=tint size=38
 > **「月末の締め作業が3日から半日になった。現場が自分で使えるのが一番の違いです」**
 >
 > — 株式会社三浦製作所 経理部長
 
 # 地域展開
-style: conclusion.size=26
+style: steps-card.h=2.5in conclusion.h=1.3in conclusion.size=26
 @3 steps
 ## 2027年度
 [2027年度：]{bold .secondary}**福岡・札幌で地域密着の導入支援を開始**
@@ -165,7 +167,7 @@ style: conclusion.size=26
 > 各拠点で地元の会計事務所と提携し、紹介経由の契約を全体の30%へ
 
 # 取締役会への依頼事項
-style: rows-num.fill=secondary,teal,accent,primary
+style: rows-num.fill=secondary,teal,accent,primary layout.rows_h=1.12in
 @rows
 1. **中期経営計画の承認**
 1. **投資枠150億円の承認**
