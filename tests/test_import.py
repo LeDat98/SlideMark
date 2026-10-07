@@ -77,7 +77,7 @@ def test_roundtrip_examples(path: Path, tmp_path: Path):
     # `dense` on an `@` line is a hint the importer emits only when a plain trial build misses the original's
     # text boxes; with the growth ceiling (layout.grow_max) a plain build can land within that tolerance of
     # the dense one, so the second import may leave it out (geometry: tests/test_roundtrip.py)
-    strip = lambda t: re.sub(r"^(@\S+) dense$", r"\1", t, flags=re.M)  # noqa: E731
+    strip = lambda t: re.sub(r"^(@\S+(?: \S+)*?) dense\b", r"\1", t, flags=re.M)  # noqa: E731
     assert strip(text1) == strip(text2), "second import must equal the first"
     orig, imported = parse(src), parse(text1)
     assert not [d for d in imported.diagnostics if d.level in ("error", "warning")], imported.diagnostics
