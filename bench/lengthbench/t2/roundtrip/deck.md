@@ -1,7 +1,7 @@
-colors: primary=#142B4D secondary=#1F5FA8 muted=#59626E
+colors: primary=#142B4D secondary=#1F5FA8 muted=#59626E accent=#2A9D8F orange=#E09F1F tint=#EEF2F7
 fonts: body="Yu Gothic" heading="Yu Gothic"
-style: table_header_fill=#142B4D table_header_color=#FFFFFF radius=0
-style: cover.band=none cover.pad=0.44in cover.band_h=61% cover.rule=#E09F1F cover.rule_h=0.06in cover.bar=#2A9D8F cover.bar_w=0.12in top.bar=#142B4D top.bar_h=0.12in title.height=0.65in title.rule=#1F5FA8 title.rule_h=0.03in render.chevron_shape=pentagon
+style: table_header_fill=primary radius=0 table.zebra.fill=tint
+style: cover.band=none cover.pad=0.44in cover.band_h=61% cover.rule=orange cover.rule_h=0.06in cover.bar=accent top.bar=primary top.bar_h=0.12in title.height=0.65in title.rule=secondary title.rule_h=0.03in render.chevron_shape=pentagon
 lang: ja
 footer: 青葉フーズ株式会社
 num: on
@@ -31,7 +31,7 @@ num: on
 
 # 売上高と営業利益の推移（億円）
 > **5年間で売上高は1.25倍に**
-```column {labels=on fmt=#,##0 colors=secondary,#E09F1F size=14 gap=80}
+```column {labels=on fmt=#,##0 colors=secondary,orange size=14 gap=80}
 ,2023,2024,2025,2026,2027計画
 売上高,1020,1085,1130,1185,1280
 営業利益,61,70,78,86,96
@@ -79,7 +79,6 @@ num: on
 ??? 価格改定は主要取引先への説明を3月中に終えます。
 
 # 事業別の売上計画（億円）
-style: table.zebra.fill=#EEF2F7
 {.zebra align=llll size=20 rowh=0.8in widths=3:2:2:2}
 | 事業 | 2026実績 | 2027計画 | 前年比 |
 |-|-|-|-|
@@ -90,14 +89,14 @@ style: table.zebra.fill=#EEF2F7
 > 冷凍食品と海外が成長をけん引
 
 # 2027年度 売上構成（%）
-```pie {legend=right labels=on fmt='0"%"' colors=secondary,#E09F1F,#2A9D8F,#8A5AA8 size=22}
+```pie {legend=right labels=on fmt='0"%"' colors=secondary,orange,accent,#8A5AA8 size=22}
 ,冷凍食品,調味料,飲料,海外
 構成比,36,25,21,18
 ```
 
 # 価格改定の方針
 > **原材料高を価格に反映し、販売数量を維持する**
-style: rows-num.fill=#142B4D,#1F5FA8,#142B4D,#1F5FA8 rows.fill=#EEF2F7 rows.size=26
+style: rows-num.fill=primary,secondary,primary,secondary rows.fill=tint
 @rows
 1. 主力3ブランドを平均6%改定
 1. 改定は2027年5月出荷分から
@@ -133,7 +132,7 @@ style: rows-num.fill=#142B4D,#1F5FA8,#142B4D,#1F5FA8 rows.fill=#EEF2F7 rows.size
 [■]{size=20 color=#2A9D8F} [コンビニ向けPB]{size=24}
 
 # 海外売上高の推移（億円）
-```line {labels=on fmt=#,##0 colors=secondary,#E09F1F,#2A9D8F size=14}
+```line {labels=on fmt=#,##0 colors=secondary,orange,accent size=14}
 ,2024,2025,2026,2027計画
 タイ,70,82,95,105
 北米,20,30,45,60
@@ -141,7 +140,6 @@ style: rows-num.fill=#142B4D,#1F5FA8,#142B4D,#1F5FA8 rows.fill=#EEF2F7 rows.size
 ```
 
 # DX施策の一覧
-style: table.zebra.fill=#EEF2F7
 {.zebra size=20 rowh=1.05in}
 | 施策 | 対象 | 効果 | 時期 |
 |-|-|-|-|

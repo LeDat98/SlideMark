@@ -7,11 +7,12 @@
   the other one skips it. Order in ``build_slide``: ``recognise2`` (chrome, background, steps, takeaway bar,
   tables, charts, chart panel) first, then ``recognise`` (quote, badges, panel, tiles, bars, dark cards);
 * **spans**: ``put_span`` / ``span_runs`` set ``RunT.span`` and ``wrap_span`` is the ONE function that writes
-  ``[text]{...}``, so a run is wrapped once, bold is stated once (``**x**`` inside, or ``bold=true`` in the
-  span when the policy asks) and a span that carries a colour replaces the colour markup. A recogniser sets
-  the span while it reads shapes; ``emit.inline`` adds what a paragraph that mixes sizes or colours needs
-  (``mixed_sizes`` / ``mixed_colors`` / ``mixed_block`` / ``block_colors`` decide, ``with_span`` / ``span``
-  write the tokens through ``put_span``); a key a recogniser already set is never written twice;
+  ``[text]{...}``, so a run is wrapped once, bold is stated once (``**x**`` inside, or the bare ``bold`` flag
+  in the span when the policy asks) and a span that carries a colour replaces the colour markup. A
+  recogniser sets the span while it reads shapes; ``emit.inline`` adds what a paragraph that mixes sizes or
+  colours needs (``mixed_sizes`` / ``mixed_colors`` / ``mixed_block`` / ``block_colors`` decide,
+  ``with_span`` / ``span`` write the tokens through ``put_span``); a key a recogniser already set is never
+  written twice;
 * **style lines**: ``merge_lines`` joins every ``style:`` (and ``sizes:``) line of a slide into one, the first
   writer of a key wins.
 """
@@ -73,11 +74,12 @@ def span_has(r, key: str) -> bool:
 
 def put_span(r, parts: Iterable[str], bold: bool = False) -> None:
     """Add ``size=34`` / ``color=#RRGGBB`` tokens to the run's span (a key already there is kept). ``bold``:
-    the span says ``bold=true`` itself when the run is bold; otherwise the run keeps its ``**`` markup."""
+    the span says ``bold`` itself (the bare flag: one token) when the run is bold; otherwise the run keeps its
+    ``**`` markup."""
     have = _keys(r.span)
     new = [p for p in parts if p and p.split("=", 1)[0] not in have]
     if new and bold and r.bold and "bold" not in have:
-        new.append("bold=true")
+        new.append("bold")
     if new:
         r.span = " ".join([*([r.span] if r.span else []), *new])
 
@@ -186,9 +188,9 @@ def with_span(
         colour = ".muted" if tok == "muted" else f"color={tok}"
     if size is None and colour is None:
         return r
-    parts = [size, "bold=true" if (r.bold if bold is None else bold) and not r.badge else None, colour]
+    parts = [size, "bold" if (r.bold if bold is None else bold) and not r.badge else None, colour]
     if r.italic:
-        parts.append("italic=true")
+        parts.append("italic")
     out = replace(r)
     put_span(out, [x for x in parts if x])
     return out

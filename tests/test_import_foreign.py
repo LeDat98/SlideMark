@@ -195,7 +195,7 @@ def test_foreign_brand_look_becomes_tokens(tmp_path: Path):
     assert len(head.splitlines()) <= 4
     assert "primary=#0B5E6B" in head or "primary=#E86A1C" in head
     assert "Georgia" in head
-    assert "title_band=#0B5E6B" in head
+    assert "title_band=#0B5E6B" in head or "title_band=secondary" in head  # (diet.py names a declared hex)
     out = tmp_path / "rebuilt.pptx"
     build(text, out, base_dir=tmp_path)
     assert color_similarity(Presentation(str(src)), Presentation(str(out))) >= 0.75

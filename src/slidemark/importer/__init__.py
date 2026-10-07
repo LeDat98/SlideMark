@@ -12,7 +12,7 @@ from pathlib import Path
 from ..ir import Diagnostic
 from ..render.design_part import read_design_part
 from ..theme import DEFAULT, JP_BUSINESS, MIDNIGHT, Theme
-from . import emit, recognise2
+from . import diet, emit, recognise2
 from .design import (
     claim_fences,
     css_fence,
@@ -122,11 +122,16 @@ def _lang(slides: list[SlideData]) -> str | None:
     return "ja" if ja and ja >= 0.3 * (ja + lat) else None
 
 
-def import_pptx(path: str | Path, out_dir: str | Path | None = None) -> tuple[str, list[Diagnostic]]:
+def import_pptx(
+    path: str | Path, out_dir: str | Path | None = None, slim: bool = False
+) -> tuple[str, list[Diagnostic]]:
     """Read ``path`` and return (SlideMark text, diagnostics).
 
     With ``out_dir`` the pictures are written to ``out_dir/images/`` and referenced as
     ``images/<slide>-<n>.<ext>``; without it only the names are referenced (info diagnostic ``import-image``).
+    ``slim`` (the CLI's default): the text of a deck made elsewhere goes through the token diet
+    (``importer/diet.py``): colour names, hoisted tokens, nothing the build does not reproduce; it costs a few
+    builds of the result.
     """
     diags: list[Diagnostic] = []
     try:
@@ -144,7 +149,11 @@ def import_pptx(path: str | Path, out_dir: str | Path | None = None) -> tuple[st
         )
         return "", diags
     try:
-        return _import(prs, out_dir, diags, Path(path).name)
+        info: dict = {}
+        text, diags = _import(prs, out_dir, diags, Path(path).name, info)
+        if slim and text and info.get("foreign"):  # a deck made elsewhere: shorter text, the same slides
+            text = diet.slim(text, out_dir)
+        return text, diags
     except Exception as e:  # last-resort guard
         diags.append(
             Diagnostic(
@@ -174,23 +183,25 @@ def _color_score(prs, text: str, out_dir) -> float:
         return -1.0
 
 
-def _import(prs, out_dir, diags: list[Diagnostic], src_name: str = "") -> tuple[str, list[Diagnostic]]:
+def _import(
+    prs, out_dir, diags: list[Diagnostic], src_name: str = "", info: dict | None = None
+) -> tuple[str, list[Diagnostic]]:
     """A foreign deck keeps its look as tokens when a trial build shows the colors match better."""
     theme = detect_theme(prs)
     if read_design_part(prs) or (src_name and _custom_theme(prs)):
-        return _import_with(prs, out_dir, diags, src_name, {})
+        return _import_with(prs, out_dir, diags, src_name, {}, info)
     tokens = derive_tokens(prs, theme)
     if not tokens:
-        return _import_with(prs, out_dir, diags, src_name, {})
+        return _import_with(prs, out_dir, diags, src_name, {}, info)
     base_diags: list[Diagnostic] = []
-    best_text, _ = _import_with(prs, out_dir, base_diags, src_name, {})
+    best_text, _ = _import_with(prs, out_dir, base_diags, src_name, {}, info)
     best = (_color_score(prs, best_text, out_dir), best_text, base_diags)
     keep_text = {k: v for k, v in tokens.items() if k not in ("colors.fg", "colors.muted")}
     for cand in (tokens, keep_text):
         if not cand or (cand is keep_text and cand == tokens):
             continue
         cand_diags: list[Diagnostic] = []
-        text, _ = _import_with(prs, out_dir, cand_diags, src_name, cand)
+        text, _ = _import_with(prs, out_dir, cand_diags, src_name, cand, info)
         score = _color_score(prs, text, out_dir)
         if score > best[0] + 0.01:
             best = (score, text, cand_diags)
@@ -226,7 +237,7 @@ def _default_palette(theme, tokens: dict) -> list[str]:
 
 
 def _import_with(
-    prs, out_dir, diags: list[Diagnostic], src_name: str, own_tokens: dict[str, str]
+    prs, out_dir, diags: list[Diagnostic], src_name: str, own_tokens: dict[str, str], info: dict | None = None
 ) -> tuple[str, list[Diagnostic]]:
     W, H = int(prs.slide_width), int(prs.slide_height)
     theme = detect_theme(prs)
@@ -267,6 +278,8 @@ def _import_with(
         foreign=not design and not is_slidemark_deck(datas),
         palette=_default_palette(theme, {**(design.get("tokens") or {}), **own_tokens}),
     )
+    if info is not None:
+        info["foreign"] = deck.foreign
     if deck.foreign:
         deck.ink = recognise2.deck_ink(datas, colors.get("bg", "FFFFFF"), H)
     emit.set_palette(colors)

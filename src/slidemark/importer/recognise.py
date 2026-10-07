@@ -13,7 +13,7 @@ the slide so the usual importer path writes the form:
   label-less ``##`` card under ``@kpi`` (stripe and figure colours as tokens), or, when the figures are
   ``01 02 03``, a number heading (``sizes: heading=44!``, colour span);
 * **dark statement panel**  a dark filled rectangle holding 3-7 short lines of different sizes -> one box
-  whose lines carry their own sizes as spans (``[9,800円]{size=40 bold=true}``);
+  whose lines carry their own sizes as spans (``[9,800円]{size=40 bold}``);
 * **big-number bars**  filled bars with a left stripe whose one line mixes label, figure and note sizes ->
   ``@rows plain`` with ``rows.stripe=`` (bars alone on the slide) or boxes with a stripe class.
 

@@ -610,8 +610,8 @@ to slide 5. Additions:
 - `==text==` emphasizes in the theme accent color (for the key number).
 - `[text]{.danger}` colors text.
 - **Mixed sizes and colours in one line.** A span takes `size=` (pt, **exact**: no pass grows, shrinks or clamps it),
-  `bold=` `italic=` and `color=` (a colour name or `#RRGGBB`; `.muted` / `.primary` ... are the class form):
-  `[売上高]{size=14 bold=true} [420億円]{size=28 bold=true color=primary} [（2026年度 210億円）]{size=12 .muted}`.
+  `bold=` `italic=` and `color=` (a colour name or `#RRGGBB`; `.muted` / `.primary` ... are the class form; a flag
+  alone is `=true`, one token): `[売上高]{size=14 bold} [420億円]{size=28 bold color=primary} [（2026年度 210億円）]{size=12 .muted}`.
   It works in paragraphs, list items (`@rows` bars too), table cells (`<br>` is a line break in a cell), `##` box
   headings and KPI value lines. A line is as tall as its largest pinned span, and a text with a
   pinned span is not grown by the sparse-slide passes (the unpinned rest still follows autofit shrinking).

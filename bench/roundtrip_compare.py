@@ -125,7 +125,7 @@ def compare(orig: Path, out: Path, do_regen: bool = False) -> dict:
         if not do_regen:
             raise FileNotFoundError(f"{orig}: no such file (pass --regen to rebuild it from build.py)")
         orig = regen(orig, out)
-    text, diags = import_pptx(orig, out)
+    text, diags = import_pptx(orig, out, slim=True)
     (out / "deck.md").write_text(text, encoding="utf-8")
     imported = out / "imported.pptx"
     build(text, imported, base_dir=out)

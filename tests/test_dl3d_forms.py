@@ -223,12 +223,9 @@ def test_importer_span_writer_pins_mixed_sizes_and_names_colours():
     assert mixed_sizes(runs) and mixed_colors(runs) and not mixed_sizes(runs[:1])
     names = {"1F5FA8": "secondary"}
     assert span("420億円", runs[1], pin=True, tint=True, names=names, fg="222B36") == (
-        "[420億円]{size=28 bold=true color=secondary}"
+        "[420億円]{size=28 bold color=secondary}"
     )
-    assert (
-        span("売上高", runs[0], pin=True, tint=True, names=names, fg="222B36")
-        == "[売上高]{size=14 bold=true}"
-    )
+    assert span("売上高", runs[0], pin=True, tint=True, names=names, fg="222B36") == "[売上高]{size=14 bold}"
     assert span("x", RunT("x"), pin=False) is None  # a uniform run needs no span
 
 
@@ -241,9 +238,9 @@ def test_spans_round_trip_through_import(tmp_path):
     )
     make(tmp_path, md, "rt")
     text, _ = import_pptx(tmp_path / "rt.pptx")
-    assert "[420億円]{size=28 bold=true color=primary}" in text
+    assert "[420億円]{size=28 bold color=primary}" in text
     assert "[（2026年度）]{size=12 .muted}" in text
-    assert "[9,800円]{size=22 bold=true color=secondary}" in text
+    assert "[9,800円]{size=22 bold color=secondary}" in text
     again = build(text, tmp_path / "rt2.pptx")
     assert not [
         d for d in again.diagnostics if d.level == "warning" and d.rule not in ("design-slide", "design-none")
@@ -556,8 +553,8 @@ def test_a_panel_round_trip_keeps_each_line_size_and_the_odd_colour(tmp_path):
     make(tmp_path, PANEL, "p")
     text, _ = import_pptx(tmp_path / "p.pptx")
     body = text.split("# T")[1]
-    assert "[9,800円]{size=32 bold=true}" in body
-    assert "[10,800円]{size=32 bold=true color=accent}" in body
+    assert "[9,800円]{size=32 bold}" in body
+    assert "[10,800円]{size=32 bold color=accent}" in body
     assert "color=#FFFFFF" not in body  # the ink of the panel is the block's own colour: not written
     again = build(text, tmp_path / "p2.pptx")
     assert not [d for d in again.diagnostics if d.rule in ("contrast", "overflow")]

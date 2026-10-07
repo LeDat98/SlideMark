@@ -14,7 +14,7 @@ def test_a_span_is_written_once_with_bold_inside():
 def test_span_with_bold_key_has_no_double_bold():
     r = RunT("9,800", bold=True, size=40)
     put_span(r, ["size=40"], bold=True)
-    assert inline([r]) == "[9,800]{size=40 bold=true}"
+    assert inline([r]) == "[9,800]{size=40 bold}"
 
 
 def test_two_writers_keep_the_first_value_of_a_key():

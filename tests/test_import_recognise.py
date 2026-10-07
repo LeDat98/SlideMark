@@ -248,7 +248,7 @@ def test_big_number_rows_alone_become_plain_rows_with_a_stripe(tmp_path):
     text = _import(d, tmp_path)
     body = _body(text)
     assert "@rows plain" in body and "rows.stripe=#1F5FA8" in body and "rows.size=22" in body
-    assert "[420億円]{size=34 color=#1F5FA8 bold=true}" in body
+    assert "[420億円]{size=34 color=#1F5FA8 bold}" in body
     assert "[（前期 210億円）]{size=18 color=#6B7582}" in body
     build(text, tmp_path / "back.pptx")
 
