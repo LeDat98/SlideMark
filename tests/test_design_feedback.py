@@ -299,12 +299,11 @@ def test_json_deck_gets_the_same_feedback(tmp_path, capsys):
 # --------------------------------------------------------------------------- the example decks
 
 
-def test_examples_basics_fires_where_expected():
-    text = (EXAMPLES / "01-basics.md").read_text(encoding="utf-8")
-    got = _rules(text)
-    assert "design-none" in got
-    assert _bare(text) == [3, 4]
-    assert got["design-slide"].message == "slides 3, 4 carry no design choice"
+@pytest.mark.parametrize("path", sorted(EXAMPLES.glob("*.md")), ids=lambda p: p.name)
+def test_examples_state_their_design(path):
+    """The examples are what agents copy: each one decides its design (header lines and per-slide choices)."""
+    got = _rules(path.read_text(encoding="utf-8"))
+    assert not got, {k: v.message for k, v in got.items()}
 
 
 def test_examples_with_a_design_header_do_not_warn_design_none():

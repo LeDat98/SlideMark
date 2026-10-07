@@ -3,6 +3,8 @@ lang: ja
 footer: ACME株式会社　経営企画部　社外秘
 num: on
 density: dense
+colors: primary=#1E3A5F danger=#C00000 success=#2E7D32
+style: palette=primary,#7FA3C7,danger,#BFC7D1
 
 # 物流DX推進計画
 2027–2029年度　取締役会資料

@@ -1,6 +1,8 @@
 theme: default
 lang: en
 num: on
+colors: primary=#1F3A60 accent=#E08A00
+style: radius=8
 
 # HTML, SVG and math, all editable
 ```html {render=native}
@@ -16,6 +18,7 @@ num: on
 
 # Vector logo and an equation
 ![SlideMark logo](assets/logo.svg)
+{size=28}
 ```math
 \text{ROI} = \frac{\sum_{t=1}^{n} \text{benefit}_t - C}{C}
 ```

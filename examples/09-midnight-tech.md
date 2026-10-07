@@ -1,6 +1,9 @@
 theme: midnight
 lang: en
 num: on
+colors: primary=#38BDF8 secondary=#2DD4BF accent=#FBBF24 surface=#16213A
+fonts: heading="Inter" body="Inter"
+style: radius=10
 
 # Shipping LedgerAI
 AI bookkeeping for small businesses
@@ -31,7 +34,7 @@ C -->|yes| D[Post entry]
 C -->|no| E[Human review]
 E --> D
 ```
-> [!tip] 92% of receipts post without a human
+> [!tip] ==92%== of receipts post without a human
 
 # Pricing model
 ```math
@@ -44,6 +47,7 @@ E --> D
 - LTV ≈ ==$1,890==
 
 # API in one call
+{size=18}
 ```python
 from ledgerai import Client
 
@@ -58,4 +62,4 @@ print(entry.account, entry.amount)
 ![Receipt upload to posted entry in 20 seconds](assets/demo.mp4)
 - Upload a photo, get a posted entry
 - Review queue for low-confidence cases
-- Plays inside PowerPoint (native video)
+- Plays inside PowerPoint (==native video==)

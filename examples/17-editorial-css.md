@@ -20,11 +20,11 @@ Annual review of the specialty coffee market, 2026
 # Three shifts in how people drink coffee
 > Ritual over speed: customers pay for time, not caffeine
 ## At home
-Home espresso machines sold 2.1M units, up 34% since 2023.
+Home espresso machines sold 2.1M units, up ==34%== since 2023.
 ## On the move
-Cold brew cans grew to 18% of ready-to-drink sales.
+Cold brew cans grew to ==18%== of ready-to-drink sales.
 ## In the café
-Average visit time rose from 11 to 19 minutes.
+Average visit time rose from 11 to ==19 minutes==.
 
 # Numbers that matter
 ## Market size {.kpi}

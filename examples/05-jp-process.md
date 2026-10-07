@@ -2,6 +2,8 @@ theme: jp-business
 lang: ja
 footer: ACME株式会社　社外秘
 num: on
+colors: primary=#1E3A5F secondary=#2F6B9A
+style: heading.band=secondary
 
 # 業務改革の進め方
 > 4段階で現行業務を可視化し、6か月で定着まで完了させる

@@ -3,6 +3,8 @@ lang: ja
 footer: さくら食品ストア株式会社　経営企画本部　社外秘
 num: on
 density: dense
+colors: success=#2E7D32 danger=#C00000 muted=#5B6573
+style: palette=primary,#7FA3C7,#BFC7D1 render.waterfall_up=success render.waterfall_down=danger
 
 # 店舗網再編と収益構造改革
 2027–2029年度 中期計画　経営会議資料（2026年10月）
@@ -159,6 +161,7 @@ density: dense
 
 # リスクと対応策
 > 最大のリスクは小型化店の売上減少であり、先行5店で検証してから展開する
+{hl=小型化店の売上が想定以上に減少 align=lccll}
 | リスク | 影響 | 可能性 | 対応策 | 責任者 |
 |-|-|-|-|-|
 | 小型化店の売上が想定以上に減少 | 大 | 中 | 先行5店で6か月検証、基準未達なら計画見直し | 店舗開発本部長 |

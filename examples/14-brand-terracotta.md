@@ -14,6 +14,7 @@ style: radius=4 border-width=0.5 card.shadow="0 2 6 #2B252218" title.band=none h
 - Chuỗi cung ứng hạt rang tại Đà Lạt
 - Ứng dụng đặt trước: 40.000 người dùng
 @end
+{hl=Q3–Q4 .zebra}
 | Giai đoạn | Cửa hàng | Vốn (tỷ đồng) |
 |---|---|---|
 | Q1–Q2 | 5 | 14 |

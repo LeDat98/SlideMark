@@ -2,6 +2,8 @@ theme: jp-business
 lang: ja
 footer: ACME株式会社　社外秘
 num: on
+colors: success=#2E7D32 danger=#C00000 muted=#5B6573
+style: kpi.font_size=36
 
 # 2026年度 上期業績サマリー
 > 売上・利益ともに計画を上回り、通期見通しを上方修正する
