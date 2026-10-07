@@ -47,7 +47,9 @@ _DERIVED = (  # style tokens the layout reproduces by itself when the original w
     "table_header_color",
     "cover.bar_w",
     "rows.size",
-    "conclusion.size",
+)
+_MEASURED = (  # tokens the layout derives from a measurement (the bar follows the largest body text of its
+    "conclusion.size",  # slide): redundant on some slides, needed on others, so only a build can tell
 )
 _LATE = ("quote.mark.color",)  # derived from a colour name the deck declares (`accent`)
 _BASE = ("bg", "fg", "surface", "border", "muted")  # theme names the readable-ink rule never moves
@@ -563,6 +565,12 @@ def _note_groups(text: str) -> list[list[Edit]]:
     return groups
 
 
+def _measured_groups(text: str) -> list[list[Edit]]:
+    """Tokens whose value the layout measures (``conclusion.size``): dropped only when a build proves it."""
+    lines = text.split("\n")
+    return _style_drops(lines, _fence_body(lines), _MEASURED)
+
+
 def _late_groups(text: str) -> list[list[Edit]]:
     """Tokens that are redundant only once the colours have their names (``quote.mark.color=accent``)."""
     lines = text.split("\n")
@@ -750,6 +758,7 @@ def _hoist_groups(text: str) -> list[list[Edit]]:
 
 STEPS = (
     _derived_groups,
+    _measured_groups,
     _note_groups,
     _color_groups,
     _late_groups,
@@ -757,18 +766,22 @@ STEPS = (
     _rename_groups,
     _hoist_groups,
 )
+NEEDS_BUILD = (_measured_groups,)  # edits that are right on some slides only: never applied unverified
 
 
 def slim(text: str, base_dir: str | Path | None = None, *, verify: bool = True) -> str:
     """``text`` with the colour names, class forms and hoisted tokens that keep every slide identical.
 
-    ``verify=False`` applies every edit without building (the unit tests of single edits use it)."""
+    ``verify=False`` applies every edit that is safe without a build (the unit tests of single edits use it);
+    the steps in ``NEEDS_BUILD`` are skipped."""
     try:
         chk = Checker(text, base_dir) if verify else None
         if chk is not None and chk.base is None:
             return text
         ok: Callable[[str, str], bool] = chk.ok if chk is not None else (lambda a, b: True)
         for step in STEPS:
+            if chk is None and step in NEEDS_BUILD:
+                continue
             after = _clean(_bisect(text, step(text), ok))
             if (
                 chk is None or after == text or chk.whole(after)

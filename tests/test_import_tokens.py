@@ -55,10 +55,19 @@ def test_imported_decks_say_a_named_colour_by_its_name(t):
         assert len(every) == len(as_text), (t, hexv, len(every), len(as_text))
 
 
-def test_the_committed_decks_build_to_themselves(tmp_path):
+@pytest.mark.parametrize("t", ["t2", "t4"])
+def test_the_committed_decks_build_to_themselves(t, tmp_path):
     """A committed deck.md is a fixed point: slimming it again changes nothing the build draws."""
-    text = (BENCH / "t2" / "roundtrip" / "deck.md").read_text(encoding="utf-8")
+    text = (BENCH / t / "roundtrip" / "deck.md").read_text(encoding="utf-8")
     assert same_slides(text, slim(text, tmp_path, verify=False), tmp_path)
+
+
+def test_a_measured_token_is_kept_without_a_build():
+    """``conclusion.size`` follows the largest body text of its slide: redundant on one slide, needed on the
+    next (t2 slide 8 keeps 24 over a ``size=20`` table), so the unverified slim leaves it alone."""
+    text = "# A\nstyle: conclusion.fill=secondary conclusion.size=24\n- x\n> bar\n"
+    assert slim(text, verify=False) == text
+    assert diet._measured_groups(text) and diet._measured_groups in diet.NEEDS_BUILD
 
 
 # --------------------------------------------------------------------------- the helper
