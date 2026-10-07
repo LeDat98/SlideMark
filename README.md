@@ -73,9 +73,14 @@ Cùng đề 15 slide, giám khảo thiết kế chấm mù (Opus, cùng một v�
 
 | Deck | Điểm | Lần gọi | Thời gian | Chi phí | Token mã nguồn |
 |---|---|---|---|---|---|
-| SlideMark wave 3 (nêu quyết định) | **3,5** | 9 | 90 s | 61% | 1,6k |
+| SlideMark sau AC7 (nêu quyết định, build in bản đồ fit từng slide) | **3,5** / 3,0 (2 lần chạy) | 4 / 5 | 29 s / 39 s | 29% / 35% | 1,5k / 1,4k |
+| SlideMark wave 3 (nêu quyết định, chưa có bản đồ fit) | 3,5 | 9 | 90 s | 61% | 1,6k |
 | SlideMark wave 2 (chỉ nội dung) | 3,0 | 5 | 36 s | 34% | 1,3k |
-| python-pptx | 2,5 | 11 | 140 s | 100% | 5,3k |
+| python-pptx | 2,5 / 3,0 | 11 | 140 s | 100% | 5,3k |
+
+Bản đồ fit: `build` in một dòng cho mỗi slide (`slide 2: lead + 4 kpi cards 72% of body, value 48->29pt (shrunk to
+fit), free 16% below`) nên agent biết quyết định của mình có hiệu lực không mà không cần mở ảnh; thuộc tính bị bỏ qua
+báo `attr-ignored` kèm dạng đúng. Mục tiêu AC7–AC9 (≤ 5 lần gọi, chi phí và thời gian ≤ 50% python-pptx) đã đạt.
 
 Toàn bộ thiết kế mà agent python-pptx tự viết (64 quyết định) nêu lại được trong SlideMark với 43% token
 (`bench/lengthbench/t2/slidemark-ported/REPORT.md`, `docs/DESIGN_COVERAGE.md`).
