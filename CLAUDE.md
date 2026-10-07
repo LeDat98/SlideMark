@@ -10,7 +10,7 @@ Design: `docs/PROPOSAL.md`. Plan: `docs/PLAN.md`. Syntax: `docs/SYNTAX.md`.
 
 ## Setup and commands
 ```bash
-uv venv .venv && uv pip install -e ".[dev]" --python .venv
+uv venv .venv && uv pip install -e ".[dev,html]" --python .venv   # html = Playwright; Chromium is pre-installed in the cloud env
 .venv/bin/pytest -q                 # all tests
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/python bench/count_tokens.py --record   # token metrics, append to bench/history.jsonl
