@@ -237,6 +237,40 @@ def _chart(c: Chart):
     return f"{c.kind} chart, {n} series{'' if n != 1 else ''}", facts
 
 
+def _vocab(v: dict, theme: Theme, dense_k: float):
+    """The line of a composition form (``@timeline`` ...): its name with the choices that took effect and the
+    text sizes (``asked->reached`` when the layout moved them)."""
+    form, n = v.get("form", "form"), v.get("n")
+    asked = v.get("base") or _asked(theme, "body", dense_k)
+    text = ("text " + _size(v.get("size"), asked)) if v.get("size") else "no body text"
+    if form == "timeline":
+        return f"timeline {n} ({v.get('dir')}, marks {v.get('marks')})", [text]
+    if form == "vs":
+        extra = (["verdict bar"] if v.get("verdict") else []) + (["winner marked"] if v.get("win") else [])
+        return "vs 2 sides", [*extra, text]
+    if form == "matrix":
+        axes = v.get("axes") or 0
+        return "matrix 2x2" + (f", {_n(axes, 'axis', 'axes')}" if axes else ""), [text]
+    if form in ("funnel", "pyramid"):
+        word = "stage" if v.get("n") == 1 else "stages"
+        return f"{form} {n} {word} (narrow end {v.get('dir')})", [
+            f"heading {round(v.get('head') or 0)}pt",
+            text,
+        ]
+    if form == "cycle":
+        return f"cycle {n} nodes ({v.get('dir')})", [f"node text {round(v.get('head') or 0)}pt", text]
+    if form == "agenda":
+        return f"agenda {n} rows" + (", current marked" if v.get("now") else ""), [
+            f"numbers {round(v.get('num') or 0)}pt",
+            text,
+        ]
+    if form == "statement":
+        return "statement" + (" + caption" if v.get("caption") else ""), [
+            f"big line {_size(v.get('size'), v.get('big_asked'))}"
+        ]
+    return form, [text]
+
+
 def _list(texts: list[Placed], theme, dense_k):
     n = sum(len(p.element.paragraphs) for p in texts)
     asked = _asked(theme, "body", dense_k)
@@ -343,6 +377,8 @@ def _slide_line(deck: Deck, slide, items: list[Placed], theme: Theme, i: int) ->
     if form is not None:
         keep = [p for p in parts if p[0] == "lead"]
         parts = [*keep, form] if kind in COMPOSED else [form, *parts]
+    if kind == "vocab" and fit.get("vocab"):
+        parts = [p for p in parts if p[0] == "lead"] + [_vocab(fit["vocab"], theme, dense_k)]
     if kind == "free":
         pinned = sum(1 for e in slide.elements if getattr(e, "box", None) is not None and e.box.x is not None)
         parts = [(f"free {_n(len(slide.elements), 'block')}, {pinned} pinned", [])] + [

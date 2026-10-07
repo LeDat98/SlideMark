@@ -88,7 +88,7 @@ Toàn bộ thiết kế mà agent python-pptx tự viết (64 quyết định) n
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-07 · commit `74a42ac` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-07 · commit `696f532` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -292,6 +292,21 @@ Nguồn: [`examples/22-en-launch-plan.md`](examples/22-en-launch-plan.md)
 ![22-en-launch-plan slide 5](docs/gallery/22-en-launch-plan/slide-05.png)
 ![22-en-launch-plan slide 6](docs/gallery/22-en-launch-plan/slide-06.png)
 ![22-en-launch-plan slide 7](docs/gallery/22-en-launch-plan/slide-07.png)
+
+### Từ vựng bố cục: @timeline, @vs, @matrix, @funnel, @pyramid, @cycle, @agenda, @statement
+
+Nguồn: [`examples/23-vocabulary.md`](examples/23-vocabulary.md)
+
+![23-vocabulary slide 1](docs/gallery/23-vocabulary/slide-01.png)
+![23-vocabulary slide 2](docs/gallery/23-vocabulary/slide-02.png)
+![23-vocabulary slide 3](docs/gallery/23-vocabulary/slide-03.png)
+![23-vocabulary slide 4](docs/gallery/23-vocabulary/slide-04.png)
+![23-vocabulary slide 5](docs/gallery/23-vocabulary/slide-05.png)
+![23-vocabulary slide 6](docs/gallery/23-vocabulary/slide-06.png)
+![23-vocabulary slide 7](docs/gallery/23-vocabulary/slide-07.png)
+![23-vocabulary slide 8](docs/gallery/23-vocabulary/slide-08.png)
+![23-vocabulary slide 9](docs/gallery/23-vocabulary/slide-09.png)
+![23-vocabulary slide 10](docs/gallery/23-vocabulary/slide-10.png)
 
 ### Từ vựng bố cục 2: iconlist, quote, split, proscons, progress, harvey, heatmap, pins
 

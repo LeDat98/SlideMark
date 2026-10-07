@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .. import icons
+from .. import forms, icons
 from ..ir import (
     Box,
     Cell,
@@ -33,7 +33,7 @@ from ..ir import (
 from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
-from . import css, forms2, kpirow, measure
+from . import css, forms2, kpirow, measure, vocab
 from .chartnote import expand_notes, scale_warning
 from .diagram import fill_tree
 from .gantt import expand_gantt
@@ -4477,6 +4477,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     measure.set_default_font(theme.fonts.body)
     measure.set_tokens(theme.layout)
     ctx = _Ctx(deck, theme, slide, index, W, H)
+    vocab_info: dict | None = None
     for label in items_skipped:
         ctx.diag(
             "items-skipped",
@@ -4784,7 +4785,24 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     final_ctx: _Ctx | None = None
     fit_body = body
     rows_el = _rows_list(ctx, slide, kind) if body is not None and body.h > 0 else None
+    vform = (
+        vocab.compose(ctx, slide, body, sg)
+        if body is not None and body.h > 0 and kind == "content" and forms.form_of(slide)
+        else None
+    )
     if (
+        vform is not None
+    ):  # DL3b: `@timeline` `@vs` `@matrix` `@funnel` `@pyramid` `@cycle` `@agenda` `@statement`
+        final_ctx, vocab_info = vform
+        ctx.diags += final_ctx.diags
+        for lab in dict.fromkeys(final_ctx.over):
+            ctx.diag(
+                "overflow",
+                f"{lab} overflows its area at the minimum font size",
+                "shorten text or split the slide",
+            )
+        kind = "vocab"  # the passes of content slides (growth, centring, bars) do not apply
+    elif (
         rows_el is not None
         and (
             rctx := _layout_rows(
@@ -5113,5 +5131,6 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         "body": [fit_body.x, fit_body.y, fit_body.w, fit_body.h] if fit_body is not None else None,
         "asked": dict(final_ctx.asked) if final_ctx else {},
         "dense_k": ctx.dense_k,
+        **({"vocab": vocab_info} if vocab_info else {}),
     }
     return _stack(head + chrome + (final_ctx.out if final_ctx else []) + tail, ctx.lt.z_default)

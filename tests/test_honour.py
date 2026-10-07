@@ -38,6 +38,8 @@ PROBES: dict[str, str] = {
     "item": "# T\n## a\n@1x2\n### one {.item <A>}\n### two {.item}\n## b\n- y\n",
     "row": "# T\n@rows\n1. one {<A>}\n2. two\n3. three\n",
     "list item": "# T\n> lead\n- one {<A>}\n- two\n- three\n",
+    "stage": "# T\n@funnel\n## a {<A>}\n- x\n## b\n- y\n## c\n- z\n",
+    "formtext": "# T\n@statement\n{A}\nbig line\n\ncaption\n",
 }
 EXTRA_HEAD = {
     "chevron": "style: layout.chevron_steps=off\n",
