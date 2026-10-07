@@ -133,7 +133,7 @@ A declared color name beats the CSS color of the same name (`colors: teal=#2A9D8
   Cover tokens (`style:`): `cover.band_h=60%` (band anchored to the top, filled by `title.band`; title block
   bottom-aligned in it; `0` = the older centred block), `cover.pad=0.55in` (air under the block), `cover.gap=0.2in`
   (title to subtitle), `cover.rule=accent` + `cover.rule_h=0.06in` (rule on the band edge, `none` = off),
-  `cover.footer=off` (the deck `footer:` shows on the cover as a bottom caption), `cover.bar=teal` + `cover.bar_w=0.12in` (a vertical bar left of the title block), `cover.band=none` (no band although `title.band` is set, so a slide `bg=` shows; the rule is full width over a `bg=`). `{size=}` or CSS (other than `color`) on the cover keeps the old look. A full-bleed cover with a rule and a bar: `style: cover.band_h=61% cover.rule=accent cover.bar=teal cover.band=none` + `@cover bg=primary dark`.
+  `cover.footer=off` (the deck `footer:` shows on the cover as a bottom caption), `cover.bar=teal` + `cover.bar_w=0.12in` (a vertical bar left of the title block), `cover.band=none` (no band although `title.band` is set, so a slide `bg=` shows; the rule is full width over a `bg=`). `cover.top_bar=<color>` / `cover.bottom_bar=<color>` (+ `cover.top_bar_h` / `cover.bottom_bar_h`, default 0.1in) draw a full-width strip on the cover's top / bottom edge (`top.bar` / `bottom.bar` skip the cover). `{size=}` or CSS (other than `color`) on the cover keeps the old look. A full-bleed cover with a rule and a bar: `style: cover.band_h=61% cover.rule=accent cover.bar=teal cover.band=none` + `@cover bg=primary dark`.
   More decoration, all inside the composed cover (`cover.band_h` above 0), all working over a slide `bg=` and `dark`: `cover.bar=accent@edge` (the bar sits on the slide's left edge over the full height, width `cover.bar_w`), `cover.rule_w=6in` (the rule is short and sits at the title, left aligned: `cover.rule_pos=above` over the title, `below` (default) between title and subtitle) and `cover.stripes=#1C3A68@8.9in,secondary@10.2in` (vertical stripes, each from its x to the right edge, drawn behind the text; the title keeps left of the first). `cover.rule_w` shortens the `cover.rule=<color>` you set. Decor shapes are named `rule` and the importer skips them.
 - **Dark slides pick their own ink.** A slide `bg=` (color, token name or `linear-gradient(...)`, every stop
   judged) that gives the theme `fg` less than 4.5:1 turns the text on the slide (title, lead, subtitle, footnote,
@@ -809,6 +809,39 @@ shape name (`Card 3`, `Text 5`, `Title`) is a built deck and is never read by ge
 
 A span `[text]{size=28 color=#E08A1E bold=true}` is the mixed-size inline syntax; a parser without it still reads the
 line (the span is plain text then, at the box size).
+
+## Import: foreign decks
+
+`slidemark import deck.pptx` writes SlideMark text. A deck SlideMark built comes back from its stored design and
+from shape names. A deck made elsewhere (python-pptx, PowerPoint, Keynote) has loose shapes, so the importer
+recognises its design from **geometry** (`importer/recognise2.py`; thresholds in one table, `T`) and writes the
+token instead of the boxes. Each recognition is conservative: it fires only when the geometry matches, else
+the older fallback (boxes, plain text) stays. Decks with their own design part are never touched.
+
+| Drawn with loose shapes | Imported as |
+|---|---|
+| a slide-filling rectangle behind the cover | `@bg=primary dark` (a declared colour name when the fill matches one, else `#hex`) |
+| a thin bar at the cover's left / a strip on its top or bottom edge | `cover.bar=#E08A1E` (`@edge` at the slide edge) + `cover.bar_w`, `cover.top_bar` / `cover.bottom_bar` (+ `_h`), with `cover.band=none cover.band_h=66%` placing the title block where the text was |
+| thin full-width strips on the top / bottom edge of most slides | `top.bar` / `bottom.bar` (+ `_h`) |
+| a thin full-width line under the title band on most slides (a short segment at its left end) | `title.rule=#E08A1E title.rule_h=0.06in` (`title.rule2` + `title.rule2_w`) |
+| a bare number text at the bottom right equal to the slide number | `num: on` (it is not a footnote) |
+| a row of chevron / pentagon shapes of one size, each with a card under it | `@3 steps` + `style: steps-arrow.fill=a,b,c steps-arrow.size=24 steps-card.size=26`; pentagons: `render.chevron_shape=pentagon` |
+| a full-width dark filled bar in the lower part with one text in it, nothing but the footer below it | the `>` conclusion + `conclusion.fill=` (when it is not `primary`) and `conclusion.size=` |
+| a body table row whose cells share a tinted fill the other rows do not (zebra rows are plain) | `{hl=<first cell>}` + `style: table.hl.fill=#FDF1DE table.hl.strength=1` |
+| table cells with runs of another size or colour | `[9,800円]{size=26 color=#E08A1E}` spans against the table's base size `{size=15}` (a table's text size is `size=`) and the deck ink; a glyph cell (`▶`) keeps its colour |
+| a chart with per-bar / per-series fills, label size, gap | `colors=#E08A1E,#1F5FA8,#1F5FA8` (one per bar on a one-series bar/column, else per series / slice), `size=18`, `gap=45` (only what differs from the build's default palette and gap) |
+| the one big card beside a chart (a total, then coloured values) | a `##` box with spans, `@2:1` kept |
+
+```markdown
+# 3年間のプロダクト計画
+style: steps-arrow.fill=#1F5FA8,#1B8A8F,secondary steps-card.size=26 conclusion.size=26
+@3 steps
+## 2027年度：
+在庫管理と請求書の自動照合をリリース
+> 各年度の第1四半期に大型リリース、第3四半期に改善リリース
+```
+
+A span's `size=` needs the span-size syntax of lane A (DL3d); until the parser reads it the size is ignored and the colour still applies.
 
 ## Diagnostics: design feedback
 

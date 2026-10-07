@@ -806,6 +806,10 @@ class Theme(Forms2Tokens):  # Forms2Tokens: the DL3b part 2 tokens (iconlist.*, 
     cover_rule_pos: str = "below"  # ... `above` the title, or `below` it (between title and subtitle)
     cover_stripes: str | None = None  # `color@x,color@x`: vertical stripes from x to the right edge
     cover_band: bool = True  # False: the cover band is not drawn although `title.band` is set (bg= shows)
+    cover_top_bar: str | None = None  # color of a full-width strip on the top edge of the cover
+    cover_top_bar_h: Length = "0.1in"
+    cover_bottom_bar: str | None = None  # ... on the bottom edge of the cover
+    cover_bottom_bar_h: Length = "0.1in"
     # slide chrome (design wave 3): edge strips, the rule under the title, a KPI stripe
     top_bar: str | None = None  # color of a strip along the top edge of every slide but the cover
     top_bar_h: Length = "0.1in"
@@ -1568,6 +1572,8 @@ _OPTIONAL_COLORS = {
     "table_hl_color",
     "cover_rule",
     "cover_bar",
+    "cover_top_bar",
+    "cover_bottom_bar",
     "top_bar",
     "bottom_bar",
     "title_rule",

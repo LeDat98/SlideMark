@@ -4220,6 +4220,18 @@ def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, f
         )
     for col, x in stripes:
         put(head, Shape(shape="rect", id="rule"), Rect(x, 0, W - x, H), fast_style(fill=col, line=None))
+    for col, h_tok, at_bottom in (  # `cover.top_bar` / `cover.bottom_bar`: a strip on the cover's edge
+        (theme.cover_top_bar, theme.cover_top_bar_h, False),
+        (theme.cover_bottom_bar, theme.cover_bottom_bar_h, True),
+    ):
+        if col:
+            sh = max(_emu(h_tok), 1)
+            put(
+                head,
+                Shape(shape="rect", id="rule"),
+                Rect(0, H - sh if at_bottom else 0, W, sh),
+                fast_style(fill=col, line=None),
+            )
     if edge and bar_w:  # the bar sits on the left edge of the slide, full height
         put(
             head,
