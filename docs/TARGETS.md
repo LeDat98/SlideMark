@@ -85,7 +85,12 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       missing header lines; `design-slide` checks form + emphasis + values per slide; facts line lists what is short.
 - [ ] DL3d Foreign-deck round trip (owner, 2026-10-07, `bench/lengthbench/t4/roundtrip`): `slidemark import` of a
       deck made elsewhere (the python-pptx open-brief deck) rebuilt with `build` must look like the original.
-      Measured by `bench/roundtrip_compare.py` (side-by-side sheet + per-slide pixel difference). Today the text,
+      Measured by `bench/roundtrip_compare.py ORIG.pptx [--out DIR] [--regen]` (side-by-side `compare-N.png` sheets,
+      8 pairs each, plus `report.json`: per-slide mean pixel difference with the `tests/test_golden.py` measure
+      (320x180 grayscale, tolerance 8), deck mean, slides over tolerance, deck.md vs build.py tokens, import
+      warnings; `--regen` rebuilds the original from the `build.py` next to it). Baseline 2026-10-07, t4: mean
+      36.4 -> 36.2 after the title fix (15 of 15 slides over 8, deck.md 27% of build.py); t2: 38.1 -> 38.1
+      (deck.md 29%); per-slide notes in `bench/lengthbench/t4/roundtrip/REPORT.md`. Today the text,
       charts and tables survive but the design falls off: cover background and bars, per-card stripe colours,
       big-number tiles, mixed run sizes in one line, per-point chart colours, chevron colours + cards + takeaway
       bar, table row highlight, dark statement panel, numbered badges, quote card; two slides break (badge text

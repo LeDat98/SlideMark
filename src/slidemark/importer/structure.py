@@ -178,6 +178,29 @@ def fold_into_tables(data: SlideData) -> None:
             data.items.remove(it)
 
 
+_GLYPH = re.compile(r"[\d\s.,:;/#+%\-\u2013\u2014]+")
+
+
+def _glyph_like(it: Item) -> bool:
+    """A 1-2 character mark (quote glyph, badge letter) or a bare number: decoration, never a title."""
+    t = re.sub(r"\s+", "", it.text)
+    return len(t) <= 2 or (len(t) <= 6 and _GLYPH.fullmatch(t) is not None)
+
+
+def pick_title(cands: list[Item], W: int) -> Item:
+    """The title of a slide with no title placeholder, by geometry and size, never by z-order.
+
+    Glyphs and bare numbers (badges, the big quote mark) are out unless nothing else is left. Of the rest, the
+    run sizes within 25% of the largest form the heading group; wide boxes beat narrow ones there, and the
+    topmost wins (a numbered row text set bigger than the title below the title band is still a row).
+    """
+    pool = [i for i in cands if not _glyph_like(i)] or cands
+    big = max((i.max_size or 0) for i in pool)
+    group = [i for i in pool if (i.max_size or 0) >= 0.75 * big]
+    wide = [i for i in group if i.w >= 0.5 * W]
+    return min(wide or group, key=lambda i: (i.y, i.x))
+
+
 def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
     """Set ``role`` on special items; returns (title item, pool of content items)."""
     W, H = deck.width, deck.height
@@ -243,7 +266,7 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
             and not in_card(i)
         ]
         if top:
-            title = max(top, key=lambda i: (i.max_size or 0, -i.y))
+            title = pick_title(top, W)
     if title:
         title.role = "title"
     # callouts: a filled text shape with a thin filled bar on its left edge

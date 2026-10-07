@@ -314,3 +314,12 @@ state it against the python-pptx arm's cost excluding the shared per-call re-rea
 **Owner decision (2026-10-06):** AC4 is measured on briefs of ≥ 5 slides only, with the 35% threshold. 3-slide
 briefs stay in the matrix for AC2, AC3, AC5 and AC6 but not for AC4. On the run 6 numbers (≥ 5 slides: 41%) AC4 is
 still open.
+
+## Foreign-deck round trip (DL3d)
+
+`python bench/roundtrip_compare.py ORIG.pptx [--out DIR] [--regen]` imports a deck made elsewhere, builds the imported
+text, renders both and writes `compare-N.png` (8 pairs per sheet, original left), `deck.md` and `report.json`. It is
+the gate's measure: per-slide mean pixel difference as in `tests/test_golden.py` (320x180 grayscale, tolerance 8),
+deck mean, slides over tolerance, deck.md tokens vs the `build.py` next to the original (gate <= 40%), import
+warnings. `--regen` rebuilds a missing original from that `build.py` (`$PPTX_PYTHON` or the current interpreter).
+Read the sheet with one image Read; the per-slide differences name the slides worth opening.
