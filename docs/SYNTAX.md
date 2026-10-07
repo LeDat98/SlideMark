@@ -788,6 +788,28 @@ from `<style>`), is laid out by Chromium as a whole-slide HTML slide. `data-rend
 | ` ```math ` | native, editable equation (LaTeX subset: `\frac`, `^`, `_`, `\sqrt`, `\sum`, `\int`, Greek, `\times`, ...) |
 | ` ```html ` | HTML/CSS: structural subset, else laid out by Chromium into native shapes/text (CSS grid, flex, cards), else an image; `{render=native\|image}` forces one (canvas, svg, gradients, transforms stay images) |
 
+## Import: forms read from a foreign deck
+
+`slidemark import` reads the shape names SlideMark draws (`Row 2 num`, `Quote text`, `Timeline 3 dot`, ...). A deck
+made elsewhere (python-pptx, PowerPoint: `Rectangle 7`, `TextBox 9`) has no such names, so
+`importer/recognise.py` reads the geometry instead, before the title is chosen, and writes the form. It fires only
+when every card of a group matches; otherwise the slide stays plain boxes and text. A slide that holds a SlideMark
+shape name (`Card 3`, `Text 5`, `Title`) is a built deck and is never read by geometry. Thresholds: `recognise.TH`.
+
+| Drawn as | Imported as |
+|---|---|
+| cards (same size, 2-8) whose first line is a short figure (`2.1兆円`, `38%`, `+22%`) at least 1.8 x the other text, optional stripe on the card edge | `@kpi` and a label-less `##` per card: the figure line, then the caption; `style:` carries `sN.border-left="9pt solid #1F5FA8"` classes (`{.s1 color=#1F5FA8}` per card), `kpi.fill=` `kpi.align=left` `kpi.note.size=` and `sizes: kpi=48` |
+| cards whose first line is `01 02 03` (1.2 x the body), stripe on top | `## [01]{color=#1F5FA8} {.s1}` + body, `sizes: heading=44! body=30!`, `sN.border-top=` |
+| a filled square / circle holding only `1 2 3 ...` inside a wide bar, bars alone on the slide (a lead above and a footnote below are fine) | `@rows` with `rows-num.fill=#a,#b,#c`, `rows.fill=`, `rows.size=` |
+| the same badges above a card body, or bars beside other content | the slide word `num` (the badges leave, `box.num.fill=` keeps their colour) |
+| a big quote glyph + one text + a `— name` line (+ panel) | `@quote fill= size=` and `quote.mark.color=` (the glyph is never the title) |
+| a dark filled rectangle with 3-7 short lines of different sizes | one box `{fill=#122B4A color=#FFFFFF}`: label heading, every line a span of its own size (`[9,800円]{size=40 bold=true}`); with `num` on the slide it is a `.kpi` card (so `num` skips it) |
+| bars with a left stripe whose one line mixes label, figure and note sizes | `@rows plain` + `rows.stripe=` (bars alone on the slide) or boxes with a stripe class; runs that differ from the first one are spans: `**売上高** [420億円]{size=34 bold=true color=#1F5FA8}` |
+| a dark filled card holding one text (not full width) | `{fill=#122B4A color=#FFFFFF}` on the box |
+
+A span `[text]{size=28 color=#E08A1E bold=true}` is the mixed-size inline syntax; a parser without it still reads the
+line (the span is plain text then, at the box size).
+
 ## Diagnostics: design feedback
 
 `build` and `check` print two deck-level warnings (no slide number, never fixed by `--fix`, never fail a build) that

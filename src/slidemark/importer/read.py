@@ -30,6 +30,7 @@ class RunT:
     badge: str | None = None  # highlight color RRGGBB when the run is a badge
     link: str | None = None
     size: float | None = None
+    span: str = ""  # `size=34 bold=true color=#1F5FA8`: the run is written as `[text]{span}` (recognise.py)
 
 
 @dataclass
@@ -106,6 +107,8 @@ class Item:
     heatmap: str = (
         ""  # table: `lo;hi;colors;text` of an `@heatmap` (the renderer appends it to the shape name)
     )
+    rec: str = ""  # set by recognise.py: the form this foreign shape was read as (kpi, numcard, quote, ...)
+    rec_attrs: str = ""  # attributes recognise.py adds to the `##` line of the box this item is
 
     @property
     def cx(self) -> float:
@@ -155,6 +158,10 @@ class SlideData:
     transition: str | None = None  # ``t=`` value: "fade", "push:0.5", ...
     build: bool = False  # click-by-click appear animations on shapes
     chart_notes: list[tuple[tuple[int, int, int, int], str]] = field(default_factory=list)  # `note=` callouts
+    style_lines: list[str] = field(default_factory=list)  # recognise.py: slide `sizes:` / `style:` lines
+    words: list[str] = field(
+        default_factory=list
+    )  # recognise.py: words of the slide's `@` line (`kpi`, `num`)
 
 
 @dataclass

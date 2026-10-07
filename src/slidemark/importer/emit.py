@@ -36,7 +36,7 @@ def esc_line_start(line: str) -> str:
 
 
 def _fmt_key(r: RunT) -> tuple:
-    return (r.bold, r.italic, r.strike, r.sup, r.sub, r.code, r.color, r.badge, r.link)
+    return (r.bold, r.italic, r.strike, r.sup, r.sub, r.code, r.color, r.badge, r.link, r.span)
 
 
 def _merge(runs: list[RunT]) -> list[RunT]:
@@ -101,9 +101,13 @@ def inline(
                 body = f"~~{body}~~"
             if r.italic and not imp_italic:
                 body = f"*{body}*"
-            if r.bold and not imp_bold and not (plain_bold and all_bold) and not r.badge:
+            if r.span:  # recognise.py: a run of its own size / colour: `[text]{size=34 bold=true}`
+                body = f"[{body}]{{{r.span}}}"
+            elif r.bold and not imp_bold and not (plain_bold and all_bold) and not r.badge:
                 body = f"**{body}**"
-            if imp_color and r.color == imp_color:
+            if r.span:
+                pass
+            elif imp_color and r.color == imp_color:
                 pass
             elif accent and r.color in accent.split("|") and not r.badge:  # `A|B`: accent shades
                 body = f"=={body}=="
