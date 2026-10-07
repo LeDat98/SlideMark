@@ -151,5 +151,56 @@
    "compare-1.png",
    "compare-2.png"
   ]
+ },
+ "after_token_diet": {
+  "original": "orig-t4.pptx",
+  "slides": 15,
+  "slides_imported": 15,
+  "per_slide": [
+   10.92,
+   20.58,
+   15.39,
+   17.28,
+   16.29,
+   46.16,
+   22.74,
+   33.3,
+   24.83,
+   27.18,
+   14.81,
+   32.13,
+   17.8,
+   49.46,
+   25.35
+  ],
+  "mean": 24.95,
+  "max": 49.46,
+  "tolerance": 8.0,
+  "over_tolerance": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15
+  ],
+  "md_tokens": 2979,
+  "build_py_tokens": 7560,
+  "token_ratio": 0.394,
+  "import_warnings": 0,
+  "warnings": [],
+  "sheets": [
+   "compare-1.png",
+   "compare-2.png"
+  ]
  }
 }

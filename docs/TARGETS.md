@@ -98,6 +98,11 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       and on `bench/lengthbench/t2/python-pptx`, no broken slide, and the imported deck.md ≤ 40% of build.py tokens.
       Font floor (docs/RENDERING.md, 2026-10-07): 0.00 on both decks, so the 21-25 point gap is design only; previews now
       use `src/slidemark/fonts/fonts.conf` (deterministic fallbacks).
+      Token part met (2026-10-07, lane G, `importer/diet.py`, `tests/test_import_tokens.py`): deck.md 3,472 -> 2,979
+      tokens = 39.4% of build.py on t4, 1,974 -> 1,902 = 36.1% on t2 (round trip unchanged: 24.95 / 21.10); the CLI
+      `slidemark import` shortens a foreign deck, `--no-slim` keeps the raw text. Next lever: glyph-bullet lines
+      (`[■]{size=18 color=#2A9D8F} [text]{size=22}` is 24% of t2) as a `bullet=` list, and `box.stripe` instead
+      of `sN.border-top` classes (about -75 tokens on t4): both are recognition changes.
 - [ ] DL4 `shape=` on any box / step / row names any of the ≥ 150 PowerPoint preset shapes; connectors with
       arrowheads, dash and curve; freeform paths from inline SVG as native geometry; images with crop, radius, mask and
       opacity; text outline / shadow / glow; per-shape gradient, pattern and line dash. Gate: a shape-gallery example

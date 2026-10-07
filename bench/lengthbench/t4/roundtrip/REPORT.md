@@ -1,13 +1,17 @@
 # Foreign-deck round trip, t4 (python-pptx open-brief deck → `slidemark import` → `build`)
 
 Measure: `bench/roundtrip_compare.py` (per-slide mean pixel difference on 320×180 grey, golden tolerance 8).
-`report.json` holds `before_title_fix`, `after_title_fix` (lane D) and `after_lanes_abc` (lanes A + B + C merged, 2026-10-07). Sheets: `compare-1.png`, `compare-2.png`; the imported text is `deck.md`.
+`report.json` holds `before_title_fix`, `after_title_fix` (lane D), `after_lanes_abc` (lanes A + B + C merged, 2026-10-07) and `after_token_diet` (lane G, `importer/diet.py`). Sheets: `compare-1.png`, `compare-2.png`; the imported text is `deck.md`.
 
 | Run | Mean | Slides over 8 | deck.md vs build.py | Import warnings |
 |---|---|---|---|---|
 | Before the title fix | 36.43 | 15 / 15 | 2,074 / 7,560 = 27% | 0 |
 | After the title fix | 36.20 | 15 / 15 | 2,049 / 7,560 = 27% | 0 |
 | After lanes A + B + C | 24.95 (t2: 21.10) | 15 / 15 | 3,472 / 7,560 = 46% | 0 |
+| After the token diet (lane G) | 24.95 (t2: 21.10) | 15 / 15 | 2,979 / 7,560 = 39.4% (t2: 1,902 / 5,263 = 36.1%) | 0 |
+
+Token diet (lane G): the same slides in 14% fewer tokens on t4 (3,472 -> 2,979) and 4% on t2 (1,974 -> 1,902), each
+edit proved by a build (per-slide difference unchanged: 0 to -0.01); the DL3d token gate (<= 40%) now passes on both.
 
 The title fix (glyphs and bare numbers are never the title) repairs slides 13 and 15 structurally and moves the
 mean by only 0.2: what remains is design (backgrounds, colours, sizes, badges), not structure. The token gate

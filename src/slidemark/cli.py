@@ -461,7 +461,7 @@ def cmd_import(args: argparse.Namespace) -> int:
         print(f"error: cannot read {args.input}: no such file", file=sys.stderr)
         return 2
     out = Path(args.output) if args.output else None
-    text, diags = import_pptx(src, out.parent if out else None)
+    text, diags = import_pptx(src, out.parent if out else None, slim=not args.no_slim)
     for d in diags:
         _say(str(d), sys.stderr)
     if any(d.rule == "import-unreadable" for d in diags):
@@ -683,6 +683,11 @@ def make_parser() -> argparse.ArgumentParser:
     im = sub.add_parser("import", help="convert a .pptx to SlideMark text (stdout, or -o file + images/)")
     im.add_argument("input")
     im.add_argument("-o", "--output", help="output .md (pictures go to images/ next to it)")
+    im.add_argument(
+        "--no-slim",
+        action="store_true",
+        help="keep every colour a hex and every token as read (default: a foreign deck is shortened)",
+    )
     im.set_defaults(func=cmd_import)
 
     v = sub.add_parser("preview", help="render slides to PNG images (needs LibreOffice)")
