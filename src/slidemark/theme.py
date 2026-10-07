@@ -606,6 +606,8 @@ class RenderTokens(BaseModel):
         "chevron"  # `@chevron` / `@steps` arrows: "chevron" (notched tail) or "pentagon" (flat tail)
     )
     chart_grid: str = "border"  # value-axis gridline color of bar / column / line charts
+    chart_pie_line: str = "bg"  # pie / doughnut wedge outline color (`none` = no outline) ...
+    chart_pie_line_width: float = 0.0  # ... and width in pt (0 = the PowerPoint default)
     chart_hl: str = "accent"  # `hl=` points: fill (bar / column / pie / waterfall), outline, line marker
     chart_hl_line: float = 2.25  # pt, outline of an `hl=` bar in a multi-series chart
     chart_hl_marker: int = 11  # pt, marker of an `hl=` point in a line chart
@@ -1382,7 +1384,13 @@ _HINT_SHADOW = "write none, on, or '<x> <y> <blur> <color>' in pt, e.g. 0 2 6 #0
 _IDENT = re.compile(r"[A-Za-z][\w-]*")
 _KEYWORDS = {"none", "hidden", "solid", "dashed", "dotted", "double", "thin", "medium", "thick"}
 _PT_FIELDS = {"font_size", "line_width", "radius", "letter_spacing"}
-_PT_PATHS = {"min_font_size", "render.line_width", "render.connector_width", "render.chart_line_width"}
+_PT_PATHS = {
+    "min_font_size",
+    "render.line_width",
+    "render.connector_width",
+    "render.chart_line_width",
+    "render.chart_pie_line_width",
+}
 _THEME_COLOR_SUFFIX = ("_fill", "_color", "_band", "_border", "_bar", "_rule", "_stripe")
 _OPTIONAL_COLORS = {
     "title_band",
@@ -1594,6 +1602,7 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
         "render.ink_light",
         "render.highlight",
         "render.chart_grid",
+        "render.chart_pie_line",
     ):
         return [(path, _color_value(raw, names))]
     if len(parts) == 1 and leaf.endswith(_THEME_COLOR_SUFFIX) and leaf in Theme.model_fields:

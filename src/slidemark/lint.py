@@ -25,7 +25,7 @@ from .contrast import ratio as _ratio
 from .design import design_diagnostics
 from .ir import Chart, Container, Deck, Diagnostic, Image, Media, Placed, Shape, Table, Text
 from .layout import css, measure
-from .layout.chartnote import chart_size
+from .layout.chartnote import chart_size, opt_pt
 from .layout.tablehl import hl_rows
 from .layout.tables import table_grid
 from .theme import Theme
@@ -363,31 +363,45 @@ def _chart_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
     if ch.title:
         checks.append(("title", "#" + hex6(theme, "fg"), size * rt.chart_title_scale, True, back_hex, "fg"))
     if _legend_pos(opts, pie, len(series)) is not None:
-        checks.append(("legend", base, legend_pt(size, rt), False, back_hex, "chart"))
+        checks.append(
+            ("legend", base, legend_pt(size, rt, opt_pt(p, "legend_size")), False, back_hex, "chart")
+        )
     if not pie:
         checks.append(("axis labels", base, size, False, back_hex, "chart"))
     labels = opts.get("labels", opts.get("data_labels"))
     lab_on = (isinstance(labels, str) and labels.strip().lower() in ("percent", "value")) or flag(labels)
-    lsize = label_pt(kind, ncat, size, rt) if pie else size * rt.chart_label_scale
+    lexact = opt_pt(p, "label_size")
+    lsize = label_pt(kind, ncat, size, rt, lexact) if pie else lexact or size * rt.chart_label_scale
     pal = theme.chart_palette(opts.get("colors"))
+    lab_ink = "#" + hex6(theme, opts["label_color"]) if opts.get("label_color") else None  # `labels.color=`
+    lab_bold = opts.get("label_bold")  # `labels.bold=`; None = the chart's own default
     if lab_on and kind != "scatter":
         if pie:
             bg = hex6(theme, "bg")
             both = kind == "pie" and str(rt.chart_pie_label_pos).strip().lower() in ("best_fit", "best-fit")
             for i in range(ncat):
                 fill = pal[i % len(pal)]
-                ink = "#" + theme.chart_label_ink(fill, *([bg] if both else []))
+                ink = lab_ink or "#" + theme.chart_label_ink(fill, *([bg] if both else []))
                 # Judged on the slice only: a pie label may also land outside it (best fit), where no single
                 # ink reads on both a mid-tone slice and the page; the renderer then favors the slice.
-                checks.append(("data labels", ink, lsize, rt.chart_pie_label_bold, ["#" + fill], "labels"))
+                bold = rt.chart_pie_label_bold if lab_bold is None else bool(lab_bold)
+                checks.append(("data labels", ink, lsize, bold, ["#" + fill], "labels"))
         elif kind in ("stacked-bar", "stacked-column"):
             for i in range(len(series)):
                 fill = pal[i % len(pal)]
-                checks.append(
-                    ("data labels", "#" + theme.chart_label_ink(fill), lsize, False, ["#" + fill], "labels")
-                )
+                ink = lab_ink or "#" + theme.chart_label_ink(fill)
+                checks.append(("data labels", ink, lsize, bool(lab_bold), ["#" + fill], "labels"))
         elif kind in ("column", "bar", "line", "waterfall"):
-            checks.append(("data labels", base, lsize, False, back_hex, "chart"))
+            checks.append(
+                (
+                    "data labels",
+                    lab_ink or base,
+                    lsize,
+                    bool(lab_bold),
+                    back_hex,
+                    "labels" if lab_ink else "chart",
+                )
+            )
     groups: dict[str, list[tuple[float, float, str, list[str], str]]] = {}
     for label, ink, sz, bold, backs, fix in checks:
         got = min(_ratio(ink, b) for b in backs)
@@ -401,6 +415,7 @@ def _chart_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
         if fix == "labels":
             hint = (
                 "add {labels=off} to the chart fence, or {colors=...} with slices the label ink can read on"
+                + (" (or change labels.color=)" if lab_ink else "")
             )
         else:
             every = list(dict.fromkeys([*back_hex, *backs]))

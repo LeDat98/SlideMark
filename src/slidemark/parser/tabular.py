@@ -25,6 +25,13 @@ CHART_KEYS = (
     "gap",
     "marker",
     "size",
+    "totals",
+    "overlap",
+    "step",
+    "labels.bold",
+    "labels.color",
+    "slice.line",
+    "legend.size",
 )
 # `labels=<word>`: where the data labels sit, by chart family (python-pptx XL_LABEL_POSITION)
 LABEL_POS = {
@@ -231,6 +238,75 @@ def _label_family(kind: str) -> str:
     )
 
 
+def _pt_list(v: str, lo: float, hi: float, limit: int) -> list[float] | None:
+    """``16`` / ``16,14``: up to ``limit`` sizes in pt, each within ``lo``-``hi``; None when invalid."""
+    parts = [p.strip() for p in re.split(r"[,;]", v) if p.strip()]
+    nums = [parse_number(p) for p in parts]
+    if not parts or len(parts) > limit or any(bad or n is None or not lo <= n <= hi for n, _, bad in nums):
+        return None
+    return [float(n) for n, _, _ in nums if n is not None]
+
+
+def _label_name(ch: Chart, low: str, ctx: Ctx, line: int | None) -> str:
+    """``labels=outside+name``: split the ``+name`` flag off; returns the position / mode word left."""
+    word, *flags = (p.strip() for p in low.split("+"))
+    if any(f != "name" for f in flags):
+        _bad(ctx, "labels", low, "a mode or position, optionally followed by +name (percent+name)", line)
+    elif ch.kind not in ("pie", "doughnut"):
+        ctx.warn(
+            f"labels=...+name is for pie and doughnut charts, not {ch.kind}",
+            line,
+            "bad-chart-option",
+            "a bar / line chart names its categories on the axis: drop +name",
+        )
+    else:
+        ch.options["label_name"] = True
+    return word
+
+
+def _apply_color_opt(ch: Chart, key: str, opt: str, v: str, ctx: Ctx, line: int | None) -> None:
+    known = {*THEME_COLORS, *ctx.colors}
+    if v.strip() in known or _HEX.match(v.strip()):
+        ch.options[opt] = v.strip()
+    else:
+        ctx.warn(
+            f"bad chart option {key}='{v}'",
+            line,
+            "bad-chart-option",
+            f"{key} is a #hex or a color name: " + "/".join(sorted(known)),
+        )
+
+
+def _apply_slice_line(ch: Chart, v: str, ctx: Ctx, line: int | None) -> None:
+    """``slice.line=bg`` / ``slice.line=#FFF,2`` / ``slice.line=none``: wedge outline (colour, width pt)."""
+    hint = "slice.line is a color (name or #hex), optionally ,width in pt (0-20), or none: slice.line=bg,2"
+    if ch.kind not in ("pie", "doughnut"):
+        ctx.warn(
+            f"slice.line is not drawn on {ch.kind} charts",
+            line,
+            "bad-chart-option",
+            "slice.line is for pie and doughnut charts",
+        )
+        return
+    color, _, width = (p.strip() for p in v.partition(","))
+    known = {*THEME_COLORS, *ctx.colors}
+    num = None
+    if width:
+        num, _, bad = parse_number(width)
+        if bad or num is None or not 0 <= num <= 20:
+            ctx.warn(f"bad chart option slice.line='{v}'", line, "bad-chart-option", hint)
+            return
+    if color.lower() == "none":
+        ch.options["slice_line"] = "none"
+    elif color in known or _HEX.match(color):
+        ch.options["slice_line"] = color
+    else:
+        ctx.warn(f"bad chart option slice.line='{v}'", line, "bad-chart-option", hint)
+        return
+    if num is not None:
+        ch.options["slice_line_w"] = float(num)
+
+
 def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) -> dict[str, str]:
     """Consume chart option keys from ``kv`` into ``ch``; returns the keys left for the generic path."""
     from .attrs import VALID_KEYS
@@ -239,6 +315,9 @@ def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) ->
     o = ch.options
     for k, v in kv.items():
         low = v.strip().lower()
+        if k == "labels" and "+" in low:
+            low = _label_name(ch, low, ctx, line)
+            v = low
         if k == "title":
             ch.title = v
         elif k == "legend":
@@ -251,8 +330,8 @@ def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) ->
                 o["labels"] = "on"
             elif low in _FALSE:
                 o["labels"] = "off"
-            elif low == "percent":
-                o["labels"] = "percent"
+            elif low in ("percent", "value"):
+                o["labels"] = low
             elif low in {w for ws in LABEL_POS.values() for w in ws}:
                 fam = _label_family(ch.kind)
                 if low in LABEL_POS.get(fam, ()):
@@ -283,16 +362,82 @@ def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) ->
             else:
                 o["gap_width"] = num
         elif k == "size":
-            num, _, bad = parse_number(v)
-            if bad or num is None or not 6 <= num <= 72:
+            sizes = _pt_list(v, 6, 72, 2)
+            if sizes is None:
                 ctx.warn(
                     f"bad chart option size='{v}'",
                     line,
                     "bad-chart-option",
-                    "size is the chart text size in pt, 6-72, e.g. size=14",
+                    "size is the chart text size in pt, 6-72, e.g. size=14; size=16,14 = data labels, "
+                    "value-axis numbers",
                 )
             else:
-                o["size"] = num
+                o["size"] = sizes[0]
+                if len(sizes) == 2:  # data labels exactly the first, the value-axis numbers the second
+                    o["label_size"], o["tick_size"] = sizes
+        elif k == "legend.size":
+            sizes = _pt_list(v, 6, 72, 1)
+            if sizes is None:
+                _bad(ctx, k, v, "a size in pt, 6-72, e.g. legend.size=14", line)
+            else:
+                o["legend_size"] = sizes[0]
+        elif k == "overlap":
+            num, _, bad = parse_number(v)
+            if bad or num is None or not -100 <= num <= 100:
+                _bad(ctx, k, v, "a number -100..100 (% of a bar), e.g. overlap=-5", line)
+            elif ch.kind not in ("bar", "column"):
+                ctx.warn(
+                    f"overlap is not drawn on {ch.kind} charts",
+                    line,
+                    "bad-chart-option",
+                    "overlap is for clustered bar and column charts (stacked bars always overlap fully)",
+                )
+            else:
+                o["overlap"] = int(num)
+        elif k == "step":
+            num, _, bad = parse_number(v)
+            if bad or num is None or num <= 0:
+                _bad(
+                    ctx,
+                    k,
+                    v,
+                    "a positive number: the distance between value-axis gridlines, e.g. step=200",
+                    line,
+                )
+            elif ch.kind in ("pie", "doughnut"):
+                ctx.warn(
+                    f"step is not drawn on {ch.kind} charts",
+                    line,
+                    "bad-chart-option",
+                    "step is the value-axis unit; a pie has no axis",
+                )
+            else:
+                o["step"] = num
+        elif k == "totals":
+            if ch.kind not in ("stacked-bar", "stacked-column"):
+                ctx.warn(
+                    f"totals is not drawn on {ch.kind} charts",
+                    line,
+                    "bad-chart-option",
+                    "totals is for stacked-bar / stacked-column (a waterfall marks its totals with = cells)",
+                )
+            elif low in _TRUE:
+                o["totals"] = "on"
+            elif low in _FALSE:
+                o["totals"] = "off"
+            else:
+                _bad(ctx, k, v, "on/off", line)
+        elif k == "labels.bold":
+            if low in _TRUE:
+                o["label_bold"] = True
+            elif low in _FALSE:
+                o["label_bold"] = False
+            else:
+                _bad(ctx, k, v, "on/off", line)
+        elif k == "labels.color":
+            _apply_color_opt(ch, k, "label_color", v, ctx, line)
+        elif k == "slice.line":
+            _apply_slice_line(ch, v, ctx, line)
         elif k == "marker":
             num, _, bad = parse_number(v)
             if bad or num is None or not 2 <= num <= 72:
@@ -349,6 +494,15 @@ def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) ->
                 near = closest(k, CHART_KEYS, 0.6)
                 hint = f"did you mean '{near}='?" if near else "valid keys: " + ", ".join(CHART_KEYS)
                 ctx.warn(f"unknown chart option '{k}'", line, "bad-chart-option", hint)
+    shown = o.get("labels") in ("on", "percent", "value")
+    for opt, key in (("label_bold", "labels.bold"), ("label_color", "labels.color"), ("label_name", "+name")):
+        if opt in o and not shown:
+            ctx.warn(
+                f"{key} has no effect without data labels",
+                line,
+                "bad-chart-option",
+                "add labels=on (or a position such as labels=outside)",
+            )
     return rest
 
 

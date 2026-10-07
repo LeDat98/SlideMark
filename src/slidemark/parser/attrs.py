@@ -17,7 +17,7 @@ from .tabular import apply_chart_kv, apply_table_kv
 _TOKEN = re.compile(
     r"""\s*(?:\.(?P<cls>[\w-]+)
         |\#(?P<id>[\w-]+)
-        |(?P<key>[A-Za-z][\w-]*)=(?P<val>(?:"[^"]*"|'[^']*'|[^\s"'{}]+)+)
+        |(?P<key>[A-Za-z][\w-]*(?:\.[\w-]+)*)=(?P<val>(?:"[^"]*"|'[^']*'|[^\s"'{}]+)+)
         |(?P<bare>bold|italic|autoplay|loop)(?![\w-]))""",
     re.X,
 )
