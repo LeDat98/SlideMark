@@ -10,12 +10,14 @@ from PIL import Image
 from slidemark.cli import main
 from slidemark.preview import contact_sheet, have_soffice
 
-FACTS_DECK = """# Cover
+FACTS_DECK = """colors: primary=#2B6CB0
+
+# Cover
 
 ---
 # Numbers
 
-```column {title="Sales"}
+```column {title="Sales" legend=bottom}
 ,Q1,Q2
 2026,10,12
 ```
@@ -29,12 +31,15 @@ FACTS_DECK = """# Cover
 ---
 # Plain
 
-- one
+- ==one==
 - two
 """
 
 BULLET_DECK = "# Hello\n\n* one\n* two\n"
-SAME_WARNING = "# A\n\n![x](nope.png)\n\n---\n# B\n\n![x](nope.png)\n\n---\n# C\n\n- ok\n"
+SAME_WARNING = (
+    "colors: primary=#2B6CB0\n\n# A\n@dense\n![x](nope.png)\n\n---\n# B\n@dense\n![x](nope.png)\n\n"
+    "---\n# C\n@dense\n- ok\n"
+)
 
 
 def _stdin(monkeypatch, text: str) -> None:
@@ -144,7 +149,7 @@ def test_build_png_contact_sheet(tmp_path, capsys):
     sheet = tmp_path / "sheet.png"
     assert main(["build", str(src), "--png", str(sheet)]) == 0
     out = capsys.readouterr().out.strip().splitlines()
-    assert sheet.is_file() and str(sheet) in out[-2] and out[-1].startswith("wrote ")
+    assert sheet.is_file() and any(str(sheet) in ln for ln in out[:-1]) and out[-1].startswith("wrote ")
 
 
 def test_png_without_soffice_is_a_note(tmp_path, capsys, monkeypatch):

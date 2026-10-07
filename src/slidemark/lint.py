@@ -12,6 +12,8 @@ Rules (all warnings, cheap to read for an agent):
 - ``tiny-text``: text renders below the theme's minimum font size.
 - ``alt``: an image without alt text.
 - ``connector-crosses``: a connector runs through a block that is not one of its ends.
+- ``design-none`` / ``design-slide``: the deck states no design / these slides carry no design choice
+  (deck-level, see ``design.py``; added by ``lint_deck``, not by ``lint``).
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ import re
 
 from .contrast import nearest_passing
 from .contrast import ratio as _ratio
+from .design import design_diagnostics
 from .ir import Chart, Container, Deck, Diagnostic, Image, Media, Placed, Shape, Table, Text
 from .layout import css, measure
 from .layout.chartnote import chart_size
@@ -652,3 +655,8 @@ def lint(deck: Deck, placed: list[list[Placed]], theme: Theme) -> list[Diagnosti
                 )
             )
     return out
+
+
+def lint_deck(deck: Deck, placed: list[list[Placed]], theme: Theme) -> list[Diagnostic]:
+    """``lint`` plus the deck-level design feedback (what ``build``, ``check`` and ``review`` report)."""
+    return [*lint(deck, placed, theme), *design_diagnostics(deck)]

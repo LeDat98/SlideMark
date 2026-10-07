@@ -173,12 +173,13 @@ def test_cli_fix_json_has_fixed(tmp_path, capsys):
     assert main(["check", "--fix", "--format", "json", str(f)]) == 0
     data = json.loads(capsys.readouterr().out)
     assert data["fixed"] == [{"line": 2, "rule": "bullet-star", "what": "'* ' bullets -> '- '"}]
-    assert data["diagnostics"] == []
+    # --fix never touches the design feedback: it stays listed
+    assert [d["rule"] for d in data["diagnostics"]] == ["design-none", "design-slide"]
 
 
 def test_cli_fix_nothing_to_fix_keeps_file(tmp_path, capsys):
     f = tmp_path / "a.md"
-    f.write_text("# T\n- a\n", encoding="utf-8")
+    f.write_text("colors: primary=#2B6CB0\n\n# T\n@dense\n- a\n", encoding="utf-8")
     before = f.stat().st_mtime_ns
     assert main(["check", "--fix", str(f)]) == 0
     assert f.stat().st_mtime_ns == before and capsys.readouterr().out.startswith("ok")
