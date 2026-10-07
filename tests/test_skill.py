@@ -20,8 +20,8 @@ def _tokens(text: str) -> int:
 
 def test_budgets():
     # SKILL.md is the only document an agent reads (docs/AGENT_COST.md): budget for completeness, not brevity;
-    # 4400 since the DL2 close-out (each native form listed once); was 3800 at wave 3; target stays 3500
-    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 4400
+    # 5000 since the composition vocabulary (16 forms, one line each); was 3800 at wave 3; target stays 3500
+    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 5000
     refs = sorted((SKILL / "reference").glob("*.md"))
     assert len(refs) >= 5
     for p in refs:

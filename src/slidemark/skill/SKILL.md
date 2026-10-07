@@ -208,6 +208,17 @@ styles one list line; a chart frame takes `{fill= radius= pad=}`.
 **Inline:** `**b**` `*i*` `~~s~~` `` `code` `` `==accent==` `[text]{.danger}` `[済]{.badge .success}`
 `[link](url)`. Lists: `-` / `1.`, nest with two spaces; `- [ ] todo`.
 
+## Composition forms (one `@word` line under the title; secondary attributes on the same line; looks via `word.*` tokens)
+
+- `@iconlist cols=2` + `- icon=bolt **Title** text` items (icon, bold title, text in 1–3 columns; `iconlist.icon.size/.color`).
+- `@quote align=center` + `> "text"` then `> — Name` (large quotation with mark and attribution; `quote.size` `quote.mark.color`).
+- `@split side=right ratio=2:3 bleed=on` + `![alt](x.png)` (or a `fill=` block) + any text/boxes (picture beside content).
+- `@proscons` + two `##` boxes (pros, cons) + optional last `> verdict` (+/− discs, verdict bar; `proscons.plus.color`).
+- `@progress max=100` + `- label 72%` (or a table label|value) → labelled bars (`progress.fill/.track/.h`).
+- `@harvey` + a table of 0–4 (or 0/25/50/75/100%) → native Harvey balls (`harvey.size/.fill/.line`).
+- `@heatmap min=0 max=100 colors=#F3F6FA,primary` + a numeric table → interpolated cell fills, auto ink (`text=auto|on|off`).
+- `@pins legend=right|bottom|off` + image + `- x=32% y=58% label` → numbered pins on the image plus a legend (`pins.fill/.size`).
+
 ## Components
 
 - **KPI row:** `@kpi` under the title makes every `##` box a card; `style: kpi.h=4.4in` sets card height, `kpi.rule=border`
