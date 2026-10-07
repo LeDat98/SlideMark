@@ -25,6 +25,7 @@ from pygments import lex
 from pygments.lexers import TextLexer, get_lexer_by_name
 from pygments.token import Comment, Keyword, Name, Number, Operator, String
 
+from .. import shapes as shape_table
 from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Series, Style, Table
 from ..layout import chartnote, measure
 from ..layout.css import border_spec, cell_insets
@@ -839,6 +840,10 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     tick_exact = chartnote.opt_pt(pl, "tick_size")  # ... value-axis numbers exactly 14
     fg = rgb(theme, pl.style.color or "fg")
     _chart_font(chart, theme, pl.style.font or theme.fonts.body, size, fg)
+    if pl.style.bold:  # `{bold=true italic=true}`: every label of the chart (the title keeps its own weight)
+        chart.font.bold = True
+    if pl.style.italic:
+        chart.font.italic = True
     if ch.title:
         chart.has_title = True
         tf = chart.chart_title.text_frame
@@ -1130,19 +1135,57 @@ def resolve_image(rc: RenderCtx, src: str) -> Path | None:
     return p if p.is_file() else None
 
 
+def picture_rect(
+    pl: Placed, iw: int, ih: int, fit: str
+) -> tuple[int, int, int, int, tuple[float, float] | None]:
+    """Frame ``(x, y, w, h, crop)`` of an ``iw`` x ``ih`` picture in its cell ``pl``.
+
+    ``pad`` insets the cell, ``size`` (percent of the cell) scales the picture inside it, ``align`` /
+    ``valign`` anchor it there (default centred); ``fit=cover`` crops to the frame (``crop`` = the shares cut
+    left+right and top+bottom), ``stretch`` fills it, ``contain`` keeps the picture's own ratio."""
+    st = pl.style
+    try:
+        pad = max(to_emu(st.padding), 0) if st.padding is not None else 0
+    except ValueError:
+        pad = 0
+    x, y = pl.x + pad, pl.y + pad
+    w, h = max(pl.w - 2 * pad, 1), max(pl.h - 2 * pad, 1)
+    k = min(max((st.font_size or 100.0) / 100.0, 0.05), 1.0)
+    crop = None
+    if fit == "contain" and iw and ih:
+        s = min(w / iw, h / ih) * k
+        dw, dh = round(iw * s), round(ih * s)
+    else:
+        dw, dh = max(round(w * k), 1), max(round(h * k), 1)
+        if fit == "cover" and iw and ih:
+            ia, ba = iw / ih, dw / dh
+            crop = ((1 - ba / ia) / 2, 0.0) if ia > ba else (0.0, (1 - ia / ba) / 2)
+    ax = {"left": 0.0, "right": 1.0}.get(st.align or "", 0.5)
+    ay = {"top": 0.0, "bottom": 1.0}.get(st.valign or "", 0.5)
+    return x + round((w - dw) * ax), y + round((h - dh) * ay), dw, dh, crop
+
+
 def _style_picture(rc: RenderCtx, pic, st: Style, w: int, h: int) -> None:
-    """CSS on a picture: border (``line``), ``border-radius``, ``box-shadow`` and ``opacity``."""
+    """Style of a picture: ``shape`` / ``radius`` (the geometry its frame is cut to), ``fill`` (behind a
+    transparent picture), border (``line``), ``shadow`` and ``opacity``."""
     spPr = pic._element.spPr
-    if st.radius:
-        geom = spPr.find(qn("a:prstGeom"))
-        if geom is not None:
-            geom.set("prst", "roundRect")
+    spec = shape_table.SHAPES.get(st.shape or "")
+    prst = shape_table.prst(st.shape) if spec is not None else ("roundRect" if st.radius else None)
+    geom = spPr.find(qn("a:prstGeom"))
+    if prst and geom is not None:
+        geom.set("prst", prst)
+        adj = spec[1] if spec is not None and spec[1] is not None else None
+        if prst == "roundRect" and adj is None and st.radius:
+            adj = min(emu(st.radius) / max(min(w, h), 1), 0.5)
+        if adj is not None:
             av = geom.find(qn("a:avLst"))
             if av is None:
                 av = etree.SubElement(geom, qn("a:avLst"))
             gd = etree.SubElement(av, qn("a:gd"))
             gd.set("name", "adj")
-            gd.set("fmla", f"val {round(min(emu(st.radius) / max(min(w, h), 1), 0.5) * 100000)}")
+            gd.set("fmla", f"val {round(adj * 100000)}")
+    if st.fill:
+        apply_fill(rc, spPr, st)
     if st.line and (st.line_width is None or st.line_width > 0):
         pic.line.color.rgb = rgb(rc.theme, st.line)
         pic.line.width = Pt(st.line_width if st.line_width is not None else rc.theme.render.line_width)
@@ -1177,16 +1220,7 @@ def add_image(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
 
         with PILImage.open(path) as pil:
             iw, ih = pil.size
-        x, y, w, h = pl.x, pl.y, pl.w, pl.h
-        crop = None
-        if im.fit == "contain" and iw and ih:
-            s = min(w / iw, h / ih)
-            dw, dh = round(iw * s), round(ih * s)
-            top = pl.style.valign == "top"  # beside text: tops line up
-            x, y, w, h = x + (w - dw) // 2, y + (0 if top else (h - dh) // 2), dw, dh
-        elif im.fit == "cover" and iw and ih:
-            ia, ba = iw / ih, w / h
-            crop = ((1 - ba / ia) / 2, 0.0) if ia > ba else (0.0, (1 - ia / ba) / 2)
+        x, y, w, h, crop = picture_rect(pl, iw, ih, im.fit)
         pic = slide.shapes.add_picture(str(path), Emu(x), Emu(y), Emu(w), Emu(h))
         if crop:
             pic.crop_left = pic.crop_right = crop[0]

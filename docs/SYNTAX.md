@@ -219,6 +219,7 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `num` | a numbered circle (1..n) left of every box heading (below; on `@steps` it is the `STEP n` caption) | `@4 num` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
 | `free` | absolute positioning: every block with `{x= y= w= h=}` (% of the area under the title, or lengths) sits exactly there, with no growth, balance or search; unplaced blocks stack on top (info `free-unplaced`) | `{x=10% y=30% w=40% h=20%}` |
+| `grid` | with `@free`: `x y w h` snap to a 12-column x 12-row grid over the body, and `3c` is a grid unit: `x=3c` / `y=2c` = the left / top edge of column / row 3 (counting from 1), `w=4c` / `h=3c` = four columns / three rows wide (a percentage snaps to the nearest twelfth). A title or subtitle pin counts over the whole slide. `3c` without `@free grid` warns `bad-length` | `@free grid` then `## a {x=1c y=2c w=6c h=5c}` |
 | `key=value` | `bg=` color or image, `t=` transition (`fade`, `push`, `wipe`, `split`, `cover`, `zoom`, `morph`; `t=fade:0.5` sets seconds), `id=`, `gap=` | `@bg=#0F172A t=fade` |
 | `a>b` `a-b` | **connector** from block `a` to block `b` (arrow / plain line). Letters count blocks in source order (`a` = 1st), digits work too (`1>3`). With `flow`, the links replace the flow arrows (info `flow-links`) | `@3 a>b a>c` |
 | `hidden` | hide the slide in the show | |
@@ -304,9 +305,29 @@ Keys:
 | Group | Keys |
 |---|---|
 | Position | `x y w h`, in `%` of the parent area (the body area inside the margins and under the title, not the slide), `in`, `cm`, `mm`, `pt`, `px`; a bare number is pt |
-| Style | `size` (pt; on a `##` box it sizes the box text, not its heading: `sizes: heading=` or `h2.size=` does), `color`, `fill`, `line` (a one-off on one `{.kpi}` card works: `## 売上 {.kpi fill=accent}`), `align`, `valign`, `bold`, `radius`, `pad` |
-| Image | `fit=contain` (default), `cover`, `stretch` |
+| Style | `size` (pt; on a `##` box it sizes the box text, not its heading: `sizes: heading=` or `h2.size=` does), `color`, `fill`, `line` (a one-off on one `{.kpi}` card works: `## 売上 {.kpi fill=accent}`), `font`, `align`, `valign`, `bold`, `italic`, `radius`, `opacity`, `pad` |
+| Element | `shadow` (`on`, `off`, or `"0 4 12 #00000040"` = x y blur color in pt), `rotate` (`rotate=15`: degrees clockwise, the whole box with its heading and children turns about its center), `shape` (`shape=hexagon`: a preset geometry, below), `z` (`z=1` to `z=9`: stacking, a shape without `z` sits at level 5, `z=1` goes behind it, `z=9` in front; a box takes its children along) |
+| Image | `fit=contain` (default), `cover`, `stretch`; `size=60` is the share of its cell the picture fills (5-100), `pad` insets it, `align` / `valign` anchor it in the cell, `fill` shows behind a transparent picture |
 | Classes | theme colors (`.primary`, `.accent`, `.danger`, `.success`, `.muted`), `.plain` (box without card), `.kpi` (big number box) |
+
+Every element kind takes the whole set (title, cover, box, item card, KPI card, step, chevron, text, callout, image,
+table, chart, code, `@rows` list), and a pinned `x y w h` is never grown, shrunk or moved by a layout pass
+(`Placed.pin`, `engine._restore_pins`): the explicit wins. Where a key means something specific the kind says so
+in the table under "Build output": a title with `fill line radius` is a styled title box (`{x= y= w= h=}` place it);
+a chart with `fill line radius shadow pad` is a framed chart (`align` / `valign` place it in its cell when `w` / `h` leave
+room, `bold` / `italic` style its labels); a table's `pad` pads every cell; a KPI card's `color` / `bold` style the
+number and `align` / `valign` place its text; `font` on a code block replaces the mono font; `align valign radius` on an
+`@rows` list act on the bars. A list item takes its own text style on its line: `- 要確認 {color=danger bold=true}` (also
+`{.danger}`; size color font bold italic align, plus fill line on a row of `@rows`).
+
+**`shape=`** draws a box, card, text block (with a fill or border), code block, image or chart frame with a preset
+geometry instead of a rectangle (`shape=pill` is a rounded rectangle with half-round ends, `radius=` still sets a
+`rounded` corner): `rect rounded pill snip snip2 round1 round2 round-diag snip-round folded plaque bevel frame ellipse
+circle diamond triangle right-triangle parallelogram trapezoid pentagon regular-pentagon hexagon heptagon octagon decagon
+dodecagon donut chevron arrow-right arrow-left arrow-up arrow-down arrow-both arrow-notched star star4 star6 star8 burst
+heart lightning sun moon cloud plus cross gear cylinder cube funnel wave ribbon scroll tear callout callout-round
+callout-oval callout-cloud` (also `oval`, `capsule`, `square`, `can`, `bolt`, ...; the table is `src/slidemark/shapes.py`).
+An unknown name warns `bad-attr` with the nearest names. `style: card.shape=hexagon` makes it a token.
 
 An attribute the layout does not honour where it is written is not silent: `build` and `check` print
 `attr-ignored` with the form that works (table under "Build output" below). One KPI row takes its height from the
@@ -680,23 +701,26 @@ cannot read prints `slide N: (no fit data)`.
 A warning (`attr-ignored: bold= on a KPI card is not honoured -> style: kpi.value.bold=on bolds the number`) for every attribute the layout or renderer does not act on, once per
 slide, kind and attribute. The detection is the table `HONOURED` / `IGNORED` in `src/slidemark/honour.py`: for each
 element kind, each attribute of `x y w h size color fill line font align valign bold italic radius opacity pad fit
-icon` is honoured or ignored, never undecided; `tests/test_honour.py` checks that, probes every cell against the real
+icon shadow rotate shape z` is honoured or ignored, never undecided; `tests/test_honour.py` checks that, probes every cell against the real
 layout and renderer, and checks that the warning carries the hint. `@free` honours `x y w h` on every kind. Ignored:
 
 | Kind | Ignored attributes |
 |---|---|
-| `title`, `cover` (slide titles) | `x` `y` `w` `h` `fill` `line` `radius` `fit` `icon` |
+| `title`, `cover` (slide titles) | `fit` `icon` |
 | `box` (a `##` box in any grid, `flow`) | `fit` |
-| `kpi` (`y` `h` `w` place the row, also beside a list or table; `x` makes a card absolute) | `color` `align` `valign` `bold` `fit` |
-| `step` (box of an `@steps` row) | `x` `y` `w` `h` `valign` `fit` |
-| `chevron` (compact `@chevron` row) | `h` `align` `valign` `radius` `pad` `fit` |
-| `text` (a paragraph or list outside a box) | `radius` `fit` `icon` |
-| `callout` | `y` `fit` `icon` |
-| `image` | `size` `color` `fill` `font` `align` `valign` `bold` `italic` `pad` `icon` |
-| `table` (`align` is one letter per column) | `radius` `pad` `fit` `icon` |
-| `chart` | `fill` `line` `align` `valign` `bold` `italic` `radius` `opacity` `pad` `fit` `icon` |
-| `code` | `font` `fit` `icon` |
-| `rows` (an `@rows` list) | `align` `valign` `radius` `fit` `icon` |
+| `item` (`### text {.item}` card) | `icon` `fit` |
+| `kpi` (`y` `h` `w` place the row, also beside a list or table; `x` makes a card absolute) | `fit` |
+| `step` (box of an `@steps` row; `valign` moves the text once a conclusion bar or `fill_steps` stretched the card) | `x` `y` `w` `h` `fit` |
+| `chevron` (compact `@chevron` row) | `radius` `fit` |
+| `text` (a paragraph or list outside a box; `radius` and `shape` show with `fill` or `line`) | `fit` `icon` |
+| `callout` | `fit` `icon` |
+| `image` | `color` `font` `bold` `italic` `icon` |
+| `table` (`align` is one letter per column) | `radius` `rotate` `shape` `fit` `icon` |
+| `chart` (`radius` `shape` show with `fill` or `line`, `opacity` with `fill`, `align` with `w`, `valign` with `h`) | `rotate` `fit` `icon` |
+| `code` | `fit` `icon` |
+| `rows` (an `@rows` list) | `fit` `icon` |
+| `row` (one line of an `@rows` list) | `x` `y` `w` `h` `valign` `radius` `opacity` `pad` `shadow` `rotate` `shape` `z` `fit` `icon` |
+| `list item` (`- text {color=danger}`) | `x` `y` `w` `h` `fill` `line` `radius` `opacity` `pad` `valign` `shadow` `rotate` `shape` `z` `fit` `icon` |
 
 `size=` on a box with no text of its own sizes nothing (it sizes the box text, not its heading): `sizes: heading=` or
 `h2.size=` does. `style:` tokens that need an element the deck does not contain warn the same way, once per token on its

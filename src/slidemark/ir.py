@@ -61,7 +61,11 @@ class Style(Model):
     text_transform: Literal["upper", "lower", "capitalize", "none"] | None = None
     underline: bool | None = None
     strike: bool | None = None
-    rotation: float | None = None  # degrees clockwise (CSS transform: rotate())
+    rotation: float | None = None  # degrees clockwise (CSS transform: rotate(), or `{rotate=15}`)
+    shape: str | None = None  # preset geometry name of the box (`{shape=hexagon}`; table in slidemark.shapes)
+    z: int | None = (
+        None  # stacking level `{z=1..9}`: a shape without one sits at the default level, higher is later
+    )
     margin: Length | None = None  # outer space around a block inside its cell
     gap: Length | None = None  # gap between the children of a container / slide body
     grid: str | None = None  # `@` grid spec from grid-template-columns / -areas ("1:2", "aab/aac")
@@ -152,6 +156,8 @@ class Paragraph(Model):
     marker: Literal["bullet", "number"] | None = None  # list paragraph if set
     level: int = 0  # list nesting depth, 0-based
     style: Style | None = None
+    # `- item {color=red}`: keys this paragraph cannot honour (x y w h radius ...), kept for `attr-ignored`
+    attrs: dict[str, Any] = Field(default_factory=dict)
 
     @property
     def plain(self) -> str:
@@ -400,3 +406,7 @@ class Placed(Model):
     h: int
     style: Style = Field(default_factory=Style)
     font_scale: float = 1.0  # autofit shrink factor applied to all font sizes of this element
+    # an author-pinned item (`{x= y= w= h=}`): (x, y, w, h, n) as the layout placed it, ``None`` for a
+    # component the author did not pin; ``n`` = items it owns in the list (itself + its children). No later
+    # pass may move or resize a pinned component: ``engine._restore_pins`` puts it back (children follow)
+    pin: tuple[int | None, int | None, int | None, int | None, int] | None = None

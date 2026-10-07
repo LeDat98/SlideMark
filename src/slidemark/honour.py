@@ -24,11 +24,13 @@ from typing import Any
 
 from .ir import Chart, Code, Container, Deck, Diagnostic, Image, Media, Placed, Slide, Table, Text
 
-# The documented attribute keys (docs/SYNTAX.md "Attributes"): position, style, image, plus `icon` on boxes.
+# The documented attribute keys (docs/SYNTAX.md "Attributes"): position, style, image, `icon` on boxes and the
+# element-control keys `shadow rotate shape z` (DL3: every element kind takes the full set).
 ATTRS = (
     *("x", "y", "w", "h"),
     *("size", "color", "fill", "line", "font", "align", "valign", "bold", "italic"),
     *("radius", "opacity", "pad", "fit", "icon"),
+    *("shadow", "rotate", "shape", "z"),
 )
 GEOMETRY = ("x", "y", "w", "h")
 
@@ -46,12 +48,17 @@ _STYLE_FIELDS = {
     "radius": "radius",
     "opacity": "opacity",
     "padding": "pad",
+    "shadow": "shadow",
+    "rotation": "rotate",
+    "shape": "shape",
+    "z": "z",
 }
 
 LABEL = {
     "title": "a slide title",
     "cover": "a cover title",
     "box": "a box",
+    "item": "an item card",
     "kpi": "a KPI card",
     "step": "an @steps box",
     "chevron": "a compact @chevron box",
@@ -62,14 +69,18 @@ LABEL = {
     "chart": "a chart",
     "code": "a code block",
     "rows": "an @rows list",
+    "row": "a row of an @rows list",
+    "list item": "a list item",
 }
 
 _FIT = "fit= is for images: ![alt](a.png){fit=cover|contain|stretch}"
 _ICON = "icon= goes on a box heading: ## Label {icon=chart}"
-_TITLE_GEO = "titles sit in the title area: @free places them, sizes: title= sizes them"
 _STEP_GEO = "step boxes follow the row: @1:2:1 steps sets column ratios, @free places blocks"
 _CHART = "charts take colors=a,b (series) and size= (text); this does not apply"
-_IMAGE = "an image has no text: x y w h line radius opacity fit apply"
+_IMAGE = "an image has no text: x y w h size fill line radius opacity pad align valign fit apply"
+_ROTATE_FRAME = "PowerPoint cannot rotate tables and charts: rotate the box around them ## b {rotate=5}"
+_ITEM_GEO = "a list item is a line of text: {color= size= bold= italic= font= align=} style it"
+_ITEM_BOX = "a list item has no box: put the list in a box (##) to give it fill, border, radius"
 
 
 def _ig(attrs: str, hint: str) -> dict[str, str]:
@@ -77,76 +88,82 @@ def _ig(attrs: str, hint: str) -> dict[str, str]:
 
 
 # kind -> attributes honoured; every other attribute of ATTRS is in IGNORED[kind] (with the hint).
+_FULL = "x y w h size color font align valign bold italic fill line radius opacity pad shadow rotate shape z"
 HONOURED: dict[str, str] = {
-    "title": "size color font align valign bold italic opacity pad",
-    "cover": "size color font align valign bold italic opacity pad",
-    "box": "x y w h size color font align valign bold italic fill line radius opacity pad icon",
-    "kpi": "x y w h size font italic fill line radius opacity pad icon",
-    "step": "size color font align bold italic fill line radius opacity pad icon",
-    "chevron": "x y w size color font bold italic fill line opacity icon",
-    "text": "x y w h size color font align valign bold italic fill line opacity pad",
-    "callout": "x w h size color font align valign bold italic fill line radius opacity pad",
-    "image": "x y w h line radius opacity fit",
-    "table": "x y w h size color font align valign bold italic fill line opacity",
-    "chart": "x y w h size color font",
-    "code": "x y w h size color align valign bold italic fill line radius opacity pad",
-    "rows": "x y w h size color font bold italic fill line opacity pad",
+    "title": _FULL,
+    "cover": _FULL,
+    "box": f"{_FULL} icon",
+    "item": _FULL,
+    "kpi": f"{_FULL} icon",
+    "step": "size color font align valign bold italic fill line radius opacity pad "
+    "shadow rotate shape z icon",
+    "chevron": "x y w h size color font align valign bold italic fill line opacity pad "
+    "shadow rotate shape z icon",
+    "text": _FULL,
+    "callout": _FULL,
+    "image": "x y w h size fill line radius opacity pad align valign fit shadow rotate shape z",
+    "table": "x y w h size color font align valign bold italic fill line opacity pad shadow z",
+    "chart": "x y w h size color font align valign bold italic fill line radius opacity pad shadow shape z",
+    "code": _FULL,
+    "rows": _FULL,
+    "row": "size color font align bold italic fill line",
+    "list item": "size color font align bold italic",
 }
 IGNORED: dict[str, dict[str, str]] = {
-    "title": {
-        **_ig("x y w h", _TITLE_GEO),
-        **_ig("fill line radius", "a title is plain text: size color font align apply"),
-        "fit": _FIT,
-        "icon": _ICON,
-    },
-    "cover": {
-        **_ig("x y w h", _TITLE_GEO),
-        **_ig("fill line radius", "a cover title is plain text: size color font align apply"),
-        "fit": _FIT,
-        "icon": _ICON,
-    },
+    "title": {"fit": _FIT, "icon": _ICON},
+    "cover": {"fit": _FIT, "icon": _ICON},
     "box": {"fit": _FIT},
-    "kpi": {
-        "color": "style: kpi.value.color=<c> colours the number",
-        "align": "a KPI card centres its text",
-        "valign": "a KPI card centres its text",
-        "bold": "style: kpi.value.bold=on bolds the number",
-        "fit": _FIT,
-    },
+    "item": {"icon": "an item card has no icon slot: put icon= on the ## box heading", "fit": _FIT},
+    "kpi": {"fit": _FIT},
     "step": {
         **_ig("x y w h", _STEP_GEO),
-        "valign": "step cards keep their text at the top: @free places blocks",
         "fit": _FIT,
     },
     "chevron": {
-        "h": "the compact row sets the chevron height: @steps (arrows + cards) fills the body",
-        **_ig("align valign radius pad", "a compact chevron centres its text: size color fill apply"),
+        "radius": "chevron points are fixed: shape=pill|rounded|pentagon redraws the box",
         "fit": _FIT,
     },
-    "text": {
-        "radius": "radius= applies to boxes (##), code and images: put the text in a box",
-        "fit": _FIT,
-        "icon": _ICON,
-    },
-    "callout": {"y": "a lone callout is centred in the body: @free places it", "fit": _FIT, "icon": _ICON},
-    "image": {**_ig("size color fill font align valign bold italic pad", _IMAGE), "icon": _ICON},
+    "text": {"fit": _FIT, "icon": _ICON},
+    "callout": {"fit": _FIT, "icon": _ICON},
+    "image": {**_ig("color font bold italic", _IMAGE), "icon": _ICON},
     "table": {
-        "radius": "table corners follow style: radius=",
-        "pad": "cell padding follows the table text: sizes: table=NN",
+        "radius": "PowerPoint tables have square corners: put the table in a box ## t {radius=12}",
+        "rotate": _ROTATE_FRAME,
+        "shape": "a table is a grid of cells: shape= is for boxes, text, images and charts",
         "fit": _FIT,
         "icon": _ICON,
     },
-    "chart": {
-        **_ig("fill line align valign bold italic radius opacity pad", _CHART),
+    "chart": {"rotate": _ROTATE_FRAME, "fit": _FIT, "icon": _ICON},
+    "code": {"fit": _FIT, "icon": _ICON},
+    "rows": {"fit": _FIT, "icon": _ICON},
+    "row": {
+        **_ig("x y w h", "rows are laid out one under the other: {x= y= w= h=} place the whole list"),
+        **_ig(
+            "valign radius opacity pad shadow rotate shape z",
+            "a row takes size color font bold italic align fill line",
+        ),
         "fit": _FIT,
         "icon": _ICON,
     },
-    "code": {"font": "code uses fonts: mono=<font>", "fit": _FIT, "icon": _ICON},
-    "rows": {
-        **_ig("align valign radius", "@rows bars are fixed: style: rows.fill= rows-num.fill= layout.rows_h="),
+    "list item": {
+        **_ig("x y w h", _ITEM_GEO),
+        **_ig("fill line radius opacity pad valign shadow rotate shape z", _ITEM_BOX),
         "fit": _FIT,
         "icon": _ICON,
     },
+}
+
+# Honoured only with a companion: (kind, attr) -> the attributes of which one must be written beside it
+# (a corner radius or a preset shape needs something to draw: a fill or a border).
+NEEDS: dict[tuple[str, str], tuple[str, ...]] = {
+    ("text", "radius"): ("fill", "line"),
+    ("text", "shape"): ("fill", "line"),
+    ("chart", "radius"): ("fill", "line"),
+    ("chart", "shape"): ("fill", "line"),
+    ("chart", "opacity"): ("fill",),
+    ("chart", "align"): ("w",),  # a chart that fills its cell has nowhere to move
+    ("chart", "valign"): ("h",),
+    ("image", "valign"): ("size",),  # a picture that fills the height has nowhere to move
 }
 
 
@@ -165,6 +182,14 @@ def _slide_kind(slide: Slide, index: int, has_body: bool) -> str:
     if slide.title and not slide.elements and not slide.conclusion and not has_body:
         return "cover" if index == 0 else "section"
     return "content"
+
+
+class _Item:
+    """A list item (or a row of an ``@rows`` list) seen as an element: its own text style and the keys it
+    cannot honour (``Paragraph.attrs``)."""
+
+    def __init__(self, p: Any, line: int | None) -> None:
+        self.box, self.style, self.attrs, self.line = None, p.style, p.attrs, line
 
 
 def _walk(slide: Slide, theme: Any, index: int) -> Iterator[tuple[Any, str]]:
@@ -189,16 +214,19 @@ def _walk(slide: Slide, theme: Any, index: int) -> Iterator[tuple[Any, str]]:
                 pass  # generated containers: nothing the author wrote
             elif "chevron" in shaped.classes and parent is None and "steps" not in shaped.classes:
                 yield el, "chevron"
+            elif "item" in el.classes:  # `### text {.item}`: an item card
+                yield el, "item"
             else:
                 yield el, "box"
             for c in el.children:
                 yield from rec(c, el)
         elif isinstance(el, Text):
             if el.role == "body":
-                yield (
-                    el,
-                    "callout" if "callout" in el.classes else "rows" if rows and _is_list(el) else "text",
-                )
+                kind = "callout" if "callout" in el.classes else "rows" if rows and _is_list(el) else "text"
+                yield el, kind
+                for p in el.paragraphs:  # `- item {color=red}`
+                    if p.marker and (p.style is not None or p.attrs):
+                        yield _Item(p, el.line), "row" if kind == "rows" else "list item"
         elif isinstance(el, (Image, Media)):
             yield el, "image"
         elif isinstance(el, Table):
@@ -226,6 +254,8 @@ def _authored(el: Any) -> list[str]:
             if getattr(el.style, field, None) is not None:
                 got.add(attr)
     extra = {**el.attrs, **(el.options if isinstance(el, Chart) else {})}  # keys no handler consumed
+    if isinstance(el, _Item):
+        got |= {k for k in ATTRS if k in el.attrs}
     if isinstance(el, Image):
         if el.fit != "contain":
             got.add("fit")
@@ -245,11 +275,16 @@ def audit(slide: Slide, theme: Any, index: int = 0) -> list[tuple[Any, str, str,
     free = slide.layout == "free"
     out = []
     for el, kind in _walk(slide, theme, index):
-        for attr in _authored(el):
-            if free and attr in GEOMETRY:
+        authored = _authored(el)
+        for attr in authored:
+            if free and attr in GEOMETRY and kind not in ("row", "list item"):
                 out.append((el, kind, attr, None))
             elif honoured(kind, attr):
-                if (
+                needs = NEEDS.get((kind, attr))
+                if needs and not any(n in authored for n in needs):
+                    hint = f"{attr}= shows with {' or '.join(f'{n}=<c>' for n in needs)}: write one beside it"
+                    out.append((el, kind, attr, hint))
+                elif (
                     attr == "size"
                     and isinstance(el, Container)
                     and not _has_text(el)

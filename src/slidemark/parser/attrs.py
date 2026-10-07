@@ -9,7 +9,7 @@ import shlex
 from dataclasses import dataclass, field
 from typing import Any
 
-from .. import icons
+from .. import icons, shapes
 from ..ir import Box, Chart, ElementBase, Image, Media, Style, Table
 from .ctx import Ctx, closest
 from .tabular import apply_chart_kv, apply_table_kv
@@ -102,9 +102,24 @@ def _float(v: str) -> float | None:
         return None
 
 
+Z_MIN, Z_MAX = 1, 9
+
+
+def _shadow(v: str) -> bool | str | None:
+    """``on`` / ``off`` or CSS-like ``"x y blur [spread] color"`` (pt); ``None`` when it is neither."""
+    s = v.strip().lower()
+    if s in ("on", "true", "yes", "1", ""):
+        return True
+    if s in ("off", "none", "false", "no", "0"):
+        return False
+    text = re.sub(r"\s*,\s*", " ", v.strip())
+    return text if re.match(r"-?\d", text) and len(text.split()) >= 2 else None
+
+
 VALID_KEYS = (
     *("x", "y", "w", "h", "size", "color", "fill", "line", "font", "align", "valign", "bold", "italic"),
     *("radius", "opacity", "pad", "fit", "bg", "t", "hidden", "gap", "id", "icon"),
+    *("shadow", "rotate", "shape", "z"),
     *("poster", "autoplay", "loop", "render"),
 )
 ICON_NAMES = tuple(icons.names())
@@ -150,9 +165,14 @@ def apply_attrs(
         if k in _BOX:
             box[k] = _length(v)
         elif k == "size":
-            f = _float(v)
-            if f is None:
-                ctx.warn(f"bad size '{v}'", line, "bad-attr", "size is a number in pt, e.g. {size=10}")
+            f = _float(v.rstrip("%")) if isinstance(el, (Image, Media)) else _float(v)
+            if f is None or (isinstance(el, (Image, Media)) and not 5 <= f <= 100):
+                what = (
+                    ("a picture's size is a percent of its cell, 5-100, e.g. {size=60}")
+                    if isinstance(el, (Image, Media))
+                    else "size is a number in pt, e.g. {size=10}"
+                )
+                ctx.warn(f"bad size '{v}'", line, "bad-attr", what)
             else:
                 style["font_size"] = f
         elif k in ("color", "fill", "line", "font"):
@@ -181,6 +201,40 @@ def apply_attrs(
                 style[k] = f
         elif k == "pad":
             style["padding"] = _length(v)
+        elif k == "rotate":
+            f = _float(re.sub(r"(deg|\u00b0)$", "", v.strip()))
+            if f is None or not -360 <= f <= 360:
+                ctx.warn(
+                    f"bad rotate '{v}'", line, "bad-attr", "rotate is degrees clockwise, e.g. {rotate=15}"
+                )
+            else:
+                style["rotation"] = f
+        elif k == "shape":
+            name = shapes.resolve(v)
+            if name is None:
+                ctx.warn(f"unknown shape '{v}'", line, "bad-attr", shapes.suggest(v))
+            else:
+                style["shape"] = name
+        elif k == "z":
+            try:
+                z = int(v.strip())
+            except ValueError:
+                z = 0
+            if not Z_MIN <= z <= Z_MAX:
+                ctx.warn(f"bad z '{v}'", line, "bad-attr", "z is a level 1..9: 1 behind the rest, 9 in front")
+            else:
+                style["z"] = z
+        elif k == "shadow":
+            sh = _shadow(v)
+            if sh is None:
+                ctx.warn(
+                    f"bad shadow '{v}'",
+                    line,
+                    "bad-attr",
+                    'use shadow=on|off or shadow="0 4 12 #00000040" (x y blur color, pt)',
+                )
+            else:
+                style["shadow"] = sh
         elif k == "fit" and isinstance(el, Image):
             if v in ("contain", "cover", "stretch"):
                 el.fit = v  # type: ignore[assignment]
@@ -222,6 +276,10 @@ def apply_attrs(
         el.box = Box(**merged)
     if style:
         el.style = (el.style or Style()).merged(Style(**style))
+    if isinstance(el, Table) and "padding" in style:  # `{pad=}` on a table pads every cell (and is measured)
+        for row in el.rows:
+            for cell in row:
+                cell.style = (cell.style or Style()).merged(Style(padding=style["padding"]))
 
 
 # --------------------------------------------------------------------------- the `@` line
@@ -243,6 +301,7 @@ KNOWN_WORDS = (
     "rows",
     "num",
     "items",
+    "grid",
 )
 TRANSITIONS = ("fade", "push", "wipe", "split", "cover", "zoom", "morph")
 _N = re.compile(r"^\d+$")
@@ -327,6 +386,8 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
             spec.layout = tok
         elif tok == "html":
             spec.classes.append("html")
+        elif tok == "grid":  # `@free grid`: x y w h snap to a 12 x 12 grid (`3c` = column 3)
+            spec.classes.append("grid")
         elif tok == "hidden":
             spec.hidden = True
         elif tok in FLAGS:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from functools import cmp_to_key
@@ -987,6 +988,9 @@ class Out:
     save_image: Callable[[int, int, bytes, str], str]
     classes: dict[str, str]
     img_n: int = 0
+    shadow: str | None = (
+        None  # the shadow most filled shapes of the slide share: a deck style, not a per-box choice
+    )
 
 
 def _kpi(b: Block, css_heading: bool = False) -> bool:
@@ -1058,22 +1062,44 @@ def _table_align(rows, hdr: int = 1) -> str | None:
     return "".join(letters) if differs else None
 
 
+def _control_attrs(it: Item | None, common: str | None = None) -> list[str]:
+    """``rotate=15``, ``shape=hexagon``, ``shadow="0 4 12 #00000040"`` of a card or picture: what the renderer
+    wrote for ``{rotate= shape= shadow=}``. A plain rectangle / rounded rectangle says nothing."""
+    if it is None:
+        return []
+    from .. import shapes
+
+    out: list[str] = []
+    if it.rot:
+        out.append(f"rotate={it.rot:g}")
+    if it.prst == "roundRect" and it.radius is not None and it.radius >= 0.49 * min(it.w, it.h) / 12700:
+        out.append("shape=pill")
+    elif it.prst and it.prst not in ("rect", "roundRect") and (name := shapes.name_of_prst(it.prst)):
+        out.append(f"shape={name}")
+    if it.shadow and it.shadow != common:
+        out.append(f'shadow="{it.shadow}"')
+    return out
+
+
 def _fit_attr(it: Item) -> str:
-    """``{fit=cover}`` for a cropped picture, ``{fit=stretch}`` when the box aspect differs from the image."""
+    """``{fit=cover}`` for a cropped picture, ``{fit=stretch}`` when the box aspect differs from the image;
+    ``rotate`` / ``shape`` / ``shadow`` of the picture join the same list."""
+    attrs = _control_attrs(it)
     if it.cropped:
-        return "{fit=cover}"
-    try:
-        import io
+        attrs.insert(0, "fit=cover")
+    else:
+        try:
+            import io
 
-        from PIL import Image as PILImage
+            from PIL import Image as PILImage
 
-        with PILImage.open(io.BytesIO(it.img[0])) as im:
-            iw, ih = im.size
-        if iw and ih and it.w and it.h and abs((it.w / it.h) / (iw / ih) - 1) > 0.04:
-            return "{fit=stretch}"
-    except Exception:
-        pass
-    return ""
+            with PILImage.open(io.BytesIO(it.img[0])) as im:
+                iw, ih = im.size
+            if iw and ih and it.w and it.h and abs((it.w / it.h) / (iw / ih) - 1) > 0.04:
+                attrs.insert(0, "fit=stretch")
+        except Exception:
+            pass
+    return "{" + " ".join(attrs) + "}" if attrs else ""
 
 
 def _narrow_cols(b: Block, out: Out) -> int | None:
@@ -1163,8 +1189,9 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     chunks: list[tuple[str, list[str]]] = []
     kpi = _kpi(b, out.deck.css_heading)
     cname = None if kpi or b.chevron else _box_class(b, out)
-    attrs = (".kpi " if kpi else "") + (f".{cname} " if cname else "") + (f"icon={b.icon}" if b.icon else "")
-    head = f"{mark} {_head(b.heading or [], out)}" + (f" {{{attrs.strip()}}}" if attrs else "")
+    attrs = (".kpi " if kpi else "") + (f".{cname} " if cname else "") + (f"icon={b.icon} " if b.icon else "")
+    attrs += " ".join(_control_attrs(b.item if not b.chevron else None, out.shadow))
+    head = f"{mark} {_head(b.heading or [], out)}" + (f" {{{attrs.strip()}}}" if attrs.strip() else "")
     if b.chevron:
         content = text_lines(b.paras, accent=acc, classes=cls)
         return [("meta", [head, *content])]
@@ -1303,6 +1330,8 @@ def build_slide(
             )
         )
     out = Out(deck, n, diags, save_image, classes)
+    shared = Counter(it.shadow for it in data.items if it.shadow and it.fill).most_common(1)
+    out.shadow = shared[0][0] if shared and shared[0][1] >= 2 else None
     lines: list[str] = []
     if title is not None:
         lines.append("# " + _head(title.paras, out))

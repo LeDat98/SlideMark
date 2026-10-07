@@ -9,7 +9,7 @@ from urllib.parse import quote, unquote
 from markdown_it.token import Token
 
 from ..ir import Cell, Chart, Code, Image, Media, Paragraph, Raw, Run, Series, Style, Table, Text
-from .attrs import Attrs, apply_attrs, media_kind, parse_attr_body
+from .attrs import TRAILING, Attrs, apply_attrs, media_kind, parse_attr_body
 from .ctx import Ctx, closest
 from .html import html_blocks
 from .inline import MD, ImageRef, inline_items, inline_runs
@@ -115,6 +115,44 @@ def paragraphs_from_tokens(tokens: list[Token], lines: bool = False) -> list[Par
         elif ty == "fence":
             out.append(Paragraph(runs=[Run(text=tok.content.rstrip("\n"), code=True)]))
     return out
+
+
+# keys a list item takes into its own text style; any other key is kept in `Paragraph.attrs`
+_ITEM_STYLE = ("font_size", "color", "font", "bold", "italic", "align", "fill", "line")
+_ITEM_KEY = {"padding": "pad", "rotation": "rotate"}
+_ITEM_REST = ("valign", "radius", "opacity", "padding", "shadow", "rotation", "shape", "z")
+_ITEM_COLORS = ("primary", "accent", "danger", "success", "muted")
+
+
+def item_attrs(p: Paragraph, ctx: Ctx, line: int) -> None:
+    """``- text {color=danger bold=true}``: a trailing attribute list styles that list item (size color font
+    italic align; a row of ``@rows`` also fill line). Keys it cannot honour (``x y w h radius ...``) go to
+    ``Paragraph.attrs`` so the build reports them as ``attr-ignored``. Anything that is not a valid
+    attribute list stays text."""
+    if p.marker is None or not p.runs:
+        return
+    last = p.runs[-1]
+    m = TRAILING.search(last.text)
+    a = parse_attr_body(m.group(1)) if m and not last.code else None
+    if a is None or not (a.kv or any(c in _ITEM_COLORS for c in a.classes)):
+        return
+    probe = Text(role="body")
+    apply_attrs(probe, a, ctx, line)
+    last.text = last.text[: m.start()].rstrip()
+    if not last.text and len(p.runs) > 1:
+        p.runs.pop()
+    own = probe.style.__dict__ if probe.style is not None else {}
+    got = {k: own[k] for k in _ITEM_STYLE if own.get(k) is not None}
+    for c in a.classes:
+        if c in _ITEM_COLORS:
+            got.setdefault("color", c)
+    if got:
+        p.style = Style(**got)
+    rest: dict[str, Any] = {_ITEM_KEY.get(k, k): own[k] for k in _ITEM_REST if own.get(k) is not None}
+    if probe.box is not None:
+        rest.update({k: v for k, v in probe.box.model_dump().items() if v is not None})
+    rest.update({k: v for k, v in probe.attrs.items() if k in ("fit", "icon")})
+    p.attrs.update(rest)
 
 
 def _cell(text: str) -> Cell:
@@ -447,6 +485,7 @@ class _Builder:
                 self.paragraph(tokens, i, line)
             elif ty in ("bullet_list_open", "ordered_list_open"):
                 for p in paragraphs_from_tokens(tokens[i : end + 1]):
+                    item_attrs(p, self.ctx, line)
                     self.add_paragraph(p, line)
             elif ty == "heading_open":
                 for p in paragraphs_from_tokens(tokens[i : end + 1]):
