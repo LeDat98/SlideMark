@@ -154,6 +154,7 @@ class LayoutTokens(BaseModel):
     table_grow_roomy: float = 2.0  # table rows grow up to this factor when a quarter of the body stays empty
     tree_slack_roomy: float = 1.15  # org-tree boxes may be this much taller than their content (roomy slides)
     tree_slack: float = 1.15  # org-tree boxes are at most this much taller than their content
+    html_footer: bool = False  # True: the deck `footer:` and `num:` are drawn on `@html` slides too
     html_fit: bool = False  # True: a lone HTML block fills the body height (stretch, else center)
     html_zoom_max: float = 1.5  # a short HTML block renders zoomed up to this factor (1 = off)
     roomy_left: float = 0.25  # share of the body left empty that triggers the roomy pass
@@ -428,6 +429,15 @@ class LayoutTokens(BaseModel):
     steps_arrow_min_h: Length = "0.55in"  # ... but at least this ...
     steps_arrow_max_h: Length = "1.2in"  # ... and at most this tall
     steps_gap: Length = "0.12in"  # arrow row -> card row
+    # --- `@rows`: an ordered list alone on the slide drawn as numbered bars
+    rows: bool = False  # True: every slide whose body is one ordered list is drawn as bars (else `@rows`)
+    rows_h: Length = "1.05in"  # a bar is at most this tall (shorter when the items do not fit the body)
+    rows_min_h: Length = "0.3in"  # ... below this the list stays plain text
+    rows_gap: Length = "0.17in"  # air between bars
+    rows_pad: Length = "0.2in"  # air between the badge and the text, and at the right end
+    rows_text_ratio: float = 0.34  # text size = this x the bar height (pt), at least the body size ...
+    rows_text_max_pt: float = 28  # ... at most this size (pt)
+    steps_caption_ratio: float = 0.65  # the "STEP n" caption line is this x the body text size
     steps_stretch: bool = True  # the cards grow down to the conclusion bar / footnote (items spread inside)
     steps_stretch_min: float = 0.4  # hollow at full height: cards are tried shorter, down to this share ...
     steps_stretch_step: float = 0.15  # ... in steps of this share of the free height
@@ -592,6 +602,10 @@ class RenderTokens(BaseModel):
     chart_seg_pad: float = 1.3  # a segment label needs this multiple of its font size as height
     chart_line_zero_max: float = 0.4  # a line chart axis starts above zero when its lowest value is above
     # this share of its highest
+    chevron_shape: str = (
+        "chevron"  # `@chevron` / `@steps` arrows: "chevron" (notched tail) or "pentagon" (flat tail)
+    )
+    chart_grid: str = "border"  # value-axis gridline color of bar / column / line charts
     chart_hl: str = "accent"  # `hl=` points: fill (bar / column / pie / waterfall), outline, line marker
     chart_hl_line: float = 2.25  # pt, outline of an `hl=` bar in a multi-series chart
     chart_hl_marker: int = 11  # pt, marker of an `hl=` point in a line chart
@@ -679,6 +693,9 @@ def _base_classes() -> dict[str, Style]:
             valign="middle",
         ),
         "decision": Style(fill="bg", line="accent"),
+        # `@rows`: the bar of every ordered-list item and its number badge (`rows-num.fill=a,b` cycles)
+        "rows": Style(fill="surface", line="border", line_width=0.75),
+        "rows-num": Style(fill="primary", color="bg"),
         # `note=` of a chart: native callout inside the chart frame, pointing at the `hl=` point
         "chart-note": Style(
             fill="surface", line="accent", line_width=1, radius=3, padding="5pt", bold=True, valign="middle"
@@ -695,6 +712,7 @@ class Theme(BaseModel):
     # font sizes in pt, by text role
     sizes: dict[str, float] = Field(default_factory=lambda: dict(DEFAULT_SIZES))
     min_font_size: float = 8  # autofit never shrinks below this
+    pinned: list[str] = Field(default_factory=list)  # size roles written `sizes: heading=20!`: never grown
     margin_x: Length = "0.5in"
     margin_y: Length = "0.4in"
     gap: Length = "0.25in"
@@ -715,6 +733,23 @@ class Theme(BaseModel):
     cover_rule: str | None = None  # color of a thin rule along the band edge (None = no rule)
     cover_rule_h: Length = "0.05in"  # ... its thickness
     cover_footer: bool = True  # the deck footer (organisation) shows on the cover as a quiet caption
+    cover_bar: str | None = None  # color of a vertical bar left of the cover title block (None = none)
+    cover_bar_w: Length = "0.12in"  # ... its width (the title block moves right by width + `cover_gap`)
+    cover_band: bool = True  # False: the cover band is not drawn although `title.band` is set (bg= shows)
+    # slide chrome (design wave 3): edge strips, the rule under the title, a KPI stripe
+    top_bar: str | None = None  # color of a strip along the top edge of every slide but the cover
+    top_bar_h: Length = "0.1in"
+    bottom_bar: str | None = None  # ... along the bottom edge
+    bottom_bar_h: Length = "0.1in"
+    title_rule: str | None = None  # color of a rule under the slide title (None = none)
+    title_rule_h: Length = "2pt"
+    kpi_stripe: str | None = None  # color of a stripe on the top edge of every `.kpi` card
+    kpi_stripe_h: Length = "6pt"
+    bullet: str | None = None  # glyph of bullet lists (None = the built-in "•" / "–")
+    bullet_color: str | None = None  # ... its color (None = the text color)
+    steps_caption: str | None = None  # `@steps`: caption under every card, "{n}" = the step number
+    steps_caption_color: str | None = None  # ... its color (None = the muted color)
+    steps_caption_size: float | None = None  # ... its size in pt (None = `layout.steps_caption_ratio` x body)
     conclusion_fill: str = "primary"
     conclusion_color: str = "bg"
     table_header_fill: str = "surface"
@@ -1087,7 +1122,7 @@ def canonical_token(group: str, key: str) -> tuple[str | None, str]:
             return f"fonts.{k}", ""
         return None, _did_you_mean(k, list(Fonts.model_fields))
     if g == "sizes":
-        if k in DEFAULT_SIZES or k in ("kpi",):
+        if k in DEFAULT_SIZES or k in ("kpi", "conclusion"):
             return f"sizes.{k}", ""
         return None, _did_you_mean(k, list(DEFAULT_SIZES))
     # style: generic path
@@ -1157,6 +1192,8 @@ def apply_tokens(theme: Theme, tokens: dict[str, str]) -> tuple[Theme, list[Diag
             pairs = normalize_token(path, raw, names) if isinstance(raw, str) else [(path, raw)]
             for p, v in pairs:
                 _set_path(trial, p.split("."), v)
+            if path.startswith("sizes.") and isinstance(raw, str) and raw.strip().endswith("!"):
+                trial["pinned"] = [*trial.get("pinned", []), path.split(".", 1)[1]]  # `heading=20!`
             Theme.model_validate(trial)
         except TokenValueError as e:
             diags.append(_bad_token(path, raw, str(e), e.hint))
@@ -1337,7 +1374,7 @@ _IDENT = re.compile(r"[A-Za-z][\w-]*")
 _KEYWORDS = {"none", "hidden", "solid", "dashed", "dotted", "double", "thin", "medium", "thick"}
 _PT_FIELDS = {"font_size", "line_width", "radius", "letter_spacing"}
 _PT_PATHS = {"min_font_size", "render.line_width", "render.connector_width", "render.chart_line_width"}
-_THEME_COLOR_SUFFIX = ("_fill", "_color", "_band", "_border")
+_THEME_COLOR_SUFFIX = ("_fill", "_color", "_band", "_border", "_bar", "_rule", "_stripe")
 _OPTIONAL_COLORS = {
     "title_band",
     "heading_band",
@@ -1346,6 +1383,13 @@ _OPTIONAL_COLORS = {
     "table_hl_fill",
     "table_hl_color",
     "cover_rule",
+    "cover_bar",
+    "top_bar",
+    "bottom_bar",
+    "title_rule",
+    "kpi_stripe",
+    "bullet_color",
+    "steps_caption_color",
 }
 _MEDIUM_PT = 2.25  # CSS `medium` border width (3px)
 
@@ -1504,6 +1548,15 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
     in_class = len(parts) == 3 and parts[0] == "classes"
     if in_class and leaf == "line":
         return _line_pairs(".".join(parts[:2]), raw, names)
+    if (
+        in_class
+        and leaf == "fill"
+        and parts[1] in ("steps-arrow", "steps-card", "rows-num")
+        and "," in raw
+        and "(" not in raw
+    ):
+        items = [p.strip() for p in _unquote(raw).split(",") if p.strip()]
+        return [(path, ",".join(_color_value(p, names) for p in items))]  # cycled over the steps
     if in_class and leaf == "fill":
         return _fill_value(path, raw, names)
     if in_class and leaf == "color":
@@ -1522,16 +1575,25 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
         if flag in ("off", "false", "no", "0", "none"):
             return [(path, False)]
         raise TokenValueError("ink.auto is on or off", "write 'style: ink.auto=off' (or on)")
+    if path == "cover_band":  # `cover.band=none` / `off` = no band; anything else = on
+        return [(path, _unquote(raw).lower() not in ("none", "off", "no", "false", "0"))]
     if path == "palette":
         items = [p.strip() for p in _unquote(raw).split(",") if p.strip()]
         return [(path, [_color_value(p, names) for p in items])]
-    if parts[0] == "colors" or path in ("render.ink_dark", "render.ink_light", "render.highlight"):
+    if parts[0] == "colors" or path in (
+        "render.ink_dark",
+        "render.ink_light",
+        "render.highlight",
+        "render.chart_grid",
+    ):
         return [(path, _color_value(raw, names))]
     if len(parts) == 1 and leaf.endswith(_THEME_COLOR_SUFFIX) and leaf in Theme.model_fields:
         if leaf in _OPTIONAL_COLORS and _unquote(raw).lower() in ("none", "null", "off"):
             return [(path, None)]
         return [(path, _color_value(raw, names))]
-    if (in_class and leaf in _PT_FIELDS) or path in _PT_PATHS or parts[0] == "sizes":
+    if parts[0] == "sizes":  # `20!` pins the size against the layout's growth
+        return [(path, _pt_value(_unquote(raw).removesuffix("!")))]
+    if (in_class and leaf in _PT_FIELDS) or path in _PT_PATHS:
         return [(path, _pt_value(raw))]
     if path in _length_fields() or (
         in_class and leaf in Style.model_fields and _is_length_type(Style.model_fields[leaf].annotation)

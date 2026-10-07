@@ -1036,6 +1036,7 @@ def parse_deck(text: str) -> Deck:
         inside, _ = fence_map(lines)
     start = parse_header(lines, inside, deck, ctx)
     ctx.lang = deck.lang
+    ctx.colors = {k.split(".", 1)[1] for k in deck.tokens if k.startswith("colors.")}
     recs = normalize(lines, inside, start, deck)
     chunks = split_slides(lines, inside, start)
     if not chunks:

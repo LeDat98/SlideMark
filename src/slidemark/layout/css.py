@@ -352,6 +352,14 @@ class CssIndex:
                 if (k := self._block(n, ch)) is not None:
                     kids.append(k)
             self._number(kids)
+            if "steps" in classes:  # `@steps`: the step's arrow is its node, its card is a second node
+                for k in kids:
+                    if k.kind != "container":
+                        continue
+                    k.classes = k.classes | {"steps-arrow"}
+                    card = Node(k.types, (k.classes - {"steps-arrow"}) | {"steps-card"}, "container", k.id, n)
+                    card.nth, card.nth_last = k.nth, k.nth_last
+                    self.nodes[("steps-card", id(k.el))] = card  # type: ignore[index]
             if "kpi" in classes:  # virtual nodes: `.kpi .value` (the big number), `.kpi .caption`
                 self.kpi_nodes[id(el)] = (
                     Node(frozenset({"p"}), frozenset({"value"}), "text", None, n),
@@ -479,7 +487,12 @@ class CssIndex:
                     slide=self.slide_no,
                     line=line,
                     rule="css-unsupported",
-                    hint="move it to a box (.box) or remove it",
+                    hint=(
+                        "a strip on the slide edge is a token: style: top.bar=<color> top.bar_h=0.1in "
+                        "(bottom.bar=<color> for the bottom edge)"
+                        if n.kind == "slide" and any(p.startswith("border") for p in bad)
+                        else "move it to a box (.box) or remove it"
+                    ),
                 )
             )
 
@@ -490,6 +503,17 @@ class CssIndex:
             return fast_style()
         self._compute(n)
         return n._own or fast_style()
+
+    def virtual(self, classes, type_: str = "p") -> Style:
+        """CSS of an element the layout makes itself (the footer and slide number are ``.caption``)."""
+        if not self.active or self.root is None:
+            return fast_style()
+        try:
+            n = Node(frozenset({type_}), frozenset(classes), "text", None, self.root)
+            self._compute(n)
+            return (n._inh or fast_style()).merged(n._own or fast_style())
+        except Exception:
+            return fast_style()
 
     def kpi_styles(self, box) -> tuple[Style, Style]:
         """``(value, caption)`` CSS of a ``.kpi`` box.

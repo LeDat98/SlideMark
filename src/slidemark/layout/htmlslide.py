@@ -76,4 +76,8 @@ def layout_html_slide(slide: Slide, deck: Deck, theme: Theme, index: int) -> lis
     items, diags = res
     for d in diags:
         diag(d.level, d.message, d.rule or "html-native", d.hint or "")
+    if theme.layout.html_footer and (deck.footer or deck.slide_number):
+        from .engine import html_footer_items
+
+        items = [*items, *html_footer_items(slide, deck, theme, index, W, H)]
     return items

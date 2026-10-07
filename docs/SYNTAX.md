@@ -78,6 +78,28 @@ Class style fields: `fill` (a color or `linear-gradient(...)`/`radial-gradient(.
 skipped with a `bad-token` warning. A theme file is the same tokens as YAML (`colors: {primary: "#7C5CFF"}`,
 `classes: {card: {radius: 14}}`), extends `default` unless it sets `extends: none` or another preset.
 
+**Slide chrome and element tokens** (one `style:` line each, no CSS fence; the python-pptx frame in one line):
+
+```markdown
+style: top.bar=primary top.bar_h=0.12in title.rule=secondary kpi.stripe=secondary bullet=■ bullet.color=teal
+```
+
+| Token | Draws |
+|---|---|
+| `top.bar=<color>` `top.bar_h=0.1in` | a full-width strip on the top edge of every slide but the cover (`bottom.bar` / `bottom.bar_h`: the bottom edge) |
+| `title.rule=<color>` `title.rule_h=2pt` | a rule on the bottom edge of the slide title |
+| `kpi.stripe=<color>` `kpi.stripe_h=6pt` | a stripe on the top edge of every `.kpi` card |
+| `bullet=■` `bullet.color=<color>` | the glyph and color of bullet lists (default `•`, text color) |
+| `footer.color=` `footer.size=` | the footer text and the slide number (CSS `.caption`) |
+| `lead.bold=on` `lead.border-left="4pt solid secondary"` | any CSS property of `lead` `conclusion` `footnote` `subtitle` `box` `chart` (`lead.color` is the theme field) |
+| `kpi.label.size=20` `kpi.label.bold=on` `kpi.value.color=` `kpi.note.color=teal` | the KPI label (`.kpi h2`), number and caption line; `kpi.size` / `kpi.color` stay the number's class style |
+| `sizes: conclusion=24` | the conclusion bar text size |
+| `sizes: heading=20!` | `!` pins a size: the layout never grows it (`{size=}` and CSS already do) |
+
+A declared color name beats the CSS color of the same name (`colors: teal=#2A9D8F` makes `teal` yours everywhere).
+`slide { border-top }` in CSS is not drawn (`css-unsupported` names `top.bar`). `layout.html_footer=on` draws the deck `footer:` and
+`num:` on `@html` slides too.
+
 ## Slides
 
 - `# Title` starts a new slide. You do not need a separator.
@@ -90,7 +112,7 @@ skipped with a `bad-token` warning. A theme file is the same tokens as YAML (`co
   Cover tokens (`style:`): `cover.band_h=60%` (band anchored to the top, filled by `title.band`; title block
   bottom-aligned in it; `0` = the older centred block), `cover.pad=0.55in` (air under the block), `cover.gap=0.2in`
   (title to subtitle), `cover.rule=accent` + `cover.rule_h=0.06in` (rule on the band edge, `none` = off),
-  `cover.footer=off` (the deck `footer:` shows on the cover as a bottom caption). `{size=}` or CSS on the cover keeps the old look.
+  `cover.footer=off` (the deck `footer:` shows on the cover as a bottom caption), `cover.bar=teal` + `cover.bar_w=0.12in` (a vertical bar left of the title block), `cover.band=none` (no band although `title.band` is set, so a slide `bg=` shows; the rule is full width over a `bg=`). `{size=}` or CSS (other than `color`) on the cover keeps the old look. A full-bleed cover with a rule and a bar: `style: cover.band_h=61% cover.rule=accent cover.bar=teal cover.band=none` + `@cover bg=primary dark`.
 - **Dark slides pick their own ink.** A slide `bg=` (color, token name or `linear-gradient(...)`, every stop
   judged) that gives the theme `fg` less than 4.5:1 turns the text on the slide (title, lead, subtitle, footnote,
   loose paragraphs) to `render.ink_light` or `render.ink_dark`, whichever contrasts more; lead, subtitle and
@@ -171,6 +193,7 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `rows/rows` | **areas**: block 1 = `a`, block 2 = `b`, ... in source order; repeat a letter to span; `.` = empty | `@aab/aac` |
 | `flow` | arrows between blocks in reading order (process diagrams) | `@4 flow` |
 | `chevron` | blocks drawn as chevrons (steps) | `@4 chevron` |
+| `rows` | an ordered list (`1.` `2.`) alone on the slide drawn as numbered bars (below; `layout.rows=on` does it for every such slide) | `@rows` |
 | `steps` | a process row: each `##` heading is an arrow, its bullets sit in a card under that arrow (below) | `@4 steps` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
 | `free` | absolute positioning: every block with `{x= y= w= h=}` (% of the area under the title, or lengths) sits exactly there, with no growth, balance or search; unplaced blocks stack on top (info `free-unplaced`) | `{x=10% y=30% w=40% h=20%}` |
@@ -204,6 +227,8 @@ step also fills the slide (`style: layout.chevron_steps=off` keeps the thin stri
 - 標準フローを策定
 ```
 
+`@4 steps num` adds a caption line first in every card (`STEP 1` ...); `style: steps.caption="STEP {n}" steps.caption_color=teal steps.caption_size=14` sets its text, color and size for every `@steps` slide (a size of its own: `layout.steps_caption_ratio` x body). `steps-arrow.fill=primary,secondary` (a list) cycles the arrow colors over the steps, `steps-card.fill=a,b` the cards; `steps-card.size=24 steps-card.bold=on` style the card text. `render.chevron_shape=pentagon` draws flat-tailed arrows (the importer reads them as chevrons). CSS reaches both parts: `.steps-arrow:nth-child(even) { background: ... }`, `.steps-card { ... }`.
+
 Looks are tokens: `style: steps-arrow.fill=accent steps-card.fill=#EEF2FF` (classes `steps-arrow` / `steps-card`,
 or per step `## 設計 {.accent}`), `layout.steps_gap` (arrow row to cards), `layout.steps_arrow_aspect` /
 `steps_arrow_min_h` / `steps_arrow_max_h` (arrow height), `layout.steps_arrow_text_ratio` (arrow text vs card
@@ -211,6 +236,17 @@ text), `layout.steps_stretch=off` (cards keep their content height). Fewer than 
 `steps-few`. Column ratios work (`@1:2:1 steps`). A sparse group (at most two short bullets per card) grows its text
 (`layout.steps_text_max_pt`, `steps_arrow_text_max_pt`), arrows and cards, and sits centred in the body
 (`layout.steps_sparse_fill`, `steps_top_share`; `layout.steps_sparse=off` keeps the compact strip).
+
+**Rows.** `@rows` draws an ordered list that is alone on the slide (a lead, conclusion and footnotes may surround it) as one bar per item with a number badge on the left. Other content on the slide: info `rows-skipped`.
+
+```markdown
+# 価格改定の方針
+@rows
+1. 主力3ブランドを平均6%改定
+2. 容量変更は行わない
+```
+
+Looks: classes `rows` (bar: `rows.fill=surface`) and `rows-num` (badge: `rows-num.fill=primary,secondary` cycles), `layout.rows_h` (bar height, 1.05in), `rows_gap`, `rows_pad`, `rows_text_ratio` / `rows_text_max_pt` (text size; `{size=}` pins it). The bars are native rectangles named `Row N` and `Row N num`; the importer folds them back to `@rows`.
 
 ## Attributes `{...}`
 
@@ -224,8 +260,8 @@ Keys:
 
 | Group | Keys |
 |---|---|
-| Position | `x y w h`, in `%` of the parent area, `in`, `cm`, `mm`, `pt`, `px`; a bare number is pt |
-| Style | `size` (pt), `color`, `fill`, `line`, `align`, `valign`, `bold`, `radius`, `pad` |
+| Position | `x y w h`, in `%` of the parent area (the body area inside the margins and under the title, not the slide), `in`, `cm`, `mm`, `pt`, `px`; a bare number is pt |
+| Style | `size` (pt; on a `##` box it sizes the box text, not its heading: `sizes: heading=` or `h2.size=` does), `color`, `fill`, `line` (a one-off on one `{.kpi}` card works: `## 売上 {.kpi fill=accent h=4.4in}`), `align`, `valign`, `bold`, `radius`, `pad` |
 | Image | `fit=contain` (default), `cover`, `stretch` |
 | Classes | theme colors (`.primary`, `.accent`, `.danger`, `.success`, `.muted`), `.plain` (box without card), `.kpi` (big number box) |
 
@@ -381,20 +417,23 @@ Chart options go in the fence attributes:
 |---|---|---|
 | `title` | text | none |
 | `legend` | `bottom`, `right`, `top`, `left`, `none` | `bottom` when >1 series, else `none` |
-| `labels` | `on` (values; on a pie/doughnut the share, `render.chart_pie_labels`), `percent` / `value` (pie/doughnut), `off` | `off` |
+| `labels` | `on` (values; on a pie/doughnut the share, `render.chart_pie_labels`), `percent` / `value` (pie/doughnut), `off`; or a position (implies `on`): `outside` `inside` `center` on bar/column (`inside` / `center` on stacked), `above` `below` `left` `right` `center` on line, `outside` `inside` `center` `best` on pie | `off` |
 | `totals` | stacked kinds: `off` drops, `on` forces the stack total at the end of each stack (default: shown with `labels=on`) | `on` with labels |
 | `fmt` | Excel number format for labels and the value axis, e.g. `0.0`, `#,##0`, `0%` | general |
 | `min`, `max` | value axis bounds | auto |
-| `colors` | comma list of theme names or hex, one per series (per point for pie) | theme palette |
+| `colors` | comma list of color names (theme, or declared in `colors:`) or hex, one per series (per point for pie) | theme palette |
 | `axis` | `off` hides the value axis and gridlines, `on` keeps them | auto: bar/column with `labels=on` and <= 4 categories hide them (the labels carry the numbers) |
-| `hl` | comma list of categories to emphasise: their points take `render.chart_hl` (default `accent`); on a one-series bar/column/waterfall the other points keep their color | none |
+| `gap` | gap between bars, 0-500 (% of a bar): `gap=80` | `render.chart_gap` |
+| `marker` | line / radar marker size in pt, 2-72: `marker=9` | theme |
+| `size` | chart text size in pt (exact: no automatic growth), 6-72: `size=14` | automatic |
+| `hl` | comma list of categories **or series** to emphasise (a series name wins; on several series the whole series takes `render.chart_hl`, a line gets a thicker stroke; a name that matches nothing is a `chart-hl` warning listing both): their points take `render.chart_hl` (default `accent`); on a one-series bar/column/waterfall the other points keep their color | none |
 | `note` | one-line takeaway: a native callout (class `.chart-note`) inside the chart frame, pointing at the first `hl` point when there is one | none |
 
 CSV cells may be quoted (`"1,240"`), may carry `%` or thousands separators (`1,240`, `12%` → number), and may
 use full-width digits; an empty cell is a gap. A cell that is not a number becomes a gap plus a warning.
 A takeaway is two attributes: `` ```bar {hl=郊外大型 note="赤字42店の半数は郊外大型"} ``. Several series keep their colors: an `hl` category gets a `render.chart_hl` outline in each; a line gets a larger marker. A `note` pins the plot area and value axis so the pointer hits the bar; a too-long note shrinks, wraps, then warns (`chart-note`).
 
-Chart look defaults are tokens (`style: render.chart_legend_scale=1.4`): legend size = `chart_legend_scale` x chart text,
+Chart look defaults are tokens (`style: render.chart_legend_scale=1.4`; `render.chart_grid=border` is the gridline color, `render.chart_line_width=3.5` the line width in pt): legend size = `chart_legend_scale` x chart text,
 data labels = `chart_label_scale`, pie/doughnut wedge labels = `chart_pie_label_scale` (bold, `chart_pie_label_bold`,
 inside the wedge, `chart_pie_label_pos`; a wedge under `chart_pie_label_min` of the total labels outside). The series
 palette (`palette`) holds no accent colour in the built-in presets: `accent` is reserved for `hl=`. On a pie, `labels=on`

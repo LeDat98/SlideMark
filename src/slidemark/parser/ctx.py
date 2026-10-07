@@ -22,6 +22,7 @@ class Ctx:
         self.diagnostics = diagnostics
         self.slide: int | None = None
         self.lang: str | None = None  # deck lang, set once the header is read
+        self.colors: set[str] = set()  # color names the deck declares in `colors:` (chart `colors=`)
         self.box_links: list[
             tuple[Any, list[Any]]
         ] = []  # (Container, raw `@` connectors) of the current slide
