@@ -103,6 +103,9 @@ class Item:
     line_color: str | None = None  # RRGGBB of a solid outline (box classes color the card border)
     rot: float = 0.0  # clockwise degrees (`a:xfrm rot`): written back as `{rotate=}`
     shadow: str | None = None  # an outer shadow as "x y blur #RRGGBB[AA]" in pt: written back as `{shadow=}`
+    heatmap: str = (
+        ""  # table: `lo;hi;colors;text` of an `@heatmap` (the renderer appends it to the shape name)
+    )
 
     @property
     def cx(self) -> float:
@@ -720,6 +723,7 @@ def read_sections(prs) -> list[tuple[str, list[int]]]:
 
 CHART_NOTE = "ChartNote"  # shape names the renderer gives a `note=` callout and its pointer
 _HLCOL = re.compile(r" hlcol=([\d,]+)$")  # ... and the `hlcol=` column numbers to a table's
+_HEATMAP = re.compile(r" heatmap=(\S+)")  # `@heatmap`: lo;hi;colors;text
 _HL = re.compile(r" hl=(.+)$")  # the renderer appends the `hl=` categories to a chart's shape name
 
 
@@ -1010,6 +1014,8 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
                     )
                 rows.append(row)
             tit = _new(ctx, "table", box, sid=sh.shape_id, name=name, rows=rows)
+            if mh := _HEATMAP.search(name):
+                tit.heatmap = mh.group(1)
             mc = _HLCOL.search(name)
             if mc:
                 tit.hlcol = mc.group(1)

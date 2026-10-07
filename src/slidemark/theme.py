@@ -18,6 +18,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .contrast import best_ink, nearest_passing, ratio
+from .forms2 import Forms2Tokens
 from .ir import Diagnostic, Length, Style
 
 PRESET_DIR = Path(__file__).parent / "presets"
@@ -741,7 +742,7 @@ def _base_classes() -> dict[str, Style]:
     }
 
 
-class Theme(BaseModel):
+class Theme(Forms2Tokens):  # Forms2Tokens: the DL3b part 2 tokens (iconlist.*, quote.*, ...)
     model_config = ConfigDict(extra="forbid")
 
     name: str
@@ -1724,6 +1725,10 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
     ``names`` are the known theme color names; ``None`` is the lenient parse-time mode where any bare word
     passes as a possibly later-declared color. Raises :class:`TokenValueError` (message + one-line hint).
     """
+    from .forms2 import normalize as forms2_normalize
+
+    if (got := forms2_normalize(path, raw, names)) is not None:  # DL3b part 2: iconlist.* quote.* ...
+        return got
     parts = path.split(".")
     leaf = parts[-1]
     in_class = len(parts) == 3 and parts[0] == "classes"

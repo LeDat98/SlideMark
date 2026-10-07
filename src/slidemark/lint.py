@@ -604,7 +604,7 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
             backs = []  # a picture fill cannot be judged
         elif not p.style.fill and (stripe := _kpi_stripe_backs(items, i, p, theme)):
             backs = stripe
-        if "rows-glyph" in getattr(el, "classes", ()):
+        if {"rows-glyph", "quote-mark"} & set(getattr(el, "classes", ())):
             continue  # the glyph of an `@rows plain` bar is a marker like a list bullet: not judged as text
         for msg, hint in _contrast_findings(items, i, p, backs, theme):
             warn("contrast", msg, hint, p)

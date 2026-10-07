@@ -74,6 +74,7 @@ _SHAPES = {
     "trapezoid": MSO_SHAPE.TRAPEZOID,
     "cloud": MSO_SHAPE.CLOUD,
     "plus": MSO_SHAPE.MATH_PLUS,
+    "pie": MSO_SHAPE.PIE,  # `@harvey` balls: attrs pie_start / pie_end (degrees clockwise from 3 o'clock)
     "callout": MSO_SHAPE.RECTANGULAR_CALLOUT,
 }
 _TRANSITIONS = {
@@ -723,6 +724,11 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
                 shp.text_frame.margin_left = Emu(shp.text_frame.margin_left + int(inset))
         if el.shape == "chevron" and not st.shape:
             shp.adjustments[0] = float(el.attrs.get("adj", rc.theme.layout.chevron_adj))
+        if (
+            el.shape == "pie" and "pie_end" in el.attrs
+        ):  # angles are 60000ths of a degree (python-pptx: / 1e5)
+            shp.adjustments[0] = float(el.attrs.get("pie_start", 270.0)) * 0.6
+            shp.adjustments[1] = float(el.attrs["pie_end"]) * 0.6
     elif isinstance(el, Table):
         if st.shadow:  # a table cannot carry an effect: a plate of the page colour behind it does
             rows = el.attrs.get("_row_h") or []

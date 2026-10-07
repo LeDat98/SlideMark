@@ -207,6 +207,7 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     cols = sorted(hl_cols(t))
     gf.name = (
         name
+        + (f" heatmap={t.attrs['heatmap']}" if t.attrs.get("heatmap") else "")  # `@heatmap`: read back
         + (f" hl={join_names(hl_names(t))}" if hl_rows(t) else "")
         + (f" hlcol={','.join(str(c + 1) for c in cols)}" if cols else "")
     )  # the importer reads it back

@@ -219,6 +219,7 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `steps` | a process row: each `##` heading is an arrow, its bullets sit in a card under that arrow (below) | `@4 steps` |
 | `items` | the bullets of every box are drawn as item cards (below); `style: box.items=cards` does it for every slide | `@4 items` |
 | `num` | a numbered circle (1..n) left of every box heading (below; on `@steps` it is the `STEP n` caption) | `@4 num` |
+| `iconlist` `quote` `split` `proscons` `progress` `harvey` `heatmap` `pins` | composition forms with secondary attributes ("Composition forms, part 2" below) | `@iconlist cols=2` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
 | `free` | absolute positioning: every block with `{x= y= w= h=}` (% of the area under the title, or lengths) sits exactly there, with no growth, balance or search; unplaced blocks stack on top (info `free-unplaced`) | `{x=10% y=30% w=40% h=20%}` |
 | `grid` | with `@free`: `x y w h` snap to a 12-column x 12-row grid over the body, and `3c` is a grid unit: `x=3c` / `y=2c` = the left / top edge of column / row 3 (counting from 1), `w=4c` / `h=3c` = four columns / three rows wide (a percentage snaps to the nearest twelfth). A title or subtitle pin counts over the whole slide. `3c` without `@free grid` warns `bad-length` | `@free grid` then `## a {x=1c y=2c w=6c h=5c}` |
@@ -294,6 +295,99 @@ style: heading.band=primary heading.rule=accent heading.rule_h=0.06in item.borde
 - 主力3ブランドの価格改定
 - 不採算SKUを15%削減
 ```
+
+**Composition forms, part 2 (DL3b).** Eight more `@word` slides, each with secondary attributes on the same line and a
+`<word>.*` token for every fill, line and size (`style:` header or slide line; `slidemark tokens` lists them). Every form
+also takes the generic attributes `gap=` (gutters), `size=` (text, pt) and `fill=` (the form's main colour). The parsed
+slide stays as written: the layout composes the body on a copy, names the shapes, and the importer folds them back to
+the same words. Example: `examples/24-vocabulary-2.md`.
+
+| Word | Source | Attributes | Tokens |
+|---|---|---|---|
+| `@iconlist` | `- icon=bolt **Title** text` items (or `:bolt:`); a bold lead is the title, nested bullets are more text | `cols=1..3` (default by item count) | `iconlist.icon.size` `.icon.color` `.gap` |
+| `@quote` | a `>` block or the body text; the last line `— Name` is the attribution | `align=left\|center\|right` | `quote.size` `quote.mark` `quote.mark.color` `quote.by.color` |
+| `@split` | an image (`![alt](x.png)`) or, without one, a `fill=` colour block; everything else sits on the other side | `side=left\|right` `ratio=1:1` (image : text) `bleed=on` `fit=cover\|contain` | `split.gap` `split.fill` `split.ratio` |
+| `@proscons` (`@pros`) | two `##` boxes (any headings): first is `+`, second `−`; a last `>` line is the verdict bar | | `proscons.plus.color` `.minus.color` `.plus` `.minus` `.gap` |
+| `@progress` | `- label 72%` (or `7/10`, `72`), or a table `label \| value` | `max=100` | `progress.fill` `.track` `.h` `.label.size` |
+| `@harvey` | a table whose cells are 0-4 or 0/25/50/75/100%; header row and label column stay text | | `harvey.size` `.fill` `.line` `.band` |
+| `@heatmap` | a numeric table; the first column is row labels when it holds text | `min=` `max=` `colors=a,b[,c]` `text=auto\|on\|off` | `heatmap.colors` `heatmap.text` |
+| `@pins` | an image + `- x=32% y=58% label` items (positions are % of the image) | `legend=right\|bottom\|off` | `pins.fill` `.color` `.size` `.legend` |
+
+```markdown
+@iconlist cols=2
+- icon=bolt **Faster builds** median 38 s
+- icon=shield **Safer releases** signed and reversible
+```
+
+```markdown
+@quote align=center
+> "We stopped arguing about the deck."
+> — Mika Tanaka, Northwind
+```
+
+```markdown
+@split side=right ratio=2:3 bleed=on
+> Quiet floors and one shared board
+![studio](assets/studio.png)
+- 3 floors, 140 desks
+```
+
+```markdown
+@proscons
+## Why buy
+- Live in eight weeks
+## Why build
+- Nine months of engineering
+> Verdict: buy now
+```
+
+```markdown
+@progress max=100
+- Billing engine 92%
+- Partner API 12%
+```
+
+```markdown
+@harvey
+| Vendor | Price | Support |
+|-|-|-|
+| Ledgerly | 4 | 2 |
+```
+
+```markdown
+@heatmap min=0 max=100 colors=#F3F6FA,primary
+| Region | Free | Team |
+|-|-|-|
+| Japan | 22 | 48 |
+```
+
+```markdown
+@pins legend=right
+![map](map.png)
+- x=26% y=36% **Harbor HQ** product
+```
+
+Details. `@iconlist`: the text column is `Iconlist N`, the icon a native `icon <name>` shape; an unknown icon is `unknown-icon` with
+a did-you-mean, a missing one `iconlist-icon` (info); `iconlist.icon.size` is a length, else 2.2 x the title size
+(`iconlist.icon_ratio`); `fill=` puts each item on a card. `@quote`: the text grows up to `quote.grow` x body (`quote.size`
+or `size=` pins it); shapes `Quote mark` / `Quote text` / `Quote by` (`Quote panel` with `fill=`); `-- name` and `~ name` also
+read as attributions, and so does a final `. — Name` of one joined `>` paragraph. `@split`: the text side is laid out by
+the ordinary engine on a slide as wide as that side (title, lead, boxes, bars, footer, every growth pass), so any content
+works there; `bleed=on` runs the image over the slide height to the edge, otherwise it is inset by the slide margins
+(corner radius from `card.radius`); shapes `Split fill`; the importer reads a full-height image beside text as
+`@split bleed=on`. `@proscons`: glyph discs `Proscons k item N glyph` (`+` / `−`), card `Proscons k`, band
+`Proscons k head` in the sign colour (ink picked for contrast); write `+` / `−` per item only inside one box
+(`- a` `− b` lines join in Markdown, a ` − ` between spaces splits them again). `@progress`: shapes `Progress N label` /
+`track` / `fill` / `value`; a value above `max` is clamped (info `progress-range`), a line with no number is
+`progress-value`; `progress.track=none` draws no track. `@harvey`: quarter-filled balls are a native ellipse
+(`Harvey r,c qN`) plus a `pie` wedge (`Harvey r,c pie`; attrs `pie_start` / `pie_end`), other cell text stays text, any
+other value is `harvey-value`. `@heatmap`: the table keeps its numbers (`text=off` leaves them out); the ink is picked
+per cell for contrast (`text=on` keeps the table ink); `colors=` takes theme names or hex, two or more stops, linear in
+RGB; the table's shape name carries ` heatmap=lo;hi;colors;text` for the importer; `fill=<c>` is the high end of
+the default scale. `@pins`: the image is drawn at its true aspect so `x= y=` land exactly; circles `Pin N`, legend
+`Pin N legend` + `Pins legend N`; a position outside 0..100% is `pins-position`. Secondary attributes a form does not take
+warn (`@quote cols=2` -> `unknown-token`, hint lists the form's keys); a bad value warns `bad-attr` with the accepted
+values and the default is used. Fit line: `slide 5: pros / cons 2 boxes, 6 items 27pt`.
 
 ## Attributes `{...}`
 
@@ -765,7 +859,7 @@ layout and renderer, and checks that the warning carries the hint. `@free` honou
 header line: `kpi.*` without a `.kpi` card, `steps*` / `steps-arrow` without `@steps`, `rows*` without `@rows`,
 `table.*` without a table, `palette` / `render.chart_*` without a chart, `bullet*` without a list, `heading.*` / `card.*` /
 `box.*` without a box, `box.num.*` without an `@num` slide, `item.*` without item cards, `rows.glyph*` without `@rows plain`,
-`render.chevron_shape` without arrows, `cover.rule_w` / `rule_pos` without `cover.rule=<color>`, `footer.*` without `footer:` / `num:`, `lead.*` without a lead; the `cover.*` chrome (`rule` `bar`
+`iconlist.*` `quote.*` `split.*` `proscons.*` `progress.*` `harvey.*` `heatmap.*` `pins.*` without that form's slide, `render.chevron_shape` without arrows, `cover.rule_w` / `rule_pos` without `cover.rule=<color>`, `footer.*` without `footer:` / `num:`, `lead.*` without a lead; the `cover.*` chrome (`rule` `bar`
 `pad` `gap` `footer`) needs the composed cover (`cover.band_h` above 0 and no `{size=}` on the cover title); and
 `chevron.*` styles nothing (arrows follow `primary`, `steps-arrow.fill=` colours `@steps`). The table is `STYLE_NEEDS`
 in the same module.

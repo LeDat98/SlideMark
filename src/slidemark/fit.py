@@ -25,8 +25,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from .forms2 import WORDS as COMPOSED
+from .forms2 import word_of
 from .honour import audit
 from .ir import Chart, Code, Container, Deck, Diagnostic, Image, Media, Placed, Raw, Shape, Table, Text
+from .layout.forms2 import fit_part
 from .theme import DEFAULT_SIZES, Theme
 from .units import EMU_PER_PT
 
@@ -296,8 +299,8 @@ def _slide_line(deck: Deck, slide, items: list[Placed], theme: Theme, i: int) ->
         and "steps-arrow" not in p.element.classes
     ]
     parts: list[tuple[str, list[str]]] = []
-    if slide.lead is not None and slide.lead.paragraphs:
-        parts.append(("lead", []))
+    if slide.lead is not None and slide.lead.paragraphs and word_of(slide.classes) != "quote":
+        parts.append(("lead", []))  # (an @quote slide draws its lead as the quotation)
     if kpis:
         parts.append(_kpi(kpis, inner, body, asked, theme))
     if arrows:
@@ -336,6 +339,10 @@ def _slide_line(deck: Deck, slide, items: list[Placed], theme: Theme, i: int) ->
             parts.append(("callout", []))
         else:
             parts.append((_list(loose, theme, dense_k), []))
+    form = fit_part(slide, kind, inner, fit)  # DL3b part 2: @iconlist @quote @split @heatmap ...
+    if form is not None:
+        keep = [p for p in parts if p[0] == "lead"]
+        parts = [*keep, form] if kind in COMPOSED else [form, *parts]
     if kind == "free":
         pinned = sum(1 for e in slide.elements if getattr(e, "box", None) is not None and e.box.x is not None)
         parts = [(f"free {_n(len(slide.elements), 'block')}, {pinned} pinned", [])] + [

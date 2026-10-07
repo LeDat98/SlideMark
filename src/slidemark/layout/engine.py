@@ -33,7 +33,7 @@ from ..ir import (
 from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
-from . import css, kpirow, measure
+from . import css, forms2, kpirow, measure
 from .chartnote import expand_notes, scale_warning
 from .diagram import fill_tree
 from .gantt import expand_gantt
@@ -4465,6 +4465,9 @@ def _clone_ctx(c: _Ctx) -> _Ctx:
 
 
 def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
+    slide = forms2.prepare(slide, deck, theme, index)  # DL3b part 2: @quote @heatmap rewrite a copy
+    if (split := forms2.split_layout(slide, deck, theme, index, _layout)) is not None:
+        return split  # @split: the text side is laid out on a virtual slide of its own width
     slide = _chevron_steps(slide, theme.layout)
     slide, items_skipped = _slide_items(slide, theme)
     try:
@@ -4795,6 +4798,23 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     ):
         final_ctx = rctx
         kind = "rows"  # the passes of content slides (growth, centring, bars) do not apply
+    elif (
+        form := forms2.compose(
+            _Ctx(deck, theme, slide, index, W, H, dense_k=ctx.dense_k, tight=ctx.tight, css=ctx.css),
+            slide,
+            kind,
+            body,
+            sg,
+        )
+    ) is not None:  # DL3b part 2: @iconlist @quote @proscons @progress @harvey @pins
+        final_ctx, kind = form
+        ctx.diags += final_ctx.diags
+        for lab in dict.fromkeys(final_ctx.over):
+            ctx.diag(
+                "overflow",
+                f"{lab} overflows its area at the minimum font size",
+                "shorten text or split the slide",
+            )
     elif kind == "free" and body is not None and elements and body.h > 0:
         final_ctx = _layout_free(ctx, elements, body, slide, theme, sg)
         ctx.diags += final_ctx.diags

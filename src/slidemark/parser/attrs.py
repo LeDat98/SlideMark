@@ -9,7 +9,7 @@ import shlex
 from dataclasses import dataclass, field
 from typing import Any
 
-from .. import icons, shapes
+from .. import forms2, icons, shapes
 from ..ir import Box, Chart, ElementBase, Image, Media, Style, Table
 from .ctx import Ctx, closest
 from .tabular import apply_chart_kv, apply_table_kv
@@ -305,6 +305,7 @@ KNOWN_WORDS = (
     "defaults",
     "grid",
 )
+KNOWN_WORDS = (*KNOWN_WORDS, *forms2.WORDS)  # DL3b part 2: @iconlist @quote @split @proscons ...
 TRANSITIONS = ("fade", "push", "wipe", "split", "cover", "zoom", "morph")
 _N = re.compile(r"^\d+$")
 _CXR = re.compile(r"^\d+x\d+$")
@@ -379,6 +380,8 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
                 spec.id = v
             elif k == "gap":
                 spec.gap = _length(v)
+            elif k in forms2.KEYS:  # secondary attributes of the composition forms (checked below)
+                spec.attrs[k] = v
             else:
                 spec.attrs[k] = v
                 near = closest(k, AT_KEYS, 0.5)
@@ -427,6 +430,7 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
                     "bad-grid",
                     "grids look like 3, 2x2, 1:2 or aab/aac (lowercase letters, same row length)",
                 )
+    forms2.check_at(spec.classes, spec.attrs, lambda msg, rule, hint: ctx.warn(msg, line, rule, hint))
     return spec
 
 
