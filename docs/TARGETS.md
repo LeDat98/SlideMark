@@ -96,6 +96,8 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       bar, table row highlight, dark statement panel, numbered badges, quote card; two slides break (badge text
       and the quote mark become the title). Gate: mean per-slide difference ≤ 8 (golden tolerance) on that deck
       and on `bench/lengthbench/t2/python-pptx`, no broken slide, and the imported deck.md ≤ 40% of build.py tokens.
+      Font floor (docs/RENDERING.md, 2026-10-07): 0.00 on both decks, so the 21-25 point gap is design only; previews now
+      use `src/slidemark/fonts/fonts.conf` (deterministic fallbacks).
 - [ ] DL4 `shape=` on any box / step / row names any of the ≥ 150 PowerPoint preset shapes; connectors with
       arrowheads, dash and curve; freeform paths from inline SVG as native geometry; images with crop, radius, mask and
       opacity; text outline / shadow / glow; per-shape gradient, pattern and line dash. Gate: a shape-gallery example
