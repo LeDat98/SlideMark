@@ -22,7 +22,7 @@ import re
 from collections.abc import Callable, Iterator
 from typing import Any
 
-from . import forms2
+from . import forms, forms2
 from .ir import Chart, Code, Container, Deck, Diagnostic, Image, Media, Placed, Slide, Table, Text
 
 # The documented attribute keys (docs/SYNTAX.md "Attributes"): position, style, image, `icon` on boxes and the
@@ -72,6 +72,8 @@ LABEL = {
     "rows": "an @rows list",
     "row": "a row of an @rows list",
     "list item": "a list item",
+    "stage": "a form box",
+    "formtext": "a form's text",
 }
 
 _FIT = "fit= is for images: ![alt](a.png){fit=cover|contain|stretch}"
@@ -82,6 +84,13 @@ _IMAGE = "an image has no text: x y w h size fill line radius opacity pad align 
 _ROTATE_FRAME = "PowerPoint cannot rotate tables and charts: rotate the box around them ## b {rotate=5}"
 _ITEM_GEO = "a list item is a line of text: {color= size= bold= italic= font= align=} style it"
 _ITEM_BOX = "a list item has no box: put the list in a box (##) to give it fill, border, radius"
+_STAGE_GEO = (
+    "a form places its shapes: @1:2 ratios, gap= and its own tokens set the geometry, @free places blocks"
+)
+_STAGE_TEXT = "size= on the @ line sizes the form's text; fill= and color= go on the box, the rest are tokens"
+_STAGE_DECO = (
+    "a form draws its own shapes: shadow= rotate= shape= z= apply to ordinary boxes, not to the form"
+)
 
 
 def _ig(attrs: str, hint: str) -> dict[str, str]:
@@ -109,6 +118,8 @@ HONOURED: dict[str, str] = {
     "rows": _FULL,
     "row": "size color font align bold italic fill line",
     "list item": "size color font align bold italic",
+    "stage": "fill color",
+    "formtext": "size color",
 }
 IGNORED: dict[str, dict[str, str]] = {
     "title": {"fit": _FIT, "icon": _ICON},
@@ -149,6 +160,21 @@ IGNORED: dict[str, dict[str, str]] = {
     "list item": {
         **_ig("x y w h", _ITEM_GEO),
         **_ig("fill line radius opacity pad valign shadow rotate shape z", _ITEM_BOX),
+        "fit": _FIT,
+        "icon": _ICON,
+    },
+    "stage": {
+        **_ig("x y w h", _STAGE_GEO),
+        **_ig("size font bold italic align valign radius opacity pad", _STAGE_TEXT),
+        **_ig("shadow rotate shape z", _STAGE_DECO),
+        "line": "a form draws its own outline: fill= and color= apply, its tokens set the rest",
+        "fit": _FIT,
+        "icon": _ICON,
+    },
+    "formtext": {
+        **_ig("x y w h", _STAGE_GEO),
+        **_ig("font bold italic align valign fill line radius opacity pad", _STAGE_TEXT),
+        **_ig("shadow rotate shape z", _STAGE_DECO),
         "fit": _FIT,
         "icon": _ICON,
     },
@@ -204,8 +230,18 @@ def _walk(slide: Slide, theme: Any, index: int) -> Iterator[tuple[Any, str]]:
     if slide.subtitle is not None and covered:
         yield slide.subtitle, "cover"
     rows = "rows" in slide.classes or bool(theme.layout.rows)
+    form = forms.form_of(slide)
+    if form and forms.fits(form, slide) is not None:
+        form = None  # not composed: ordinary blocks
+    drawn = form in ("timeline", "funnel", "pyramid", "cycle")  # boxes become shapes of the form
 
     def rec(el: Any, parent: Container | None) -> Iterator[tuple[Any, str]]:
+        if isinstance(el, Container) and drawn and parent is None:
+            yield el, "stage"
+            return
+        if isinstance(el, Text) and form in ("agenda", "statement") and parent is None and el.role == "body":
+            yield el, "formtext"
+            return
         if isinstance(el, Container):
             if "kpi" in el.classes:  # `y h w` place the row (layout.kpirow), `x` makes the card absolute
                 yield el, "kpi"
@@ -392,6 +428,10 @@ class _Facts:
 
         return any("num" in s.classes and not steps(s) for s in self.deck.slides)
 
+    def has_form(self, name: str) -> bool:
+        """A slide with the composition form ``@name`` (``@timeline`` ...)."""
+        return any(forms.form_of(s) == name for s in self.deck.slides)
+
     def plain_rows(self) -> bool:
         return any({"rows", "plain"} <= set(s.classes) for s in self.deck.slides)
 
@@ -474,6 +514,14 @@ STYLE_NEEDS: list[tuple[re.Pattern[str], Callable[[_Facts], bool], str]] = [
         re.compile(r"^render\.chevron_shape$"),
         _Facts.steps,
         "no @steps / @chevron slide in the deck: the shape is the arrows' own",
+    ),
+    *(
+        (
+            re.compile(rf"^{name}[.-]"),
+            lambda f, name=name: f.has_form(name),
+            f"no @{name} slide in the deck: write `@{name}` under the title of the slide",
+        )
+        for name in forms.FORMS
     ),
     (re.compile(r"^(heading\.|card\.|box\.)"), _Facts.boxes, "no ## box in the deck"),
     (re.compile(r"^(footer|num)\."), _Facts.footer, "no footer: set `footer:` or `num: on`"),

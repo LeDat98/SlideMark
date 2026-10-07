@@ -219,6 +219,7 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `steps` | a process row: each `##` heading is an arrow, its bullets sit in a card under that arrow (below) | `@4 steps` |
 | `items` | the bullets of every box are drawn as item cards (below); `style: box.items=cards` does it for every slide | `@4 items` |
 | `num` | a numbered circle (1..n) left of every box heading (below; on `@steps` it is the `STEP n` caption) | `@4 num` |
+| `timeline` `vs` `matrix` `funnel` `pyramid` `cycle` `agenda` `statement` | a composition form: the `##` boxes (or the list / line) are drawn as that diagram (below); each takes secondary keys (`dir=` `marks=` `x=` `y=` `align=` `valign=`) and the common `size=` `fill=` `gap=` | `@timeline dir=v marks=num` |
 | `iconlist` `quote` `split` `proscons` `progress` `harvey` `heatmap` `pins` | composition forms with secondary attributes ("Composition forms, part 2" below) | `@iconlist cols=2` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
 | `free` | absolute positioning: every block with `{x= y= w= h=}` (% of the area under the title, or lengths) sits exactly there, with no growth, balance or search; unplaced blocks stack on top (info `free-unplaced`) | `{x=10% y=30% w=40% h=20%}` |
@@ -295,6 +296,43 @@ style: heading.band=primary heading.rule=accent heading.rule_h=0.06in item.borde
 - 主力3ブランドの価格改定
 - 不採算SKUを15%削減
 ```
+
+## Composition forms
+
+One `@word` line turns the blocks under it into a diagram, with secondary keys on the same line. Every form takes
+`size=14` (its text, pt; a pinned size never shrinks or grows), `fill=a,b,c` (colors, cycled) and `gap=`; a
+ratio token (`@1:2:1 timeline`) sets column widths as it does for `@steps`. Looks are tokens named after the form
+(`style: timeline.dot=accent funnel.fill=#1F3A8A,#5A73B4`; list below). The layout names every shape it draws
+(`Timeline 2 dot`, `Funnel 1 up`, `Cycle 3 arrow ccw`), so `slidemark import` writes the form back. A slide that
+lacks what the form needs (`@cycle` with two boxes) warns `<form>-skipped` and is laid out as ordinary blocks; an
+unknown key, a wrong choice (`dir=x`) or a key without its form warns with the valid words. One form per slide
+(`form-conflict`). The `build` fit line names the form: `slide 4: timeline 5 (h, marks on), text 16->22pt (grown)`.
+
+```markdown
+@timeline dir=h marks=on
+## 2027年4月
+パイロット開始
+- 3拠点で試行
+## 2027年10月 {.accent}
+全国展開
+```
+
+| Form | Blocks | Keys | Tokens (`style:`) |
+|---|---|---|---|
+| `@timeline` | 2-10 `##` boxes: heading = date / label, body = text. `{.accent}` = the current milestone | `dir=h` (default; text alternates above / below a line) `v` (all text right of a vertical line); `marks=on` (dots) `off` (stems only) `num` (numbered dots) | `timeline.line` `timeline.line.w` `timeline.dot` `timeline.dot.size` `timeline.now` `timeline.date.color`; `layout.timeline_stem` `timeline_text_w`; a box's own `{fill= color=}` = its dot and heading |
+| `@vs` | 2 `##` cards side by side + an optional 3rd `## 結論` verdict bar below. `{.hero}` = the winner | `@2:1 vs` card widths | `vs.badge.text` (`vs`) `vs.badge.fill` `vs.badge.color` `vs.badge.size`; `vs.verdict.fill` `vs.verdict.color`; `vs.win.line` `vs.win.w` `vs.win.fill` |
+| `@matrix` | exactly 4 `##` boxes in reading order: top-left, top-right, bottom-left, bottom-right | `x="低←重要度→高"` `y="低←緊急度→高"` (label + arrow along the bottom / left; leave one out and its axis is not drawn); `@1:2 matrix` column ratio; `fill=a,b,c,d` quadrant fills | `matrix.axis.color` `matrix.axis.size` `matrix.axis.w`; `matrix.fill=a,b,c,d` |
+| `@funnel` | 2-8 `##` boxes: heading inside the stage, body to its right | `dir=down` (default: the narrow end at the bottom) `up`; `@3:1 funnel` shapes : bodies | `funnel.fill=a,b,c` (cycled; default tints of `primary`) `funnel.color` `funnel.gap` `funnel.taper` (narrow / wide end, 0.3) `funnel.share` (width of the shapes, 0.5) |
+| `@pyramid` | 2-8 `##` boxes, first = the top | `dir=up` (default: narrow end on top) `down`; `@3:1 pyramid` | `pyramid.fill` `pyramid.color` `pyramid.gap` `pyramid.taper` (0.2; 0 = a point) `pyramid.share` |
+| `@cycle` | 3-6 `##` boxes around a ring: heading in the node, body outside it, curved arrows between | `dir=cw` (default) `ccw` | `cycle.fill=a,b` `cycle.color` `cycle.arrow` `cycle.arrow.w` `cycle.node.size` |
+| `@agenda` | one `1.` list alone (a `   - note` under an item is its second line). `{.accent}` at the end of an item = the current one | `@1:5 agenda` number column : text | `agenda.num.size` `agenda.num.color` `agenda.num.text` (`"第{n}章"`, `"0{n}"`) `agenda.rule` (`none` = no rules) `agenda.rule.w` `agenda.now` `agenda.dim` (the other items once one is current) |
+| `@statement` | one or two plain lines under the title: the number / sentence, then a caption | `align=left\|center\|right` `valign=top\|middle\|bottom` | `statement.size` `statement.color` `statement.sub.size` `statement.sub.color` |
+
+Text grows into the room (up to `layout.vocab_grow` x the body size) and shrinks to fit; `size=` pins it. `@vs` and
+`@matrix` draw their `##` boxes as ordinary cards (`card.*`, `heading.band`, `{fill=}` all apply); a box of the
+other forms takes `{fill= color=}` only (other attributes warn `attr-ignored`, hint names the form's tokens).
+Shapes: stages are native custom-geometry trapezoids, cycle arrows native `arc` shapes with arrowheads, axes
+and stems native connectors, the matrix y label vertical text (`vert270`); all editable in PowerPoint.
 
 **Composition forms, part 2 (DL3b).** Eight more `@word` slides, each with secondary attributes on the same line and a
 `<word>.*` token for every fill, line and size (`style:` header or slide line; `slidemark tokens` lists them). Every form
@@ -805,7 +843,7 @@ A line is `slide N: <form> [+ <form>], <facts>`:
 
 | Part | Says |
 |---|---|
-| form | what the slide became, joined with ` + `: `lead`, `N kpi (hero) cards NN% of body`, `steps N`, `chevron N (compact)`, `N boxes (2x2 / row / stack)`, `table RxC at NNpt`, `<kind> chart, N series`, `list N items NNpt`, `rows N bars`, `image`, `code`, `callout`, `free N blocks, M pinned`; `html, N shapes` for `@html`; `cover` / `section` with the title size and `band composed` or `centred block` (a `{size=}` on the cover title keeps the old centred look) |
+| form | what the slide became, joined with ` + `: `timeline 5 (h, marks on)`, `vs 2 sides`, `matrix 2x2`, `funnel 4 stages`, `cycle 4 nodes`, `agenda 5 rows`, `statement + caption`, `lead`, `N kpi (hero) cards NN% of body`, `steps N`, `chevron N (compact)`, `N boxes (2x2 / row / stack)`, `table RxC at NNpt`, `<kind> chart, N series`, `list N items NNpt`, `rows N bars`, `image`, `code`, `callout`, `free N blocks, M pinned`; `html, N shapes` for `@html`; `cover` / `section` with the title size and `band composed` or `centred block` (a `{size=}` on the cover title keeps the old centred look) |
 | `A->Bpt (shrunk to fit / grown)` | the text size asked (the role size in `sizes:`, `kpi.value.size=`, `{size=}`) against the size drawn; a size within 4% of the ask prints once. Sizes you pin (`size=`, `sizes: body=14!`) never move |
 | `value`, `card text`, `text`, `at` | which text: the KPI number, step card text, box text, table text |
 | `free N% below / above / right / beside` | the empty part of the body under (over, beside) the content, from 10% (above: 20%); `fills body` when nothing is left |
@@ -853,13 +891,15 @@ layout and renderer, and checks that the warning carries the hint. `@free` honou
 | `rows` (an `@rows` list) | `fit` `icon` |
 | `row` (one line of an `@rows` list) | `x` `y` `w` `h` `valign` `radius` `opacity` `pad` `shadow` `rotate` `shape` `z` `fit` `icon` |
 | `list item` (`- text {color=danger}`) | `x` `y` `w` `h` `fill` `line` `radius` `opacity` `pad` `valign` `shadow` `rotate` `shape` `z` `fit` `icon` |
+| `stage` (a `##` box of `@timeline` `@funnel` `@pyramid` `@cycle`: honours `fill` `color`) | `x` `y` `w` `h` `size` `line` `font` `bold` `italic` `align` `valign` `radius` `opacity` `pad` `shadow` `rotate` `shape` `z` `fit` `icon` |
+| `formtext` (the text of `@agenda` `@statement`: honours `size` `color`) | `x` `y` `w` `h` `font` `bold` `italic` `align` `valign` `fill` `line` `radius` `opacity` `pad` `shadow` `rotate` `shape` `z` `fit` `icon` |
 
 `size=` on a box with no text of its own sizes nothing (it sizes the box text, not its heading): `sizes: heading=` or
 `h2.size=` does. `style:` tokens that need an element the deck does not contain warn the same way, once per token on its
 header line: `kpi.*` without a `.kpi` card, `steps*` / `steps-arrow` without `@steps`, `rows*` without `@rows`,
 `table.*` without a table, `palette` / `render.chart_*` without a chart, `bullet*` without a list, `heading.*` / `card.*` /
 `box.*` without a box, `box.num.*` without an `@num` slide, `item.*` without item cards, `rows.glyph*` without `@rows plain`,
-`iconlist.*` `quote.*` `split.*` `proscons.*` `progress.*` `harvey.*` `heatmap.*` `pins.*` without that form's slide, `render.chevron_shape` without arrows, `cover.rule_w` / `rule_pos` without `cover.rule=<color>`, `footer.*` without `footer:` / `num:`, `lead.*` without a lead; the `cover.*` chrome (`rule` `bar`
+`timeline.*` `vs.*` `matrix.*` `funnel.*` `pyramid.*` `cycle.*` `agenda.*` `statement.*` `iconlist.*` `quote.*` `split.*` `proscons.*` `progress.*` `harvey.*` `heatmap.*` `pins.*` without that form's slide, `render.chevron_shape` without arrows, `cover.rule_w` / `rule_pos` without `cover.rule=<color>`, `footer.*` without `footer:` / `num:`, `lead.*` without a lead; the `cover.*` chrome (`rule` `bar`
 `pad` `gap` `footer`) needs the composed cover (`cover.band_h` above 0 and no `{size=}` on the cover title); and
 `chevron.*` styles nothing (arrows follow `primary`, `steps-arrow.fill=` colours `@steps`). The table is `STYLE_NEEDS`
 in the same module.

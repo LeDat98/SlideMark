@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import difflib
+import math
 import os
 import re
 import shlex
 from dataclasses import dataclass, field
 from typing import Any
 
-from .. import forms2, icons, shapes
+from .. import forms, forms2, icons, shapes
 from ..ir import Box, Chart, ElementBase, Image, Media, Style, Table
 from .ctx import Ctx, closest
 from .tabular import apply_chart_kv, apply_table_kv
@@ -81,9 +82,10 @@ def split_trailing_attrs(text: str) -> tuple[str, Attrs | None]:
 
 def _length(v: str) -> str | float:
     try:
-        return float(v)
+        f = float(v)
     except ValueError:
         return v
+    return f if math.isfinite(f) else v  # `w=INF` / `nan` are text: the layout reads them as a bad length
 
 
 def _bool(v: str) -> bool | None:
@@ -286,7 +288,7 @@ def apply_attrs(
 
 LAYOUT_WORDS = ("cover", "section", "blank", "center", "free")
 FLAGS = ("flow", "chevron", "steps")
-AT_KEYS = ("bg", "t", "id", "gap")
+AT_KEYS = ("bg", "t", "id", "gap", *(k for k in forms.ALL_KEYS if k != "gap"))
 KNOWN_WORDS = (
     *LAYOUT_WORDS,
     *FLAGS,
@@ -304,6 +306,7 @@ KNOWN_WORDS = (
     "noemph",
     "defaults",
     "grid",
+    *forms.FORMS,
 )
 KNOWN_WORDS = (*KNOWN_WORDS, *forms2.WORDS)  # DL3b part 2: @iconlist @quote @split @proscons ...
 TRANSITIONS = ("fade", "push", "wipe", "split", "cover", "zoom", "morph")
@@ -384,9 +387,10 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
                 spec.attrs[k] = v
             else:
                 spec.attrs[k] = v
-                near = closest(k, AT_KEYS, 0.5)
-                hint = f"did you mean '{near}='?" if near else f"valid keys: {', '.join(AT_KEYS)}"
-                ctx.warn(f"unknown '@' key '{k}'", line, "unknown-token", hint)
+                if k not in AT_KEYS:
+                    near = closest(k, AT_KEYS, 0.5)
+                    hint = f"did you mean '{near}='?" if near else f"valid keys: {', '.join(AT_KEYS)}"
+                    ctx.warn(f"unknown '@' key '{k}'", line, "unknown-token", hint)
         elif tok in LAYOUT_WORDS:
             spec.layout = tok
         elif tok == "html":

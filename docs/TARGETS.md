@@ -74,7 +74,7 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       after every pass (`Placed.pin`), `@free grid` (`x=3c w=4c`), list-item / `@rows` row attributes, importer reads
       `shape` `rotate` `shadow` back; fuzz = 50 sets × 16 kinds, 0 silent. Open: per-cell `{fill color}` on a table
       cell, per-point `{color label}` on a chart.
-- [ ] DL3b Composition vocabulary (owner, 2026-10-07: "rich to the point of no limit"): ≥ 15 new forms, each one
+- [ ] DL3b Composition vocabulary (owner, 2026-10-07: "rich to the point of no limit"; part 1 done: timeline, vs, matrix, funnel, pyramid, cycle, agenda, statement; part 2 done: iconlist, quote, split, proscons, progress, harvey, heatmap, pins = 16 forms): ≥ 15 new forms, each one
       `@word` line with secondary attributes and tokens, importer round trip, in SKILL.md in one line each:
       timeline (h/v, milestones), comparison / vs (two columns with a verdict), 2x2 matrix with axis labels,
       funnel, pyramid, cycle, icon list, quote, big statement (one number / one sentence), image + text split,

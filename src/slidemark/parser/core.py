@@ -8,6 +8,7 @@ from typing import Any
 
 import yaml
 
+from .. import forms, forms2
 from ..ir import Chart, Container, Deck, Link, Paragraph, Run, Slide, Style, Table, Text
 from .attrs import (
     FLAGS,
@@ -776,6 +777,7 @@ def parse_slide(
         slide.grid, slide_links = None, []
         slide.layout = slide.layout or "blank"
         slide.html = html_src
+    _check_form(slide, ctx)
     _infer_cover(slide, index, ctx)
     if "grid" in slide.classes and slide.layout != "free":
         slide.classes.remove("grid")
@@ -1013,8 +1015,36 @@ def _cover_lines(els: list[Any]) -> tuple[list[Text], list[Container]] | None:
     return out, boxes
 
 
+def _check_form(slide: Slide, ctx: Ctx) -> None:
+    """DL3b forms (`@timeline` ...): one per slide, keys and values valid, the blocks the form needs."""
+    found = [c for c in slide.classes if c in forms.FORMS]
+    line = slide.line
+    if len(found) > 1:
+        ctx.add(
+            "warning",
+            f"two forms on one slide: @{found[0]} and @{found[1]}",
+            line,
+            "form-conflict",
+            f"keep one: @{found[0]} is used",
+        )
+    form = found[0] if found else None
+    if form or not forms2.word_of(
+        slide.classes
+    ):  # an @quote / @split ... slide: ``forms2.check_at`` owns its keys
+        for rule, msg, hint in forms.check_attrs(form, slide.attrs):
+            ctx.add("warning", msg, line, rule, hint)
+    if form and (why := forms.fits(form, slide)):
+        ctx.add(
+            "warning",
+            why,
+            line,
+            f"{form}-skipped",
+            "the slide is laid out as ordinary blocks; " + forms.EXAMPLE[form],
+        )
+
+
 def _infer_cover(slide: Slide, index: int, ctx: Ctx | None = None) -> None:
-    if slide.title is None or slide.layout in ("blank", "center", "free"):
+    if slide.title is None or slide.layout in ("blank", "center", "free") or forms.form_of(slide):
         return
     els = slide.elements
     if not els:

@@ -66,6 +66,11 @@ class Block:
     links: list[str] = field(default_factory=list)  # box: link tokens between its children
     card: bool = False  # box: an ``Item N`` card (a bullet drawn as a card by ``@items``)
     items: bool = False  # box: its bullets were item cards (the slide gets the ``items`` word)
+    drawn: bool = False  # box: a shape a composition form drew (its geometry is the form's, not ``shape=``)
+    flag: str = ""  # box: a class the form says (``accent`` = the current milestone, ``hero`` = the winner)
+    marks: list[int] = field(
+        default_factory=list
+    )  # text: paragraph indexes that take ``{.accent}`` (@agenda)
 
 
 # --------------------------------------------------------------------------- classification
@@ -1122,6 +1127,8 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     acc, cls = out.deck.accent, out.classes
     if b.kind == "text":
         lines = text_lines(b.paras, accent=acc, classes=cls)
+        if b.marks and len(lines) == len(b.paras):  # @agenda: the current item
+            lines = [ln + " {.accent}" if i in b.marks else ln for i, ln in enumerate(lines)]
         return [("text", lines)] if lines else []
     if b.kind == "code":
         text = "\n".join("".join(r.text.replace("\n", "\n") for r in p.runs) for p in b.paras)
@@ -1189,9 +1196,9 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     mark = "###" if b.sub else "##"
     chunks: list[tuple[str, list[str]]] = []
     kpi = _kpi(b, out.deck.css_heading)
-    cname = None if kpi or b.chevron else _box_class(b, out)
+    cname = None if kpi or b.chevron else (b.flag or _box_class(b, out))
     attrs = (".kpi " if kpi else "") + (f".{cname} " if cname else "") + (f"icon={b.icon} " if b.icon else "")
-    attrs += " ".join(_control_attrs(b.item if not b.chevron else None, out.shadow))
+    attrs += " ".join(_control_attrs(b.item if not (b.chevron or b.drawn) else None, out.shadow))
     head = f"{mark} {_head(b.heading or [], out)}" + (f" {{{attrs.strip()}}}" if attrs.strip() else "")
     if b.chevron:
         content = text_lines(b.paras, accent=acc, classes=cls)
@@ -1241,18 +1248,30 @@ def build_slide(
     classes: dict[str, str],
     info: dict | None = None,
 ) -> list[str]:
+    from . import vocab  # (it needs Block from this module)
+
     fold_into_tables(data)
+    vform = vocab.extract(
+        data
+    )  # DL3b: the named shapes of @timeline / @funnel / ... fold back into their source
     title, pool = classify(data, deck)
     pool = fold_kpi(fold_steps(pool))
     pool, rows_mode = fold_rows(pool)
     rows_slide = rows_mode is not None
-    form = forms2.fold(pool, data, deck)  # DL3b part 2: @iconlist @quote @proscons @progress @harvey ...
+    form = (
+        forms2.fold(pool, data, deck) if vform is None else None
+    )  # DL3b part 2: @iconlist @quote @proscons ...
     if form is not None:
         pool = form.pool
+    active = vform if vform is not None else form  # the composed form of this slide (either vocabulary)
     by_role = {r: [i for i in data.items if i.role == r] for r in ("lead", "conclusion", "footnote")}
     icons = [i for i in data.items if i.role == "icon"]
     blocks = make_blocks(pool, deck, icons)
     _attach_icons(icons, blocks)
+    if vform is not None and not vform.keep:
+        form_extra, blocks = blocks, vform.boxes  # content the form did not draw stays below its boxes
+    else:
+        form_extra = []
     arrows = sum(1 for i in pool if i.kind == "shape" and i.prst and "rrow" in i.prst)
     dia = recover_diagram(blocks, data.conns, data.items)
     if dia is not None:
@@ -1321,6 +1340,12 @@ def build_slide(
     if form is not None:
         tokens = form.tokens if form.replace_tokens else [*tokens, *form.tokens]
         grid = [*form.before, *grid, *form.after]
+    if vform is not None:
+        if vform.keep:  # @vs / @matrix: the cards are ordinary boxes
+            grid = vform.adjust(grid, deck.colors.get("border"))
+        else:
+            grid, extras = vform.boxes, form_extra
+        tokens, groups = list(vform.tokens), None
     for g in gdiag:
         diags.append(
             Diagnostic(level="info", message=g, slide=n, rule="import-layout", hint="check the arrangement")
@@ -1356,8 +1381,9 @@ def build_slide(
     if not groups and arrows and "chevron" not in tokens and n_boxes > 1 and arrows >= n_boxes - 1:
         tokens.append("flow")
     if info is not None:
-        info["tokens"] = [] if groups else [t for t in tokens if t != "blank"]
+        info["tokens"] = [] if groups or active is not None else [t for t in tokens if t != "blank"]
         info["at"] = None
+        info["form"] = vform.form if vform is not None else None
     seq = [*grid, *extras]
     links = link_tokens(top, seq, drop_next="flow" in tokens)
     for b in seq:
@@ -1368,7 +1394,7 @@ def build_slide(
     extra: list[str] = []
     title_only = (
         title is not None
-        and form is None  # a composed form (its shapes left the pool) is a content slide
+        and active is None  # a composed form (its shapes left the pool) is a content slide
         and all(b.kind == "text" for b in blocks)
         and sum(len(b.paras) for b in blocks) + len(by_role["lead"]) <= 2
         and not any(p.marker for b in blocks for p in b.paras)

@@ -29,6 +29,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from . import forms as part1  # DL3b part 1: @timeline @vs @matrix ... (its own key check)
+
 Length = str | float | int
 
 WORDS: tuple[str, ...] = (
@@ -86,6 +88,8 @@ def word_of(classes: list[str]) -> str | None:
 def check_at(classes: list[str], attrs: dict[str, str], warn: Callable[[str, str, str], None]) -> None:
     """``@`` line check: a secondary attribute the form does not take warns (``warn(msg, rule, hint)``)."""
     word = word_of(classes)
+    if word is None and any(c in part1.FORMS for c in classes):
+        return  # an @timeline / @vs / ... slide: ``forms.check_attrs`` owns its keys
     for k in attrs:
         if k not in KEYS:
             continue  # unknown keys are the parser's own diagnostic

@@ -34,6 +34,7 @@ TITLES = {
     "21-jp-dark-pitch": "Tiếng Nhật: pitch tối thiết kế bằng CSS/HTML",
     "24-vocabulary-2": "Từ vựng bố cục 2: iconlist, quote, split, proscons, progress, harvey, heatmap, pins",
     "22-en-launch-plan": "Tiếng Anh: kế hoạch ra mắt, chevron khớp cột bảng, ghi chú biểu đồ (hl=, note=)",
+    "23-vocabulary": "Từ vựng bố cục: @timeline, @vs, @matrix, @funnel, @pyramid, @cycle, @agenda, @statement",  # noqa: E501
 }
 
 

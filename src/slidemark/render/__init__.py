@@ -48,6 +48,7 @@ from .media import add_media, finish_timing
 from .objects import add_chart, add_image, add_table, code_paragraphs, resolve_image
 from .text import fill_text, insert_rpr_child
 from .util import RenderCtx, emu, is_gradient, parse_color, rgb
+from .vocabshapes import draw_arc, draw_trapezoid
 
 __all__ = ["render"]
 
@@ -689,12 +690,16 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
         )
         if el.attrs.get("nowrap"):  # one line measured by Chromium: a wider substitute font must not wrap it
             tf.word_wrap = False
+        if el.attrs.get("vert"):  # a vertical axis label (`vert270`: reads bottom to top)
+            tf._txBody.find(qn("a:bodyPr")).set("vert", str(el.attrs["vert"]))
         if "callout" in el.classes and st.line and not use_placeholder:
             _accent_bar(rc, s, pl, name)
     elif isinstance(el, Shape) and el.shape == "line":
         _connector(rc, s, pl, name)
     elif isinstance(el, Shape) and el.shape == "icon":
         add_icon(rc, s, pl, name)  # unknown names draw nothing (the parser warns)
+    elif isinstance(el, Shape) and el.shape in ("arc", "trap"):  # DL3b: curved arrows, tapered stages
+        (draw_arc if el.shape == "arc" else draw_trapezoid)(rc, s, pl, name, _autoshape)
     elif isinstance(el, Shape):
         kind = _SHAPES.get(el.shape)
         if kind is None:
