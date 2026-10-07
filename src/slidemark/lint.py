@@ -32,7 +32,7 @@ from .layout.chartnote import chart_size, opt_pt
 from .layout.tablehl import hl_cell, hl_rows
 from .layout.tables import table_grid
 from .theme import Theme, slide_theme
-from .units import EMU_PER_PT, slide_size
+from .units import EMU_PER_PT, slide_size, to_emu
 
 _TOL = int(EMU_PER_PT)  # 1pt slack for rounding
 _OVERFLOW_TOL = 1.08  # measurement is an estimate: report only clear overflows
@@ -492,6 +492,35 @@ def _backdrop(items: list[Placed], i: int, bg: list[RGB], theme: Theme) -> list[
     return bg
 
 
+def _kpi_stripe_backs(items: list[Placed], i: int, p: Placed, theme: Theme) -> list[RGB]:
+    """The stripe colour when a KPI card's text sits on ``kpi.stripe`` (a tall stripe is a header band behind
+    the label): the card is the backdrop the lint finds, but the stripe is drawn over it by the renderer.
+    One colour when the text lies inside the stripe, stripe and card when it only overlaps it."""
+    if not theme.kpi_stripe or not isinstance(p.element, Text):
+        return []
+    card = next(
+        (
+            q
+            for q in reversed(items[:i])
+            if isinstance(q.element, Container)
+            and "kpi" in q.element.classes
+            and q.x <= p.x + p.w // 2 <= q.x + q.w
+            and q.y <= p.y + p.h // 2 <= q.y + q.h
+        ),
+        None,
+    )
+    if card is None:
+        return []
+    top = card.y + min(max(to_emu(theme.kpi_stripe_h), 1), card.h)  # bottom edge of the stripe
+    over = min(p.y + p.h, top) - max(p.y, card.y)
+    stripe = _backs(theme.kpi_stripe, theme, None)
+    if over <= 0 or not stripe:
+        return []
+    if over >= 0.5 * p.h:
+        return stripe  # mostly on the stripe: judged against it alone
+    return [*stripe, *_backs(card.style.fill, theme, None)]  # partly on it: both must carry the text
+
+
 def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> list[Diagnostic]:
     out: list[Diagnostic] = []
     slide = deck.slides[index] if index < len(deck.slides) else None
@@ -566,6 +595,10 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
         backs = _backs(p.style.fill, theme, backdrop[0] if backdrop else None) or backdrop
         if _is_image(p.style.fill, theme):
             backs = []  # a picture fill cannot be judged
+        elif not p.style.fill and (stripe := _kpi_stripe_backs(items, i, p, theme)):
+            backs = stripe
+        if "rows-glyph" in getattr(el, "classes", ()):
+            continue  # the glyph of an `@rows plain` bar is a marker like a list bullet: not judged as text
         for msg, hint in _contrast_findings(items, i, p, backs, theme):
             warn("contrast", msg, hint, p)
 

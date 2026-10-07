@@ -4,13 +4,7 @@ num: on
 colors: bg=#FFFFFF fg=#142B4D primary=#142B4D secondary=#1F5FA8 accent=#D9821E muted=#555F6B surface=#EEF3F9 border=#C5D0DE ink=#D6E2F2
 fonts: heading="Yu Gothic" body="Yu Gothic" ea="Yu Gothic"
 sizes: title=28 lead=18 heading=18! footnote=12 caption=10 cover-title=54 cover-subtitle=22
-style: title.band=none title.color=primary title.rule=secondary title.rule_h=3pt lead.bold=on lead.background=surface lead.border-left="7pt solid accent" lead.padding="5pt 12pt" layout.kpi_lone_h=0.9 layout.kpi_lone_min_h=0.85 kpi.color=secondary card.fill=bg card.line=border kpi.size=34 kpi.label.size=20 kpi.label.bold=on kpi.label.color=primary kpi.stripe=primary kpi.note.size=22 kpi.note.bold=on kpi.note.color=#A06016 card.radius=0 steps-arrow.fill=primary,secondary steps-card.size=24 steps-card.bold=on render.chart_grid=border cover.band=none cover.bar=accent cover.bar_w=0.35in cover.rule=accent cover.band_h=61% subtitle.color=ink strat.fill=surface strat.line=border item.fill=bg item.line=border item.radius=0 steps-card.fill=surface steps-card.line=border
-
-```css
-.strat { border-top: 6pt solid #D9821E }
-.item { border-left: 5pt solid #1F5FA8 }
-.steps-card { border-left: 5pt solid #D9821E }
-```
+style: title.band=none title.color=primary title.rule=secondary title.rule_h=3pt lead.bold=on lead.background=surface lead.border-left="7pt solid accent" lead.padding="5pt 12pt" layout.kpi_lone_h=0.9 layout.kpi_lone_min_h=0.85 kpi.color=secondary card.fill=bg card.line=border kpi.size=34 kpi.label.size=20 kpi.label.bold=on kpi.label.color=primary kpi.stripe=primary kpi.note.size=22 kpi.note.bold=on kpi.note.color=#A06016 card.radius=0 steps-arrow.fill=primary,secondary steps-card.size=24 steps-card.bold=on steps-card.fill=surface steps-card.border-left="5pt solid accent" render.chart_grid=border render.chevron_shape=pentagon,chevron cover.band=none cover.bar=accent@edge cover.bar_w=0.35in cover.rule=accent cover.rule_w=6in cover.band_h=61% subtitle.color=ink strat.fill=surface strat.border-top="6pt solid accent" box.num.fill=primary heading.rule=secondary heading.rule_h=0.03in item.border-left="5pt solid secondary" item.size=14 item.bold=off
 
 # 2027年度 事業計画
 @cover bg=primary dark
@@ -33,30 +27,26 @@ style: title.band=none title.color=primary title.rule=secondary title.rule_h=3pt
 
 # 売上高と営業利益の推移（億円）
 > 5年間で売上高は1.25倍に
-```column {labels=outside fmt=#,##0 legend=top gap=60 size=14 colors=primary,accent min=0 max=1400}
+```column {labels=outside labels.bold=on fmt=#,##0 legend=top legend.size=14 gap=60 overlap=-5 step=200 size=14,12 colors=primary,accent min=0 max=1400}
 ,2023,2024,2025,2026,2027計画
 売上高,1020,1085,1130,1185,1280
 営業利益,61,70,78,86,96
 ```
 
 # 4つの重点戦略
-@4
+@4 items num
 ## 既存事業の収益改善 {.strat}
-@1x2
-### 主力3ブランドの価格改定 {.item}
-### 不採算SKUを15%削減 {.item}
+- 主力3ブランドの価格改定
+- 不採算SKUを15%削減
 ## 海外展開の加速 {.strat}
-@1x2
-### タイ工場の増設 {.item}
-### 北米で冷凍食品を発売 {.item}
+- タイ工場の増設
+- 北米で冷凍食品を発売
 ## DXの推進 {.strat}
-@1x2
-### 需要予測のAI化 {.item}
-### 受発注の完全電子化 {.item}
+- 需要予測のAI化
+- 受発注の完全電子化
 ## 人的資本への投資 {.strat}
-@1x2
-### 賃上げ率4.5% {.item}
-### デジタル人材を50名採用 {.item}
+- 賃上げ率4.5%
+- デジタル人材を50名採用
 ※ 各戦略のKPIは個別資料を参照
 
 # 年間スケジュール

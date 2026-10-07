@@ -89,8 +89,12 @@ style: top.bar=primary top.bar_h=0.12in title.rule=secondary kpi.stripe=secondar
 |---|---|
 | `top.bar=<color>` `top.bar_h=0.1in` | a full-width strip on the top edge of every slide but the cover (`bottom.bar` / `bottom.bar_h`: the bottom edge) |
 | `title.rule=<color>` `title.rule_h=2pt` | a rule on the bottom edge of the slide title |
-| `kpi.stripe=<color>` `kpi.stripe_h=6pt` | a stripe on the top edge of every `.kpi` card |
+| `title.rule2=<color>` `title.rule2_w=1.6in` | a second, short segment of the title rule's height on its left end (an accent over the rule) |
+| `heading.rule=<color>` `heading.rule_h=2pt` | a rule under every `##` box heading (on the lower edge of the band with `heading.band`); not on `###`, KPI cards or item cards |
+| `kpi.stripe=<color>` `kpi.stripe_h=6pt` | a stripe on the top edge of every `.kpi` card (a tall stripe is a header band: a label on it is judged against the stripe colour) |
 | `kpi.rule=<color>` `kpi.rule_h=1pt` `kpi.rule_w=100%` | a divider rule between the number and its caption in every `.kpi` card (off by default). The caption becomes its own text box under the rule; `layout.kpi_rule_gap_em` is the air around it |
+| `kpi.fill=<c>` `kpi.line=<c>` | the card fill and border of every `.kpi` card (aliases of `card.fill` / `card.line` for KPI cards; also `kpi.radius` `kpi.shadow`) |
+| `table.num_pad=0.6in` | the right inset of right-aligned (numeric) table cells, header included |
 | `bullet=■` `bullet.color=<color>` | the glyph and color of bullet lists (default `•`, text color) |
 | `footer.color=` `footer.size=` | the footer text and the slide number (CSS `.caption`) |
 | `lead.bold=on` `lead.border-left="4pt solid secondary"` | any CSS property of `lead` `conclusion` `footnote` `subtitle` `box` `chart` (`lead.color` is the theme field) |
@@ -128,6 +132,7 @@ A declared color name beats the CSS color of the same name (`colors: teal=#2A9D8
   bottom-aligned in it; `0` = the older centred block), `cover.pad=0.55in` (air under the block), `cover.gap=0.2in`
   (title to subtitle), `cover.rule=accent` + `cover.rule_h=0.06in` (rule on the band edge, `none` = off),
   `cover.footer=off` (the deck `footer:` shows on the cover as a bottom caption), `cover.bar=teal` + `cover.bar_w=0.12in` (a vertical bar left of the title block), `cover.band=none` (no band although `title.band` is set, so a slide `bg=` shows; the rule is full width over a `bg=`). `{size=}` or CSS (other than `color`) on the cover keeps the old look. A full-bleed cover with a rule and a bar: `style: cover.band_h=61% cover.rule=accent cover.bar=teal cover.band=none` + `@cover bg=primary dark`.
+  More decoration, all inside the composed cover (`cover.band_h` above 0), all working over a slide `bg=` and `dark`: `cover.bar=accent@edge` (the bar sits on the slide's left edge over the full height, width `cover.bar_w`), `cover.rule_w=6in` (the rule is short and sits at the title, left aligned: `cover.rule_pos=above` over the title, `below` (default) between title and subtitle) and `cover.stripes=#1C3A68@8.9in,secondary@10.2in` (vertical stripes, each from its x to the right edge, drawn behind the text; the title keeps left of the first). `cover.rule_w` shortens the `cover.rule=<color>` you set. Decor shapes are named `rule` and the importer skips them.
 - **Dark slides pick their own ink.** A slide `bg=` (color, token name or `linear-gradient(...)`, every stop
   judged) that gives the theme `fg` less than 4.5:1 turns the text on the slide (title, lead, subtitle, footnote,
   loose paragraphs) to `render.ink_light` or `render.ink_dark`, whichever contrasts more; lead, subtitle and
@@ -210,6 +215,8 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `chevron` | blocks drawn as chevrons (steps) | `@4 chevron` |
 | `rows` | an ordered list (`1.` `2.`) alone on the slide drawn as numbered bars (below; `layout.rows=on` does it for every such slide) | `@rows` |
 | `steps` | a process row: each `##` heading is an arrow, its bullets sit in a card under that arrow (below) | `@4 steps` |
+| `items` | the bullets of every box are drawn as item cards (below); `style: box.items=cards` does it for every slide | `@4 items` |
+| `num` | a numbered circle (1..n) left of every box heading (below; on `@steps` it is the `STEP n` caption) | `@4 num` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
 | `free` | absolute positioning: every block with `{x= y= w= h=}` (% of the area under the title, or lengths) sits exactly there, with no growth, balance or search; unplaced blocks stack on top (info `free-unplaced`) | `{x=10% y=30% w=40% h=20%}` |
 | `key=value` | `bg=` color or image, `t=` transition (`fade`, `push`, `wipe`, `split`, `cover`, `zoom`, `morph`; `t=fade:0.5` sets seconds), `id=`, `gap=` | `@bg=#0F172A t=fade` |
@@ -242,7 +249,7 @@ step also fills the slide (`style: layout.chevron_steps=off` keeps the thin stri
 - 標準フローを策定
 ```
 
-`@4 steps num` adds a caption line first in every card (`STEP 1` ...); `style: steps.caption="STEP {n}" steps.caption_color=teal steps.caption_size=14` sets its text, color and size for every `@steps` slide (a size of its own: `layout.steps_caption_ratio` x body). `steps-arrow.fill=primary,secondary` (a list) cycles the arrow colors over the steps, `steps-card.fill=a,b` the cards; `steps-card.size=24 steps-card.bold=on` style the card text. `render.chevron_shape=pentagon` draws flat-tailed arrows (the importer reads them as chevrons). CSS reaches both parts: `.steps-arrow:nth-child(even) { background: ... }`, `.steps-card { ... }`.
+`@4 steps num` adds a caption line first in every card (`STEP 1` ...); `style: steps.caption="STEP {n}" steps.caption_color=teal steps.caption_size=14` sets its text, color and size for every `@steps` slide (a size of its own: `layout.steps_caption_ratio` x body). `steps-arrow.fill=primary,secondary` (a list) cycles the arrow colors over the steps, `steps-card.fill=a,b` the cards; `steps-card.size=24 steps-card.bold=on` style the card text. `render.chevron_shape=pentagon` draws flat-tailed arrows (the importer reads them as chevrons); a list names the arrows in reading order, the last word repeats: `render.chevron_shape=pentagon,chevron` (first arrow flat, the rest notched). CSS reaches both parts: `.steps-arrow:nth-child(even) { background: ... }`, `.steps-card { ... }`.
 
 Looks are tokens: `style: steps-arrow.fill=accent steps-card.fill=#EEF2FF` (classes `steps-arrow` / `steps-card`,
 or per step `## 設計 {.accent}`), `layout.steps_gap` (arrow row to cards), `layout.steps_arrow_aspect` /
@@ -261,7 +268,28 @@ text), `layout.steps_stretch=off` (cards keep their content height). Fewer than 
 2. 容量変更は行わない
 ```
 
+**Plain rows.** `@rows plain` draws the same bars without number badges: a list with `-` or `1.` is fine. The marker is a glyph (`style: rows.glyph=■ rows.glyph.color=accent`; without `rows.glyph` the `bullet=` token is the glyph, `rows.glyph.color` falls back to `bullet.color`) and/or a left stripe: `rows.stripe=primary,secondary` (a list cycles over the bars; also on numbered `@rows`, `layout.rows_stripe_w`, 0.14in). Shapes: `Row N`, `Row N glyph`, `Row N stripe`; the importer folds them back to `@rows plain`.
+
+```markdown
+style: rows.glyph=■ rows.glyph.color=accent rows.stripe=primary,secondary
+@rows plain
+- 主力3ブランドを平均6%改定
+- 改定は2027年5月出荷分から
+```
+
 Looks: classes `rows` (bar: `rows.fill=surface`) and `rows-num` (badge: `rows-num.fill=primary,secondary` cycles), `layout.rows_h` (bar height, 1.05in), `rows_gap`, `rows_pad`, `rows_text_ratio` / `rows_text_max_pt` (text size; `{size=}` pins it). The bars are native rectangles named `Row N` and `Row N num`; the importer folds them back to `@rows`.
+
+**Item cards.** `@4 items` draws the bullets of every `##` box as cards (a `1xN` grid inside the box, one card per bullet, a deeper bullet joins the card above); `style: box.items=cards` does it for every slide. The cards are the class `item`: `style: item.fill=bg item.line=border item.border-left="5pt solid secondary" item.size=14 item.bold=off item.valign=middle` (defaults: `bg` fill, the card line, text vertically centred; `item.color` `item.align` `item.radius` work too). Text size, bold and valign act on the card text, never on a heading band. A box that holds anything but bullets keeps them as bullets (info `items-skipped`). `### text {.item}` sub-boxes are the same cards, so `item.*` and `{size=}` reach them too. Shapes: `Item N`; the importer reads cards back as bullets and adds `items`.
+
+**Numbered boxes.** `@4 num` puts a circle with 1..n left of every `##` heading (with `heading.band` inside the band): `style: box.num.fill=primary box.num.color=bg box.num.size=20` (fill defaults to `primary`, or the heading ink on a band; digit color to a readable ink; digit size to the heading size, the circle is `layout.num_badge_ratio` = 1.9 x the digit). Not on `###`, KPI cards or `@steps`. Shapes: `Num N` (decor: the importer drops them and adds `num`).
+
+```markdown
+style: heading.band=primary heading.rule=accent heading.rule_h=0.06in item.border-left="5pt solid secondary" item.size=14
+@4 items num
+## 既存事業の収益改善
+- 主力3ブランドの価格改定
+- 不採算SKUを15%削減
+```
 
 ## Attributes `{...}`
 
@@ -673,8 +701,9 @@ layout and renderer, and checks that the warning carries the hint. `@free` honou
 `size=` on a box with no text of its own sizes nothing (it sizes the box text, not its heading): `sizes: heading=` or
 `h2.size=` does. `style:` tokens that need an element the deck does not contain warn the same way, once per token on its
 header line: `kpi.*` without a `.kpi` card, `steps*` / `steps-arrow` without `@steps`, `rows*` without `@rows`,
-`table.*` without a table, `palette` / `render.chart_*` without a chart, `bullet*` without a list, `heading.*` / `card.*`
-without a box, `footer.*` without `footer:` / `num:`, `lead.*` without a lead; the `cover.*` chrome (`rule` `bar`
+`table.*` without a table, `palette` / `render.chart_*` without a chart, `bullet*` without a list, `heading.*` / `card.*` /
+`box.*` without a box, `box.num.*` without an `@num` slide, `item.*` without item cards, `rows.glyph*` without `@rows plain`,
+`render.chevron_shape` without arrows, `cover.rule_w` / `rule_pos` without `cover.rule=<color>`, `footer.*` without `footer:` / `num:`, `lead.*` without a lead; the `cover.*` chrome (`rule` `bar`
 `pad` `gap` `footer`) needs the composed cover (`cover.band_h` above 0 and no `{size=}` on the cover title); and
 `chevron.*` styles nothing (arrows follow `primary`, `steps-arrow.fill=` colours `@steps`). The table is `STYLE_NEEDS`
 in the same module.

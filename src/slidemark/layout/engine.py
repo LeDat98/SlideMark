@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, field, replace
+from typing import Any
 
 from .. import icons
 from ..ir import (
@@ -80,6 +81,7 @@ _SIZE_KEY = {
     "conclusion": "lead",
 }
 _INHERIT_ROLES = {"body", "quote"}
+_KPI_CARD_FIELDS = ("fill", "line", "line_width", "radius", "shadow", "opacity")  # `kpi.fill=` = the card's
 _INHERIT_FIELDS = (
     "font_size",
     "color",
@@ -132,6 +134,7 @@ class _Ctx:
     tight: float = 1.0  # gap / padding factor (dense slides)
     grow: float = 1.0  # body text growth inside boxes (sparse grids), shared by all sibling boxes
     depth: int = 0  # 0 = slide level, > 0 inside a box
+    sub: int = 0  # titled boxes around the box being placed (> 0 = a `###` sub-box: no heading rule)
     text_only: bool = False  # the slide body is plain text only: its body text grows like box text
     head_grow: bool = False  # very sparse boxes: box headings grow with ``grow`` (up to ``GROW_HEAD``)
     grew: bool = False  # set when ``grow`` actually scaled some text
@@ -1122,6 +1125,11 @@ def _card_style(ctx: _Ctx, c: Container) -> Style:
     else:
         base = _scale_pad(ctx.theme.classes.get("card", fast_style(padding=ctx.lt.box_pad)), ctx.step)
     others = _class_styles(ctx, c, skip=("plain", "kpi"))
+    if "kpi" in c.classes and (kc := ctx.theme.classes.get("kpi")) is not None:
+        # `kpi.fill=` / `kpi.line=` ...: the card look of a KPI card (its text fields style the number)
+        alias = {k: v for k, v in kc.__dict__.items() if k in _KPI_CARD_FIELDS and v is not None}
+        if alias:
+            others = [*others, fast_style(**alias)]
     own = ctx.css.own(c)
     st = fast_style().merged(ctx.css.inherited(c), base, *others, own, c.style)
     if own.line_width and not st.line:
@@ -1195,19 +1203,25 @@ def _head_metrics(
         return None
     h_el, hst, eff, band = parts
     icon = _icon_name(c)
-    isz, shift = _icon_side(ctx, hst, eff, kpi) if icon else (0, 0)
+    num = None if icon or kpi else _num_of(c)  # `@num`: a numbered badge takes the icon's place
+    mark = bool(icon) or num is not None
+    isz, shift = (0, 0)
+    if icon:
+        isz, shift = _icon_side(ctx, hst, eff, kpi)
+    elif num is not None:
+        isz, shift = _num_side(ctx, hst, eff)
     if icon and kpi:
         isz = min(isz, max(rect_w - 2 * pad, 1))
         shift = 0
-    if icon and band:
+    if mark and band:
         shift = pad + isz  # the text's own padding supplies the gap after the icon
     if band:
         hh = round(_text_need(ctx, h_el, hst, rect_w - shift, eff))
-        if icon:
+        if mark:
             hh = max(hh, isz + 2 * pad)
     else:
         hh = round(_text_need(ctx, h_el, hst, rect_w - (2 * pad if hpad is None else hpad) - shift, eff))
-        if icon and not kpi:
+        if mark and not kpi:
             hh = max(hh, isz)
     if row:
         hh = max(hh, ctx.band_h.get((id(c), rect_w), 0))
@@ -1249,6 +1263,67 @@ def _icon_side(ctx: _Ctx, hst: Style, eff: float, kpi: bool) -> tuple[int, int]:
     return side, side + round(ctx.lt.icon_gap * side)
 
 
+def _num_of(c) -> int | None:
+    """The badge number of a box (``@num`` stamps ``attrs["num"]`` on a copy of the slide), else ``None``."""
+    n = getattr(c, "attrs", {}).get("num")
+    return n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else None
+
+
+def _num_digit(ctx: _Ctx, hst: Style, eff: float) -> float:
+    """Digit size (pt) of a numbered badge: ``box.num.size`` or the box heading size."""
+    if ctx.theme.box_num_size:
+        return ctx.theme.box_num_size
+    return (hst.font_size or 18) * eff * ctx.lt.num_digit_ratio
+
+
+def _num_side(ctx: _Ctx, hst: Style, eff: float) -> tuple[int, int]:
+    """(badge diameter, space the badge takes left of the heading text) in EMU."""
+    side = round(_num_digit(ctx, hst, eff) * ctx.lt.num_badge_ratio * EMU_PER_PT)
+    return side, side + round(ctx.lt.icon_gap * side)
+
+
+def _num_item(ctx: _Ctx, n: int, hst: Style, eff: float, band: str | None) -> tuple[Shape, Style]:
+    """The numbered circle (``box.num.fill`` / ``color`` / ``size``) of box ``n``: an ellipse + digits.
+
+    Default: ``primary`` with ``bg`` digits; on a heading band the heading ink (so the circle shows on it)."""
+    th = ctx.theme
+    on_band = bool(band) and not th.box_num_fill
+    fill = th.box_num_fill or (hst.color if on_band else None) or "primary"
+    ink = th.box_num_color or th.ink_on(fill, band if on_band else "bg")
+    el = Shape(
+        shape="ellipse",
+        paragraphs=[Paragraph(runs=[Run(text=str(n), bold=True)])],
+        attrs={"shape_name": f"Num {n}"},
+        classes=["num"],
+    )
+    st = fast_style(
+        font=hst.font,
+        font_ea=hst.font_ea,
+        font_size=_num_digit(ctx, hst, eff),
+        fill=fill,
+        color=ink,
+        bold=True,
+        align="center",
+        valign="middle",
+        padding="0pt",
+    )
+    return el, st
+
+
+def _emit_rule(ctx: _Ctx, rect: Rect, color: str | None) -> None:
+    """A decor rule (named ``rule``: the importer skips it) of ``rect`` in ``color``."""
+    ctx.emit(Shape(shape="rect", id="rule"), rect, fast_style(fill=color, line=None))
+
+
+def _head_rule(ctx: _Ctx, c: Container, kpi: bool, band, pad: int) -> tuple[int, int]:
+    """(air above, thickness) in EMU of the ``heading.rule`` under the heading of box ``c`` (0, 0 = none).
+
+    Not drawn on a KPI card, on a sub-box (``###`` and item cards) or on a box without heading."""
+    if not ctx.theme.heading_rule or kpi or ctx.sub or c.title is None or "item" in c.classes:
+        return 0, 0
+    return (0 if band else pad // 4), max(_emu(ctx.theme.heading_rule_h), 1)
+
+
 def _inset4(rect: Rect, pl: int, pt: int, pr: int, pb: int) -> Rect:
     """``rect`` shrunk by per-side insets (never below zero size)."""
     w, h = max(rect.w - pl - pr, 0), max(rect.h - pt - pb, 0)
@@ -1287,6 +1362,17 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
     if metrics := _head_metrics(ctx, c, rect.w, pad, kpi, hpad=pl + pr):
         (h_el, hst, eff, band), isz, shift, hh = metrics
         icon = _icon_name(c)
+        num = None if icon or kpi else _num_of(c)
+        mark = bool(icon) or num is not None
+
+        def emit_mark(r: Rect, fill: str | None) -> None:  # the icon or `@num` badge left of the heading
+            if icon:
+                ctx.emit(_icon_item(icon), r, fast_style(fill=fill or "primary"))
+            else:
+                badge, badge_st = _num_item(ctx, num or 0, hst, eff, band)
+                ctx.emit(badge, r, badge_st)
+
+        rule_air, rule_h = _head_rule(ctx, c, kpi, band, pad)
         if icon and kpi:  # icon centered above the label and the number
             ctx.emit(
                 _icon_item(icon),
@@ -1298,27 +1384,32 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
             if hh > rect.h * _TOL:
                 ctx.over.append(_label(c))
             band_rect = Rect(rect.x, rect.y, rect.w, min(hh, rect.h))
-            if icon:  # the band is a plain shape behind the icon and the shifted heading text
+            if mark:  # the band is a plain shape behind the icon / badge and the shifted heading text
                 ctx.emit(Shape(shape="rect"), band_rect, fast_style(fill=band))
-                ctx.emit(
-                    _icon_item(icon),
-                    Rect(rect.x + pad, rect.y + (band_rect.h - isz) // 2, isz, isz),
-                    fast_style(fill=hst.color),
-                )
+                emit_mark(Rect(rect.x + pad, rect.y + (band_rect.h - isz) // 2, isz, isz), hst.color)
                 text_rect = Rect(rect.x + shift, rect.y, rect.w - shift, band_rect.h)
                 ctx.emit(h_el, text_rect, hst.model_copy(update={"fill": None}), eff)
             else:
                 ctx.emit(h_el, band_rect, hst, eff)
-            y = band_rect.bottom + round(pad * 0.5)
+            y = band_rect.bottom
+            if rule_h:  # `heading.rule`: a rule on the lower edge of the band
+                _emit_rule(ctx, Rect(rect.x, y, rect.w, rule_h), ctx.theme.heading_rule)
+                y += rule_h
+            y += round(pad * 0.5)
         else:
-            if icon and not kpi:
-                ctx.emit(
-                    _icon_item(icon), Rect(inner.x, y, isz, isz), fast_style(fill=hst.color or "primary")
-                )
+            if mark and not kpi:
+                emit_mark(Rect(inner.x, y + (hh - isz) // 2 if num is not None else y, isz, isz), hst.color)
             if hh > inner.h * _TOL:
                 ctx.over.append(_label(c))
+            if num is not None:  # the heading text centres on its badge
+                hst = hst.merged(fast_style(valign="middle"))
             ctx.emit(h_el, Rect(inner.x + shift, y, inner.w - shift, min(hh, inner.h)), hst, eff)
-            y += hh + round(pad * 0.5)
+            y += hh
+            if rule_h:  # `heading.rule`: a rule under the heading text
+                y += rule_air
+                _emit_rule(ctx, Rect(inner.x, y, inner.w, rule_h), ctx.theme.heading_rule)
+                y += rule_h
+            y += round(pad * 0.5)
     area = Rect(inner.x, y, inner.w, max(inner.bottom - y, 0))
     if not c.children:
         return
@@ -1327,8 +1418,9 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
     grid = _cgrid(ctx, c)
     if kpi:
         children = _kpi_children(ctx, children, area.w, c)
-    saved = (ctx.depth, ctx.grow)
+    saved = (ctx.depth, ctx.grow, ctx.sub)
     ctx.depth += 1
+    ctx.sub += c.title is not None
     if kpi:
         ctx.grow = _kpi_grow(ctx, saved[1], c, area.w)
     try:
@@ -1336,11 +1428,17 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
             _place_blocks(ctx, children, area, child_inherit, grid, c.classes, gap, c, c.links)
         else:
             rects = _place_stack(
-                ctx, children, area, child_inherit, gap, c, center=kpi and len(children) == 1
+                ctx,
+                children,
+                area,
+                child_inherit,
+                gap,
+                c,
+                center=(kpi or "item" in c.classes) and len(children) == 1,
             )
             _emit_links(ctx, c.links, rects)
     finally:
-        ctx.depth, ctx.grow = saved
+        ctx.depth, ctx.grow, ctx.sub = saved
     if not kpi:
         ids = [id(ch) for ch in children if _spreadable(ch) and id(ch) in ctx.text_out]
         if ids:
@@ -1491,10 +1589,11 @@ def _box_nat0(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None
         (_h_el, _hst, _eff, band), isz, _shift, hh = metrics
         if kpi and _icon_name(c):
             total += isz + round(pad * 0.4)
+        r_air, r_h = _head_rule(ctx, c, kpi, band, pad)
         if band:
-            total = hh + round(pad * 0.5) + pb
+            total = hh + r_h + round(pad * 0.5) + pb
         else:
-            total += hh + round(pad * 0.5)
+            total += hh + (r_air + r_h if r_h else 0) + round(pad * 0.5)
     children = c.children
     if not children:
         return total
@@ -1503,15 +1602,16 @@ def _box_nat0(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None
     inner_w = max(width - pl - pr, 1)
     if kpi:
         children = _kpi_children(ctx, children, inner_w, c)
-    saved = (ctx.depth, ctx.grow)
+    saved = (ctx.depth, ctx.grow, ctx.sub)
     ctx.depth += 1
+    ctx.sub += c.title is not None
     if kpi:
         ctx.grow = _kpi_grow(ctx, saved[1], c, inner_w)
     try:
         child_inherit = inherit.merged(_only_inheritable(style))
         nat = [_natural_height(ctx, ch, inner_w, child_inherit) for ch in children]
     finally:
-        ctx.depth, ctx.grow = saved
+        ctx.depth, ctx.grow, ctx.sub = saved
     if any(n is None for n in nat):
         return None
     return total + sum(nat) + _gap(ctx, _cgap(ctx, c), inner_w, small=True) * (len(nat) - 1)
@@ -3593,6 +3693,7 @@ def _rows_list(ctx: _Ctx, slide: Slide, kind: str) -> Text | None:
     Only a content slide whose body is one ordered (``1.``) list, nothing nested: a lead, conclusion and
     footnotes may surround it. ``@rows`` on a slide that does not fit gets the info line ``rows-skipped``."""
     asked = "rows" in slide.classes
+    plain = asked and "plain" in slide.classes  # `@rows plain`: unnumbered bars (glyph and / or stripe)
     if not (asked or ctx.lt.rows) or kind != "content":
         return None
     els = slide.elements
@@ -3604,14 +3705,19 @@ def _rows_list(ctx: _Ctx, slide: Slide, kind: str) -> Text | None:
         and el.box is None
         and not slide.links
         and el.paragraphs
-        and all(p.marker == "number" and p.level == 0 for p in el.paragraphs)
+        and all(
+            p.marker in (("number", "bullet") if plain else ("number",)) and p.level == 0
+            for p in el.paragraphs
+        )
     ):
         return el
     if asked:
         ctx.diag(
             "rows-skipped",
-            "@rows needs one ordered list (1. 2. 3.) alone on the slide",
-            "put the numbered items directly under the title, with no other block or nested list",
+            "@rows needs one ordered list (1. 2. 3.) alone on the slide"
+            if not plain
+            else "@rows plain needs one list (- or 1.) alone on the slide",
+            "put the items directly under the title, with no other block or nested list",
             level="info",
         )
     return None
@@ -3629,6 +3735,7 @@ def _layout_rows(ctx: _Ctx, el: Text, body: Rect, sg: int) -> _Ctx | None:
     h = min(_emu(lt.rows_h), (body.h - gap * (n - 1)) // n)
     if h < _emu(lt.rows_min_h):
         return None
+    unnumbered = "plain" in ctx.slide.classes  # `@rows plain`: no number badge, an optional glyph
     bar_st = fast_style().merged(*_class_styles(ctx, Shape(classes=["rows"])), ctx.css.own(el))
     num_cls = th.classes.get("rows-num") or fast_style()
     st0 = _styled(ctx, el, _role_style(ctx, "body"))
@@ -3637,14 +3744,21 @@ def _layout_rows(ctx: _Ctx, el: Text, body: Rect, sg: int) -> _Ctx | None:
     size = st0.font_size or 18
     if not explicit:
         size = min(max(size, h / EMU_PER_PT * lt.rows_text_ratio), max(lt.rows_text_max_pt, size))
-    text_w = body.w - h - 2 * pad
+    stripes = [x.strip() for x in th.rows_stripe.split(",")] if th.rows_stripe else []
+    stripe_w = min(_emu(lt.rows_stripe_w), h) if stripes else 0
+    glyph = (th.rows_glyph or th.bullet or "")[:1] if unnumbered else ""
+    glyph_pt = size * lt.rows_glyph_ratio
+    glyph_w = round(glyph_pt * 1.4 * EMU_PER_PT) if glyph else 0
+    # left of the text: stripe, then the number badge (square, as tall as the bar) or the glyph
+    lead = stripe_w + (0 if unnumbered else h) + (glyph_w + pad if glyph else 0)
+    text_w = body.w - lead - 2 * pad
     plain = [p.model_copy(update={"marker": None, "level": 0}) for p in paras]
     st_txt = st0.merged(
         fast_style(
             font_size=size,
             align="left",
             valign="middle",
-            padding_left=str(round((h + pad) / EMU_PER_PT, 2)) + "pt",
+            padding_left=str(round((lead + pad) / EMU_PER_PT, 2)) + "pt",
         )
     )
     # the widest item decides one size for all rows: it must fit its bar on at most the lines the bar holds
@@ -3666,28 +3780,57 @@ def _layout_rows(ctx: _Ctx, el: Text, body: Rect, sg: int) -> _Ctx | None:
                 fast_style(padding_top="0pt", padding_bottom="0pt", padding_right=f"{pad / EMU_PER_PT:g}pt")
             ),
         )
-        fill = cyc[i % len(cyc)] if cyc else (num_cls.fill or "primary")
-        badge = Paragraph(runs=[Run(text=str(i + 1), bold=True)], style=None)
-        ctx.emit(
-            Shape(
-                shape="rect",
-                paragraphs=[badge],
-                attrs={"shape_name": f"Row {i + 1} num"},
-                classes=["rows-num"],
-            ),
-            Rect(body.x, y, h, h),
-            fast_style(
-                font=st0.font,
-                font_ea=st0.font_ea,
-                font_size=size,
-                fill=fill,
-                color=th.ink_on(fill, num_cls.color or "bg"),
-                bold=True,
-                align="center",
-                valign="middle",
-                padding="0pt",
-            ),
-        )
+        if stripe_w:  # `rows.stripe=a,b`: a stripe on the left edge of the bar, colours cycle
+            col = stripes[i % len(stripes)]
+            ctx.emit(
+                Shape(shape="rect", attrs={"shape_name": f"Row {i + 1} stripe"}, classes=["rows-stripe"]),
+                Rect(body.x, y, stripe_w, h),
+                fast_style(fill=col, line=None),
+            )
+        if glyph:  # `@rows plain`: the glyph (`rows.glyph=■`, else `bullet=`) before the text
+            ctx.emit(
+                Shape(
+                    shape="rect",
+                    paragraphs=[Paragraph(runs=[Run(text=glyph)])],
+                    attrs={"shape_name": f"Row {i + 1} glyph"},
+                    classes=["rows-glyph"],
+                ),
+                Rect(body.x + stripe_w + pad, y, glyph_w, h),
+                fast_style(
+                    font=st0.font,
+                    font_ea=st0.font_ea,
+                    font_size=glyph_pt,
+                    fill=None,
+                    line=None,
+                    color=th.rows_glyph_color or th.bullet_color or "fg",
+                    align="center",
+                    valign="middle",
+                    padding="0pt",
+                ),
+            )
+        if not unnumbered:
+            fill = cyc[i % len(cyc)] if cyc else (num_cls.fill or "primary")
+            badge = Paragraph(runs=[Run(text=str(i + 1), bold=True)], style=None)
+            ctx.emit(
+                Shape(
+                    shape="rect",
+                    paragraphs=[badge],
+                    attrs={"shape_name": f"Row {i + 1} num"},
+                    classes=["rows-num"],
+                ),
+                Rect(body.x + stripe_w, y, h, h),
+                fast_style(
+                    font=st0.font,
+                    font_ea=st0.font_ea,
+                    font_size=size,
+                    fill=fill,
+                    color=th.ink_on(fill, num_cls.color or "bg"),
+                    bold=True,
+                    align="center",
+                    valign="middle",
+                    padding="0pt",
+                ),
+            )
         y += h + gap
     return ctx
 
@@ -3792,18 +3935,47 @@ def _bar_shrink(st: Style, base: float, em: float, room: float, want: float, lt:
     return st if abs(want - base) < 1e-6 else st.merged(fast_style(font_size=want))
 
 
+def _cover_stripes(theme: Theme, W: int) -> list[tuple[str, int]]:
+    """``cover.stripes=color@x,color@x`` as (color, x EMU) pairs, left to right (a bad item was dropped by the
+    token check)."""
+    out: list[tuple[str, int]] = []
+    for item in (theme.cover_stripes or "").split(","):
+        col, at, pos = item.strip().rpartition("@")
+        if not at or not col:
+            continue
+        try:
+            out.append((col, min(max(to_emu(pos, W), 0), W)))
+        except (ValueError, KeyError):
+            continue
+    return sorted(out, key=lambda t: t[1])
+
+
 def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, fit_text, dims) -> Rect | None:
     """Cover composed from tokens: a band (``cover.band_h`` of the height, filled when ``title.band`` is set)
     anchored to the top, the title (+ subtitle) bottom-aligned in it ``cover.pad`` above its edge, a thin
-    ``cover.rule`` along that edge and the deck footer as a quiet caption at the bottom (``cover.footer``)."""
+    ``cover.rule`` along that edge and the deck footer as a quiet caption at the bottom (``cover.footer``).
+
+    Decoration: ``cover.bar=<color>`` (beside the title block) or ``<color>@edge`` (the slide's left edge,
+    full height), ``cover.stripes=<color>@<x>,...`` (vertical stripes from x to the right edge, the
+    title keeps left of the first), ``cover.rule_w`` (a short rule at the title, ``cover.rule_pos`` above or
+    below it)."""
     W, H, Mx, My, sg, inner_w = dims
     theme, deck = ctx.theme, ctx.deck
     band = theme.title_band if theme.cover_band else None  # `cover.band=none`: no band (a `bg=` shows)
-    bar_w = _emu(theme.cover_bar_w) if theme.cover_bar else 0  # `cover.bar=<color>`: a bar left of the title
-    off = bar_w + _emu(theme.cover_gap) if bar_w else 0
+    bar_col, _at, bar_where = (theme.cover_bar or "").partition("@")
+    edge = bar_where.strip().lower() == "edge"
+    bar_w = _emu(theme.cover_bar_w) if bar_col else 0  # `cover.bar=<color>`: a bar left of the title
+    off = bar_w + _emu(theme.cover_gap) if bar_w and not edge else 0
     tx, tw = Mx + off, inner_w - off
+    stripes = _cover_stripes(theme, W)
+    air = _emu(theme.cover_gap)
+    if stripes:  # the text keeps clear of the first stripe
+        tw = max(min(tw, stripes[0][1] - tx - air), inner_w // 4)
     bh = round(H * theme.cover_band_h)
     rh = _emu(theme.cover_rule_h) if theme.cover_rule else 0
+    short = bool(rh and theme.cover_rule_w is not None)  # a short rule at the title, not on the band edge
+    rule_w = min(max(_emu(theme.cover_rule_w), 1), tw) if short else 0
+    below = short and theme.cover_rule_pos != "above"
     if band:
         put(
             head,
@@ -3811,8 +3983,16 @@ def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, f
             Rect(0, 0, W, bh),
             fast_style(fill=band, line=None),
         )
+    for col, x in stripes:
+        put(head, Shape(shape="rect", id="rule"), Rect(x, 0, W - x, H), fast_style(fill=col, line=None))
+    if edge and bar_w:  # the bar sits on the left edge of the slide, full height
+        put(
+            head,
+            Shape(shape="rect", id="rule"),
+            Rect(0, 0, min(bar_w, W), H),
+            fast_style(fill=bar_col, line=None),
+        )
     bottom = bh - _emu(theme.cover_pad)
-    air = _emu(theme.cover_gap)
     s_r = None
     sh = 0
     if sub:
@@ -3823,28 +4003,39 @@ def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, f
         s_fs = fit_text(sub, Rect(tx, 0, tw, round(bh * 0.25)), s_st)
         sh = round(_text_need(ctx, sub, s_st, tw, s_fs))
         s_r = Rect(tx, bottom - sh, tw, sh)
+    gap_ts = air if sh else 0  # title -> subtitle
+    if below:  # title, air, rule, air, subtitle
+        gap_ts = air + rh + (air if sh else 0)
     if slide.title:
         t_st = _role_style(ctx, "title", cover=True).merged(fast_style(valign="bottom"))
         if band:
             t_st = t_st.merged(fast_style(color=theme.title_band_color))
         t_st = _styled(ctx, slide.title, t_st, classes=False)
-        room = max(bottom - sh - (air if sh else 0) - My, 1)
-        t_r = Rect(tx, bottom - sh - (air if sh else 0) - room, tw, room)
+        room = max(bottom - sh - gap_ts - My, 1)
+        t_r = Rect(tx, bottom - sh - gap_ts - room, tw, room)
         t_fs = fit_text(slide.title, t_r, t_st)
         t_fs = _grow_cover_title(ctx, slide.title, t_st, t_r, t_fs)
         th = round(_text_need(ctx, slide.title, t_st, tw, t_fs))
         put(head, slide.title, Rect(tx, t_r.bottom - th, tw, th), t_st, t_fs)
-        if bar_w:
+        if bar_w and not edge:
             top = t_r.bottom - th
             put(
                 head,
                 Shape(shape="rect", id="rule"),
                 Rect(Mx, top, bar_w, bottom - top),
-                fast_style(fill=theme.cover_bar, line=None),
+                fast_style(fill=bar_col, line=None),
+            )
+        if short:  # `cover.rule_w`: above the title, or under it (between title and subtitle)
+            ry = t_r.bottom + air if below else t_r.bottom - th - air - rh
+            put(
+                head,
+                Shape(shape="rect", id="rule"),
+                Rect(tx, ry, rule_w, rh),
+                fast_style(fill=theme.cover_rule, line=None),
             )
     if s_r is not None:
         put(head, sub, s_r, s_st, s_fs)
-    if rh:
+    if rh and not short:
         full = band is not None or slide.background is not None
         put(
             head,
@@ -3863,7 +4054,7 @@ def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, f
         )
     if not slide.elements:
         return None
-    top = bh + rh + sg
+    top = bh + (0 if short else rh) + sg
     return Rect(Mx, top, inner_w, max(foot_y - top - sg, 0))
 
 
@@ -3902,6 +4093,112 @@ def _chevron_steps(slide: Slide, lt: LayoutTokens) -> Slide:
     return new
 
 
+def _item_card(
+    paras: list[Paragraph], n: int, line: int | None, box: Container | None = None, size: float | None = None
+) -> Container:
+    """One item card: a plain-text leaf box (class ``item``, shape name ``Item n``) holding ``paras``.
+
+    ``size`` (``item.size`` or ``{size=}``) is pinned on the text: a size the author chose never grows."""
+    first = paras[0].model_copy(update={"marker": None, "level": 0})
+    text = Text(
+        role="body",
+        paragraphs=[first, *paras[1:]],
+        line=line,
+        style=fast_style(font_size=size) if size else None,
+    )
+    src = box
+    return Container(
+        id=src.id if src else None,
+        box=src.box if src else None,
+        style=src.style if src else None,
+        classes=[*(src.classes if src else []), *(["item"] if not src or "item" not in src.classes else [])],
+        attrs={**(src.attrs if src else {}), "shape_name": f"Item {n}"},
+        children=[text],
+        line=line,
+    )
+
+
+def _item_paras(t: Text) -> list[list[Paragraph]] | None:
+    """The bullets of a list text as items (a deeper paragraph belongs to the item above), else ``None``."""
+    if t.role != "body" or "callout" in t.classes or t.box is not None or not t.paragraphs:
+        return None
+    if not all(p.marker for p in t.paragraphs):
+        return None
+    items: list[list[Paragraph]] = []
+    for p in t.paragraphs:
+        if p.level > 0 and items:
+            items[-1].append(p)
+        else:
+            items.append([p])
+    return items
+
+
+def _slide_items(slide: Slide, theme: Theme) -> tuple[Slide, list[str]]:
+    """``@items`` / ``box.items=cards``: the bullets of every box are item cards (a ``1xN`` grid of cards of
+    the ``item`` class); ``### x {.item}`` sub-boxes become the same cards (their text is body text, so
+    ``item.size`` / ``bold`` / ``valign`` apply). ``@num`` stamps ``attrs["num"]`` on every titled box so that
+    the layout draws a numbered badge. Works on a copy: the parsed slide stays as written. Returns the slide
+    and the labels of boxes that hold more than a list (skipped: the bullets stay)."""
+    cards = "items" in slide.classes or theme.box_items == "cards"
+    numbered = "num" in slide.classes and not {"steps", "chevron", "rows"} & set(slide.classes)
+    counter = [0, 0]  # item cards, numbered boxes
+    skipped: list[str] = []
+    item_cls = theme.classes.get("item")
+    item_size = item_cls.font_size if item_cls is not None else None
+
+    def leaf_item(c: Container) -> bool:
+        return "item" in c.classes and c.title is not None and not c.children and not c.links
+
+    def walk(els: list, nested: bool = False) -> tuple[list, bool]:
+        out, changed = [], False
+        for e in els:
+            if not isinstance(e, Container):
+                out.append(e)
+                continue
+            new = e
+            if leaf_item(e):  # `### x {.item}`: the heading text is the item text
+                counter[0] += 1
+                new = _item_card(
+                    [p for p in e.title.paragraphs] or [Paragraph()],  # type: ignore[union-attr]
+                    counter[0],
+                    e.line,
+                    e.model_copy(update={"title": None}),
+                    (e.style.font_size if e.style and e.style.font_size else None) or item_size,
+                )
+            elif "steps" in e.classes or "kpi" in e.classes or "diagram" in e.classes:
+                pass
+            else:
+                kids, kid_changed = walk(e.children, nested or e.title is not None)
+                upd: dict[str, Any] = {}
+                if kid_changed:
+                    upd["children"] = kids
+                if numbered and e.title is not None and not nested:
+                    counter[1] += 1
+                    upd["attrs"] = {**e.attrs, "num": counter[1]}
+                plain_box = e.title is not None and e.grid is None and not e.links
+                if cards and plain_box and "item" not in e.classes:
+                    lists = [_item_paras(t) if isinstance(t, Text) else None for t in e.children]
+                    if e.children and all(x is not None for x in lists):
+                        flat = [it for x in lists for it in x]  # type: ignore[union-attr]
+                        built = []
+                        for it in flat:
+                            counter[0] += 1
+                            built.append(_item_card(it, counter[0], e.line, size=item_size))
+                        upd.update(children=built, grid=f"1x{len(built)}")
+                    elif any(isinstance(t, Text) and any(p.marker for p in t.paragraphs) for t in e.children):
+                        skipped.append(_label(e))  # bullets next to other blocks stay bullets
+                if upd:
+                    new = e.model_copy(update=upd)
+            changed = changed or new is not e
+            out.append(new)
+        return out, changed
+
+    els, changed = walk(slide.elements)
+    if not changed:
+        return slide, skipped
+    return slide.model_copy(update={"elements": els}), skipped
+
+
 def _attach_bar(
     out: list[Placed], body: Rect, tail: list[Placed], bar: Text | None, lt: LayoutTokens
 ) -> list[Placed]:
@@ -3934,6 +4231,7 @@ def _clone_ctx(c: _Ctx) -> _Ctx:
 
 def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     slide = _chevron_steps(slide, theme.layout)
+    slide, items_skipped = _slide_items(slide, theme)
     try:
         W, H = slide_size(deck.size)
     except ValueError:
@@ -3941,6 +4239,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     measure.set_default_font(theme.fonts.body)
     measure.set_tokens(theme.layout)
     ctx = _Ctx(deck, theme, slide, index, W, H)
+    for label in items_skipped:
+        ctx.diag(
+            "items-skipped",
+            f"{label} holds more than a bullet list: its bullets stay bullets",
+            "put only bullets in a box to draw them as item cards, or use `### text {.item}` per item",
+            level="info",
+        )
     dense = deck.density == "dense" or "dense" in slide.classes
     ctx.dense_k = theme.dense_scale if dense else 1.0
     ctx.tight = ctx.lt.dense_tight if dense else 1.0
@@ -4094,17 +4399,27 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             st = _styled(ctx, slide.title, st, classes=False)
             put(head, slide.title, r, st, fit_text(slide.title, r, st))
             if (
-                theme.title_rule and kind != "free"
-            ):  # `title.rule=<color>`: a rule on the bottom edge of the title
+                theme.title_rule or theme.title_rule2
+            ) and kind != "free":  # `title.rule=<color>`: a rule on the bottom edge of the title
                 rule_h = max(_emu(theme.title_rule_h), 1)
                 full = theme.title_band is not None
-                rules.append(
-                    (
-                        Shape(shape="rect", id="rule"),
-                        Rect(0 if full else Mx, r.bottom - rule_h, W if full else inner_w, rule_h),
-                        fast_style(fill=theme.title_rule, line=None),
+                if theme.title_rule:
+                    rules.append(
+                        (
+                            Shape(shape="rect", id="rule"),
+                            Rect(0 if full else Mx, r.bottom - rule_h, W if full else inner_w, rule_h),
+                            fast_style(fill=theme.title_rule, line=None),
+                        )
                     )
-                )
+                if theme.title_rule2:  # `title.rule2=<color>`: a short segment on the left end of the rule
+                    seg = min(max(_emu(theme.title_rule2_w), 1), W if full else inner_w)
+                    rules.append(
+                        (
+                            Shape(shape="rect", id="rule"),
+                            Rect(0 if full else Mx, r.bottom - rule_h, seg, rule_h),
+                            fast_style(fill=theme.title_rule2, line=None),
+                        )
+                    )
         for role, el in (("subtitle", slide.subtitle), ("lead", slide.lead)):
             if kind == "blank" or el is None or not el.paragraphs:
                 continue

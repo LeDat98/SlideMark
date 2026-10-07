@@ -145,6 +145,7 @@ class RenderCtx:
     links: list[tuple[object, object, str, int]] = field(default_factory=list)
     slides: list = field(default_factory=list)
     template: bool = False  # the base presentation comes from a user template
+    chev_rank: dict[int, int] = field(default_factory=dict)  # id(Placed) -> reading rank of a chevron arrow
 
     def diag(self, rule: str, message: str, hint: str, level: str = "warning", line: int | None = None):
         self.deck.diagnostics.append(

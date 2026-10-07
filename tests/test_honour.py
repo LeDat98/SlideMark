@@ -296,6 +296,9 @@ BOXES = "# T\n## a\n- x\n## b\n- y\n"
 TABLE = "# T\n```table\na,b\n1,2\n3,4\n```\n"
 CHART = "# T\n```column\n,a,b\nS,1,2\n```\n"
 ROWS = "# T\n@rows\n1. a\n2. b\n"
+ITEMS = "# T\n@2 items\n## a\n- x\n## b\n- y\n"
+NUMS = "# T\n@2 num\n## a\n- x\n## b\n- y\n"
+PLAIN_ROWS = "# T\n@rows plain\n- a\n- b\n"
 
 # (token, a deck that lacks what it styles, a deck that has it)
 STYLE_CASES = [
@@ -315,6 +318,16 @@ STYLE_CASES = [
     ("heading.band=#FF0000", LIST, BOXES),
     ("card.fill=#FF0000", LIST, BOXES),
     ("lead.bold=on", BOXES, LIST),
+    ("item.fill=#FF0000", BOXES, ITEMS),
+    ("box.num.fill=#FF0000", BOXES, NUMS),
+    ("box.items=cards", LIST, BOXES),
+    ("heading.rule=#FF0000", LIST, BOXES),
+    ("rows.glyph=■", ROWS, PLAIN_ROWS),
+    ("rows.stripe=#FF0000", LIST, ROWS),
+    ("render.chevron_shape=pentagon", LIST, STEPS),
+    ("table.num_pad=0.5in", BOXES, TABLE),
+    ("kpi.fill=#FF0000", BOXES, KPI),
+    ("cover.stripes=#FF0000@10in", LIST, COVER),
 ]
 
 
@@ -403,3 +416,28 @@ def test_cover_tokens_see_css_on_the_cover_title(tmp_probe):
     plain = "```css\n.lead { font-weight: bold }\n```\n"
     got = _diags(f"{SHEAD} cover.rule=#FF0000\n{plain}\n{COVER}", tmp_probe)
     assert not [d for d in got if d.rule == "attr-ignored"]
+
+
+def test_cover_rule_width_needs_the_rule_it_shortens(tmp_probe):
+    """`cover.rule_w` / `rule_pos` place `cover.rule`: without a rule colour they say what to set."""
+    got = _diags(f"{SHEAD} cover.band_h=60% cover.rule=none cover.rule_w=4in\n{COVER}", tmp_probe)
+    hits = [d for d in got if d.rule == "attr-ignored"]
+    assert [d.message for d in hits] == ["style: cover.rule_w= has no effect here"]
+    assert "cover.rule=<color>" in hits[0].hint
+    ok = _diags(
+        f"{SHEAD} cover.band_h=60% cover.rule=#FF0000 cover.rule_w=4in cover.rule_pos=above\n{COVER}",
+        tmp_probe,
+    )
+    assert not [d for d in ok if d.rule == "attr-ignored"]
+
+
+def test_num_on_steps_is_the_caption_flag_so_box_num_tokens_need_a_numbered_box_slide(tmp_probe):
+    steps_num = STEPS.replace("@3 steps", "@3 steps num")
+    got = _diags(f"{SHEAD} box.num.fill=#FF0000\n{steps_num}", tmp_probe)
+    assert [d.message for d in got if d.rule == "attr-ignored"] == ["style: box.num.fill= has no effect here"]
+
+
+def test_item_size_on_an_item_card_is_honoured(tmp_probe):
+    """`### x {.item size=14}` sizes the card text: no "sizes the box text" warning."""
+    md = "# T\n## a\n@1x2\n### one {.item size=14}\n### two {.item}\n## b\n- y\n"
+    assert not _warn(md, tmp_probe)

@@ -5,10 +5,7 @@ num: on
 colors: bg=#FFFFFF fg=#222B38 primary=#142B4F secondary=#2F6DB5 sky=#8FB8E3 accent=#E07B18 muted=#595959 surface=#ECF1F8 border=#BFC5CE ink=#D6E2F3
 fonts: heading="Yu Gothic" body="Yu Gothic" ea="Yu Gothic"
 sizes: title=28 lead=18 heading=20! body=20 table=20 footnote=14 caption=10 conclusion=22 cover-title=48 cover-subtitle=20
-style: title.band=none title.color=primary title.rule=primary title.rule_h=3pt lead.bold=on lead.color=primary lead.background=surface lead.border-left="7pt solid secondary" lead.padding="5pt 12pt" footer.color=muted footer.border-top="1pt solid border" layout.cell_pad_x=0.15in layout.kpi_lone_h=0.9 layout.kpi_lone_min_h=0.85 card.radius=0 card.fill=bg card.line=border heading.band=primary heading.align=center heading.bold=on kpi.stripe=primary kpi.stripe_h=0.12in kpi.color=primary kpi.size=42 kpi.label.size=20 kpi.label.bold=on kpi.label.color=muted kpi.note.size=22 kpi.note.bold=on kpi.note.color=secondary steps-arrow.fill=primary,secondary steps-card.fill=surface steps-card.size=24 steps-card.bold=on steps-card.align=center table.header.fill=primary table.header.color=#FFFFFF table.zebra.fill=surface conclusion.fill=primary conclusion.bold=on conclusion.border-left="9pt solid accent" palette=primary,secondary,sky,accent render.chart_grid=border render.chart_line_width=3 cover.footer=off cover.band=none cover.band_h=55% cover.rule=accent cover.rule_h=0.07in bullet=■ bullet.color=accent rows.fill=surface rows.line=surface rows-num.fill=primary,secondary
-```css
-.steps-card { border-top: 5pt solid #E07B18 }
-```
+style: title.band=none title.color=primary title.rule=primary title.rule_h=3pt title.rule2=accent title.rule2_w=1.6in lead.bold=on lead.color=primary lead.background=surface lead.border-left="7pt solid secondary" lead.padding="5pt 12pt" footer.color=muted footer.border-top="1pt solid border" layout.cell_pad_x=0.15in layout.kpi_lone_h=0.9 layout.kpi_lone_min_h=0.85 card.radius=0 card.fill=bg card.line=border heading.band=primary heading.align=center heading.bold=on heading.rule=accent heading.rule_h=0.06in item.fill=surface item.line=surface item.border-left="7pt solid secondary" kpi.stripe=primary kpi.stripe_h=0.12in kpi.color=primary kpi.size=42 kpi.label.size=20 kpi.label.bold=on kpi.label.color=muted kpi.note.size=22 kpi.note.bold=on kpi.note.color=secondary steps-arrow.fill=primary,secondary render.chevron_shape=pentagon,chevron steps-card.fill=surface steps-card.size=24 steps-card.bold=on steps-card.align=center steps-card.border-top="5pt solid accent" table.header.fill=primary table.header.color=#FFFFFF table.zebra.fill=surface table.num_pad=0.6in conclusion.fill=primary conclusion.bold=on conclusion.border-left="9pt solid accent" palette=primary,secondary,sky,accent render.chart_grid=border render.chart_line_width=3 cover.footer=off cover.band=none cover.band_h=55% cover.rule=accent cover.rule_h=0.07in cover.rule_w=1.6in cover.rule_pos=above cover.stripes=#1C3A68@8.9in,secondary@10.2in bullet=■ bullet.color=accent rows.fill=surface rows.line=surface rows.stripe=primary,secondary
 
 # 2027年度 事業計画
 @cover bg=primary dark
@@ -31,14 +28,14 @@ style: title.band=none title.color=primary title.rule=primary title.rule_h=3pt l
 
 # 売上高と営業利益の推移（億円）
 > 5年間で売上高は1.25倍に
-```column {labels=outside fmt=#,##0 legend=bottom gap=80 size=16 colors=primary,secondary}
+```column {labels=outside labels.bold=on fmt=#,##0 legend=bottom gap=80 size=16,14 colors=primary,secondary}
 ,2023,2024,2025,2026,2027計画
 売上高,1020,1085,1130,1185,1280
 営業利益,61,70,78,86,96
 ```
 
 # 4つの重点戦略
-@4
+@4 items
 ## 既存事業の収益改善
 - 主力3ブランドの価格改定
 - 不採算SKUを15%削減
@@ -77,7 +74,7 @@ style: title.band=none title.color=primary title.rule=primary title.rule_h=3pt l
 
 # 2027年度 売上構成（%）
 @3:2
-```pie {labels=outside fmt=0"%" size=18 colors=primary,secondary,sky,accent legend=none}
+```pie {labels=outside+name labels.bold=on fmt=0"%" size=18 slice.line=bg colors=primary,secondary,sky,accent legend=none}
 ,冷凍食品,調味料,飲料,海外
 構成比,36,25,21,18
 ```
@@ -95,7 +92,7 @@ style: title.band=none title.color=primary title.rule=primary title.rule_h=3pt l
 # 価格改定の方針
 > 原材料高を価格に反映し、販売数量を維持する
 {size=24}
-@rows
+@rows plain
 1. 主力3ブランドを平均6%改定
 2. 改定は2027年5月出荷分から
 3. 容量変更は行わない
@@ -116,7 +113,7 @@ style: title.band=none title.color=primary title.rule=primary title.rule_h=3pt l
 +5pt
 
 # 海外展開の重点地域
-@3
+@3 items
 ## タイ
 - 工場の生産能力を1.5倍に
 - ASEAN向け輸出拠点
@@ -128,7 +125,7 @@ style: title.band=none title.color=primary title.rule=primary title.rule_h=3pt l
 - コンビニ向けPB
 
 # 海外売上高の推移（億円）
-```line {labels=on legend=bottom size=16 marker=9 colors=primary,accent,secondary min=0 max=120}
+```line {labels=on labels.bold=on legend=bottom size=16,14 marker=9 colors=primary,accent,secondary min=0 max=120}
 ,2024,2025,2026,2027計画
 タイ,70,82,95,105
 北米,20,30,45,60
@@ -171,7 +168,7 @@ style: title.band=none title.color=primary title.rule=primary title.rule_h=3pt l
 
 # 設備投資の配分（億円）
 > 設備投資は総額100億円
-```bar {labels=outside legend=none gap=50 size=16 colors=primary min=0 max=50}
+```bar {labels=outside labels.bold=on legend=none gap=50 size=16,14 colors=primary min=0 max=50}
 ,タイ工場,国内工場更新,DX,研究開発
 投資額,45,30,15,10
 ```
@@ -179,7 +176,7 @@ style: title.band=none title.color=primary title.rule=primary title.rule_h=3pt l
 
 # 主なリスクと対応
 {size=24}
-@rows
+@rows plain
 1. 原材料価格の上昇: 先物予約を拡大
 2. 為替変動: 輸入の30%をヘッジ
 3. 物流費の上昇: 共同配送を拡大
@@ -193,14 +190,14 @@ style: title.band=none title.color=primary title.rule=primary title.rule_h=3pt l
 ```
 
 # 四半期別売上高の内訳（億円）
-```stacked-column {labels=center legend=bottom gap=70 size=16 colors=primary,accent}
+```stacked-column {labels=center labels.bold=on totals=off legend=bottom gap=70 size=16,14 colors=primary,accent}
 ,Q1,Q2,Q3,Q4
 国内,250,262,280,268
 海外,50,58,65,47
 ```
 
 # サステナビリティの取り組み
-@3
+@3 items
 ## 環境
 - CO2排出量を2019年比30%削減
 - プラスチック容器を20%削減
@@ -226,7 +223,7 @@ style: title.band=none title.color=primary title.rule=primary title.rule_h=3pt l
 -20億円
 
 # 営業利益率の推移（%）
-```line {labels=above legend=none fmt=0.0 size=16 marker=9 colors=primary min=5 max=8}
+```line {labels=above labels.bold=on legend=none fmt=0.0 size=16,14 marker=9 colors=primary min=5 max=8}
 ,2023,2024,2025,2026,2027計画
 営業利益率,6.0,6.5,6.9,7.2,7.5
 ```
@@ -251,7 +248,7 @@ DX推進室,全社のデジタル化,2027年4月
 # 経営会議への依頼事項
 > 本日ご承認いただきたい事項
 {size=28}
-@rows
+@rows plain
 1. 2027年度事業計画の承認
 2. 設備投資100億円の承認
 3. 価格改定の実施時期の承認
@@ -259,7 +256,7 @@ DX推進室,全社のデジタル化,2027年4月
 
 # まとめ
 {size=28}
-@rows
+@rows plain
 1. 売上高1,280億円・営業利益96億円を目指す
 2. 価格改定と海外展開で成長
 3. DXと人材投資で生産性を高める

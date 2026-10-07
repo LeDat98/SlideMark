@@ -1,4 +1,4 @@
-# Porting the python-pptx deck's design decisions to SlideMark (lengthbench t1, 5 slides; DL2 lane D)
+# Porting the python-pptx deck's design decisions to SlideMark (lengthbench t1, 5 slides; DL2 lanes D, E and F)
 
 Same method as `../../t2/slidemark-ported/REPORT.md`. Source `../python-pptx/build.py`; port `deck.md`
 (render `sheet.png`); content-only baseline `../slidemark/deck.md`.
@@ -8,7 +8,8 @@ Same method as `../../t2/slidemark-ported/REPORT.md`. Source `../python-pptx/bui
 ```
 $ slidemark build deck.md -o /tmp/t1.pptx --png sheet.png
 info slide 3 chart-scale: series '営業利益' (max 96) is under 10% of '売上高' (max 1280): ...
-design: colors fonts sizes style css num; 4/4 slides carry choices
+slide 4: 4 boxes (row), text 18->14pt (shrunk to fit), fills body
+design: colors fonts sizes style num; 4/4 slides carry choices
 wrote /tmp/t1.pptx: 5 slides 16:9, 1 chart, notes on 1 slide, 0 warnings (checked: fit, overlap, contrast, text size, word breaks)
 $ python bench/agent_accept.py bench/lengthbench/t1/accept.json /tmp/t1.pptx
 accepted
@@ -20,9 +21,12 @@ accepted
 |---|---|---|
 | `python-pptx/build.py` | 3,187 | 100% |
 | `slidemark/deck.md` (content only) | 460 | 14% |
-| `slidemark-ported/deck.md` | **912** | **28.6%** (header 385) |
+| `slidemark-ported/deck.md` before lane F (lane D port) | 912 | 28.6% (header 385) |
+| `slidemark-ported/deck.md` after lane F (**no css fence**, chart forms of lane E) | **890** | **27.9%** (header 382) |
 
 ## Decisions (44; N = native, C = css only, M = missing)
+
+Rows changed by lane F (box, cover and chrome forms) and lane E (chart forms) are marked; every other row is as in the lane D port.
 
 | # | Decision (build.py line) | SlideMark line | |
 |---|---|---|---|
@@ -37,52 +41,52 @@ accepted
 | 9 | page number 10 grey right, none on cover (L100) | `num: on`, `sizes: caption=10` | N |
 | 10 | speaker notes (L227) | `??? ...` | N |
 | 11 | cover full navy (L107) | `@cover bg=primary dark` | N |
-| 12 | accent bar on the slide's left edge, full height, 0.35 in (L110) | `cover.bar=accent cover.bar_w=0.35in` draws beside the title block only | M |
-| 13 | accent rule 6 in wide between title and subtitle (L111) | `cover.rule=accent` is full width at the band edge | M |
+| 12 | accent bar on the slide's left edge, full height, 0.35 in (L110) | `cover.bar=accent@edge cover.bar_w=0.35in` (lane F) | N |
+| 13 | accent rule 6 in wide between title and subtitle (L111) | `cover.rule=accent cover.rule_w=6in` (`cover.rule_pos=below` is the default; lane F) | N |
 | 14 | title 54 bold white, subtitle 22 light blue (L119, L126) | `sizes: cover-title=54 cover-subtitle=22`, `subtitle.color=ink`, `cover.band_h=61%` | N |
 | 15 | KPI card white fill + border (L140) | `card.fill=bg card.line=border` | N |
-| 16 | navy header band with white label (L141-142) | none; used `kpi.stripe=primary` + navy label | M |
+| 16 | navy header band with white label (L141-142) | none; `kpi.stripe=primary` + navy label (a tall stripe is not a band: the label sits below it; lane C's `kpi.band`) | M |
 | 17 | value 34 bold blue (L143) | `kpi.color=secondary kpi.size=34` | N |
-| 18 | divider rule between value and note (L144) | none | M |
+| 18 | divider rule between value and note (L144) | none (lane C) | M |
 | 19 | note 22 bold accent (L145) | `kpi.note.size=22 kpi.note.bold=on kpi.note.color=#A06016` (darker, contrast) | N |
 | 20 | KPI card height 4.2 in (L137) | `layout.kpi_lone_h=0.9 layout.kpi_lone_min_h=0.85` | N |
 | 21 | clustered column, navy + accent (L154, L174) | `column {colors=primary,accent}` | N |
-| 22 | legend top, 14 (L160-162) | `legend=top legend.size=14` (`size=14` scaled the legend 1.2x) | new |
+| 22 | legend top, 14 (L160-162) | `legend=top legend.size=14` | N |
 | 23 | gap width 60 (L164) | `gap=60` | N |
-| 24 | series overlap -5 (L165) | `overlap=-5` | new |
+| 24 | series overlap -5 (L165) | `overlap=-5` (lane E) | N |
 | 25 | labels outside, `#,##0`, 14 (L166-172) | `labels=outside fmt=#,##0` | N |
-| 26 | data labels bold (L173) | `labels.bold=on` (`labels.color=` too) | new |
+| 26 | data labels bold (L173) | `labels.bold=on` (lane E) | N |
 | 27 | value axis 0..1400 (L178-179) | `min=0 max=1400` | N |
-| 28 | major unit 200 (L180) | `step=200` | new |
-| 29 | tick labels 12 vs category 14 (L181, L186) | `size=14,12` (data labels and categories 14, value-axis numbers 12) | new |
+| 28 | major unit 200 (L180) | `step=200` (lane E) | N |
+| 29 | tick labels 12 vs category 14 (L181, L186) | `size=14,12` (lane E) | N |
 | 30 | gridline colour, no axis line (L184-185) | `render.chart_grid=border` | N |
-| 31 | box card light fill + border (L200) | `strat.fill=surface strat.line=border` + `{.strat}` | N |
-| 32 | accent stripe on top of the card (L201) | css `.strat { border-top: 6pt solid #D9821E }` | C |
-| 33 | navy circle with 1-4 (L202-203) | none | M |
+| 31 | box card light fill + border (L200) | `strat.fill=surface` + `{.strat}` | N |
+| 32 | accent stripe on top of the card (L201) | `strat.border-top="6pt solid accent"` (a class token; was a css rule) | N |
+| 33 | navy circle with 1-4 (L202-203) | `@4 items num`, `box.num.fill=primary` (lane F) | N |
 | 34 | heading 18 bold navy left (L204) | `sizes: heading=18!` | N |
-| 35 | blue rule under the heading (L205) | `heading.border-bottom` hits every heading including `###` | M |
-| 36 | item card white fill + border (L208) | `### item {.item}` + `item.fill=bg item.line=border item.radius=0` | N |
-| 37 | item card blue left stripe (L209) | css `.item { border-left: 5pt solid #1F5FA8 }` | C |
-| 38 | item text 14 regular, centred vertically (L210) | `###` text is heading-sized bold; `item.font_size/bold/valign` ignored | M |
+| 35 | blue rule under the heading (L205) | `heading.rule=secondary heading.rule_h=0.03in` (lane F) | N |
+| 36 | item card white fill + border (L208) | `@4 items`; the `item` class defaults to the `bg` fill and the card line (lane F) | N |
+| 37 | item card blue left stripe (L209) | `item.border-left="5pt solid secondary"` (was css) | N |
+| 38 | item text 14 regular, centred vertically (L210) | `item.size=14 item.bold=off` (valign middle is the default; was ignored) | N |
 | 39 | footnote 12 grey (L211) | `※ ...`, `sizes: footnote=12` | N |
 | 40 | arrows alternate navy / blue (L221) | `steps-arrow.fill=primary,secondary` | N |
-| 41 | first arrow a pentagon, others chevrons (L221) | `render.chevron_shape` is all or none | M |
-| 42 | step card light fill + border (L224) | `steps-card.fill=surface steps-card.line=border` | N |
-| 43 | step card accent left stripe (L225) | css `.steps-card { border-left: 5pt solid #D9821E }` | C |
+| 41 | first arrow a pentagon, others chevrons (L221) | `render.chevron_shape=pentagon,chevron` (lane F) | N |
+| 42 | step card light fill + border (L224) | `steps-card.fill=surface` | N |
+| 43 | step card accent left stripe (L225) | `steps-card.border-left="5pt solid accent"` (was css) | N |
 | 44 | card text 24 bold navy left (L226) | `steps-card.size=24 steps-card.bold=on`, plain paragraph | N |
 
-Count: 29 N, 4 new (24, 26, 28, 29; row 22 is N via the new `legend.size=`), 3 C, 8 M (lane E, DL2 chart decisions).
+Count: **42 N, 0 C, 2 M** = 95.5% statable, all native (lane D port: 33 N + 3 C + 8 M). DL2 (>= 95% statable, <= 30% of the tokens)
+holds on this deck.
 
 ## Deviations accepted for 0 warnings
 
 - KPI note colour #D9821E became #A06016 (2.6:1 on the card fill).
-- KPI cards have a navy 6 pt top stripe and a navy label, not the header band.
-- The cover accent bar sits beside the title, and the cover rule is full width at 61%.
-- Slide 4 item text is 18 bold and top-aligned, with no number circles and no heading rule.
-- All four step arrows are chevrons.
-- Chart labels are regular weight, tick size follows `size=14`, and the major unit is automatic (statable now: `labels.bold=on size=14,12 overlap=-5 step=200 legend.size=14`; the port deck.md is not re-ported).
+- KPI cards have a navy 6 pt top stripe and a navy label, not the header band, and no divider rule (lane C).
+- The two step arrows after the first are chevrons as in the original; the pentagon is the first (as in the original).
+- Slide 4 items are 14 pt regular as in the original; the cards fill the box height (the original used fixed 1 in cards).
 
-## Proposed syntax for the missing items
+## What the lane F port changed
 
-`kpi.band=primary` · `kpi.rule=border` · `@4 num` · `@4 items` · `heading.rule=secondary` · `cover.bar=accent@edge` ·
-`cover.rule_w=6in` · `render.chevron_shape=pentagon,chevron` · `labels.bold=on` · `overlap=-5` · `step=200` · `size=14,12`
+The css fence is gone (three rules became the class tokens `strat.border-top`, `item.border-left`, `steps-card.border-left`), the
+`### {.item}` sub-boxes and their `@1x2` lines became `@4 items`, and `item.fill=bg item.line=border item.radius=0` are the
+defaults now. The chart line uses the lane E forms (16 tokens). Tokens 912 -> 890 (874 without the chart forms).
