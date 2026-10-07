@@ -662,6 +662,23 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       Still named: tall cards holding one short bullet look like padding (steps, boxes); a plain list for an
       ordered set of policies; the accent-free palette is now too single-hue to tell pie wedges / lines apart;
       the python-pptx deck's footer + page number on every slide reads as "finished".
+- [x] Design wave 3 (2026-10-07, owner direction `docs/DESIGN_REQUIRED.md`: SlideMark assists decisions, it does
+      not replace them; the agent states position, colour, shape and type like python-pptx forces it to).
+      Lane 1 SKILL.md "Decide first" step + two patterns where every slide carries choices (3,797 tokens, budget
+      3,800). Lane 2 `docs/DESIGN_COVERAGE.md` (64 python-pptx decisions: 39 covered, 21 new, 4 skipped): chrome
+      tokens `top.bar` `title.rule` `kpi.stripe` `kpi.label/value/note.*` `bullet=` `footer.*`, `@rows`, `steps
+      num`, cyclic `steps-arrow.fill`, cover `bar`/`band=none`, chart `gap= marker= size= labels=<pos>`, `hl=`
+      names a series, `colors:` names in `colors=`, pinned sizes `20!`, `layout.html_footer`. Lane 3
+      `design-none` / `design-slide` warnings + `design:` facts line (`src/slidemark/design.py`). Lane 4 port
+      of the python-pptx deck: 2,283 tokens (43%), `bench/lengthbench/t2/slidemark-ported/REPORT.md`. Lane 5
+      examples state their design. Fresh-agent run on the 15-slide brief: 9 calls, 5 builds, 91 s, cost 129k,
+      deck 1,595 tokens, `14/14 slides carry choices`, accepted. Blind judge round 6: **this run 3.5 (rank 1)**,
+      wave-2 deck 3.0, python-pptx 2.5 (rank 3; it scored 3.5 in rounds 1–5, so cross-round noise is large, but
+      within the round the judge named why: one accent used as a rule, takeaways on the charts). Cost rose from
+      73k to 129k (61% of python-pptx 212k; 9 calls vs 11; 91 s vs 140 s): the price of decisions, accepted by
+      the owner. Deck in `bench/lengthbench/t2/slidemark-wave3/`. Still named: tall cards with one bullet
+      (steps, boxes), KPI rows all equal when the agent sets no hero, two reds in the pie (`palette` had the
+      accent twice), tiny chart note boxes.
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or
