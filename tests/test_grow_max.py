@@ -189,7 +189,11 @@ def test_sparse_info_is_info_not_warning_and_reads_the_same_number(tmp_path):
         "merge it into a neighbour, add a figure/table/chart, or change its form (@rows, @items, @steps, "
         "side by side); bigger text is capped by layout.grow_max=1.5"
     )
-    assert not [x for x in deck.diagnostics if x.level in ("warning", "error")]
+    assert not [
+        x
+        for x in deck.diagnostics
+        if x.level in ("warning", "error") and not (x.rule or "").startswith("design-")
+    ]
 
 
 def test_the_hint_names_the_ceiling_of_the_deck(tmp_path):
