@@ -74,6 +74,13 @@ def split_trailing_attrs(text: str) -> tuple[str, Attrs | None]:
     m = TRAILING.search(text)
     if not m:
         return text, None
+    if (
+        m.start() > 0
+        and m.start() == m.start(1) - 1
+        and text[m.start() - 1] == "]"
+        and "[" in text[: m.start()]
+    ):
+        return text, None  # `[x]{size=12}` is the span's own attribute list, not the heading's
     a = parse_attr_body(m.group(1))
     if a is None:
         return text, None
@@ -121,7 +128,7 @@ def _shadow(v: str) -> bool | str | None:
 VALID_KEYS = (
     *("x", "y", "w", "h", "size", "color", "fill", "line", "font", "align", "valign", "bold", "italic"),
     *("radius", "opacity", "pad", "fit", "bg", "t", "hidden", "gap", "id", "icon"),
-    *("shadow", "rotate", "shape", "z"),
+    *("shadow", "rotate", "shape", "z", "stripe"),
     *("poster", "autoplay", "loop", "render"),
 )
 ICON_NAMES = tuple(icons.names())
@@ -288,7 +295,7 @@ def apply_attrs(
 
 LAYOUT_WORDS = ("cover", "section", "blank", "center", "free")
 FLAGS = ("flow", "chevron", "steps")
-AT_KEYS = ("bg", "t", "id", "gap", *(k for k in forms.ALL_KEYS if k != "gap"))
+AT_KEYS = ("bg", "t", "id", "gap", "num", *(k for k in forms.ALL_KEYS if k != "gap"))
 KNOWN_WORDS = (
     *LAYOUT_WORDS,
     *FLAGS,
@@ -303,6 +310,7 @@ KNOWN_WORDS = (
     "rows",
     "num",
     "items",
+    "tile",
     "noemph",
     "defaults",
     "grid",
@@ -383,6 +391,13 @@ def parse_at(text: str, ctx: Ctx, line: int) -> AtSpec:
                 spec.id = v
             elif k == "gap":
                 spec.gap = _length(v)
+            elif k == "num":  # `@4 num=text`: the number as big coloured text above the heading, not a badge
+                if v in ("text", "badge", "on"):
+                    spec.classes += [c for c in ("num", "num-text" if v == "text" else "") if c]
+                else:
+                    ctx.warn(
+                        f"bad num '{v}'", line, "bad-attr", "use num=text (big number) or num=badge (circle)"
+                    )
             elif k in forms2.KEYS:  # secondary attributes of the composition forms (checked below)
                 spec.attrs[k] = v
             else:

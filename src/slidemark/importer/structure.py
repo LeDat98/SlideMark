@@ -68,6 +68,8 @@ class Block:
     items: bool = False  # box: its bullets were item cards (the slide gets the ``items`` word)
     drawn: bool = False  # box: a shape a composition form drew (its geometry is the form's, not ``shape=``)
     flag: str = ""  # box: a class the form says (``accent`` = the current milestone, ``hero`` = the winner)
+    num: str = ""  # box: its heading is a big number: ``text`` (`@4 num=text`) or ``heading`` (`{.num}`)
+    tile: bool = False  # box: a KPI card whose heading is the number (`@kpi tile`): heading + caption body
     marks: list[int] = field(
         default_factory=list
     )  # text: paragraph indexes that take ``{.accent}`` (@agenda)
@@ -192,6 +194,7 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
             or it.has_slidenum
             or nm.startswith("band")
             or nm == "rule"
+            or nm == "stripe"  # `box.stripe` / `item.stripe`: the colour rides in the design tokens
             or _NUM_BADGE.fullmatch(nm)  # `@num`: the numbered circle of a box heading
             or nm == "background"
             or nm.endswith(" accent")
@@ -294,6 +297,7 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
             and i.h <= 0.15 * H
             and len(i.paras) <= 2
             and not any(p.marker for p in i.paras)
+            and not _ROW.fullmatch(i.name or "")  # an `@rows` bar at the bottom is a row, not the takeaway
             and not any(o is not i and o.role is None and o.y >= i.y and o.kind != "shape" for o in pool)
         ]
         if cands:
@@ -563,6 +567,7 @@ def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = Non
         head: list[ParaT] | None = None
         extra: list[ParaT] = []
         body = real
+        num = ""
         if it.kind == "text":
             head, extra = [it.paras[0]], it.paras[1:]
         else:
@@ -571,7 +576,24 @@ def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = Non
             for ic in icons or ():
                 if it.x <= ic.cx <= it.x + it.w and it.y <= ic.cy <= it.y + 0.4 * it.h:
                     top = max(top, ic.y + ic.h)
+            kname = (k0.name or "").lower()
             if (
+                k0.kind == "text"
+                and not kids.get(k0.uid)
+                and kname == "tile"  # `@kpi tile`: value line + caption, no label
+                and k0.paras
+                and not (k0.role or "").startswith("callout")
+            ):
+                head, extra, body, num = [k0.paras[0]], k0.paras[1:], real[1:], "tile"
+            elif (
+                k0.kind == "text"
+                and not kids.get(k0.uid)
+                and kname == "number text"  # `@4 num=text`: "01" over the heading text
+                and len(k0.paras) == 2
+                and not (k0.role or "").startswith("callout")
+            ):
+                head, body, num = [k0.paras[1]], real[1:], "text"
+            elif (
                 k0.kind == "text"
                 and not kids.get(k0.uid)
                 and len(k0.paras) == 1
@@ -580,6 +602,7 @@ def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = Non
                 and k0.y - top <= 0.3 * it.h
             ):
                 head, body = k0.paras, real[1:]
+                num = "heading" if kname == "number heading" else ""
         blocks: list[Block] = []
         for k in body:
             blocks.extend(make(k, True))
@@ -612,7 +635,18 @@ def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = Non
             return [Block("box", it.x, it.y, it.w, it.h, item=it, heading=head, children=[text], items=True)]
         return [
             Block(
-                "box", it.x, it.y, it.w, it.h, item=it, heading=head, children=blocks, sub=nested, card=card
+                "box",
+                it.x,
+                it.y,
+                it.w,
+                it.h,
+                item=it,
+                heading=head,
+                children=blocks,
+                sub=nested,
+                card=card,
+                num="" if num == "tile" else num,
+                tile=num == "tile",
             )
         ]
 
@@ -1030,7 +1064,11 @@ def _box_class(b: Block, out: Out) -> str | None:
 
 def _head(paras: list[ParaT], out: Out) -> str:
     txt = one_line(paras, plain_bold=True, accent=None, classes=out.classes)
-    return txt[:-1] + "\\}" if txt.endswith("}") else txt
+    if txt.endswith("}") and not re.search(
+        r"\]\{[^{}]*\}$", txt
+    ):  # (a span's own `]{size=12}` is no attribute list)
+        return txt[:-1] + "\\}"
+    return txt
 
 
 def _table_align(rows, hdr: int = 1) -> str | None:
@@ -1123,10 +1161,10 @@ def _narrow_cols(b: Block, out: Out) -> int | None:
     return None
 
 
-def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
+def emit_block(b: Block, out: Out, in_box: bool = False) -> list[tuple[str, list[str]]]:
     acc, cls = out.deck.accent, out.classes
     if b.kind == "text":
-        lines = text_lines(b.paras, accent=acc, classes=cls)
+        lines = text_lines(b.paras, accent=acc, classes=cls, block_spans=in_box)
         if b.marks and len(lines) == len(b.paras):  # @agenda: the current item
             lines = [ln + " {.accent}" if i in b.marks else ln for i, ln in enumerate(lines)]
         return [("text", lines)] if lines else []
@@ -1195,16 +1233,21 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     # box
     mark = "###" if b.sub else "##"
     chunks: list[tuple[str, list[str]]] = []
-    kpi = _kpi(b, out.deck.css_heading)
-    cname = None if kpi or b.chevron else (b.flag or _box_class(b, out))
-    attrs = (".kpi " if kpi else "") + (f".{cname} " if cname else "") + (f"icon={b.icon} " if b.icon else "")
+    kpi = not b.tile and _kpi(b, out.deck.css_heading)
+    cname = None if kpi or b.chevron or b.tile else (b.flag or _box_class(b, out))
+    attrs = (".kpi " if kpi or b.tile else "") + (".tile " if b.tile else "")
+    attrs += (f".{cname} " if cname else "") + (".num " if b.num == "heading" else "")
+    attrs += f"icon={b.icon} " if b.icon else ""
     attrs += " ".join(_control_attrs(b.item if not (b.chevron or b.drawn) else None, out.shadow))
     head = f"{mark} {_head(b.heading or [], out)}" + (f" {{{attrs.strip()}}}" if attrs.strip() else "")
     if b.chevron:
         content = text_lines(b.paras, accent=acc, classes=cls)
         return [("meta", [head, *content])]
     if kpi:
-        lines = [one_line([p], accent=acc, classes=cls, plain_bold=True) for p in b.children[0].paras]
+        lines = [
+            one_line([p], accent=acc, classes=cls, plain_bold=True, spans_on=k > 0)
+            for k, p in enumerate(b.children[0].paras)
+        ]
         narrow = _narrow_cols(b, out)
         return [("meta", [head, *[ln for ln in lines if ln], *([f"@{narrow}"] if narrow else [])])]
     toks = list(b.links)
@@ -1219,7 +1262,7 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
         toks = [str(ncol)]
     chunks.append(("meta", [head, "@" + " ".join(toks)] if toks else [head]))
     for ch in b.children:
-        chunks.extend(("itext" if k == "text" else k, ln) for k, ln in emit_block(ch, out))
+        chunks.extend(("itext" if k == "text" else k, ln) for k, ln in emit_block(ch, out, True))
     return chunks
 
 
@@ -1425,6 +1468,8 @@ def build_slide(
     if any(_NUM_BADGE.fullmatch((i.name or "").lower().strip()) for i in data.items):
         extra.append("num")  # `@4 num`: the badges are decor, the slide word draws them again
     boxes = [b for b in seq if b.kind == "box"]
+    if boxes and any(b.num == "text" for b in boxes):
+        extra.append("num=text")  # `@4 num=text`: the number text above every heading is drawn again
     if any(b.items for b in boxes) and not any(
         not b.items and any(p.marker for c in b.children if c.kind == "text" for p in c.paras) for b in boxes
     ):

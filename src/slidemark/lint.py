@@ -195,7 +195,7 @@ def _fix_hint(
         label = f"set the color to {ink} (passes {need:g}:1 on {back_hex[0]})"
     if run.highlight:
         token = "badge.color"
-    elif run.size and run.color and _in_class(items, i, "kpi"):
+    elif run.size and not run.exact and run.color and _in_class(items, i, "kpi"):
         token = "kpi.unit.color"  # the unit run of a KPI value
     elif run.color:
         return f"{label}: change the run's color to {{color={ink}}}"
@@ -232,17 +232,18 @@ def _contrast_findings(
 ) -> list[tuple[str, str]]:
     """(message, hint) per distinct drawn color of the text item that is unreadable (< 3:1) on its back."""
     out: list[tuple[str, str]] = []
-    seen: set[tuple[str | None, str | None]] = set()
+    seen: set[tuple[str | None, str | None, float]] = set()
     for q in p.element.paragraphs:  # type: ignore[attr-defined]
         pst = p.style.merged(q.style) if q.style else p.style
         size = (pst.font_size or theme.sizes.get("body", 18)) * p.font_scale
         for r in q.runs:
             if not r.text.strip():
                 continue
-            col = theme.run_color(r.color, r.highlight, pst.color or "fg", size, p.style.fill)
-            if (col, r.highlight) in seen:
+            rsize = r.size if r.exact and r.size else size  # `[x]{size=12}`: its own size, not the line's
+            col = theme.run_color(r.color, r.highlight, pst.color or "fg", rsize, p.style.fill)
+            if (col, r.highlight, rsize) in seen:
                 continue
-            seen.add((col, r.highlight))
+            seen.add((col, r.highlight, rsize))
             use = _backs(r.highlight, theme, None) if r.highlight else backs
             fg_c = _rgba(col, theme)
             if not fg_c or not use:
@@ -256,7 +257,7 @@ def _contrast_findings(
                 ratio = contrast_ratio(_blend((fg_c[0], alpha), mean), mean)  # type: ignore[arg-type]
                 bad = bad or ratio < 3.0
             if bad:
-                hint = _fix_hint(items, i, p, r, col, use, theme, size, pst.color)
+                hint = _fix_hint(items, i, p, r, col, use, theme, rsize, pst.color)
                 out.append((f"{_label(p)} has low contrast {ratio:.1f}:1", hint))
     return out
 
@@ -503,8 +504,8 @@ def _kpi_stripe_backs(items: list[Placed], i: int, p: Placed, theme: Theme) -> l
     """The stripe colour when a KPI card's text sits on ``kpi.stripe`` (a tall stripe is a header band behind
     the label): the card is the backdrop the lint finds, but the stripe is drawn over it by the renderer.
     One colour when the text lies inside the stripe, stripe and card when it only overlaps it."""
-    if not theme.kpi_stripe or not isinstance(p.element, Text):
-        return []
+    if not isinstance(p.element, Text) or theme.kpi_stripe_side != "top":
+        return []  # a side stripe is a thin edge, never a band behind the label
     card = next(
         (
             q
@@ -518,9 +519,12 @@ def _kpi_stripe_backs(items: list[Placed], i: int, p: Placed, theme: Theme) -> l
     )
     if card is None:
         return []
+    spec = card.element.attrs.get("stripe") or (theme.kpi_stripe or "").split(",")[0].strip()
+    if not spec:
+        return []
     top = card.y + min(max(to_emu(theme.kpi_stripe_h), 1), card.h)  # bottom edge of the stripe
     over = min(p.y + p.h, top) - max(p.y, card.y)
-    stripe = _backs(theme.kpi_stripe, theme, None)
+    stripe = _backs(spec, theme, None)
     if over <= 0 or not stripe:
         return []
     if over >= 0.5 * p.h:
@@ -573,6 +577,11 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
         if not paras or not any(q.plain.strip() for q in paras):
             continue
         size = (p.style.font_size or theme.sizes.get("body", 18)) * p.font_scale
+        if drawn := [r.size for q in paras for r in q.runs if r.exact and r.size and r.text.strip()]:
+            rest = any(not (r.exact and r.size) and r.text.strip() for q in paras for r in q.runs)
+            size = (
+                min(size, *drawn) if rest else min(drawn)
+            )  # `[x]{size=8}` spans are drawn at their own size
         if size < theme.min_font_size - 0.05:
             warn(
                 "tiny-text",

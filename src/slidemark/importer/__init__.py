@@ -11,6 +11,7 @@ from pathlib import Path
 from ..ir import Diagnostic
 from ..render.design_part import read_design_part
 from ..theme import DEFAULT, JP_BUSINESS, MIDNIGHT, Theme
+from . import emit
 from .design import (
     claim_fences,
     css_fence,
@@ -250,6 +251,7 @@ def _import_with(
         margin_x=to_emu(theme.margin_x),
         gap=to_emu(theme.gap),
     )
+    emit.set_palette(colors)
     rules = design_rules(design)
     deck.implied = {r: implied_style(rules, r, colors) for r in ("lead", "conclusion", "footnote")}
     deck.css_heading = heading_sized(rules)

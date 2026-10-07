@@ -33,7 +33,7 @@ from ..ir import (
 from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
-from . import css, forms2, kpirow, measure, vocab
+from . import cardlook, css, forms2, kpirow, measure, vocab
 from .chartnote import expand_notes, scale_warning
 from .diagram import fill_tree
 from .gantt import expand_gantt
@@ -725,6 +725,8 @@ def _explicit_size(ctx: _Ctx, el) -> bool:
         return True
     if ctx.theme.pinned and isinstance(el, Text) and _SIZE_KEY.get(el.role, "body") in ctx.theme.pinned:
         return True  # `sizes: heading=20!`
+    if isinstance(el, Text) and any(measure.has_exact(p) for p in el.paragraphs):
+        return True  # `[420億円]{size=28}`: the author sized part of the line, the line is not grown
     return bool(ctx.css.active and ctx.css.own(el).font_size is not None)
 
 
@@ -1288,7 +1290,16 @@ def _card_style(ctx: _Ctx, c: Container) -> Style:
     st = fast_style().merged(ctx.css.inherited(c), base, *others, own, c.style)
     if own.line_width and not st.line:
         st = st.merged(fast_style(line="border"))
+    if st.color is None and (fill := _own_fill(ctx, c)) and "kpi" not in c.classes:
+        ink = ctx.theme.ink_on(fill, "fg")  # `## x {fill=primary}`: the text on it is readable without color=
+        if ink != "fg":
+            st = st.merged(fast_style(color=ink))
     return _tighten(ctx, st)
+
+
+def _own_fill(ctx: _Ctx, c: Container) -> str | None:
+    """The fill the author gave this box itself (``{fill=}``, a CSS rule), not one of the card class."""
+    return (c.style.fill if c.style is not None else None) or ctx.css.own(c).fill
 
 
 def _cpads(ctx: _Ctx, c: Container) -> tuple[Style, int, tuple[int, int, int, int]]:
@@ -1305,6 +1316,11 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
     band, band_ink = ctx.theme.kpi_band_for() if kpi else ctx.theme.heading_band_for(c.classes)
     h_el = c.title if c.title.role == "heading" else c.title.model_copy(update={"role": "heading"})
     hst = _text_style(ctx, h_el, fast_style())
+    if not kpi and (fill := _own_fill(ctx, c)) and not band:  # a heading on the box's own fill stays readable
+        h_own = (c.title.style.color if c.title.style is not None else None) or ctx.css.own(h_el).color
+        ink = ctx.theme.ink_on(fill, hst.color) if h_own is None and hst.color else hst.color
+        if ink and ink != hst.color:
+            hst = hst.merged(fast_style(color=ink))
     if kpi:
         body_size = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k
         own_al = c.style.align if c.style is not None else None  # `{align=left}` on the card: its label too
@@ -1329,7 +1345,11 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
             hst = hst.merged(fast_style(font_size=ctx.theme.kpi_band_size))
             h_el = h_el.model_copy(update={"attrs": {**h_el.attrs, "pin_size": True}})
     eff = measure.effective_scale(hst.font_size or 18, ctx.scale, ctx.theme.min_font_size)
-    fixed = _explicit_size(ctx, h_el) or _explicit_size(ctx, c.title)
+    fixed = (
+        _explicit_size(ctx, h_el)
+        or _explicit_size(ctx, c.title)
+        or any(p.style is not None and p.style.font_size for p in h_el.paragraphs)  # `box.num.size`: exact
+    )
     if ctx.head_grow and ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi and not fixed:
         eff *= min(ctx.grow, ctx.lt.grow_head)
     if ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi and not fixed and (body := _box_body_pt(ctx, c)):
@@ -1450,8 +1470,8 @@ def _num_item(ctx: _Ctx, n: int, hst: Style, eff: float, band: str | None) -> tu
     Default: ``primary`` with ``bg`` digits; on a heading band the heading ink (so the circle shows on it)."""
     th = ctx.theme
     on_band = bool(band) and not th.box_num_fill
-    fill = th.box_num_fill or (hst.color if on_band else None) or "primary"
-    ink = th.box_num_color or th.ink_on(fill, band if on_band else "bg")
+    fill = cardlook.pick(th.box_num_fill, n - 1) or (hst.color if on_band else None) or "primary"
+    ink = cardlook.pick(th.box_num_color, n - 1) or th.ink_on(fill, band if on_band else "bg")
     el = Shape(
         shape="ellipse",
         paragraphs=[Paragraph(runs=[Run(text=str(n), bold=True)])],
@@ -4376,7 +4396,10 @@ def _slide_items(slide: Slide, theme: Theme) -> tuple[Slide, list[str]]:
     and the labels of boxes that hold more than a list (skipped: the bullets stay)."""
     cards = "items" in slide.classes or theme.box_items == "cards"
     numbered = "num" in slide.classes and not {"steps", "chevron", "rows"} & set(slide.classes)
+    num_text = numbered and "num-text" in slide.classes  # `@4 num=text`: big number text, not a badge
+    tile = "tile" in slide.classes  # `@kpi tile`: a KPI card's heading is its number
     counter = [0, 0]  # item cards, numbered boxes
+    seen = [0, 0]  # `##` boxes (stripe / number colours cycle over them), KPI cards (stripes)
     skipped: list[str] = []
     item_cls = theme.classes.get("item")
     item_size = item_cls.font_size if item_cls is not None else None
@@ -4400,16 +4423,34 @@ def _slide_items(slide: Slide, theme: Theme) -> tuple[Slide, list[str]]:
                     e.model_copy(update={"title": None}),
                     (e.style.font_size if e.style and e.style.font_size else None) or item_size,
                 )
-            elif "steps" in e.classes or "kpi" in e.classes or "diagram" in e.classes:
+                new = cardlook.stamp(new, stripe=cardlook.pick(theme.item_stripe, counter[0] - 1))
+            elif "kpi" in e.classes:  # `kpi.stripe=a,b,c` cycles; `@kpi tile`: the heading is the number
+                sc = e.attrs.get("stripe") or cardlook.pick(theme.kpi_stripe, seen[1])
+                seen[1] += 1
+                new = cardlook.stamp(e, stripe=sc)
+                if tile or "tile" in e.classes:
+                    new = cardlook.kpi_tile(new, sc)
+            elif "steps" in e.classes or "diagram" in e.classes:
                 pass
             else:
                 kids, kid_changed = walk(e.children, nested or e.title is not None)
                 upd: dict[str, Any] = {}
                 if kid_changed:
                     upd["children"] = kids
-                if numbered and e.title is not None and not nested:
+                head = e.title is not None and not nested
+                idx = seen[0]
+                seen[0] += head
+                sc = e.attrs.get("stripe")
+                if head and sc is None and "plain" not in e.classes:
+                    sc = cardlook.pick(theme.box_stripe, idx)
+                    if sc:
+                        upd["attrs"] = {**e.attrs, "stripe": sc}
+                if numbered and head and not num_text:
                     counter[1] += 1
-                    upd["attrs"] = {**e.attrs, "num": counter[1]}
+                    upd["attrs"] = {**upd.get("attrs", e.attrs), "num": counter[1]}
+                if head and (num_text or "num" in e.classes):  # a heading drawn as a big number
+                    auto = None if "num" in e.classes else idx + 1
+                    upd["title"] = cardlook.number_heading(e, theme, idx, sc, auto).title
                 plain_box = e.title is not None and e.grid is None and not e.links
                 if cards and plain_box and "item" not in e.classes:
                     lists = [_item_paras(t) if isinstance(t, Text) else None for t in e.children]
@@ -4418,7 +4459,10 @@ def _slide_items(slide: Slide, theme: Theme) -> tuple[Slide, list[str]]:
                         built = []
                         for it in flat:
                             counter[0] += 1
-                            built.append(_item_card(it, counter[0], e.line, size=item_size))
+                            card = _item_card(it, counter[0], e.line, size=item_size)
+                            built.append(
+                                cardlook.stamp(card, stripe=cardlook.pick(theme.item_stripe, counter[0] - 1))
+                            )
                         upd.update(children=built, grid=f"1x{len(built)}")
                     elif any(isinstance(t, Text) and any(p.marker for p in t.paragraphs) for t in e.children):
                         skipped.append(_label(e))  # bullets next to other blocks stay bullets
@@ -4470,6 +4514,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         return split  # @split: the text side is laid out on a virtual slide of its own width
     slide = _chevron_steps(slide, theme.layout)
     slide, items_skipped = _slide_items(slide, theme)
+    dense_in = deck.density == "dense" or "dense" in slide.classes
+    slide = cardlook.pin_spans(
+        slide, theme, theme.dense_scale if dense_in else 1.0
+    )  # `[x]{size=28}` pins its text
     try:
         W, H = slide_size(deck.size)
     except ValueError:
@@ -4531,6 +4579,15 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                         fast_style(fill=color, line=None),
                     )
                 )
+    if kind == "cover" and theme.cover_bottom_bar:  # `cover.bottom.bar=<color>`: a band on the bottom edge
+        bh = max(_emu(theme.cover_bottom_bar_h), 1)
+        rules.append(
+            (
+                Shape(shape="rect", id="rule"),
+                Rect(0, max(H - bh, 0), W, min(bh, H)),
+                fast_style(fill=theme.cover_bottom_bar, line=None),
+            )
+        )
     reserved: tuple[Style, int] | None = None  # style and height of the empty lead slot kept for the body y
 
     def put(dst: list[Placed], el, rect: Rect, style: Style, fs: float = 1.0):

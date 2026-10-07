@@ -638,6 +638,33 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
                     shp.rotation = st.rotation % 360
 
 
+def _stripe(rc: RenderCtx, s, pl: Placed, el: Container, card: bool) -> None:
+    """The stripe on an edge of a card: ``kpi.stripe`` / ``box.stripe`` / ``item.stripe`` (the layout stamps
+    colour of this card, a list cycles over the cards) or ``{stripe=teal}`` on one card. Drawn from the final
+    card rectangle, so a card a pass stretched or moved keeps it. A KPI card keeps its stripe shape name
+    ``rule`` (the importer skips it); the others are ``Stripe``."""
+    th = rc.theme
+    kind = "kpi" if "kpi" in el.classes else "item" if "item" in el.classes else "box"
+    color = el.attrs.get("stripe")
+    if kind == "kpi" and not color and th.kpi_stripe:
+        color = th.kpi_stripe.split(",")[0].strip()  # a card the layout did not stamp
+    if not color or (kind != "kpi" and not card):
+        return
+    thick = {"kpi": th.kpi_stripe_h, "item": th.item_stripe_h, "box": th.box_stripe_h}[kind]
+    side = {"kpi": th.kpi_stripe_side, "item": th.item_stripe_side, "box": th.box_stripe_side}[kind]
+    side = side if side in ("top", "bottom", "left", "right") else "top"
+    t = max(to_emu(thick), 1)
+    t = min(t, pl.h if side in ("top", "bottom") else pl.w)
+    x, y, w, h = {
+        "top": (pl.x, pl.y, pl.w, t),
+        "bottom": (pl.x, pl.y + pl.h - t, pl.w, t),
+        "left": (pl.x, pl.y, t, pl.h),
+        "right": (pl.x + pl.w - t, pl.y, t, pl.h),
+    }[side]
+    bar = pl.model_copy(update={"x": x, "y": y, "w": w, "h": h, "style": Style(fill=str(color), line=None)})
+    _autoshape(rc, s, bar, MSO_SHAPE.RECTANGLE, "rule" if kind == "kpi" else "Stripe")
+
+
 def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_placeholder: bool) -> None:
     el = pl.element
     st = pl.style
@@ -646,16 +673,7 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
         if st.fill or st.line or st.shape:
             kind = MSO_SHAPE.ROUNDED_RECTANGLE if st.radius else MSO_SHAPE.RECTANGLE
             _autoshape(rc, s, pl, kind, name)
-        if (
-            "kpi" in el.classes and rc.theme.kpi_stripe
-        ):  # `kpi.stripe=<color>`: a stripe on the card's top edge
-            stripe = pl.model_copy(
-                update={
-                    "h": min(max(to_emu(rc.theme.kpi_stripe_h), 1), pl.h),
-                    "style": Style(fill=rc.theme.kpi_stripe, line=None),
-                }
-            )
-            _autoshape(rc, s, stripe, MSO_SHAPE.RECTANGLE, "rule")
+        _stripe(rc, s, pl, el, bool(st.fill or st.line or st.shape))
     elif isinstance(el, Text):
         field = el.attrs.get("field")
         if use_placeholder:

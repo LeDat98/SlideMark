@@ -358,7 +358,9 @@ def list_indent(size_pt: float, level: int) -> tuple[int, int]:
     return hang * (level + 1), -hang
 
 
-Segment = tuple[str, bool, bool] | tuple[str, bool, bool, bool]  # (text, bold, mono[, badge])
+# (text, bold, mono[, badge[, width ratio]]): the ratio is the run's pinned size / the size the paragraph is
+# measured at (`[x]{size=28}` spans); 1.0 when absent
+Segment = tuple[str, bool, bool] | tuple[str, bool, bool, bool] | tuple[str, bool, bool, bool, float]
 
 
 _UNITS_CACHE: dict = {}
@@ -393,8 +395,10 @@ def _units0(
     units: list[tuple[float, float, str, bool, str]] = []
     key = font_key(font)
 
+    ratio = [1.0]
+
     def _char_em(ch: str, kind: str, key: str) -> float:  # noqa: F811 - adds the letter spacing
-        return _base_em(ch, kind, key) + extra
+        return (_base_em(ch, kind, key) + extra) * ratio[0]
 
     st = {"word": "", "w": 0.0, "sp": 0.0}
 
@@ -405,6 +409,7 @@ def _units0(
 
     for seg in segments:
         text, bold, mono = seg[0], seg[1], seg[2]
+        ratio[0] = seg[4] if len(seg) > 4 else 1.0
         kind = "mono" if mono else ("bold" if bold else "regular")
         if len(seg) > 3 and seg[3] and text.strip() and "\n" not in text and "\v" not in text:
             flush()
@@ -510,21 +515,46 @@ def _count_lines(
     return lines, cur
 
 
+def has_exact(p: Paragraph) -> bool:
+    """True when a run of ``p`` has an exact size of its own (``[x]{size=28}``)."""
+    return any(r.exact and r.size for r in p.runs)
+
+
+def exact_ref(p: Paragraph, size: float) -> float:
+    """The size a paragraph with exact spans is measured and spaced at: the paragraph's own ``size``, or the
+    largest exact span when every run with text is one (nothing is drawn at ``size`` then)."""
+    pinned = [r.size for r in p.runs if r.exact and r.size]
+    if not pinned:
+        return size
+    if all(r.exact and r.size for r in p.runs if r.text.strip()):
+        return max(pinned)
+    return size
+
+
 def para_segments(
-    p: Paragraph, bold: bool = False, mono: bool = False, transform: str | None = None
+    p: Paragraph,
+    bold: bool = False,
+    mono: bool = False,
+    transform: str | None = None,
+    size: float | None = None,
 ) -> list[Segment]:
-    """Styled segments of a paragraph; ``transform`` (CSS text-transform) is applied as the renderer does."""
+    """Styled segments of a paragraph; ``transform`` (CSS text-transform) is applied as the renderer does.
+
+    With ``size`` (the pt the paragraph is measured at) a run with an exact size carries its width ratio."""
     from .css import transform_text
 
-    return [
-        (
+    out: list[Segment] = []
+    for r, t in zip(p.runs, bound_texts(p.runs), strict=True):
+        seg = (
             transform_text(t, transform),
             bold or r.bold or bool(r.highlight),
             mono or r.code,
             bool(r.highlight),
         )
-        for r, t in zip(p.runs, bound_texts(p.runs), strict=True)
-    ]
+        if size and r.exact and r.size and abs(r.size - size) > 1e-6:
+            seg = (*seg, r.size / size)
+        out.append(seg)
+    return out
 
 
 def text_spacing(style: Style, p: Paragraph | None = None) -> tuple[float, str | None]:
@@ -657,16 +687,27 @@ def paragraphs_height(
     total_pt = 0.0
     for i, p in enumerate(paragraphs):
         size = (p.style.font_size if p.style and p.style.font_size else base) * scale
+        pinned = has_exact(p)
+        if pinned:  # exact spans: measured at the largest pinned size when nothing else is drawn
+            size = exact_ref(p, size)
         indent = list_indent(size, p.level)[0] if p.marker else 0
         wpt = (width_emu - indent) / EMU_PER_PT
         bold = bool((p.style and p.style.bold) or style.bold)
         spc, tf = text_spacing(style, p)
-        segs = para_segments(p, bold, mono, tf)
-        sq = paragraph_squeeze(p, style, wpt, size, segs, mono=mono) if squeeze else 0.0
+        segs = para_segments(p, bold, mono, tf, size if pinned else None)
+        sq = paragraph_squeeze(p, style, wpt, size, segs, mono=mono) if squeeze and not pinned else 0.0
         lines = count_lines(segs, wpt, size, font, spc * scale + sq)
         ls = (p.style.line_spacing if p.style and p.style.line_spacing else style.line_spacing) or 1.0
-        lh = size * (_tok.line_cjk if has_cjk(p.plain) else _tok.line_latin) * ls
-        total_pt += lines * lh + (size * gap if i > 0 else 0)
+        fac = (_tok.line_cjk if has_cjk(p.plain) else _tok.line_latin) * ls
+        lh = size * fac
+        extra = 0.0
+        if pinned:  # a line holding a bigger exact span is as tall as that span
+            big = max(r.size for r in p.runs if r.exact and r.size)
+            if big > size:
+                pin_pt = sum(text_em(r.text, r.bold) * r.size for r in p.runs if r.exact and r.size)
+                n_big = min(lines, max(1, int(-(-pin_pt // max(wpt, 1.0)))))
+                extra = (big - size) * fac * n_big
+        total_pt += lines * lh + extra + (size * gap if i > 0 else 0)
     return total_pt * EMU_PER_PT * SAFETY
 
 

@@ -143,6 +143,45 @@ def _finish(runs: list[Run]) -> list[Run]:
     return out
 
 
+def _span_attrs(a: Attrs) -> dict[str, Any]:
+    """``[x]{size=28 bold=true italic=on}``: the text look of one span (a bad value is ignored)."""
+    out: dict[str, Any] = {}
+    size = a.kv.get("size")
+    if size is not None and (v := _num(size)) is not None and 1 <= v <= 400:
+        out["size"] = v
+    for key in ("bold", "italic"):
+        if key in a.kv:
+            on = _flag(a.kv[key])
+            if on is not None:
+                out[key] = on
+    return out
+
+
+def _num(v: str) -> float | None:
+    try:
+        f = float(re.sub(r"(pt)?$", "", v.strip()))
+    except ValueError:
+        return None
+    return f if f == f and abs(f) != float("inf") else None
+
+
+def _flag(v: str) -> bool | None:
+    s = v.strip().lower()
+    if s in ("true", "1", "yes", "on", ""):
+        return True
+    if s in ("false", "0", "no", "off"):
+        return False
+    return None
+
+
+def _span_look(looks: list[dict[str, Any]]) -> dict[str, Any]:
+    """The innermost value of every span attribute that is open (inner spans win)."""
+    out: dict[str, Any] = {}
+    for look in looks:
+        out.update(look)
+    return out
+
+
 def inline_items(children: list[Token] | None, allow_images: bool = False) -> list[Run | ImageRef]:
     """Convert inline tokens to runs; with ``allow_images`` images are returned as ``ImageRef`` items."""
     items: list[Run | ImageRef] = []
@@ -152,6 +191,7 @@ def inline_items(children: list[Token] | None, allow_images: bool = False) -> li
     colors: list[str | None] = []
     badges: list[str] = []
     span_kinds: list[bool] = []
+    span_looks: list[dict[str, Any]] = []  # `size=` `bold=` `italic=` per open span
 
     def flush() -> None:
         if buf:
@@ -163,16 +203,18 @@ def inline_items(children: list[Token] | None, allow_images: bool = False) -> li
         if badges:
             extra["highlight"] = badges[-1]
             color = "bg"
+        look = _span_look(span_looks)
         buf.append(
             Run(
                 text=text,
-                bold=bold > 0 or bool(badges),
-                italic=italic > 0,
+                bold=bold > 0 or bool(badges) or bool(look.get("bold")),
+                italic=italic > 0 or bool(look.get("italic")),
                 strike=strike > 0,
                 sub=sub > 0,
                 sup=sup > 0,
                 color=color,
                 link=links[-1] if links else None,
+                **({"size": look["size"], "exact": True} if look.get("size") else {}),
                 **extra,
             )
         )
@@ -230,9 +272,12 @@ def inline_items(children: list[Token] | None, allow_images: bool = False) -> li
             if is_badge:
                 badges.append(next((c for c in a.classes if c in BADGE_COLORS), "primary"))
             span_kinds.append(is_badge)
+            span_looks.append({} if is_badge else _span_attrs(a))
         elif ty == "span_close":
             if colors:
                 colors.pop()
+            if span_looks:
+                span_looks.pop()
             if span_kinds and span_kinds.pop() and badges:
                 badges.pop()
         elif ty == "image":

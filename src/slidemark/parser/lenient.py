@@ -236,7 +236,9 @@ def normalize(lines: list[str], inside: list[bool], start: int, deck: Deck) -> l
             if m and m.group(1).strip(" *") and not star_warned:
                 diag(i, "'* ' bullet", "bullet-star", "use '- ' for bullets")
                 star_warned = True
-            if BR_RE.search(line) and not br_warned:
+            if (
+                BR_RE.search(line) and not br_warned and not line.lstrip().startswith("|")
+            ):  # a cell may hold <br>
                 diag(
                     i,
                     "<br> in text",
