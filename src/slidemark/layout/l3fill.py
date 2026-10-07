@@ -1636,7 +1636,6 @@ def fit_lone_kpi(
     on_bar: bool = False,
     fixed: bool = False,
     to_body: bool = False,
-    pin: tuple[int | None, int | None] | None = None,
 ) -> list[Placed]:
     """A body of nothing but KPI cards: cards that use the body height in a balanced way, centred.
 
@@ -1648,10 +1647,9 @@ def fit_lone_kpi(
     Other blocks, icons, explicit sizes / heights: unchanged.
     ``to_body`` (small-body themes, ``kpi_to_body``): the cards stretch down the body to
     ``kpi_to_body_h`` of its height and the text grows with them, within the ``kpi_lone_*`` caps.
-    ``pin`` = ``(y, h)`` in EMU from ``y=`` / ``h=`` on the first card that has them: the row's top offset in
-    the body and the card height (never below what the content needs)."""
+    A row whose cards carry ``h=`` / ``y=`` / ``w=`` is left alone (``kpirow``)."""
     try:
-        return _fit_lone_kpi(out, body, lt, on_bar, fixed, to_body, pin)
+        return _fit_lone_kpi(out, body, lt, on_bar, fixed, to_body)
     except Exception:  # never raise on bad input
         return out
 
@@ -1669,9 +1667,7 @@ def _fit_lone_kpi(
     on_bar: bool,
     fixed: bool,
     to_body: bool = False,
-    pin: tuple[int | None, int | None] | None = None,
 ) -> list[Placed]:
-    pin_y, pin_h = pin or (None, None)
     if not lt.kpi_lone or body.h <= 0:
         return out
     items = _body_items(out, body)
@@ -1718,9 +1714,9 @@ def _fit_lone_kpi(
         default=0.0,
     )
     stretch = to_body and lt.kpi_to_body and lt.body_valign != "top"
-    limit = pin_h or round(max(lt.kpi_lone_h, lt.kpi_to_body_h if stretch else 0.0) * body.h)
+    limit = round(max(lt.kpi_lone_h, lt.kpi_to_body_h if stretch else 0.0) * body.h)
     own_h = to_emu(lt.kpi_h) if lt.kpi_h is not None else 0  # `kpi.h=4.4in`: the author's own card height
-    if own_h > 0 and not pin_h:  # a `{h=}` pin on the card wins over the deck token
+    if own_h > 0:
         limit = min(own_h, body.h)
     if fixed:
         g, label_hi, cap_hi = 1.0, label0, cap0
@@ -1733,8 +1729,8 @@ def _fit_lone_kpi(
         card_h = 2 * pad + hh + gap + mh
         if card_h <= limit:
             break
-    floor = pin_h or min(round(max(lt.kpi_lone_min_h, lt.kpi_to_body_h if stretch else 0.0) * body.h), limit)
-    if own_h > 0 and not pin_h:
+    floor = min(round(max(lt.kpi_lone_min_h, lt.kpi_to_body_h if stretch else 0.0) * body.h), limit)
+    if own_h > 0:
         floor = limit
     extra = max(
         floor - card_h, 0
@@ -1743,7 +1739,7 @@ def _fit_lone_kpi(
         max(card_h, floor), body.h
     )  # content is never cut: at the old sizes the card may pass its share
     centre = lt.kpi_lone_bar_center if on_bar else lt.kpi_lone_center
-    top = body.y + (pin_y if pin_y is not None else round((body.h - card_h) * centre))
+    top = body.y + round((body.h - card_h) * centre)
     top = max(body.y, min(top, body.bottom - card_h))
     lab_y = top + pad + round(extra * lt.kpi_lone_label_air)
     res: dict[int, Placed] = {}

@@ -649,8 +649,7 @@ cannot read prints `slide N: (no fit data)`.
 
 ### `attr-ignored`
 
-A warning (`attr-ignored: h= on a KPI card beside other content is not honoured -> layout.kpi_to_body_h=0.55 or {.kpi}
-cards alone on the slide (no list, no icon=)`) for every attribute the layout or renderer does not act on, once per
+A warning (`attr-ignored: bold= on a KPI card is not honoured -> style: kpi.value.bold=on bolds the number`) for every attribute the layout or renderer does not act on, once per
 slide, kind and attribute. The detection is the table `HONOURED` / `IGNORED` in `src/slidemark/honour.py`: for each
 element kind, each attribute of `x y w h size color fill line font align valign bold italic radius opacity pad fit
 icon` is honoured or ignored, never undecided; `tests/test_honour.py` checks that, probes every cell against the real
@@ -660,8 +659,7 @@ layout and renderer, and checks that the warning carries the hint. `@free` honou
 |---|---|
 | `title`, `cover` (slide titles) | `x` `y` `w` `h` `fill` `line` `radius` `fit` `icon` |
 | `box` (a `##` box in any grid, `flow`) | `fit` |
-| `kpi` (cards alone on the slide: `h` `y` pin the row) | `color` `align` `valign` `bold` `fit` |
-| `kpi-row` (cards beside a list, table or icon) | `y` `h` `color` `align` `valign` `bold` `fit` |
+| `kpi` (`y` `h` `w` place the row, also beside a list or table; `x` makes a card absolute) | `color` `align` `valign` `bold` `fit` |
 | `step` (box of an `@steps` row) | `x` `y` `w` `h` `valign` `fit` |
 | `chevron` (compact `@chevron` row) | `h` `align` `valign` `radius` `pad` `fit` |
 | `text` (a paragraph or list outside a box) | `radius` `fit` `icon` |

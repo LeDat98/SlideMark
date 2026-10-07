@@ -53,7 +53,6 @@ LABEL = {
     "cover": "a cover title",
     "box": "a box",
     "kpi": "a KPI card",
-    "kpi-row": "a KPI card beside other content",
     "step": "an @steps box",
     "chevron": "a compact @chevron box",
     "text": "a text block",
@@ -69,7 +68,6 @@ _FIT = "fit= is for images: ![alt](a.png){fit=cover|contain|stretch}"
 _ICON = "icon= goes on a box heading: ## Label {icon=chart}"
 _TITLE_GEO = "titles sit in the title area: @free places them, sizes: title= sizes them"
 _STEP_GEO = "step boxes follow the row: @1:2:1 steps sets column ratios, @free places blocks"
-_KPI_PIN = "layout.kpi_to_body_h=0.55 or {.kpi} cards alone on the slide (no list, no icon=)"
 _CHART = "charts take colors=a,b (series) and size= (text); this does not apply"
 _IMAGE = "an image has no text: x y w h line radius opacity fit apply"
 
@@ -84,7 +82,6 @@ HONOURED: dict[str, str] = {
     "cover": "size color font align valign bold italic opacity pad",
     "box": "x y w h size color font align valign bold italic fill line radius opacity pad icon",
     "kpi": "x y w h size font italic fill line radius opacity pad icon",
-    "kpi-row": "x w size font italic fill line radius opacity pad icon",
     "step": "size color font align bold italic fill line radius opacity pad icon",
     "chevron": "x y w size color font bold italic fill line opacity icon",
     "text": "x y w h size color font align valign bold italic fill line opacity pad",
@@ -110,14 +107,6 @@ IGNORED: dict[str, dict[str, str]] = {
     },
     "box": {"fit": _FIT},
     "kpi": {
-        "color": "style: kpi.value.color=<c> colours the number",
-        "align": "a KPI card centres its text",
-        "valign": "a KPI card centres its text",
-        "bold": "style: kpi.value.bold=on bolds the number",
-        "fit": _FIT,
-    },
-    "kpi-row": {
-        **_ig("y h", _KPI_PIN),
         "color": "style: kpi.value.color=<c> colours the number",
         "align": "a KPI card centres its text",
         "valign": "a KPI card centres its text",
@@ -178,23 +167,11 @@ def _slide_kind(slide: Slide, index: int, has_body: bool) -> str:
     return "content"
 
 
-def _lone_kpi(slide: Slide, theme: Any) -> bool:
-    """Only KPI cards (no icon) in the body: ``fit_lone_kpi`` pins their ``y=`` / ``h=``."""
-    els = slide.elements
-    if not els or slide.layout == "free" or not theme.layout.kpi_lone:
-        return False
-    return all(
-        isinstance(e, Container) and "kpi" in e.classes and not e.attrs.get("icon") and not e.links
-        for e in els
-    )
-
-
 def _walk(slide: Slide, theme: Any, index: int) -> Iterator[tuple[Any, str]]:
     """``(element, kind)`` for every element that can carry attributes."""
     from .layout.engine import _chevron_steps
 
     shaped = _chevron_steps(slide, theme.layout)  # a short-bodied @chevron row is built as @steps
-    lone = _lone_kpi(shaped, theme)
     covered = _slide_kind(slide, index, bool(slide.lead)) in ("cover", "section")
     if slide.title is not None:
         yield slide.title, "cover" if covered else "title"
@@ -204,8 +181,8 @@ def _walk(slide: Slide, theme: Any, index: int) -> Iterator[tuple[Any, str]]:
 
     def rec(el: Any, parent: Container | None) -> Iterator[tuple[Any, str]]:
         if isinstance(el, Container):
-            if "kpi" in el.classes:
-                yield el, ("kpi" if lone and parent is None else "kpi-row")
+            if "kpi" in el.classes:  # `y h w` place the row (layout.kpirow), `x` makes the card absolute
+                yield el, "kpi"
             elif parent is not None and "steps" in parent.classes:
                 yield el, "step"
             elif "diagram" in el.classes or "group" in el.classes and "steps" in el.classes:

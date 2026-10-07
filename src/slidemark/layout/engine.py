@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, field, replace
-from typing import Any
 
 from .. import icons
 from ..ir import (
@@ -478,10 +477,10 @@ def _len(ctx: _Ctx, value, ref: int, el=None) -> int | None:
 # --------------------------------------------------------------------------- geometry helpers
 
 
-def _is_abs(el) -> bool:
+def _is_abs(el, siblings: list) -> bool:
     b: Box | None = getattr(el, "box", None)
-    if kpirow.pinned(el):  # `y=` / `h=` / `w=` on a KPI card in a row size and place the row, not the card
-        return False
+    if kpirow.pinned(el) and kpirow.any_pinned(siblings):
+        return False  # `y h w` on a card of an all-KPI row size and place the row, not the card
     return b is not None and (b.x is not None or b.y is not None)
 
 
@@ -1499,7 +1498,7 @@ def _box_nat0(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None
     children = c.children
     if not children:
         return total
-    if any(_is_abs(ch) for ch in children):
+    if any(_is_abs(ch, children) for ch in children):
         return None
     inner_w = max(width - pl - pr, 1)
     if kpi:
@@ -1666,10 +1665,10 @@ def _place_stack(
     """Stack blocks full width, one per row. Returns the rect of every child by index."""
     rects: dict[int, Rect] = {}
     for i, ch in enumerate(children):
-        if _is_abs(ch):
+        if _is_abs(ch, children):
             rects[i] = _apply_box(ctx, ch, area, True)
             _place_block(ctx, ch, rects[i], inherit)
-    flow = [(i, ch) for i, ch in enumerate(children) if not _is_abs(ch)]
+    flow = [(i, ch) for i, ch in enumerate(children) if not _is_abs(ch, children)]
     if not flow:
         return rects
     nat = [_natural_height(ctx, ch, area.w, inherit) for _, ch in flow]
@@ -2123,10 +2122,10 @@ def _place_blocks(
 ) -> None:
     rects: dict[int, Rect] = {}
     for i, b in enumerate(blocks):
-        if _is_abs(b):
+        if _is_abs(b, blocks):
             rects[i] = _apply_box(ctx, b, area, True)
             _place_block(ctx, b, rects[i], inherit)
-    flow = [(i, b) for i, b in enumerate(blocks) if not _is_abs(b)]
+    flow = [(i, b) for i, b in enumerate(blocks) if not _is_abs(b, blocks)]
     if not flow:
         _emit_links(ctx, links or [], rects)
         return
@@ -3903,39 +3902,6 @@ def _chevron_steps(slide: Slide, lt: LayoutTokens) -> Slide:
     return new
 
 
-def _kpi_pins(slide: Slide) -> tuple[Slide, tuple[Any, Any]]:
-    """``y=`` / ``h=`` on a ``.kpi`` card of the slide body pin the whole row (the first card that has them).
-
-    They are taken off the cards (a card with ``y`` would leave the row and pile up on the others) and handed
-    to ``fit_lone_kpi``, which honours them when the cards are alone on the slide. Next to other content they
-    have no effect, and ``attr-ignored`` says so. ``@free`` keeps every box as written."""
-    if slide.layout == "free":
-        return slide, (None, None)
-    cards = [
-        e
-        for e in slide.elements
-        if isinstance(e, Container)
-        and "kpi" in e.classes
-        and e.box is not None
-        and (e.box.y is not None or e.box.h is not None)
-    ]
-    if not cards:
-        return slide, (None, None)
-    y = next((c.box.y for c in cards if c.box and c.box.y is not None), None)
-    h = next((c.box.h for c in cards if c.box and c.box.h is not None), None)
-    ids = {id(c) for c in cards}
-
-    def strip(e):
-        if id(e) not in ids:
-            return e
-        box = e.box.model_copy(update={"y": None, "h": None})
-        return e.model_copy(
-            update={"box": box if any(v is not None for v in box.model_dump().values()) else None}
-        )
-
-    return slide.model_copy(update={"elements": [strip(e) for e in slide.elements]}), (y, h)
-
-
 def _attach_bar(
     out: list[Placed], body: Rect, tail: list[Placed], bar: Text | None, lt: LayoutTokens
 ) -> list[Placed]:
@@ -3968,7 +3934,6 @@ def _clone_ctx(c: _Ctx) -> _Ctx:
 
 def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     slide = _chevron_steps(slide, theme.layout)
-    slide, kpi_pin = _kpi_pins(slide)
     try:
         W, H = slide_size(deck.size)
     except ValueError:
@@ -4459,10 +4424,6 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 isinstance(e, Container) and "kpi" in e.classes and _kpi_explicit(final_ctx, e)
                 for e in slide.elements
             )
-            pin = (
-                _len(ctx, kpi_pin[0], body_now.h) if kpi_pin[0] is not None else None,
-                _len(ctx, kpi_pin[1], body_now.h) if kpi_pin[1] is not None else None,
-            )
             lone = fit_lone_kpi(
                 final_ctx.out,
                 body_now,
@@ -4470,7 +4431,6 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 has_bar,
                 fixed,
                 theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt,
-                pin,
             )
             final_ctx.out = (
                 scale_kpi_values(final_ctx.out, body_now, ctx.lt, fixed) if lone is final_ctx.out else lone

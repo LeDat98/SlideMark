@@ -1,6 +1,6 @@
 """``attr-ignored``: every documented attribute is honoured or listed as ignored on each element kind (no
 third state), the table is true (each cell is probed against the real layout and renderer), and the warning
-names a form that works. Also the honoured one-liners: ``y=`` / ``h=`` on a lone KPI row."""
+names a form that works. Also the honoured one-liners: ``y=`` / ``h=`` / ``w=`` on a KPI row."""
 
 from __future__ import annotations
 
@@ -25,7 +25,6 @@ PROBES: dict[str, str] = {
     "cover": "# T {A}\n## sub\n",
     "box": "# T\n> lead\n## a {<A>}\n- x\n- y\n## b\n- y\n## c\n- z\n",
     "kpi": "# T\n> lead\n## L1 {.kpi <A>}\n12\ncap\n## L2 {.kpi}\n34\ncap\n## L3 {.kpi}\n56\ncap\n",
-    "kpi-row": "# T\n> lead\n## L1 {.kpi <A>}\n12\ncap\n## L2 {.kpi}\n34\ncap\n@end\n- text\n- text\n",
     "step": "# T\n@3 steps\n## a {<A>}\n- x\n## b\n- y\n## c\n- z\n",
     "chevron": "# T\n@3 chevron\n## a {<A>}\n- x\n## b\n- y\n## c\n- z\n",
     "text": "# T\n> lead\n{A}\nParagraph one\n\nParagraph two\n",
@@ -217,15 +216,14 @@ def test_size_on_a_box_without_text_is_ignored(tmp_probe):
     assert not _warn("# T\n> lead\n## a {size=40}\n- x\n## b\n- y\n## c\n- z\n", tmp_probe)
 
 
-def test_kpi_pins_need_the_cards_alone(tmp_probe):
-    beside = _warn("# T\n> lead\n## a {.kpi h=55% y=24%}\n1\nc\n## b {.kpi}\n2\nc\n@end\n- x\n", tmp_probe)
-    assert sorted(d.message for d in beside) == [
-        "h= on a KPI card beside other content is not honoured",
-        "y= on a KPI card beside other content is not honoured",
-    ]
-    assert all("layout.kpi_to_body_h=0.55" in d.hint and "alone" in d.hint for d in beside)
+def test_kpi_pins_are_honoured_beside_other_content_and_with_icons(tmp_probe):
+    """``y h w`` on a KPI card place the row (``layout.kpirow``): no ``attr-ignored``."""
+    beside = _warn(
+        "# T\n> lead\n## a {.kpi h=55% y=24% w=40%}\n1\nc\n## b {.kpi}\n2\nc\n@end\n- x\n", tmp_probe
+    )
+    assert not beside
     icon = _warn("# T\n> lead\n## a {.kpi h=55% icon=yen}\n1\nc\n## b {.kpi}\n2\nc\n", tmp_probe)
-    assert [d.message for d in icon] == ["h= on a KPI card beside other content is not honoured"]
+    assert not icon
     assert not _warn("# T\n> lead\n## a {.kpi h=55% y=24%}\n1\nc\n## b {.kpi}\n2\nc\n", tmp_probe)
 
 
@@ -263,10 +261,12 @@ def test_kpi_row_takes_y_from_the_first_card(tmp_probe):
     assert len({c.x for c in cards}) == 3  # still a row, not a pile
 
 
-def test_kpi_pins_are_dropped_beside_other_content(tmp_probe):
+def test_kpi_pins_take_effect_beside_other_content(tmp_probe):
     plain, _ = _cards("# T\n> lead\n" + KPIS % "" + "@end\n- x\n", tmp_probe)
-    pinned, _ = _cards("# T\n> lead\n" + KPIS % " h=30% y=10%" + "@end\n- x\n", tmp_probe)
-    assert [(c.x, c.y, c.w, c.h) for c in plain] == [(c.x, c.y, c.w, c.h) for c in pinned]
+    pinned, body = _cards("# T\n> lead\n" + KPIS % " h=30% y=10%" + "@end\n- x\n", tmp_probe)
+    assert pinned[0].h == pytest.approx(0.3 * body[3], abs=3)
+    assert pinned[0].y == pytest.approx(body[1] + 0.1 * body[3], abs=3)
+    assert [c.h for c in plain] != [c.h for c in pinned]
 
 
 def test_audit_reports_honoured_cells_too(tmp_probe):
@@ -278,7 +278,7 @@ def test_audit_reports_honoured_cells_too(tmp_probe):
 
 def test_check_reports_it_too(tmp_probe):
     """lint_deck gets ``attr-ignored`` from ``check`` / ``review`` too (no .pptx written)."""
-    got = _diags(HEAD + "# T\n> lead\n## a {.kpi h=50%}\n1\nc\n## b {.kpi}\n2\nc\n@end\n- x\n", tmp_probe)
+    got = _diags(HEAD + "# T\n> lead\n## a {.kpi bold=true}\n1\nc\n## b {.kpi}\n2\nc\n@end\n- x\n", tmp_probe)
     assert any(d.rule == "attr-ignored" for d in got)
 
 

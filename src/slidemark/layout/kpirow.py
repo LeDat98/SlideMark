@@ -25,7 +25,11 @@ def pinned(el) -> bool:
 
 
 def any_pinned(elements) -> bool:
-    return any(pinned(e) for e in elements)
+    """A pinned KPI card in a body whose boxes are all KPI cards (a row the author can place).
+
+    A card beside other boxes is not a row: its ``y`` has no effect there and the sparse passes stay on."""
+    boxes = [e for e in elements if isinstance(e, Container)]
+    return any(pinned(e) for e in boxes) and all(is_kpi(e) for e in boxes)
 
 
 def pin_row(
