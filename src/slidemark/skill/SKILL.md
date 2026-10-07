@@ -187,7 +187,9 @@ goes full width below. Each table/chart/image/code outside a box is its own bloc
 **`@` line** (only if the automatic layout is wrong; one per slide, tokens space separated):
 `@3` columns · `@2x2` grid · `@1:2` ratios · `@aab/aac` areas (letters = blocks in order, `.` empty) ·
 `chevron` steps (heading + 1–2 short bullets) · `steps` arrows, bullets in a card below (`steps num` adds a
-"STEP n" caption) · `rows` a `1.` list alone as numbered bars · `flow` cards with arrows · `a>b` arrow, `a-b` line between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition ·
+"STEP n" caption) · `rows` a `1.` list alone as numbered bars (`rows plain` = unnumbered, `rows.glyph=■ rows.stripe=a,b`) ·
+`items` bullets of each box as item cards (`item.fill` `item.border-left="5pt solid secondary"` `item.size`) · `num` a
+numbered circle on each box heading (`box.num.fill`) · `flow` cards with arrows · `a>b` arrow, `a-b` line between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition ·
 `@bg=#0B1020` or `@bg="linear-gradient(135deg,#1A0B2E,#7A1FA2)"` background (dark flips text light; `@dark`
 `@light` force it) · `@free` no automatic layout: blocks sit at their own `{x y w h}`.
 
@@ -242,7 +244,9 @@ category or a series). Numbers may be
   `heading.band=primary` `table.header.fill=primary`
   `palette=primary,accent,#FF5A1F` (chart series) `h1.letter-spacing=2pt` (any `selector.css-property`)
   `hero.fill=#FF5A1F` (your own class, used as `## X {.hero}`). Chrome: `top.bar=primary` `title.rule=secondary` `kpi.stripe=secondary` `kpi.label.size=20` `bullet=■` `lead.bold=on`
-  `footer.color=muted` `steps-arrow.fill=a,b` `rows-num.fill=a,b` `cover.bar=teal` `render.chart_grid=border`. A text look in one token:
+  `footer.color=muted` `steps-arrow.fill=a,b` `rows-num.fill=a,b` `heading.rule=accent` `title.rule2=accent` `cover.bar=teal|accent@edge`
+  `cover.rule_w=6in cover.rule_pos=above|below` `cover.stripes=a@9in` `render.chevron_shape=pentagon,chevron`
+  `table.num_pad=0.6in` `render.chart_grid=border`. A text look in one token:
   `kpi.label="20 bold primary"` `steps-card="24 bold center"` `heading=center` (size, bold, italic, left/center/right, colour)
   (a token whose element the deck lacks, or `chevron.fill`, warns `attr-ignored`).
 - A ` ```css ` fence (header = whole deck, in a slide = that slide) styles `slide h1 h2 p li .lead
