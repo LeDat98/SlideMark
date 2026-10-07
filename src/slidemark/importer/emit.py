@@ -6,6 +6,7 @@ import re
 from dataclasses import replace
 
 from .read import CellT, ChartT, ParaT, RunT
+from .runs import span_has, wrap_span
 
 _ESC = re.compile(r"([\\`*\[\]~^])")
 _UNDER = re.compile(r"(?<![A-Za-z0-9])_|_(?![A-Za-z0-9])")
@@ -113,22 +114,23 @@ def inline(
                 body = f"~~{body}~~"
             if r.italic and not imp_italic:
                 body = f"*{body}*"
-            if r.span:  # recognise.py: a run of its own size / colour: `[text]{size=34 bold=true}`
-                body = f"[{body}]{{{r.span}}}"
-            elif r.bold and not imp_bold and not (plain_bold and all_bold) and not r.badge:
+            if (
+                r.bold
+                and not imp_bold
+                and not (plain_bold and all_bold)
+                and not r.badge
+                and not span_has(r, "bold")
+            ):
                 body = f"**{body}**"
-            if r.span:
-                pass
+            if span_has(r, "color"):
+                pass  # the span carries the colour
             elif imp_color and r.color == imp_color:
                 pass
             elif accent and r.color in accent.split("|") and not r.badge:  # `A|B`: accent shades
                 body = f"=={body}=="
             elif r.color and not r.badge and (cname := (classes or {}).get(r.color)) in ("success", "danger"):
                 body = f"[{body}]{{.{cname}}}"
-        if (
-            r.span and not r.code
-        ):  # recognise2: a run of its own size / colour -> `[text]{size=26 color=#E08A1E}`
-            body = f"[{body}]{{{r.span}}}"
+            body = wrap_span(body, r)  # runs.py: one `[text]{size=26 color=#E08A1E}` for both recognisers
         if r.badge:
             cls = _badge_class(r.badge, classes or {})
             body = f"[{body}]{{.badge{(' .' + cls) if cls else ''}}}"

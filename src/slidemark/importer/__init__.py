@@ -31,6 +31,7 @@ from .design import (
 )
 from .look import _keep_valid, color_similarity, derive_tokens
 from .read import ReadCtx, SlideData, read_sections, read_slide
+from .runs import is_slidemark_deck
 from .structure import DeckInfo, build_slide, notes_lines
 
 __all__ = ["import_pptx"]
@@ -263,7 +264,7 @@ def _import_with(
         margin_x=to_emu(theme.margin_x),
         margin_y=to_emu(theme.margin_y),
         gap=to_emu(theme.gap),
-        foreign=not design and not recognise2.is_slidemark_deck(datas),
+        foreign=not design and not is_slidemark_deck(datas),
         palette=_default_palette(theme, {**(design.get("tokens") or {}), **own_tokens}),
     )
     if deck.foreign:

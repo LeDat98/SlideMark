@@ -24,6 +24,7 @@ from .emit import (
 from .links import find_links, recover_diagram
 from .links import tokens as link_tokens
 from .read import Item, ParaT, RunT, SlideData
+from .runs import merge_lines
 
 CHEVRONS = ("chevron", "homePlate", "pentagon")
 STACKABLE = ("table", "callout", "text", "code")
@@ -1430,8 +1431,6 @@ def build_slide(
             "> "
             + one_line(lead[0].paras, accent=deck.accent, classes=classes, implied=deck.implied.get("lead"))
         )
-    if (style_line := found.style_line()) is not None:  # per-slide tokens a recognition states
-        lines.append(style_line)
     n_boxes = sum(1 for b in grid if b.kind == "box")
     if not groups and arrows and "chevron" not in tokens and n_boxes > 1 and arrows >= n_boxes - 1:
         tokens.append("flow")
@@ -1498,7 +1497,8 @@ def build_slide(
         info["extra"] = extra
         info["title_only"] = title_only
     tokens = [*tokens, *links, *extra]
-    lines.extend(data.style_lines)  # recognise.py: slide `sizes:` / `style:` lines
+    # slide `style:` / `sizes:` lines of both recognisers, one line each (runs.merge_lines)
+    lines.extend(merge_lines([found.style_line(), *data.style_lines]))
     if info is not None:
         info["pos"] = len(lines)
     if tokens:

@@ -19,6 +19,7 @@ from dataclasses import dataclass, field, replace
 
 from .look import _contrast, _dist, _lum
 from .read import Item, ParaT, SlideData
+from .runs import claim, free, is_foreign, span_runs
 
 CHEVRON_PRST = ("chevron", "homePlate", "pentagon")
 _HEX = re.compile(r"^[0-9A-Fa-f]{6}$")
@@ -131,19 +132,6 @@ def _safe(default):
     return deco
 
 
-_OWN_NAME = re.compile(
-    r"(Title|Subtitle|Lead|Footer|Slide Number|Conclusion|Footnote|band|rule|Background"
-    r"|(Card|Text|Heading|Step|Row|Item|KPI|Num|Pill|Rows|Code|Callout)( \d+.*)?)"
-)
-
-
-@_safe(True)  # (an unreadable deck is left alone)
-def is_slidemark_deck(datas: list[SlideData]) -> bool:
-    """True when a shape carries a name only SlideMark's own renderer gives (``Title``, ``band``, ``Text 1``):
-    the deck was built by SlideMark, even if it has no design part to say so."""
-    return any(_OWN_NAME.fullmatch(it.name or "") for sd in datas for it in sd.items)
-
-
 def _foreign_name(it: Item) -> bool:
     """False for a shape SlideMark itself drew (its names are folded by name elsewhere)."""
     return not re.match(
@@ -157,7 +145,7 @@ def _foreign_name(it: Item) -> bool:
 def recognise(data: SlideData, deck, n: int) -> Found:
     """Recognise the slide's designed shapes; renames / merges items in place and returns tokens to write."""
     found = Found()
-    if not getattr(deck, "foreign", False):
+    if not is_foreign(deck):
         return found
     for step in (_page_number, _cover_background, _chevron_steps, _takeaway_bar, _tables, _charts, _panels):
         try:
@@ -424,6 +412,8 @@ def _chevron_steps(data: SlideData, deck, n: int, found: Found) -> None:
     arrows = [c.fill.upper() for c in row]
     for k, (a, card) in enumerate(zip(row, cards, strict=True), 1):
         a.name, card.name = f"Step {k} arrow", f"Step {k} card"
+        claim(a, "steps")  # (recognise.py leaves the steps to this module)
+        claim(card, "steps")
     if any(_dist(a, deck.colors.get("primary", "")) > T.same_fill for a in arrows):
         found.style["steps-arrow.fill"] = ",".join(name_or_hex(deck, a) for a in arrows)
     asz = _modal([r.size for a in row for p in a.paras for r in p.runs if r.size and r.text.strip()])
@@ -436,6 +426,8 @@ def _chevron_steps(data: SlideData, deck, n: int, found: Found) -> None:
         and t not in row
         and any(c.x <= t.cx <= c.x + c.w and c.y <= t.cy <= c.y + c.h for c in cards)
     ]
+    for t in inside:
+        claim(t, "steps")
     csz = _modal([r.size for t in inside for p in t.paras for r in p.runs if r.size and r.text.strip()])
     if csz:
         found.style["steps-card.size"] = f"{csz:g}"
@@ -512,11 +504,14 @@ def _takeaway_bar(data: SlideData, deck, n: int, found: Found) -> None:
         return
     if txt is None:
         bar.name = "Conclusion"
+        claim(bar, "conclusion")
     else:
         data.items[:] = [i for i in data.items if i is not txt and i is not bar]
-        data.items.append(
-            replace(txt, fill=bar.fill, x=bar.x, y=bar.y, w=bar.w, h=bar.h, name="Conclusion", line=bar.line)
+        merged = replace(
+            txt, fill=bar.fill, x=bar.x, y=bar.y, w=bar.w, h=bar.h, name="Conclusion", line=bar.line
         )
+        claim(merged, "conclusion")
+        data.items.append(merged)
     if _dist(bar.fill.upper(), deck.colors.get("primary", "")) > T.same_fill:
         found.style["conclusion.fill"] = name_or_hex(deck, bar.fill)
     sz = _modal([r.size for p in (txt or bar).paras for r in p.runs if r.size and r.text.strip()])
@@ -599,22 +594,25 @@ def _tag_spans(paras: list[ParaT], deck, base_size: float | None = None, multi_o
     run's size is the base. The reference colour is the deck ink (``fg``). ``multi_only`` leaves a text of one
     run alone (a heading, a lone number)."""
     runs = [r for p in paras for r in p.runs if r.text.strip()]
-    if not runs or (multi_only and len(runs) < 2):
+    if not runs:
         return
     base_pt = base_size or runs[0].size
     ink = deck.ink or deck.colors.get("fg", "")
     accent = (deck.accent or "").split("|")
-    for r in runs:
-        parts = []
-        if r.size and base_pt and abs(r.size - base_pt) >= T.span_dsize:
-            parts.append(f"size={r.size:g}")
-        handled = r.color is not None and (
-            r.color in accent or r.color in (deck.colors.get("success"), deck.colors.get("danger"))
-        )
+    markup = (deck.colors.get("success"), deck.colors.get("danger"))  # colours the markup already says
+
+    def color_of(r) -> str | None:
+        handled = r.color is not None and (r.color in accent or r.color in markup)
         if r.color and not handled and not r.badge and ink and _dist(r.color, ink) > T.near:
-            parts.append("color=" + name_or_hex(deck, r.color, near=True))
-        if parts:
-            r.span = " ".join(parts)
+            return name_or_hex(deck, r.color, near=True)
+        return None
+
+    span_runs(
+        paras,
+        size_off=lambda r: bool(base_pt) and abs(r.size - base_pt) >= T.span_dsize,
+        color_of=color_of,
+        multi_only=multi_only,
+    )
 
 
 def _tables(data: SlideData, deck, n: int, found: Found) -> None:
@@ -769,7 +767,11 @@ def _panels(data: SlideData, deck, n: int, found: Found) -> None:
         if len(cards) != 1:
             continue
         card = cards[0]
+        if not free(card):
+            continue
+        claim(card, "chartpanel")  # (recognise.py's dark panel / tiles skip it)
         for t in data.items:
             if t.kind == "text" and t.role is None and card.x <= t.cx <= card.x + card.w:
                 if card.y <= t.cy <= card.y + card.h:
+                    claim(t, "chartpanel")
                     _tag_spans(t.paras, deck, multi_only=True)

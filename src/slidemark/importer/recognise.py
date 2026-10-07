@@ -30,6 +30,7 @@ from dataclasses import replace
 
 from .emit import one_line, text_lines
 from .read import Item, ParaT, RunT, SlideData
+from .runs import claim, free, is_foreign, put_span, span_runs
 
 # every threshold of the recognisers (fractions of the slide width W / height H unless named otherwise)
 TH = {
@@ -69,14 +70,6 @@ _NUMBERISH = re.compile(r"\d")
 _STRIP_NUM = re.compile(r"[\d,.\s+\-−%％¥￥$▲△▼]")
 _HEX = re.compile(r"[0-9A-Fa-f]{6}")
 EMU_IN = 914400
-# shape names SlideMark itself gives (`Card 3`, `Text 5`, `Heading 2`, `Shape 4`, `Title` ...): a slide with
-# one of them was drawn by the library, and the importer reads its names, never its geometry
-_NATIVE = re.compile(
-    r"(?:Card|Text|Heading|Shape|Footnote|Pill|Item|Num|Step|Row) \d+(?: .*)?|KPI (?:value|caption)"
-    r"|Title|Footer|Slide Number|Lead|Conclusion|Subtitle|band(?: .*)?|[Rr]ule|icon \S+"
-)
-
-
 # --------------------------------------------------------------------------- helpers
 
 
@@ -110,7 +103,7 @@ def _mid(it: Item, box: Item) -> bool:
 
 
 def _live(data: SlideData) -> list[Item]:
-    return [i for i in data.items if not i.rec and i.role is None]
+    return [i for i in data.items if free(i)]
 
 
 def _in_body(it: Item, W: int, H: int) -> bool:
@@ -118,7 +111,7 @@ def _in_body(it: Item, W: int, H: int) -> bool:
 
 
 def _claim(it: Item, rec: str, role: str = "rec") -> None:
-    it.rec, it.role = rec, role
+    claim(it, rec, role)
 
 
 def _text_color(it: Item) -> str | None:
@@ -235,11 +228,9 @@ class _Styles:
 
 
 def _add_style(data: SlideData, tokens: list[str]) -> None:
-    """Slide ``style:`` tokens (one line; a key written twice keeps the first)."""
-    have = {t.split("=", 1)[0] for ln in data.style_lines if ln.startswith("style: ") for t in ln[7:].split()}
-    new = [t for t in tokens if t and t.split("=", 1)[0] not in have]
-    if new:
-        data.style_lines.append("style: " + " ".join(new))
+    """Slide ``style:`` tokens (``runs.merge_lines`` joins every writer's line into one at emission)."""
+    if tokens := [t for t in tokens if t]:
+        data.style_lines.append("style: " + " ".join(tokens))
 
 
 def _ranks(names: list[str]) -> str:
@@ -543,7 +534,7 @@ def _apply_tiles(data: SlideData, deck, order: list[Item], info: dict, is_index:
             if col and col != fg:
                 for r in p0.runs:
                     if r.text.strip():
-                        r.span = f"color=#{col}"
+                        put_span(r, [f"color=#{col}"])
         elif col and col != fg:
             attrs.append(f"color=#{col}")
         c.rec_attrs = " ".join(attrs)
@@ -577,22 +568,12 @@ def _apply_tiles(data: SlideData, deck, order: list[Item], info: dict, is_index:
 
 def _spans(paras: list[ParaT], base_size: float | None, base_color: str | None, every: bool = False) -> None:
     """Give each run that differs from the base (size, colour) its own span; ``every`` spans all runs."""
-    for p in paras:
-        for r in p.runs:
-            if not r.text.strip():
-                continue
-            parts = []
-            if r.size and (
-                every or base_size is None or abs(r.size - base_size) / base_size > TH["span_tol"]
-            ):
-                parts.append(f"size={r.size:g}")
-            c = _hex(r.color)
-            if c and (every or c != base_color):
-                parts.append(f"color=#{c}")
-            if parts and r.bold:
-                parts.append("bold=true")
-            if parts:
-                r.span = " ".join(parts)
+    span_runs(
+        paras,
+        size_off=lambda r: every or base_size is None or abs(r.size - base_size) / base_size > TH["span_tol"],
+        color_of=lambda r: f"#{c}" if (c := _hex(r.color)) and (every or c != base_color) else None,
+        bold=True,
+    )
 
 
 def _panel(data: SlideData, deck) -> bool:
@@ -650,7 +631,7 @@ def _dark_cards(data: SlideData, deck) -> bool:
         for p in texts[0].paras:  # (a heading-only box draws its text in the heading ink, not the box ink)
             for r in p.runs:
                 if r.text.strip():
-                    r.span = f"color=#{_hex(r.color) or ink}"
+                    put_span(r, [f"color=#{_hex(r.color) or ink}"], bold=True)
         c.rec, c.role = "dark", "rec"
         c.rec_attrs = f"fill=#{f} color=#{ink}"
         for t in texts:
@@ -746,7 +727,7 @@ def _apply_bars(data: SlideData, deck, sel: list[tuple]) -> None:
 
 def recognise(data: SlideData, deck) -> None:
     """Prepare the slide: claimed shapes get ``rec`` (and role ``rec`` / ``decor``), see the module doc."""
-    if any(_NATIVE.fullmatch((i.name or "").strip()) for i in data.items):
+    if not is_foreign(deck):  # (computed once per deck: runs.is_slidemark_deck)
         return
     for step in (_quote, _badges, _panel, _tiles, _bars, _dark_cards):
         try:
