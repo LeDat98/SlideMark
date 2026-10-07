@@ -1,0 +1,41 @@
+name: publish
+# Publishes the package to PyPI through Trusted Publishing (OpenID Connect): no API token is stored.
+# PyPI side: project `slidemark`, owner `LeDat98`, repository `SlideMark`, workflow `publish.yml`,
+# environment `pypi`. GitHub side: Settings > Environments > `pypi` (add the owner as a required reviewer
+# so a release is approved by hand). Runs on a published GitHub release or on demand; the version comes
+# from `pyproject.toml`, so bump it and tag `vX.Y.Z` first.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv build
+      - run: uv venv .venv && uv pip install --python .venv dist/*.whl
+      - run: .venv/bin/slidemark version
+      - run: printf '# Hello\n- one\n- two\n' | .venv/bin/slidemark build - -o /tmp/smoke.pptx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/slidemark
+    permissions:
+      id-token: write # the OIDC token PyPI trusts
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

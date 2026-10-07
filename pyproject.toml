@@ -36,7 +36,7 @@ dev = [
 slidemark = "slidemark.cli:main"
 
 [tool.hatch.build.targets.sdist]
-exclude = [".hypothesis", ".claude", "docs/gallery", "bench/answers", "out", "tests/golden"]
+exclude = [".hypothesis", ".claude", "docs/gallery", "bench", "out", "tests/golden", "examples/assets"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/slidemark"]
