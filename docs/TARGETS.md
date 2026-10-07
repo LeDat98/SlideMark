@@ -56,11 +56,14 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
 - [x] DL1 SKILL.md "Decide first" step; `design-none` / `design-slide` warnings; `design:` facts line; both SKILL.md
       patterns and all 22 examples state a design with 0 warnings (wave 3, 2026-10-07; fresh-agent run on the 15-slide
       brief: `14/14 slides carry choices`, judge round 6 rank 1).
-- [ ] DL2 Port of an agent's python-pptx deck (`bench/lengthbench/t2/slidemark-ported`): ≥ 95% of its decisions statable
-      with tokens or attributes (no `css` fence, no `@html` needed), deck ≤ 30% of `build.py` tokens (now 60/64 = 94%
-      incl. 9 CSS-only, 2,283 tokens = 43%; the 4 missing: KPI divider rule, exact row height, a colour per bar, a
-      manual per-point label position). DL2 part 1 (2026-10-07): CSS-only rows 0, the port uses no css fence and no
-      `@html`: 1,577 tokens = 29.96%, accepted, 0 warnings. Lane F (2026-10-07): t1 (5 slides) 42/44 = 95%, 890 tokens = 27.9%, meets DL2; t3 (25 slides) 56 N + 1 CSS of 62 = 92%, 2,889 tokens = 35.3%. Open: KPI header band / divider / unit size, exact table row heights, a colour per bar, per-point label positions, the pie side panel (lane C).
+- [ ] DL2 Port of an agent's python-pptx deck (`bench/lengthbench/t{1,2,3}/slidemark-ported`): >= 95% of its decisions statable
+      with tokens or attributes (no `css` fence, no `@html`), deck <= 30% of `build.py` tokens. Measured 2026-10-07 after lane G
+      (`docs/DESIGN_COVERAGE.md`, each REPORT.md): **t1 100% (44/44) / 27.7% (882 / 3,187): met. t2 98% (63/64) / 29.96%
+      (1,577 / 5,263): met. t3 97% (61/63) / 32.0% (2,622 / 8,188): decision gate met, token gate FAILS by 166 tokens.** All three
+      are 0 warnings, `agent_accept` accepted, no css fence, no `@html`. Not ticked because of t3: the deck has 1,930 tokens of
+      content (24%) and the header alone costs 394; what is left to cut is repetition per chart / table (`labels.bold=on` x5,
+      `hcol=1 .zebra` x4, about 60 tokens with a deck-wide default) and stated decisions. Still not statable: a data-label
+      position per series (t2, t3), the pie side panel with slice-coloured stripes (t3).
 - [ ] DL3 Every element kind (title, lead, box, KPI, list item, table cell, chart point/series, image, step, row, cover)
       accepts `{x y w h size color fill border align valign bold rotate shape z}` on its own line, with pinned values
       never grown or moved by a layout pass; per-cell `{fill color}` on a table cell, per-point `{color label}` on a

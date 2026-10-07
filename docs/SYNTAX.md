@@ -93,6 +93,8 @@ style: top.bar=primary top.bar_h=0.12in title.rule=secondary kpi.stripe=secondar
 | `heading.rule=<color>` `heading.rule_h=2pt` | a rule under every `##` box heading (on the lower edge of the band with `heading.band`); not on `###`, KPI cards or item cards |
 | `kpi.stripe=<color>` `kpi.stripe_h=6pt` | a stripe on the top edge of every `.kpi` card (a tall stripe is a header band: a label on it is judged against the stripe colour) |
 | `kpi.rule=<color>` `kpi.rule_h=1pt` `kpi.rule_w=100%` | a divider rule between the number and its caption in every `.kpi` card (off by default). The caption becomes its own text box under the rule; `layout.kpi_rule_gap_em` is the air around it |
+| `kpi.band=<color>` `kpi.band.color=<c>` `kpi.band.size=20` | a header band on every `.kpi` card, flush on its top edge, holding the label in the band's ink (white, or what reads on the fill; like `heading.band` on boxes); `kpi.band.size` also pins the label size; an `icon=` sits under the band; `layout.kpi_band_pad` is the air around the label |
+| `kpi.unit.size=22` `kpi.unit.color=<c>` | the unit of a KPI value (the trailing non-digit run of the value line: `億円` in `1,280億円`, `名`, `%`) in its own size, smaller than the digits (never larger than the number); a value without digits or without a tail is left alone; per slide: `style: kpi.unit.size=32` inside the slide |
 | `kpi.fill=<c>` `kpi.line=<c>` | the card fill and border of every `.kpi` card (aliases of `card.fill` / `card.line` for KPI cards; also `kpi.radius` `kpi.shadow`) |
 | `table.num_pad=0.6in` | the right inset of right-aligned (numeric) table cells, header included |
 | `bullet=■` `bullet.color=<color>` | the glyph and color of bullet lists (default `•`, text color) |

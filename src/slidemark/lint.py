@@ -195,6 +195,8 @@ def _fix_hint(
         label = f"set the color to {ink} (passes {need:g}:1 on {back_hex[0]})"
     if run.highlight:
         token = "badge.color"
+    elif run.size and run.color and _in_class(items, i, "kpi"):
+        token = "kpi.unit.color"  # the unit run of a KPI value
     elif run.color:
         return f"{label}: change the run's color to {{color={ink}}}"
     elif isinstance(el, Text) and base in ("muted", "fg") and not on_fill:
@@ -212,7 +214,12 @@ def _fix_hint(
         token = f"{sel}.band.color" if p.style.fill and sel in ("title", "heading") else f"{sel}.color"
     else:
         return f"{label}: add {{color={ink}}} to this block"
-    if token.endswith(".color") and not on_fill and token != "kpi.color" and not token.startswith("colors."):
+    if (
+        token.endswith(".color")
+        and not on_fill
+        and token not in ("kpi.color", "kpi.unit.color")
+        and not token.startswith("colors.")
+    ):
         # a selector colors text of every size on bg and on cards: suggest one value that passes everywhere
         every = list(dict.fromkeys([*back_hex, *(h for h in theme.surface_backs() if h)]))
         ink = nearest_passing(theme.hexval(color) or ink, every, theme.render.contrast_min)

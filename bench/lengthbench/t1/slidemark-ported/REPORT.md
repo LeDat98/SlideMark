@@ -1,4 +1,4 @@
-# Porting the python-pptx deck's design decisions to SlideMark (lengthbench t1, 5 slides; DL2 lanes D, E and F)
+# Porting the python-pptx deck's design decisions to SlideMark (lengthbench t1, 5 slides; DL2 lanes D, E, F and G)
 
 Same method as `../../t2/slidemark-ported/REPORT.md`. Source `../python-pptx/build.py`; port `deck.md`
 (render `sheet.png`); content-only baseline `../slidemark/deck.md`.
@@ -22,7 +22,8 @@ accepted
 | `python-pptx/build.py` | 3,187 | 100% |
 | `slidemark/deck.md` (content only) | 460 | 14% |
 | `slidemark-ported/deck.md` before lane F (lane D port) | 912 | 28.6% (header 385) |
-| `slidemark-ported/deck.md` after lane F (**no css fence**, chart forms of lane E) | **890** | **27.9%** (header 382) |
+| `slidemark-ported/deck.md` after lane F (**no css fence**, chart forms of lane E) | 890 | 27.9% (header 382) |
+| `slidemark-ported/deck.md` after lane G (`kpi.band`, `kpi.rule`) | **882** | **27.7%** (header 373) |
 
 ## Decisions (44; N = native, C = css only, M = missing)
 
@@ -45,9 +46,9 @@ Rows changed by lane F (box, cover and chrome forms) and lane E (chart forms) ar
 | 13 | accent rule 6 in wide between title and subtitle (L111) | `cover.rule=accent cover.rule_w=6in` (`cover.rule_pos=below` is the default; lane F) | N |
 | 14 | title 54 bold white, subtitle 22 light blue (L119, L126) | `sizes: cover-title=54 cover-subtitle=22`, `subtitle.color=ink`, `cover.band_h=61%` | N |
 | 15 | KPI card white fill + border (L140) | `card.fill=bg card.line=border` | N |
-| 16 | navy header band with white label (L141-142) | none; `kpi.stripe=primary` + navy label (a tall stripe is not a band: the label sits below it; lane C's `kpi.band`) | M |
+| 16 | navy header band with white label (L141-142) | `kpi.band=primary kpi.band.size=20` (lane G; the ink is white by itself) | N |
 | 17 | value 34 bold blue (L143) | `kpi.color=secondary kpi.size=34` | N |
-| 18 | divider rule between value and note (L144) | none (lane C) | M |
+| 18 | divider rule between value and note (L144) | `kpi.rule=border` (lane C) | N |
 | 19 | note 22 bold accent (L145) | `kpi.note.size=22 kpi.note.bold=on kpi.note.color=#A06016` (darker, contrast) | N |
 | 20 | KPI card height 4.2 in (L137) | `layout.kpi_lone_h=0.9 layout.kpi_lone_min_h=0.85` | N |
 | 21 | clustered column, navy + accent (L154, L174) | `column {colors=primary,accent}` | N |
@@ -75,13 +76,12 @@ Rows changed by lane F (box, cover and chrome forms) and lane E (chart forms) ar
 | 43 | step card accent left stripe (L225) | `steps-card.border-left="5pt solid accent"` (was css) | N |
 | 44 | card text 24 bold navy left (L226) | `steps-card.size=24 steps-card.bold=on`, plain paragraph | N |
 
-Count: **42 N, 0 C, 2 M** = 95.5% statable, all native (lane D port: 33 N + 3 C + 8 M). DL2 (>= 95% statable, <= 30% of the tokens)
-holds on this deck.
+Count: **44 N, 0 C, 0 M** = 100% statable, all native (lane F port: 42 N + 2 M; lane D port: 33 N + 3 C + 8 M). DL2
+(>= 95% statable, <= 30% of the tokens) holds on this deck.
 
 ## Deviations accepted for 0 warnings
 
 - KPI note colour #D9821E became #A06016 (2.6:1 on the card fill).
-- KPI cards have a navy 6 pt top stripe and a navy label, not the header band, and no divider rule (lane C).
 - The two step arrows after the first are chevrons as in the original; the pentagon is the first (as in the original).
 - Slide 4 items are 14 pt regular as in the original; the cards fill the box height (the original used fixed 1 in cards).
 
@@ -90,3 +90,9 @@ holds on this deck.
 The css fence is gone (three rules became the class tokens `strat.border-top`, `item.border-left`, `steps-card.border-left`), the
 `### {.item}` sub-boxes and their `@1x2` lines became `@4 items`, and `item.fill=bg item.line=border item.radius=0` are the
 defaults now. The chart line uses the lane E forms (16 tokens). Tokens 912 -> 890 (874 without the chart forms).
+
+## What the lane G port changed
+
+The KPI header band and the divider are native now: `kpi.stripe=primary` + `kpi.label.size=20 kpi.label.bold=on kpi.label.color=primary`
+became `kpi.band=primary kpi.band.size=20 kpi.rule=border` (the band label is bold and white on its own). Tokens 890 -> 882
+(27.7%), 0 warnings, `agent_accept` accepted.

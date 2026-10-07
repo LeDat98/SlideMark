@@ -5,9 +5,9 @@ num: on
 colors: fg=#222B36 primary=#142B4D secondary=#1F5FA8 accent=#E09F1F teal=#217B70 muted=#59626E surface=#EEF2F7 border=#C9D2DE
 fonts: font="Yu Gothic"
 sizes: title=28 lead=18 heading=20! body=22! table=20 footnote=13 caption=10 cover-title=54
-style: title.band=none title=primary lead="bold secondary" heading.band=primary heading=center card.radius=0 kpi.color=secondary conclusion.fill=secondary conclusion="24 bold" palette=secondary,accent,teal,#8A5AA8 table.header.fill=primary table.zebra.fill=surface render.chart_line_width=3.5 top.bar=primary title.rule=secondary kpi.stripe=secondary kpi.h=4.4in kpi.label="20 bold primary" kpi.note="20 bold teal" bullet=■ bullet.color=teal cover.band_h=61% cover.rule=accent cover.bar=teal render.chevron_shape=pentagon steps-card="24 bold center" steps-arrow.fill=primary,secondary steps.caption_color=teal
+style: title=primary lead="bold secondary" heading.band=primary heading=center card.radius=0 kpi.color=secondary conclusion.fill=secondary conclusion="24 bold" palette=secondary,accent,teal,#8A5AA8 table.header.fill=primary table.zebra.fill=surface render.chart_line_width=3.5 top.bar=primary title.rule=secondary kpi.stripe=secondary kpi.h=4.4in kpi.rule=border kpi.rule_w=60% kpi.label="20 bold primary" kpi.note="20 bold teal" bullet=■ bullet.color=teal cover.band_h=61% cover.rule=accent cover.bar=teal render.chevron_shape=pentagon rows-num.fill=primary,secondary steps-card="24 bold center" steps-arrow.fill=primary,secondary steps.caption_color=teal
 # 2027年度 事業計画
-@cover bg=primary dark
+@cover bg=primary
 style: subtitle.color=#D6E2F0
 青葉フーズ株式会社 経営企画部 2027年3月
 
@@ -29,7 +29,7 @@ style: subtitle.color=#D6E2F0
 
 # 売上高と営業利益の推移（億円）
 > 5年間で売上高は1.25倍に
-```column {labels=on legend=bottom fmt=#,##0 size=14 gap=80}
+```column {labels=on fmt=#,##0 size=14 gap=80}
 ,2023,2024,2025,2026,2027計画
 売上高,1020,1085,1130,1185,1280
 営業利益,61,70,78,86,96
@@ -54,17 +54,17 @@ style: subtitle.color=#D6E2F0
 # 年間スケジュール
 @steps num
 ## 4–6月
-- 価格改定
+価格改定
 ## 7–9月
-- タイ工場着工
+タイ工場着工
 ## 10–12月
-- 北米発売
+北米発売
 ## 1–3月
-- 効果検証
+効果検証
 ??? 価格改定は主要取引先への説明を3月中に終えます。
 
 # 事業別の売上計画（億円）
-```table {align=llll widths=39:28:28:26 .zebra hcol=1}
+```table {align=llll widths=7:5:5:5 .zebra hcol=1 rowh=0.8in}
 事業,2026実績,2027計画,前年比
 冷凍食品,420,465,+11%
 調味料,310,325,+5%
@@ -74,7 +74,7 @@ style: subtitle.color=#D6E2F0
 > 冷凍食品と海外が成長をけん引
 
 # 2027年度 売上構成（%）
-```pie {labels=on legend=right}
+```pie {labels=on}
 ,冷凍食品,調味料,飲料,海外
 構成比,36,25,21,18
 ```
@@ -113,7 +113,7 @@ sizes: heading=26! body=24!
 - コンビニ向けPB
 
 # 海外売上高の推移（億円）
-```line {labels=on legend=bottom size=14 marker=9}
+```line {labels=on size=14 marker=9}
 ,2024,2025,2026,2027計画
 タイ,70,82,95,105
 北米,20,30,45,60
@@ -121,7 +121,7 @@ sizes: heading=26! body=24!
 ```
 
 # DX施策の一覧
-```table {align=llll widths=39:28:28:26 .zebra hcol=1}
+```table {widths=7:5:5:5 .zebra hcol=1 rowh=1.05in}
 施策,対象,効果,時期
 需要予測AI,全工場,在庫 -15%,2027年6月
 受発注の電子化,主要取引先,工数 -30%,2027年9月
@@ -132,13 +132,13 @@ sizes: heading=26! body=24!
 # DX推進のロードマップ
 @steps num
 ## 2027年4月
-- 経費精算
+経費精算
 ## 6月
-- 需要予測AI
+需要予測AI
 ## 9月
-- 受発注電子化
+受発注電子化
 ## 12月
-- 予知保全
+予知保全
 
 # 人的資本の目標
 @kpi
@@ -157,7 +157,7 @@ sizes: heading=26! body=24!
 
 # 設備投資の配分（億円）
 > 設備投資は総額100億円
-```bar {labels=on legend=none}
+```bar {labels=on}
 ,タイ工場,国内工場更新,DX,研究開発
 投資額,45,30,15,10
 ```
