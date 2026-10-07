@@ -18,7 +18,7 @@ style: radius=12 card.shadow="0 6 18 #00000066"
 # Three research areas
 > Each area has a lab lead and a 2027 milestone
 ## Photonic chips
-- 40× lower energy per inference
+- ==40×== lower energy per inference
 - Tape-out Q2 2027
 ## Optical memory
 - Non-volatile, 2 ns access
@@ -26,6 +26,7 @@ style: radius=12 card.shadow="0 6 18 #00000066"
 - Runs today's models unchanged
 
 # Funding
+{hl="Series B" widths=1:1:1:2}
 | Round | Year | Amount | Lead |
 |---|---|---|---|
 | Seed | 2023 | $4M | Northstar |

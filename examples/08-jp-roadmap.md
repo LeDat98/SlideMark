@@ -2,6 +2,8 @@ theme: jp-business
 lang: ja
 footer: ACME株式会社　社外秘
 num: on
+colors: success=#2E7D32
+sizes: lead=18
 
 # 中期経営計画 2027–2029
 @section

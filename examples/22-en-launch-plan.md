@@ -86,6 +86,7 @@ Cost,142,-11,-8,-6,1,=
 
 # Risks and mitigations
 > Hiring speed is the main risk; every wave has a go/no-go gate
+{hl="Clinician hiring falls behind" widths=3:1.2:1.9:5:1.2 align=lccll}
 | Risk | Impact | Likelihood | Mitigation | Owner |
 |-|-|-|-|-|
 | Clinician hiring falls behind | High | Medium | Two recruiting partners, sign-on bonus pool $0.8M | COO |

@@ -2,6 +2,8 @@ theme: jp-business
 lang: ja
 footer: ACME株式会社　社外秘
 num: on
+colors: danger=#C00000
+style: render.connector_width=3
 
 # 推進体制
 > 社長直轄のPMOを設置し、3つの分科会で横断的に推進する

@@ -2,6 +2,8 @@ theme: jp-business
 lang: ja
 footer: ACME株式会社　社外秘
 num: on
+colors: primary=#1E3A5F accent=#C00000
+sizes: body=11 footnote=9
 
 # 新規事業の検討状況と今後の方針
 > 3つの課題を解決し、2027年度の黒字化を目指す

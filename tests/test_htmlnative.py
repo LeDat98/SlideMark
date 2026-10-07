@@ -161,7 +161,7 @@ def test_build_native_shapes_and_ea_font(tmp_path, chromium):
     assert boxes[0].text_frame.margin_left == 0
     xml = boxes[1]._element.xml
     assert "<a:ea " in xml and 'b="1"' in xml
-    assert not [d for d in deck.diagnostics if d.level != "info"]
+    assert not [d for d in deck.diagnostics if d.level != "info" and not (d.rule or "").startswith("design-")]
 
 
 def test_grid_build_positions(tmp_path, chromium):

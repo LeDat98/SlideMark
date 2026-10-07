@@ -3,6 +3,8 @@ lang: ja
 footer: 東和精機株式会社　経営企画室　Confidential
 num: on
 density: dense
+fonts: heading=Meiryo body=Meiryo ea=Meiryo
+style: palette=#BFC7D1,#7FA3C7,primary
 
 # 中期経営計画 2027–2029
 サービス事業への転換と収益構造改革
