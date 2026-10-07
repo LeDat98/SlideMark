@@ -201,7 +201,8 @@ rows), `.badge` (inline pill). On a heading, `size` `fill` `color` style the who
 
 ## Components
 
-- **KPI row:** `@kpi` under the title makes every `##` box a card; `style: kpi.h=4.4in` sets card height.
+- **KPI row:** `@kpi` under the title makes every `##` box a card; `style: kpi.h=4.4in` sets card height, `kpi.rule=border`
+  draws a rule between number and note; place the row yourself with `{.kpi .hero w=45% h=55% y=24%}` (shares of the body).
   **KPI card:** `## Label {.kpi icon=yen}` + value line + caption line; `{.kpi .hero}` = the lead metric,
   wider with a bigger number. Up to 4 in a row; `@end` + a list or table below them. Alone on the slide
   they take `h=55%` / `y=` from the first card (beside other content: `attr-ignored`).
@@ -215,7 +216,7 @@ rows), `.badge` (inline pill). On a heading, `size` `fill` `color` style the who
 ## Tables and charts
 
 Table: ` ```table ` fence with CSV (first row = header; quote cells with commas: `"1,240"`), or a GFM table.
-Options on the fence or the line before: `{widths=3:1:1 align=lrr header=1 hcol=1 .zebra}` (one `align` letter
+Options on the fence or the line before: `{widths=3:1:1 align=lrr header=1 hcol=1 rowh=0.8in .zebra}` (one `align` letter
 per column); `.gantt` draws filled period cells as bars; `hl=Metro,Kyoto` emphasises the rows whose first cell
 matches, `hlcol=Q3` a column. Merge: a lone `<` joins the cell to the left, `^` the cell above.
 
@@ -224,7 +225,8 @@ first row = categories (first cell empty), then one row per series (name first).
 `labels=on|percent|off` `legend=bottom|right|top|none` `fmt="0.0"|"#,##0"|"0%"` `min=` `max=`
 `colors=primary,accent,#888888` (names from `colors:` work) `gap=80` `marker=9` `size=14` (exact)
 `labels=outside|inside|above|below` (`+name` on a pie) `labels.bold=on` `labels.color=` `size=16,14` (labels, axis)
-`legend.size=` `overlap=-5` `step=200` `totals=off` `slice.line=bg` `axis=off`; takeaway: `hl=Metro note="Metro: 40% of visits"` (`hl=` names a
+`legend.size=` `overlap=-5` `step=200` `totals=off` `slice.line=bg` `axis=off`; one word per category
+(`labels=above,below,above,above`) places each point's label; a one-series bar takes `colors=a,b,c,d` (one per bar); takeaway: `hl=Metro note="Metro: 40% of visits"` (`hl=` names a
 category or a series). Numbers may be
 `1,240`, `12%`, `▲3`; a decimal comma needs quotes (`"1,6"`). One value axis.
 
