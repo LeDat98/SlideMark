@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -73,7 +74,11 @@ def test_roundtrip_examples(path: Path, tmp_path: Path):
     src = path.read_text(encoding="utf-8")
     text1, text2, d1, _ = _roundtrip(tmp_path, src)
     assert not [d for d in d1 if d.level in ("error", "warning")]
-    assert text1 == text2, "second import must equal the first"
+    # `dense` on an `@` line is a hint the importer emits only when a plain trial build misses the original's
+    # text boxes; with the growth ceiling (layout.grow_max) a plain build can land within that tolerance of
+    # the dense one, so the second import may leave it out (geometry: tests/test_roundtrip.py)
+    strip = lambda t: re.sub(r"^(@\S+) dense$", r"\1", t, flags=re.M)  # noqa: E731
+    assert strip(text1) == strip(text2), "second import must equal the first"
     orig, imported = parse(src), parse(text1)
     assert not [d for d in imported.diagnostics if d.level in ("error", "warning")], imported.diagnostics
     a, b = signature(orig), signature(imported)

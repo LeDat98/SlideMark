@@ -40,10 +40,12 @@ Settle these in your reasoning, then write them into the deck (`build` echoes th
 3. **Each chart and table:** series colours, labels, legend, the takeaway (`hl=` + `note=`), `widths=` `align=`
    `.zebra`.
 4. **Expected fit:** per slide, what its fit line should say (form, size, how full); a line that differs is
-   the cue to change one thing.
+   the cue to change one thing. Text grows to fill a sparse slide only up to `layout.grow_max` (1.5 x; `grow.max=1` = never)
+   and the fit line / `sparse` info (`sparse: 42% free`) name slides that stay empty: decide their form (merge,
+   add a figure, `@rows` / `@items` / side by side) rather than raising `size=`.
 
-`design-none` (no `colors:` `fonts:` `sizes:` `style:`, no deck `css`) and `design-slide` (no element carries a
-choice) are advisory: state the choice the hint names.
+`design-none` (no design lines) and `design-slide` (no element carries a choice) are advisory: state the choice
+the hint names.
 
 ## Pattern 1: English deck, every slide decided
 
@@ -206,11 +208,10 @@ rows), `.badge` (inline pill). On a heading, `size` `fill` `color` style the who
 - **KPI row:** `@kpi` under the title makes every `##` box a card; `style: kpi.h=4.4in` sets card height, `kpi.rule=border`
   draws a rule between number and note; place the row yourself with `{.kpi .hero w=45% h=55% y=24%}` (shares of the body).
   **KPI card:** `## Label {.kpi icon=yen}` + value line + caption line; `{.kpi .hero}` = the lead metric,
-  wider with a bigger number. Up to 4 in a row; `@end` + a list or table below them. Alone on the slide
-  they take `h=55%` / `y=` from the first card (beside other content: `attr-ignored`).
+  wider with a bigger number. Up to 4 in a row; `@end` + a list or table below them.
 - **Callout:** `> [!note] text` (`tip` `warn` `caution`), at slide level or inside a box.
 - **Icons:** `icon=` on a box heading: `check warning info user chart money yen target rocket gear clock
-  globe shield flag` (a wrong name is fixed to the nearest), or `icon=logo.svg`.
+  globe shield flag` or `icon=logo.svg`.
 - **Flowchart, org chart:** ` ```mermaid ` with `graph TD` / `graph LR`, `A[申請] --> B{承認?}`, `B -->|yes| C`.
 - **Math:** ` ```math ` LaTeX → native equation. **Images:** `![what it shows](a.png)` (alt text required);
   `![alt](demo.mp4)` video/audio; ` ```svg ` inline SVG. Other fences are code.
@@ -247,8 +248,7 @@ category or a series). Numbers may be
   `footer.color=muted` `steps-arrow.fill=a,b` `rows-num.fill=a,b` `heading.rule=accent` `title.rule2=accent` `cover.bar=teal|accent@edge`
   `cover.rule_w=6in cover.rule_pos=above|below` `cover.stripes=a@9in` `render.chevron_shape=pentagon,chevron`
   `table.num_pad=0.6in` `render.chart_grid=border`. A text look in one token:
-  `kpi.label="20 bold primary"` `steps-card="24 bold center"` `heading=center` (size, bold, italic, left/center/right, colour)
-  (a token whose element the deck lacks, or `chevron.fill`, warns `attr-ignored`).
+  `kpi.label="20 bold primary"` `steps-card="24 bold center"` `heading=center` (size, bold, italic, left/center/right, colour).
 - A ` ```css ` fence (header = whole deck, in a slide = that slide) styles `slide h1 h2 p li .lead
   .conclusion .footnote .box .kpi table th td tr code img .chart` and your `{.class}`: colours, gradients,
   borders, radius, shadows, fonts, spacing, `transform: rotate()`.

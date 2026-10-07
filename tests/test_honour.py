@@ -35,7 +35,12 @@ PROBES: dict[str, str] = {
     "code": "# T\n> lead\n{A}\n```python\nprint(1)\n```\n",
     "rows": "# T\n@rows\n{A}\n1. one\n2. two\n3. three\n",
 }
-EXTRA_HEAD = {"chevron": "style: layout.chevron_steps=off\n"}
+EXTRA_HEAD = {
+    "chevron": "style: layout.chevron_steps=off\n",
+    # a lone sparse text block is centred in the body after layout, which hides `y=` (it used to be masked
+    # here by text growth changing with any attribute): probe it top-anchored
+    "text": "style: layout.body_valign=top\n",
+}
 # values that change the output (any of them differing from the baseline counts as honoured)
 VALUES: dict[str, list[str]] = {
     "x": ["x=10%"],

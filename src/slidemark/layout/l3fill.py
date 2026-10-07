@@ -144,7 +144,7 @@ def _max_step(card: Placed, inner: list[Placed], lt: LayoutTokens, to_bar: bool 
     if heads:
         hp = max((h.style.font_size or 18) * h.font_scale for h in heads)
         cap = min(cap, hp * lt.l3_body_head_max)
-    return max(cap / pt, 1.0) if pt > 0 else 1.0
+    return measure.grow_cap(lt, m.style.font_size, pt, cap) if pt > 0 else 1.0  # ... and layout.grow_max
 
 
 def _fill_card(
@@ -512,7 +512,7 @@ def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: boo
     pad_v = max(min(m.y - c.y for c, m in zip(cards, mains, strict=True)), 0)
     # 1. card text: the largest common growth that wraps nothing new and stays under the cap
     cur_pt = max(m.style.font_size * m.font_scale for m in mains)  # type: ignore[operator]
-    s_top = max(text_max / max(cur_pt, 1.0), 1.0)
+    s_top = measure.grow_cap(lt, max(m.style.font_size for m in mains), cur_pt, text_max)  # ... and grow_max
     step = max(lt.l3_grow_step, 0.01)
     best, k = 1.0, 1
     while True:
@@ -1433,7 +1433,10 @@ def _grow_chevron_text(
     if lt.chevron_text_max_pt <= 0 or any("icon_side" in c.element.attrs for c in chevs):
         return None
     sizes = [(c.style.font_size or 18) * c.font_scale for c in chevs]
-    s_top = min(lt.chevron_text_max_pt / max(sz, 1.0) for sz in sizes)
+    s_top = min(
+        measure.grow_cap(lt, c.style.font_size or 18, sz, lt.chevron_text_max_pt)  # ... and grow_max
+        for c, sz in zip(chevs, sizes, strict=True)
+    )
     step = max(lt.l3_grow_step, 0.01)
 
     def fits(s: float) -> bool:
@@ -1509,6 +1512,17 @@ def _value_fit(m: Placed, lt: LayoutTokens) -> float:
     return m.w / EMU_PER_PT * lt.kpi_fit_margin * lt.kpi_lone_fit / max(em, 1e-6)
 
 
+def _value_cap(parts: list[tuple[Placed, Placed, Placed]], sizes: list[float], lt: LayoutTokens) -> float:
+    """Largest common growth of the numbers that keeps each within ``layout.grow_max`` x its role size."""
+    if lt.grow_max <= 1.0:
+        return 1.0
+    caps = [
+        measure.ceiling(lt) * (m.element.paragraphs[0].style.font_size or 36) / max(s, 1e-6)
+        for (_c, _h, m), s in zip(parts, sizes, strict=True)
+    ]
+    return max(min(caps, default=1.0), 1.0)
+
+
 def _hero_sizes(parts: list[tuple[Placed, Placed, Placed]], lt: LayoutTokens) -> list[float]:
     """Number sizes of one KPI row after the width rule: a card k times wider than the narrowest gets
     k^``kpi_value_exp`` times the narrowest card's number, within one line of its card, never smaller."""
@@ -1578,11 +1592,16 @@ def _scale_kpi_values(out: list[Placed], body: Rect, lt: LayoutTokens, fixed: bo
         hero = _hero_sizes(parts, lt)
         inner_pt = min(m.w for _, _, m in parts) / EMU_PER_PT
         g_fit = min(_value_fit(m, lt) / s for (_, _, m), s in zip(parts, hero, strict=True))
-        gmax = max(min(lt.kpi_lone_value_grow, g_fit), 1.0)
+        gmax = max(min(lt.kpi_lone_value_grow, g_fit, _value_cap(parts, hero, lt)), 1.0)
         label0 = min((h.style.font_size or 11) * h.font_scale for _, h, _ in parts)
         label_hi = min(
             _step_up(
-                h.element.paragraphs[0].plain, (h.style.font_size or 11) * h.font_scale, inner_pt, True, lt
+                h.element.paragraphs[0].plain,
+                (h.style.font_size or 11) * h.font_scale,
+                inner_pt,
+                True,
+                lt,
+                h.style.font_size,
             )
             for _, h, _ in parts
         )
@@ -1594,7 +1613,14 @@ def _scale_kpi_values(out: list[Placed], body: Rect, lt: LayoutTokens, fixed: bo
         cap0 = min(caps, default=0.0)
         cap_hi = min(
             (
-                _step_up(m.element.paragraphs[1].plain, c0, inner_pt, False, lt)
+                _step_up(
+                    m.element.paragraphs[1].plain,
+                    c0,
+                    inner_pt,
+                    False,
+                    lt,
+                    m.element.paragraphs[1].style.font_size or 12,
+                )
                 for (_, _, m), c0 in zip(
                     [p for p in parts if len(p[2].element.paragraphs) > 1], caps, strict=True
                 )
@@ -1654,9 +1680,13 @@ def fit_lone_kpi(
         return out
 
 
-def _step_up(plain: str, pt: float, wpt: float, bold: bool, lt: LayoutTokens) -> float:
-    """``pt`` stepped up (``kpi_lone_text_grow``, max ``kpi_lone_text_max_pt``) while it stays on one line."""
+def _step_up(
+    plain: str, pt: float, wpt: float, bold: bool, lt: LayoutTokens, base: float | None = None
+) -> float:
+    """``pt`` stepped up (``kpi_lone_text_grow``, max ``kpi_lone_text_max_pt`` and ``grow_max`` x the role
+    size ``base``) while it stays on one line."""
     big = min(pt * lt.kpi_lone_text_grow, max(lt.kpi_lone_text_max_pt, pt))
+    big = min(big, max(pt, measure.ceiling(lt) * (base or pt)))
     return big if measure.text_em(plain, bold=bold) * big <= wpt * lt.kpi_fit_margin else pt
 
 
@@ -1685,9 +1715,24 @@ def _fit_lone_kpi(
     # the numbers grow by one factor (the ratios between cards stay), never wrap, never get smaller
     sizes0 = [_value_pt(m) for _, _, m in parts] if fixed else _hero_sizes(parts, lt)
     fits = [_value_fit(m, lt) / s for (_, _, m), s in zip(parts, sizes0, strict=True)]
-    g = max(min(lt.kpi_lone_value_grow, min(fits), lt.kpi_lone_value_max_pt / max(sizes0)), 1.0)
+    g = max(
+        min(
+            lt.kpi_lone_value_grow,
+            min(fits),
+            lt.kpi_lone_value_max_pt / max(sizes0),
+            _value_cap(parts, sizes0, lt),
+        ),
+        1.0,
+    )
     label_hi = min(
-        _step_up(h.element.paragraphs[0].plain, (h.style.font_size or 11) * h.font_scale, inner_pt, True, lt)
+        _step_up(
+            h.element.paragraphs[0].plain,
+            (h.style.font_size or 11) * h.font_scale,
+            inner_pt,
+            True,
+            lt,
+            h.style.font_size,
+        )
         for _, h, _ in parts
     )
     cap_hi = min(
@@ -1698,6 +1743,7 @@ def _fit_lone_kpi(
                 inner_pt,
                 False,
                 lt,
+                m.element.paragraphs[1].style.font_size or 12,
             )
             for _, _, m in parts
             if len(m.element.paragraphs) > 1

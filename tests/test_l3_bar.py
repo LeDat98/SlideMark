@@ -184,14 +184,19 @@ def test_lone_chevron_text_never_shrinks_and_never_breaks_a_word(src):
 
 @pytest.mark.parametrize("src", [JA3, VI3])
 def test_lone_three_step_chevron_text_grows(src):
-    on, off = _chev(src), _chev(src, chevron_text_max_pt=0)
+    on, off = (
+        _chev(src, grow_max=3.0),
+        _chev(src, grow_max=3.0, chevron_text_max_pt=0),
+    )  # (grow_max: test_grow_max)
     assert _pt(on[0]) > _pt(off[0]) * 1.1
     assert len({round(_pt(c), 3) for c in on}) == 1  # one size for the whole row
 
 
 def test_chevron_render_reopens(tmp_path):
     f = tmp_path / "c.md"
-    f.write_text(JA3, encoding="utf-8")
+    f.write_text(
+        "style: layout.grow_max=3\n" + JA3, encoding="utf-8"
+    )  # the pass's own cap (grow_max: test_grow_max)
     build(f, tmp_path / "c.pptx")
     shapes = [
         s

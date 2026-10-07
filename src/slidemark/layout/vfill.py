@@ -69,6 +69,7 @@ def _grow_table(p: Placed, peer_pt: float = 0.0) -> Placed:
         or len(rh) != nrows
         or not tk.table_vtext_min_rows <= nrows <= tk.table_vtext_max_rows
         or any(c.style is not None and c.style.font_size is not None for row in t.rows for c in row)
+        or (t.style is not None and t.style.font_size is not None)  # `{size=}`: the author's call
     ):
         return p
     size = (p.style.font_size or 14) * p.font_scale
@@ -78,7 +79,12 @@ def _grow_table(p: Placed, peer_pt: float = 0.0) -> Placed:
     cap_pt = tk.table_vtext_max_pt
     if peer_pt > 0:
         cap_pt = min(cap_pt, peer_pt)
-    top = min(tk.table_vtext_max, cap_pt / max(size, 1e-6), avg / tk.table_comfort_em)
+    top = min(
+        tk.table_vtext_max,
+        cap_pt / max(size, 1e-6),
+        avg / tk.table_comfort_em,
+        measure.grow_cap(tk, p.style.font_size, size, cap_pt),  # layout.grow_max x the table's size
+    )
     base = row_heights(t, anchors, cw, p.style, p.font_scale)
     # renders wrap earlier than the model (fallback fonts, diacritics): test the growth on narrower columns
     narrow = [max(1, round(w * (1.0 - tk.l3_wrap_margin))) for w in cw]
@@ -151,8 +157,9 @@ def _fit_table(p: Placed, target: int, peer_pt: float, beside: bool = False) -> 
         tk.table_vtext_max > 1.0  # `sizes: table=` pins the size
         and tk.table_text_step > 0
         and not any(c.style is not None and c.style.font_size is not None for row in t.rows for c in row)
+        and not (t.style is not None and t.style.font_size is not None)  # `{size=}`: the author's call
     )
-    top = max(cap_pt / max(size, 1e-6), 1.0) if growable else 1.0
+    top = measure.grow_cap(tk, p.style.font_size, size, cap_pt) if growable else 1.0  # ... and grow_max
     narrow = [max(1, round(w * (1.0 - tk.l3_wrap_margin))) for w in cw]
     old = row_heights(t, anchors, narrow, p.style, p.font_scale)
     steps = int((top - 1.0) / max(tk.table_text_step, 1e-6) + 1e-9)

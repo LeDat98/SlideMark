@@ -48,9 +48,10 @@ def build_deck(deck: Deck, out: str | Path, base_dir: str | Path | None = None) 
     seen = {(d.rule, d.slide) for d in deck.diagnostics}
     deck.diagnostics.extend(d for d in lint_deck(deck, placed, theme) if (d.rule, d.slide) not in seen)
     try:  # the per-slide fit map of `slidemark build` (fit.py): read off the layout result, never fatal
-        from .fit import fit_lines
+        from .fit import fit_report
 
-        deck.attrs["fit_map"] = fit_lines(deck, placed, theme)
+        deck.attrs["fit_map"], sparse = fit_report(deck, placed, theme)
+        deck.diagnostics.extend(sparse)  # info `sparse`: a slide that stays empty after growth
     except Exception:
         deck.attrs.pop("fit_map", None)
     from .render import render  # python-pptx loads only when a file is written

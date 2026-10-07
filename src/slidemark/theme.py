@@ -218,8 +218,14 @@ class LayoutTokens(BaseModel):
     hug_shift: float = (
         0.0  # share of the leftover body (beyond left_keep) that moves a card block down (0 = off)
     )
-    grow_max: float = (
+    grow_normal_max: float = (
         1.3  # normal-density slides: body text never grows beyond this factor (dense: dense_*_body)
+    )
+    grow_max: float = (
+        1.5  # deck-wide ceiling: no growth pass takes text beyond this x its role size (1 = no growth)
+    )
+    sparse_note: float = (
+        0.35  # a slide whose body stays more than this share empty after growth gets `sparse: N% free`
     )
     center_beside: bool = (
         False  # True: a card as tall as the chart / image beside it centers its content vertically
@@ -1115,6 +1121,7 @@ STYLE_ALIASES = {
     "margin": "margin_x",
     "ink.auto": "render.ink_auto",
     "kpi.h": "layout.kpi_h",
+    "grow.max": "layout.grow_max",
 }
 _STYLE_FIELDS = tuple(Style.model_fields)
 _NUM = re.compile(r"^-?\d+(?:\.\d+)?$")

@@ -50,11 +50,12 @@ def test_default_table_text_at_least_body_size_and_rows_capped():
 
 
 def test_text_cap_follows_tokens():
-    _, size, theme = table_item(JP, "style: layout.table_free=off\n\n")  # the wave-2 pass has its own cap
+    ceil = "layout.grow_max=3"  # the deck-wide ceiling is test_grow_max.py; here the passes' own caps
+    _, size, theme = table_item(JP, f"style: layout.table_free=off {ceil}\n\n")  # wave-2 pass: own cap
     assert size <= theme.sizes["body"] * theme.layout.table_text_max + 1e-6
-    _, free, _ = table_item(JP)
+    _, free, _ = table_item(JP, f"style: {ceil}\n\n")
     assert size < free <= theme.layout.table_free_text_max_pt + 1e-6
-    _, off, _ = table_item(JP, "style: layout.table_text_step=0\n\n")
+    _, off, _ = table_item(JP, f"style: layout.table_text_step=0 {ceil}\n\n")
     assert off < size  # growth off: only the regular table growth remains
 
 

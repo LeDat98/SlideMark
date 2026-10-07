@@ -3,7 +3,8 @@
 Two passes over the finished placed items of a content slide body (token driven, geometry only):
 
 * ``fill_text_list``: body text alone under the lead (a few bullets, one or two paragraphs) that leaves
-  more than ``layout.list_fill_free`` of the body empty grows its text (up to ``list_text_max_pt``, never
+  more than ``layout.list_fill_free`` of the body empty grows its text (up to ``list_text_max_pt`` and
+  ``layout.grow_max`` x its size, the smaller wins; never
   onto a new wrapped line), then its paragraph gaps (up to ``list_gap_max`` em) until it covers
   ``list_fill_share`` of the body; the block sits with ``list_top_share`` of what is left above it.
 * ``fill_table_free``: a table alone in the body (at most ``table_free_max_rows`` rows) grows its text (up to
@@ -94,7 +95,8 @@ def _fill_text_list(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Pla
     def wraps_ok(s: float) -> bool:
         return s <= 1.0 or all(_spread(p, 10**9, lt, _text_pad(p), s) is not None for p in texts)
 
-    s_top = max(lt.list_text_max_pt / max(cur_pt, 1.0), 1.0)
+    base_pt = max((p.style.font_size or 18) for p in texts)
+    s_top = measure.grow_cap(lt, base_pt, cur_pt, lt.list_text_max_pt)  # list_text_max_pt or grow_max
     step = max(lt.l3_grow_step, 0.01)
     n = int((s_top - 1.0) / step + 1e-9)
     best = 1.0
@@ -179,7 +181,7 @@ def _fill_table_free(out: list[Placed], body: Rect, lt: LayoutTokens, bar: bool)
     size = (p.style.font_size or 14) * p.font_scale
     avail = body.bottom - body.y
     # 1. text: the largest factor (<= table_free_text_max_pt) that adds no wrapped line and fits the body
-    top_f = max(lt.table_free_text_max_pt / max(size, 1e-6), 1.0)
+    top_f = measure.grow_cap(lt, p.style.font_size or 14, size, lt.table_free_text_max_pt)  # or grow_max
     step = lt.table_text_step
     narrow = [max(1, round(w * (1.0 - lt.l3_wrap_margin))) for w in cw]
     old = row_heights(t, anchors, narrow, p.style, p.font_scale)

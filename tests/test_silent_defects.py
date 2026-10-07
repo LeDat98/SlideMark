@@ -134,7 +134,9 @@ def test_list_after_kpi_row_is_body_size_under_the_row():
     assert lst.w >= 0.95 * _content_width(theme)  # a full-width row
     row_bottom = max(c.y + c.h for c in cards)
     assert lst.y >= row_bottom  # under the KPI row
-    assert lst.y - row_bottom <= 0.5 * 914400  # ... directly (no dead band between the two)
+    assert (
+        lst.y - row_bottom <= 0.7 * 914400
+    )  # ... directly (no dead band between the two; text stops at grow_max)
     # no dead band between the lead and the KPI row
     assert min(c.y for c in cards) - (lead.y + lead.h) <= 0.6 * 914400
 

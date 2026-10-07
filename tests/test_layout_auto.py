@@ -147,7 +147,9 @@ def test_small_diagram_is_top_anchored_and_callout_hugs_it():
     call = next(p for p in placed if isinstance(p.element, Text) and "callout" in p.element.classes)
     title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
     assert 0 <= call.y - (card.y + card.h) < 0.5 * IN  # right below the diagram
-    assert card.y - (title.y + title.h) < 0.8 * IN  # a block under 60% of the body never floats mid-height
+    # a block under 60% of the body never floats mid-height (text and nodes stop at layout.grow_max, so the
+    # empty band is larger than when nodes grew 1.7x: the sparse completion then moves it down a little)
+    assert card.y - (title.y + title.h) < 1.5 * IN
 
 
 # ---------------------------------------------------------------- math and code

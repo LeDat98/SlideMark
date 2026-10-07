@@ -346,6 +346,8 @@ def _grouped(diags: list[Diagnostic]) -> list[str]:
         groups: dict[tuple, list[Diagnostic]] = {}
         for d in (d for d in diags if d.level == level):
             key = (d.rule, d.message, d.hint) if d.slide else (id(d),)
+            if d.slide and d.rule == "sparse":
+                key = (d.rule, d.hint)  # one hint for every sparse slide (the messages differ by number)
             groups.setdefault(key, []).append(d)
         for ds in groups.values():
             if len(ds) == 1:
@@ -354,6 +356,10 @@ def _grouped(diags: list[Diagnostic]) -> list[str]:
             d = ds[0]
             slides = ",".join(str(n) for n in sorted({x.slide for x in ds if x.slide}))
             hint = f" -> {d.hint}" if d.hint else ""
+            if d.rule == "sparse":
+                msgs = "; ".join(x.message for x in sorted(ds, key=lambda x: x.slide or 0))
+                lines.append(f"{level} slides {slides} sparse: {msgs}{hint}")
+                continue
             where = f"slides {slides}" if "," in slides else f"slide {slides}"
             lines.append(f"{level} {where} {d.rule or ''}: {d.message}{hint} (x{len(ds)})".replace("  ", " "))
     return lines

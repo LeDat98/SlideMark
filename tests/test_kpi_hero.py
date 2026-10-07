@@ -182,7 +182,8 @@ def test_explicit_sizes_are_untouched():
     ids=["ja", "ja-hero", "en", "en-bar", "ja-hero-bar"],
 )
 def test_kpi_row_uses_the_body_height(md):
-    placed, _, theme = lay(md, kpi_to_body=False)  # the old share (kpi_to_body: tests/test_sparse_wave2.py)
+    # the old share (kpi_to_body: test_sparse_wave2.py); no deck-wide ceiling (grow_max: test_grow_max.py)
+    placed, _, theme = lay(md, kpi_to_body=False, grow_max=3.0)
     lt = theme.layout
     cs = kpi_cards(placed)
     top = max(p.y + p.h for p in placed if getattr(p.element, "role", None) in ("title", "lead"))
@@ -197,8 +198,10 @@ def test_kpi_row_uses_the_body_height(md):
 
 
 def test_default_theme_three_kpis_fill_more_than_before():
-    placed, _, _ = lay(en())
-    old, _, _ = lay(en(), kpi_lone_value_grow=1.35, kpi_lone_value_max_pt=66.0, kpi_lone_min_h=0.0)
+    placed, _, _ = lay(en(), grow_max=3.0)  # (the deck-wide ceiling, layout.grow_max, is test_grow_max.py)
+    old, _, _ = lay(
+        en(), grow_max=3.0, kpi_lone_value_grow=1.35, kpi_lone_value_max_pt=66.0, kpi_lone_min_h=0.0
+    )
     assert max(v[2] for v in values(placed)) > max(v[2] for v in values(old))
     assert kpi_cards(placed)[0].h > kpi_cards(old)[0].h
 
