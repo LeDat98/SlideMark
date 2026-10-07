@@ -340,7 +340,20 @@ def chart_lines(ch: ChartT) -> list[str]:
     attrs = []
     if ch.title:
         attrs.append(_attr("title", ch.title.replace("\n", " ")))
-    for k in ("legend", "labels", "totals", "fmt", "min", "max", "axis", "hl", "note"):
+    for k in (
+        "legend",
+        "labels",
+        "labels.bold",
+        "totals",
+        "fmt",
+        "min",
+        "max",
+        "axis",
+        "overlap",
+        "step",
+        "hl",
+        "note",
+    ):
         if k in ch.options:
             attrs.append(_attr(k, ch.options[k]))
     head = f"```{ch.kind}" + (" {" + " ".join(attrs) + "}" if attrs else "")

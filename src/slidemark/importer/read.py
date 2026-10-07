@@ -485,6 +485,8 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
                 opts["labels"] = "percent"
             elif dl.show_value:
                 opts["labels"] = "on"
+            if kind in ("pie", "doughnut") and "labels" in opts and dl.show_category_name:
+                opts["labels"] += "+name"  # category name + value / share, newline separated
             if "labels" in opts and not dl.number_format_is_linked and dl.number_format != "General":
                 fmt = dl.number_format
     except Exception:
@@ -517,7 +519,43 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
         pass
     if fmt:
         opts["fmt"] = fmt
+    _read_decisions(chart, plot, kind, data, cats, opts)
     return ChartT(kind=kind, title=title, categories=cats, series=data, options=opts)
+
+
+def _read_decisions(chart, plot, kind: str, data, cats, opts: dict[str, str]) -> None:
+    """Options an author states that the build does not derive: ``labels.bold``, ``overlap``, ``step``."""
+    try:
+        for el in chart._chartSpace.iter(qn("c:dLbls")):  # first data labels block that sets a weight
+            rpr = el.find(".//" + qn("a:defRPr"))
+            if rpr is not None and rpr.get("b") is not None:
+                bold = rpr.get("b") in ("1", "true")
+                if bold != (kind in ("pie", "doughnut")):  # pie / doughnut labels are bold by default
+                    opts["labels.bold"] = "on" if bold else "off"
+                break
+    except Exception:
+        pass
+    try:
+        if kind in ("bar", "column") and plot.overlap:
+            opts["overlap"] = str(plot.overlap)
+    except Exception:
+        pass
+    try:
+        unit = chart.value_axis.major_unit
+        if unit and kind in ("bar", "column", "stacked-bar", "stacked-column", "area"):
+            from ..render.axis import resolve_axis
+            from ..theme import RenderTokens
+
+            lo = float(opts["min"]) if "min" in opts else None
+            hi = float(opts["max"]) if "max" in opts else None
+            nonneg = all(v is None or v >= 0 for _, vals in data for v in vals)
+            auto = resolve_axis(
+                kind, [vals for _, vals in data], RenderTokens(), lo, hi, None, nonneg, ncat=len(cats)
+            )[2]
+            if auto is None or abs(auto - unit) > 1e-9:
+                opts["step"] = f"{unit:g}"
+    except Exception:
+        pass
 
 
 def _is_total_carrier(ser) -> bool:

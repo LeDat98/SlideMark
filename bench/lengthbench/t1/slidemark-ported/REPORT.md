@@ -47,14 +47,14 @@ accepted
 | 19 | note 22 bold accent (L145) | `kpi.note.size=22 kpi.note.bold=on kpi.note.color=#A06016` (darker, contrast) | N |
 | 20 | KPI card height 4.2 in (L137) | `layout.kpi_lone_h=0.9 layout.kpi_lone_min_h=0.85` | N |
 | 21 | clustered column, navy + accent (L154, L174) | `column {colors=primary,accent}` | N |
-| 22 | legend top, 14 (L160-162) | `legend=top size=14` | N |
+| 22 | legend top, 14 (L160-162) | `legend=top legend.size=14` (`size=14` scaled the legend 1.2x) | new |
 | 23 | gap width 60 (L164) | `gap=60` | N |
-| 24 | series overlap -5 (L165) | none | M |
+| 24 | series overlap -5 (L165) | `overlap=-5` | new |
 | 25 | labels outside, `#,##0`, 14 (L166-172) | `labels=outside fmt=#,##0` | N |
-| 26 | data labels bold (L173) | none | M |
+| 26 | data labels bold (L173) | `labels.bold=on` (`labels.color=` too) | new |
 | 27 | value axis 0..1400 (L178-179) | `min=0 max=1400` | N |
-| 28 | major unit 200 (L180) | none (auto gave 200) | M |
-| 29 | tick labels 12 vs category 14 (L181, L186) | one size only | M |
+| 28 | major unit 200 (L180) | `step=200` | new |
+| 29 | tick labels 12 vs category 14 (L181, L186) | `size=14,12` (data labels and categories 14, value-axis numbers 12) | new |
 | 30 | gridline colour, no axis line (L184-185) | `render.chart_grid=border` | N |
 | 31 | box card light fill + border (L200) | `strat.fill=surface strat.line=border` + `{.strat}` | N |
 | 32 | accent stripe on top of the card (L201) | css `.strat { border-top: 6pt solid #D9821E }` | C |
@@ -71,7 +71,7 @@ accepted
 | 43 | step card accent left stripe (L225) | css `.steps-card { border-left: 5pt solid #D9821E }` | C |
 | 44 | card text 24 bold navy left (L226) | `steps-card.size=24 steps-card.bold=on`, plain paragraph | N |
 
-Count: 29 N, 3 C, 12 M.
+Count: 29 N, 4 new (24, 26, 28, 29; row 22 is N via the new `legend.size=`), 3 C, 8 M (lane E, DL2 chart decisions).
 
 ## Deviations accepted for 0 warnings
 
@@ -80,7 +80,7 @@ Count: 29 N, 3 C, 12 M.
 - The cover accent bar sits beside the title, and the cover rule is full width at 61%.
 - Slide 4 item text is 18 bold and top-aligned, with no number circles and no heading rule.
 - All four step arrows are chevrons.
-- Chart labels are regular weight, tick size follows `size=14`, and the major unit is automatic.
+- Chart labels are regular weight, tick size follows `size=14`, and the major unit is automatic (statable now: `labels.bold=on size=14,12 overlap=-5 step=200 legend.size=14`; the port deck.md is not re-ported).
 
 ## Proposed syntax for the missing items
 

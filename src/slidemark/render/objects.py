@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from lxml import etree
@@ -18,6 +19,7 @@ from pptx.enum.dml import MSO_LINE
 from pptx.enum.text import MSO_ANCHOR
 from pptx.oxml import parse_xml
 from pptx.oxml.ns import qn
+from pptx.text.text import Font, TextFrame
 from pptx.util import Emu, Pt
 from pygments import lex
 from pygments.lexers import TextLexer, get_lexer_by_name
@@ -429,7 +431,7 @@ def _pie_pos(theme: Theme):
     return _PIE_POS.get(str(theme.render.chart_pie_label_pos).strip().lower().replace("-", "_"))
 
 
-def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct, vals=()) -> None:
+def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct, vals=(), exact=None) -> None:
     """Per-slice ``c:dLbl`` so each label has its own readable ink (slices differ in fill).
 
     A doughnut label always sits on its slice. A pie label sits where ``render.chart_pie_label_pos`` says
@@ -437,7 +439,7 @@ def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct, vals=()) 
     goes outside (ink for the page), and best fit may land either way (one ink that reads on both).
     """
     rt = theme.render
-    pt = pie_label_pt(size, rt)
+    pt = pie_label_pt(size, rt, exact)
     dls = ser.data_labels  # series-level dLbls override the plot-level ones: repeat the shared settings
     dls.font.size = Pt(pt)
     dls.font.bold = rt.chart_pie_label_bold
@@ -543,7 +545,7 @@ def _waterfall_plan(ch: Chart, ser: Series, opts: dict, theme: Theme) -> dict:
     }
 
 
-def _style_waterfall_series(ser, si: int, plan: dict, theme: Theme, size: float, fg, lab_on, nf) -> None:
+def _style_waterfall_series(ser, si: int, plan: dict, theme: Theme, lab_pt: float, fg, lab_on, nf) -> None:
     if si == wfall.BASE or si == wfall.PAD:  # invisible: no fill, no line
         ser.format.fill.background()
         ser.format.line.fill.background()
@@ -568,7 +570,7 @@ def _style_waterfall_series(ser, si: int, plan: dict, theme: Theme, size: float,
         tf = dl.text_frame
         tf.text = wfall.fmt_num(shown, nf, sign=kind in ("up", "down"))
         run = tf.paragraphs[0].runs[0]
-        run.font.size = Pt(size * theme.render.chart_label_scale)
+        run.font.size = Pt(lab_pt)
         run.font.color.rgb = ink
         dl.position = XL_LABEL_POSITION.INSIDE_BASE
 
@@ -634,7 +636,7 @@ def stack_totals(ch: Chart, series: list[Series], lab_on: bool, opts: dict, rt) 
     return [*series, Series(name=name, values=[pad if v > 0 else None for v in sums])]
 
 
-def _style_total_carrier(ser, sums: list[float], theme: Theme, size: float, fg, nf) -> None:
+def _style_total_carrier(ser, sums: list[float], theme: Theme, lab_pt: float, fg, nf) -> None:
     ser.format.fill.background()
     ser.format.line.fill.background()
     for i, v in enumerate(sums):
@@ -644,10 +646,81 @@ def _style_total_carrier(ser, sums: list[float], theme: Theme, size: float, fg, 
         tf = dl.text_frame
         tf.text = wfall.fmt_num(v, nf, sign=False)
         run = tf.paragraphs[0].runs[0]
-        run.font.size = Pt(size * theme.render.chart_label_scale)
+        run.font.size = Pt(lab_pt)
         run.font.bold = True
         run.font.color.rgb = fg
         dl.position = XL_LABEL_POSITION.INSIDE_BASE
+
+
+def _wedge_line(pt, theme: Theme, opts: dict) -> None:
+    """Outline of a pie / doughnut wedge: ``slice.line=`` else ``render.chart_pie_line`` (+ ``_width``)."""
+    from .util import parse_color
+
+    rt = theme.render
+    word = str(opts.get("slice_line") or rt.chart_pie_line)
+    width = _num(opts.get("slice_line_w"))
+    if width is None:
+        width = rt.chart_pie_line_width
+    hexv, alpha = parse_color(theme, word, "bg")
+    if word.strip().lower() == "none" or alpha == 0:
+        pt.format.line.fill.background()
+        return
+    pt.format.line.color.rgb = RGBColor.from_string(hexv)
+    if width and width > 0:
+        pt.format.line.width = Pt(width)
+
+
+_DLBL_ORDER = ("showLegendKey", "showVal", "showCatName", "showSerName", "showPercent", "showBubbleSize")
+
+
+def _set_flag(el, tag: str, val: bool) -> None:
+    """Set ``c:<tag>`` of a ``c:dLbls`` / ``c:dLbl``, creating it in schema order when missing."""
+    e = el.find(qn(f"c:{tag}"))
+    if e is None:
+        e = el.makeelement(qn(f"c:{tag}"), {})
+        after = [el.find(qn(f"c:{t}")) for t in _DLBL_ORDER[: _DLBL_ORDER.index(tag)]]
+        prev = next((a for a in reversed(after) if a is not None), None)
+        if prev is not None:
+            prev.addnext(e)
+        else:
+            el.insert(0, e)
+    e.set("val", "1" if val else "0")
+
+
+def _label_font(el) -> Font:
+    return TextFrame(el.get_or_add_txPr(), None).paragraphs[0].font
+
+
+def style_labels(chart, opts: dict, theme: Theme, pie: bool) -> None:
+    """``labels.bold=`` / ``labels.color=`` on every data label of the chart and ``labels=...+name`` on a pie
+    (category name, a newline, then the value or share). Hidden (deleted) labels are left alone."""
+    bold = opts.get("label_bold")
+    color = opts.get("label_color")
+    name = bool(opts.get("label_name")) and pie
+    if bold is None and not color and not name:
+        return
+    rgb_ = RGBColor.from_string(hex6(theme, str(color))) if color else None
+    for el in chart._chartSpace.iter(qn("c:dLbls"), qn("c:dLbl")):
+        if el.find(qn("c:delete")) is not None:
+            continue
+        fonts = [Font(r) for r in el.iterfind(".//" + qn("a:rPr"))]  # a label with its own text (waterfall)
+        if el.find(qn("c:txPr")) is not None or not fonts:
+            fonts.append(_label_font(el))
+        for f in fonts:
+            if bold is not None:
+                f.bold = bool(bold)
+            if rgb_ is not None:
+                f.color.rgb = rgb_
+        if name:
+            _set_flag(el, "showCatName", True)
+            if el.find(qn("c:separator")) is None:
+                sep = el.makeelement(qn("c:separator"), {})
+                sep.text = "\n"
+                anchor = el.find(qn("c:showBubbleSize"))
+                if anchor is None:
+                    anchor = el.find(qn("c:showPercent"))
+                if anchor is not None:
+                    anchor.addnext(sep)
 
 
 def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
@@ -710,6 +783,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     chart = gf.chart
     _positive_axis_ids(chart)
     size = chartnote.chart_size(pl, theme)
+    lab_exact = chartnote.opt_pt(pl, "label_size")  # `size=16,14`: data labels exactly 16 ...
+    tick_exact = chartnote.opt_pt(pl, "tick_size")  # ... value-axis numbers exactly 14
     fg = rgb(theme, pl.style.color or "fg")
     _chart_font(chart, theme, pl.style.font or theme.fonts.body, size, fg)
     if ch.title:
@@ -728,7 +803,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     if pos is not None:
         chart.legend.position = pos
         chart.legend.include_in_layout = False
-        chart.legend.font.size = Pt(legend_pt(size, theme.render))
+        chart.legend.font.size = Pt(legend_pt(size, theme.render, chartnote.opt_pt(pl, "legend_size")))
     # colors: explicit list (theme names / hex) else the theme palette
     cl = opts.get("colors")
     if isinstance(cl, str):
@@ -743,7 +818,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     if lab_on and kind not in ("scatter", "waterfall"):  # python-pptx has no data labels for XY series
         plot.has_data_labels = True
         dl = plot.data_labels
-        dl.font.size = Pt(label_pt(kind, ncat, size, theme.render))
+        dl.font.size = Pt(label_pt(kind, ncat, size, theme.render, lab_exact))
         dl.font.color.rgb = fg
         if lab_pct and pie:
             dl.show_value, dl.show_percentage = False, True
@@ -772,18 +847,22 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     round(sum(_num(s.values[i]) or 0.0 for s in series[:-1] if i < len(s.values)), 10)
                     for i in range(len(series[-1].values))
                 ]
-                _style_total_carrier(ser, tot, theme, size, fg, nf)
+                _style_total_carrier(
+                    ser, tot, theme, lab_exact or size * theme.render.chart_label_scale, fg, nf
+                )
             elif wf:
-                _style_waterfall_series(ser, si, wf, theme, size, fg, lab_on, nf)
+                _style_waterfall_series(
+                    ser, si, wf, theme, lab_exact or size * theme.render.chart_label_scale, fg, lab_on, nf
+                )
             elif pie:
                 for pi in range(len(cats)):
                     pt = ser.points[pi]
                     pt.format.fill.solid()
                     pt.format.fill.fore_color.rgb = RGBColor.from_string(pal[pi % len(pal)])
-                    pt.format.line.color.rgb = rgb(theme, "bg")
+                    _wedge_line(pt, theme, opts)
                 if lab_on:
                     _pie_point_labels(
-                        ser, pal, len(cats), theme, kind, fg, size, nf, lab_pct, series[0].values
+                        ser, pal, len(cats), theme, kind, fg, size, nf, lab_pct, series[0].values, lab_exact
                     )
             elif kind in ("line", "radar", "scatter"):
                 if kind == "scatter":
@@ -808,7 +887,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 if lab_on and kind in ("bar", "column") and lpos in ("inside", "center"):
                     sdl = ser.data_labels  # inside the bar: the ink is chosen per series fill
                     sdl.show_value = True
-                    sdl.font.size = Pt(label_pt(kind, ncat, size, theme.render))
+                    sdl.font.size = Pt(label_pt(kind, ncat, size, theme.render, lab_exact))
                     sdl.font.color.rgb = RGBColor.from_string(
                         _ink_hex(theme, color, label_color_on(color, theme))
                     )
@@ -819,7 +898,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 if lab_on and kind in ("stacked-bar", "stacked-column"):  # labels sit inside the fill
                     sdl = ser.data_labels
                     sdl.show_value = True
-                    seg_pt = label_pt(kind, ncat, size, theme.render)
+                    seg_pt = label_pt(kind, ncat, size, theme.render, lab_exact)
                     sdl.font.size = Pt(seg_pt)
                     sdl.font.color.rgb = RGBColor.from_string(
                         _ink_hex(theme, color, label_color_on(color, theme))
@@ -847,12 +926,16 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             if gw is None:
                 gw = rt.chart_gap_few if ncat <= rt.chart_gap_few_cats else rt.chart_gap
             chart.plots[0].gap_width = max(0, min(500, round(gw)))
+            if (ov := _num(opts.get("overlap"))) is not None and kind in ("bar", "column"):
+                chart.plots[0].overlap = max(-100, min(100, round(ov)))
         except Exception:
             pass
     if hl_names := apply_hl(ch, chart, cats, real_series, wf, theme, pal):
         gf.name = f"{name} hl={','.join(hl_names)}"  # the importer reads it back
     if note_plan and note_plan.plot:
         pin_plot(chart, note_plan.plot)
+    if lab_on:
+        style_labels(chart, opts, theme, pie)
     if pie:
         return
     try:
@@ -864,6 +947,8 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             va.has_major_gridlines = True
             va.major_gridlines.format.line.color.rgb = rgb(theme, theme.render.chart_grid)
             va.format.line.fill.background()
+            if tick_exact:
+                va.tick_labels.font.size = Pt(tick_exact)
             if nf:
                 va.tick_labels.number_format = nf
                 va.tick_labels.number_format_is_linked = False
@@ -887,8 +972,21 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 lo, hi, unit = la
         if note_plan and note_plan.axis:  # the pointer of a `note=` needs the exact scale
             lo, hi, unit = note_plan.axis
+        if (step := _num(opts.get("step"))) and step > 0:  # `step=200`: the author's gridline distance
+            span = (hi if hi is not None else 0.0) - (lo or 0.0)
+            if hi is not None and span / step > 60:
+                rc.diag(
+                    "bad-chart-option",
+                    f"step={step:g} would draw {span / step:.0f} gridlines on this axis",
+                    "use a larger step, or drop step= for the automatic one",
+                    line=ch.line,
+                )
+            else:
+                unit = step
+                if hi is not None and _num(opts.get("max")) is None and not (note_plan and note_plan.axis):
+                    hi = round((lo or 0.0) + math.ceil(span / step - 1e-9) * step, 10)  # ends on a gridline
         if kind == "line" and lab_on:  # close lines: their labels alternate above / below
-            lpt = label_pt(kind, ncat, size, theme.render)
+            lpt = label_pt(kind, ncat, size, theme.render, lab_exact)
             for si, idxs in label_collisions(
                 [s.values for s in series], lo, hi, lpt, pl.h / EMU_PER_PT, theme.render
             ).items():

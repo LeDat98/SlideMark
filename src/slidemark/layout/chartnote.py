@@ -62,6 +62,19 @@ def chart_size(pl: Placed, theme: Theme) -> float:
     return chart_text_pt(base, pl.w, pl.h, theme.render)
 
 
+def _opt(ch: Chart, key: str) -> float | None:
+    v = ch.options.get(key)
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else None
+
+
+def opt_pt(pl: Placed, key: str) -> float | None:
+    """An exact chart size option (``label_size``, ``tick_size``, ``legend_size``) in pt, scale applied."""
+    v = pl.element.options.get(key) if isinstance(pl.element, Chart) else None
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0:
+        return float(v) * pl.font_scale
+    return None
+
+
 def resolve_hl(ch: Chart, cats: list[str]) -> list[int]:
     """Indexes of the ``hl=`` categories in ``cats`` (exact, else case-insensitive); others are skipped."""
     raw = ch.options.get("hl") or []
@@ -251,7 +264,7 @@ def _marks(ch: Chart, d: _Data, frac, W: int, H: int, size: float, theme: Theme)
         return None
     px, py, pw, ph = frac[0] * W, frac[1] * H, frac[2] * W, frac[3] * H
     n = len(d.cats)
-    lab = label_pt(d.kind, n, size, rt)
+    lab = label_pt(d.kind, n, size, rt, _opt(ch, "label_size"))
     lab_h = lab * 1.45 * EMU_PER_PT
     lab_w = [
         _text_w(_num_text(max(abs(e[0]), abs(e[1])), d.fmt), lab) + 0.8 * lab * EMU_PER_PT if e else 0.0
@@ -472,7 +485,7 @@ def _plan(ch: Chart, pl: Placed, theme: Theme, note: str) -> NotePlan:
     font = pl.style.font
     note_style = base.merged(fast_style(font=font)) if font else base
     floor = size  # never smaller than the category / axis labels (they use the chart text size)
-    size0 = max(size * rt.chart_label_scale + rt.chart_note_size_add, floor)
+    size0 = max((opt_pt(pl, "label_size") or size * rt.chart_label_scale) + rt.chart_note_size_add, floor)
     d = _data(ch, theme) if ch.kind in PLOTTED else None
     frac = plot_fractions(ch, d, W, H, size, theme) if d else None
     marks = _marks(ch, d, frac, W, H, size, theme) if d and frac else None

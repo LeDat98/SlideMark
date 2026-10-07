@@ -417,23 +417,33 @@ Chart options go in the fence attributes:
 |---|---|---|
 | `title` | text | none |
 | `legend` | `bottom`, `right`, `top`, `left`, `none` | `bottom` when >1 series, else `none` |
-| `labels` | `on` (values; on a pie/doughnut the share, `render.chart_pie_labels`), `percent` / `value` (pie/doughnut), `off`; or a position (implies `on`): `outside` `inside` `center` on bar/column (`inside` / `center` on stacked), `above` `below` `left` `right` `center` on line, `outside` `inside` `center` `best` on pie | `off` |
+| `labels` | `on` (values; on a pie/doughnut the share, `render.chart_pie_labels`), `percent` / `value` (pie/doughnut), `off`; or a position (implies `on`): `outside` `inside` `center` on bar/column (`inside` / `center` on stacked), `above` `below` `left` `right` `center` on line, `outside` `inside` `center` `best` on pie; on a pie/doughnut a `+name` suffix adds the category name above the value or share (`outside+name`, `percent+name`, `value+name`) | `off` |
+| `labels.bold`, `labels.color` | `on` / `off`: data labels bold (a pie's are bold by default, `off` unbolds them); a color name or `#hex` for every data label (replaces the automatic readable ink: the contrast check still judges it) | automatic |
 | `totals` | stacked kinds: `off` drops, `on` forces the stack total at the end of each stack (default: shown with `labels=on`) | `on` with labels |
 | `fmt` | Excel number format for labels and the value axis, e.g. `0.0`, `#,##0`, `0%` | general |
 | `min`, `max` | value axis bounds | auto |
 | `colors` | comma list of color names (theme, or declared in `colors:`) or hex, one per series (per point for pie) | theme palette |
 | `axis` | `off` hides the value axis and gridlines, `on` keeps them | auto: bar/column with `labels=on` and <= 4 categories hide them (the labels carry the numbers) |
 | `gap` | gap between bars, 0-500 (% of a bar): `gap=80` | `render.chart_gap` |
+| `overlap` | clustered bar/column: overlap of the bars of one category, -100..100 (% of a bar; negative = a gap between them): `overlap=-5` | PowerPoint's (0) |
+| `step` | distance between value-axis gridlines (the major unit): `step=200`. It asks for the axis to be shown (see `axis`), and an automatic max is rounded up onto a gridline; a step that would draw more than 60 lines is ignored with a warning | automatic |
 | `marker` | line / radar marker size in pt, 2-72: `marker=9` | theme |
-| `size` | chart text size in pt (exact: no automatic growth), 6-72: `size=14` | automatic |
+| `size` | chart text size in pt (exact: no automatic growth), 6-72: `size=14`. Two values state two sizes: `size=16,14` = data labels (exactly 16, also the category axis and the base of the title) and the value-axis numbers (14) | automatic |
+| `legend.size` | legend text size in pt, 6-72 (otherwise `render.chart_legend_scale` x chart text) | scaled |
+| `slice.line` | pie/doughnut wedge outline: a color name or `#hex`, optionally `,width` in pt, or `none`: `slice.line=bg`, `slice.line=#FFFFFF,2.5` | `render.chart_pie_line`, `render.chart_pie_line_width` |
 | `hl` | comma list of categories **or series** to emphasise (a series name wins; on several series the whole series takes `render.chart_hl`, a line gets a thicker stroke; a name that matches nothing is a `chart-hl` warning listing both): their points take `render.chart_hl` (default `accent`); on a one-series bar/column/waterfall the other points keep their color | none |
 | `note` | one-line takeaway: a native callout (class `.chart-note`) inside the chart frame, pointing at the first `hl` point when there is one | none |
 
 CSV cells may be quoted (`"1,240"`), may carry `%` or thousands separators (`1,240`, `12%` → number), and may
 use full-width digits; an empty cell is a gap. A cell that is not a number becomes a gap plus a warning.
+Dotted keys (`labels.bold=on`, `slice.line=bg`, `legend.size=14`) are plain attributes of the fence. Decisions in one line:
+`` ```column {labels=outside labels.bold=on size=16,14 overlap=-5 step=200 min=0 max=1400 gap=60} ``,
+`` ```pie {labels=outside+name slice.line=bg,2 size=14} ``, `` ```stacked-column {labels=center totals=off} ``.
+A bad value (an out-of-range number, `overlap` on a stacked chart, `+name` on a bar chart, `labels.bold` without
+`labels=`) is a `bad-chart-option` warning with a one-line hint and the option is dropped.
 A takeaway is two attributes: `` ```bar {hl=郊外大型 note="赤字42店の半数は郊外大型"} ``. Several series keep their colors: an `hl` category gets a `render.chart_hl` outline in each; a line gets a larger marker. A `note` pins the plot area and value axis so the pointer hits the bar; a too-long note shrinks, wraps, then warns (`chart-note`).
 
-Chart look defaults are tokens (`style: render.chart_legend_scale=1.4`; `render.chart_grid=border` is the gridline color, `render.chart_line_width=3.5` the line width in pt): legend size = `chart_legend_scale` x chart text,
+Chart look defaults are tokens (`style: render.chart_legend_scale=1.4`; `render.chart_grid=border` is the gridline color, `render.chart_line_width=3.5` the line width in pt, `render.chart_pie_line=bg` / `render.chart_pie_line_width=2` the wedge outline): legend size = `chart_legend_scale` x chart text,
 data labels = `chart_label_scale`, pie/doughnut wedge labels = `chart_pie_label_scale` (bold, `chart_pie_label_bold`,
 inside the wedge, `chart_pie_label_pos`; a wedge under `chart_pie_label_min` of the total labels outside). The series
 palette (`palette`) holds no accent colour in the built-in presets: `accent` is reserved for `hl=`. On a pie, `labels=on`

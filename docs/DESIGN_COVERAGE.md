@@ -100,8 +100,14 @@ fixed cost, while t3 pays for 25 slides of per-slide choices (+755 tokens over i
 | Gap width 80 | L209 | `gap=80` | new (was `gap_width=`, undocumented) |
 | Label position outside / above / below / inside | L210, L355, L318 | `labels=outside` `inside` `center` `above` `below` `left` `right` `best` | new |
 | Label size / number format | L205, L203 | `fmt=#,##0`, `size=14`, `render.chart_label_scale` | covered |
-| Legend position / size | L182-184, L312-313 | `legend=bottom`, `render.chart_legend_scale` | covered |
-| Chart text 14, axis 13 | L177, L214 | `size=14` (one size; axis and labels follow it) | new |
+| Legend position / size | L182-184, L312-313; t1 L160-162 | `legend=bottom`, `legend.size=14` (`render.chart_legend_scale` for a deck) | new (`legend.size`) |
+| Chart text 14, axis 13 | L177, L214; t1 L181, L186; t3 L350, L358 | `size=14` (one size: labels, axes, title base), `size=16,14` = data labels exactly 16 and value-axis numbers 14 | new |
+| Data labels bold / a label colour | t1 L173; t3 L368 | `labels.bold=on`, `labels.color=primary` (`off` unbolds a pie) | new |
+| Series overlap -5 | t1 L165 | `overlap=-5` (clustered bar / column) | new |
+| Value-axis major unit 200 | t1 L180 | `step=200` (implies the axis is shown; the max rounds onto a gridline) | new |
+| Stacked chart without totals | t3 (python-pptx draws none) | `totals=off` (was documented but a `bad-chart-option`) | new |
+| Pie label = name + value, newline | t3 L373-381 | `labels=outside+name`, `percent+name`, `value+name` | new |
+| Pie slice outline colour / width | t3 L388 | `slice.line=bg,2` or `style: render.chart_pie_line=bg render.chart_pie_line_width=2` | new |
 | Gridline colour | L213, L366 | `style: render.chart_grid=border` | new |
 | Line width 3.5 | L359 | `style: render.chart_line_width=3.5` | covered |
 | Marker size 9 | L363 | `marker=9` | new |
@@ -125,8 +131,9 @@ fixed cost, while t3 pays for 25 slides of per-slide choices (+755 tokens over i
 
 ## Summary
 
-Rows listed: 64. **covered 39** (4 of them only after a routing fix: `lead.bold`, `conclusion.*`, `footnote.*`, a
-deck-declared colour named like a CSS colour; 2 of them mix a token form with a CSS-only form for columns), **new 21**,
+Rows listed: 70. **covered 38** (4 of them only after a routing fix: `lead.bold`, `conclusion.*`, `footnote.*`, a
+deck-declared colour named like a CSS colour; 2 of them mix a token form with a CSS-only form for columns), **new 28**
+(6 of them from the 5- and 25-slide ports, DL2 lane E: chart label weight, size pairs, overlap, step, totals, pie name and outline),
 **missing 4** (KPI divider rule, exact table row height, a colour per bar of one series, a manual per-point label
 position).
 

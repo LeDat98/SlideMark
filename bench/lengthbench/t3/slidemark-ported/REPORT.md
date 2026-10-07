@@ -73,22 +73,22 @@ accepted
 | Rows | orange square glyph (L310) | `@rows` takes no `bullet=` | M |
 | Rows | text 28 / 24 (L305) | `{size=28}` / `{size=24}` before `@rows` | N |
 | Charts | column gap 80, labels outside, 16, legend bottom, colours (L452) | `gap=80 labels=outside size=16 legend=bottom colors=primary,secondary` | N |
-| Charts | data labels bold (L368) | none | M |
+| Charts | data labels bold (L368) | `labels.bold=on` | new |
 | Charts | gridline colour, no axis line (L348-349) | `render.chart_grid=border` | N |
-| Charts | tick 14 vs category 16 vs labels 16 (L350, L358) | `size=` is one value | M |
+| Charts | tick 14 vs category 16 vs labels 16 (L350, L358) | `size=16,14` | new |
 | Charts | pie slice colours (L383) | `colors=primary,secondary,sky,accent` | N |
-| Charts | pie label = name + value, newline (L373-381) | none | M |
-| Charts | pie slice white outline (L388) | none | M |
+| Charts | pie label = name + value, newline (L373-381) | `labels=outside+name` (also `percent+name`, `value+name`) | new |
+| Charts | pie slice white outline (L388) | `slice.line=bg` (`,width`; token `render.chart_pie_line`) | new |
 | Charts | pie side panel with stripes in slice colours (L477-487) | `@3:2` + `###` `.kpi` sub-boxes (13 pt labels, no stripes) | M |
 | Charts | line colours, width 3, marker 9 (L394-400) | `colors= marker=9`, `render.chart_line_width=3` | N |
 | Charts | per-series / per-point label positions (L405-421) | automatic collision rule only | M |
 | Charts | axis min / max (L354-356) | `min= max=` | N |
 | Charts | bar reversed, axis labels at the bottom, max 50 (L537-541) | automatic + `max=50` | N |
 | Charts | stacked, labels centred white, gap 70 (L363-426) | `stacked-column {labels=center gap=70}` | N |
-| Charts | stacked without totals (no totals in python-pptx) | `totals=off` rejected by the parser; totals are drawn | M |
+| Charts | stacked without totals (no totals in python-pptx) | `totals=off` | new |
 | Charts | number formats (`#,##0`, `0.0`, `0"%"`) (L169, L369) | `fmt=` | N |
 
-Count: 41 N, 2 C, 19 M.
+Count: 41 N, 5 new (data labels bold, size pair, pie name + value, slice outline, `totals=off`), 2 C, 14 M (lane E, DL2 chart decisions).
 
 ## Deviations accepted for 0 warnings
 
@@ -96,7 +96,7 @@ Count: 41 N, 2 C, 19 M.
 - Rows are numbered badges, not orange glyphs with alternating stripes.
 - Cover rule is full width under the title; there are no right-hand stripes.
 - The pie panel labels are 13 pt and have no slice-coloured stripes.
-- Stacked columns show totals.
+- Stacked columns show totals (`totals=off` is accepted now).
 - Three-up KPI values are 48.9 pt (60 pt does not fit).
 - Steps text is 24 pt on every slide (26 pt for three steps in the original).
 - Table row heights are automatic, with no right inset.
@@ -114,6 +114,6 @@ accept `totals=off` as documented · `render.chevron_shape=pentagon,chevron`
 - `kpi.fill=bg kpi.line=border` accepted and ignored (use `card.fill=bg`).
 - `{.kpi size=60}` ignored; a slide css `.kpi { font-size: 60pt }` works.
 - `item.font_size`, `item.bold`, `item.valign` on a `###` sub-box are ignored.
-- `totals=off` is documented but rejected with `bad-chart-option`.
+- `totals=off` is documented but rejected with `bad-chart-option` (fixed by lane E: parsed, no carrier series is drawn).
 - `heading.border-bottom` hits every heading level.
 - `kpi.stripe_h=0.7in` with a white label gives a false `contrast` warning (lint reads the label against the card fill).

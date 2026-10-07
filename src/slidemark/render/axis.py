@@ -104,11 +104,16 @@ BAR_KINDS = ("column", "bar", "stacked-column", "stacked-bar")
 
 def axis_shown(opts: dict, kind: str, ncat: int, labels_on: bool, rt: RenderTokens) -> bool:
     """Whether the value axis (and its gridlines) is drawn: ``axis=on`` / ``off`` decide, else a bar chart
-    whose labels carry the numbers drops it when it has few categories (``chart_axis_off_cats``)."""
+    whose labels carry the numbers drops it when it has few categories (``chart_axis_off_cats``).
+    A ``step=`` or the second value of ``size=a,b`` implies the axis is wanted."""
     v = str(opts.get("axis", "auto")).strip().lower()
     if v in ("off", "false", "no", "0"):
         return False
     if v in ("on", "true", "yes", "1"):
+        return True
+    if opts.get("step") or opts.get(
+        "tick_size"
+    ):  # stating the gridline step / the axis number size asks for it
         return True
     return not (labels_on and kind in BAR_KINDS and 0 < ncat <= rt.chart_axis_off_cats)
 
@@ -122,14 +127,16 @@ def chart_text_pt(base: float, w_emu: float, h_emu: float, rt: RenderTokens) -> 
     return max(base, big)
 
 
-def legend_pt(size: float, rt: RenderTokens) -> float:
-    """Legend text size (pt) of a chart whose text is ``size`` pt."""
-    return size * rt.chart_legend_scale
+def legend_pt(size: float, rt: RenderTokens, exact: float | None = None) -> float:
+    """Legend text size (pt) of a chart whose text is ``size`` pt (``exact``: ``legend.size=``)."""
+    return exact if exact else size * rt.chart_legend_scale
 
 
-def pie_label_pt(size: float, rt: RenderTokens) -> float:
+def pie_label_pt(size: float, rt: RenderTokens, exact: float | None = None) -> float:
     """Wedge label size (pt) of a pie / doughnut: ``chart_pie_label_scale`` x chart text, never below the
-    plain data label size and at most ``chart_pie_label_max_pt``."""
+    plain data label size and at most ``chart_pie_label_max_pt`` (``exact``: first value of ``size=a,b``)."""
+    if exact:
+        return exact
     plain = size * rt.chart_label_scale
     return max(plain, min(size * rt.chart_pie_label_scale, rt.chart_pie_label_max_pt))
 
@@ -149,9 +156,12 @@ def pie_percent(labels, nf: str | None, rt: RenderTokens) -> bool:
     return rt.chart_pie_labels == "percent" and not nf
 
 
-def label_pt(kind: str, ncat: int, size: float, rt: RenderTokens) -> float:
+def label_pt(kind: str, ncat: int, size: float, rt: RenderTokens, exact: float | None = None) -> float:
     """Data label size (pt) of a chart whose text is ``size`` pt: bigger inside stacked segments (never below
-    the chart text) and on a sparse bar chart, else ``chart_label_scale``."""
+    the chart text) and on a sparse bar chart, else ``chart_label_scale``. ``exact`` (the first value of
+    ``size=a,b``) is the size itself, with no scale."""
+    if exact:
+        return exact
     if kind in ("pie", "doughnut"):
         return pie_label_pt(size, rt)
     if kind.startswith("stacked"):
