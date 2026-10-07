@@ -76,7 +76,7 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       agenda / section with numbers, pros / cons, progress bars, harvey balls, heatmap table, map pins (on an
       image). Gate: an open 15-slide brief (content only, no slide kinds) built by a fresh agent uses ≥ 7 distinct
       forms, and the blind judge's "monotony" note disappears.
-- [ ] DL3c Design feedback, tightened (`docs/DESIGN_REQUIRED.md` "Tightened rules"): `design-none` names the
+- [x] DL3c Design feedback, tightened (2026-10-07, lane H: `design-none` names the missing lines; `design-slide` checks form + emphasis (or `@noemph`) + values (or `@defaults`); facts line `9/14 slides decided form+emphasis+values; short: …`; all 22 examples and both SKILL.md patterns pass; 207 tests) (`docs/DESIGN_REQUIRED.md` "Tightened rules"): `design-none` names the
       missing header lines; `design-slide` checks form + emphasis + values per slide; facts line lists what is short.
 - [ ] DL4 `shape=` on any box / step / row names any of the ≥ 150 PowerPoint preset shapes; connectors with
       arrowheads, dash and curve; freeform paths from inline SVG as native geometry; images with crop, radius, mask and
