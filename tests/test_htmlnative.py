@@ -61,7 +61,7 @@ def _place(renderer, html, w=600, h=300):
 
 
 def _deck(body: str, attr: str = "{render=native}") -> str:
-    return f"# T\n\n```html{attr}\n{body}\n```\n"
+    return f"colors: primary=#1E3A5F\n\n# T\n\n```html{attr}\n{body}\n```\n"
 
 
 def test_convertible_rules():
