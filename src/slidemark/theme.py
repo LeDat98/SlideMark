@@ -483,6 +483,9 @@ class LayoutTokens(BaseModel):
     kpi_lone_fit: float = 0.88  # the number fills at most this share of the card text width (CJK guard)
     kpi_lone_h: float = 0.65  # a lone KPI card is at most this share of the body height
     kpi_lone_min_h: float = 0.5  # ... and at least this share (a short row gets air inside its cards)
+    kpi_h: Length | None = (
+        None  # `kpi.h=4.4in`: a lone KPI card is exactly this tall (None = the shares above)
+    )
     kpi_lone_label_air: float = (
         0.3  # ... of that air, this share goes above the label, the rest around the number
     )
@@ -1080,6 +1083,7 @@ STYLE_ALIASES = {
     "fg": "colors.fg",
     "margin": "margin_x",
     "ink.auto": "render.ink_auto",
+    "kpi.h": "layout.kpi_h",
 }
 _STYLE_FIELDS = tuple(Style.model_fields)
 _NUM = re.compile(r"^-?\d+(?:\.\d+)?$")
@@ -1218,6 +1222,19 @@ def apply_tokens(theme: Theme, tokens: dict[str, str]) -> tuple[Theme, list[Diag
     _derive_surface(data, tokens)
     _derive_table_size(data, tokens)
     return Theme.model_validate(data), diags
+
+
+def slide_theme(theme: Theme, slide: Any) -> Theme:
+    """``theme`` with the slide's own ``sizes:`` / ``style:`` tokens on top (itself when it has none).
+
+    Never raises: tokens were checked by the parser; one that still fails is skipped."""
+    tokens = getattr(slide, "tokens", None)
+    if not tokens:
+        return theme
+    try:
+        return apply_tokens(theme, dict(tokens))[0]
+    except Exception:  # noqa: BLE001 - a slide must still lay out
+        return theme
 
 
 def _derive_table_size(data: dict, tokens: dict[str, str]) -> None:

@@ -33,7 +33,9 @@ from .tokens import (
     note_stated,
     parse_token_line,
     parse_token_map,
+    slide_tokens,
     style_css_rules,
+    take_slide_tokens,
 )
 
 FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
@@ -451,13 +453,15 @@ def _merge_specs(specs: list[AtSpec], ctx: Ctx, lines: list[int]) -> AtSpec:
     return out
 
 
-def _build_box(h2: Item, content: list[Item], ats: list[Item], ctx: Ctx) -> Container:
+def _build_box(h2: Item, content: list[Item], ats: list[Item], ctx: Ctx, kpi_all: bool = False) -> Container:
     title, attrs = _heading_text(h2.text, h2.line, ctx)
     box = Container(title=title if h2.text.strip() else None, line=h2.line)
     if attrs is not None:
         apply_attrs(box, attrs, ctx, h2.line)
     if h2.pending is not None:
         apply_attrs(box, h2.pending, ctx, h2.line)
+    if kpi_all and "kpi" not in box.classes:  # `@kpi` on the slide: every box is a KPI card
+        box.classes.append("kpi")
     kpi = "kpi" in box.classes
     if ats:
         spec = _merge_specs([parse_at(a.text, ctx, a.line) for a in ats], ctx, [a.line for a in ats])
@@ -513,6 +517,19 @@ def _merge_text(blocks: list[Text], role: str) -> Text:
     return Text(role=role, paragraphs=paras, line=first.line, style=first.style, classes=first.classes)  # type: ignore[arg-type]
 
 
+def _at_has_word(items: list[Item], word: str) -> bool:
+    """True when a slide-level `@` line (not one inside a `##` box) holds ``word``."""
+    in_box = False
+    for it in items:
+        if it.kind == "h2":
+            in_box = True
+        elif it.kind == "end":
+            in_box = False
+        elif it.kind == "at" and not in_box and word in it.text.split():
+            return True
+    return False
+
+
 def parse_slide(
     chunk: Chunk, lines: list[str], inside: list[bool], ctx: Ctx, index: int, recs: list[Rec] | None = None
 ) -> Slide:
@@ -546,6 +563,7 @@ def parse_slide(
     slide.notes = "\n".join([*extra_notes, *([notes] if notes else [])]) or None
 
     slide_links: list[RawLink] = []
+    kpi_all = _at_has_word(items, "kpi")
     boxes: list[tuple[Item, list[Item], list[Item]]] = []  # h2, content, at lines
     order: list[Any] = []  # ("top", [items], section) | ("box", idx, section) in source order
     sec_ats: list[list[Item]] = [[]]  # slide-level `@` lines per row-group section
@@ -619,7 +637,7 @@ def parse_slide(
             sec_last_box[sc] = False
         else:
             h2, content, ats = boxes[val]
-            box = _build_box(h2, content, ats, ctx)
+            box = _build_box(h2, content, ats, ctx, kpi_all)
             slide.elements.append(box)
             sec_count[sc] += 1
             sec_boxes[sc].append(box)
@@ -727,6 +745,8 @@ def parse_slide(
 
     if "html" in slide.classes:
         slide.classes.remove("html")
+    if kpi_all and "kpi" in slide.classes:
+        slide.classes.remove("kpi")  # the word styled the boxes; the slide itself is no KPI card
     if html_src is not None:
         if slide.elements or slide.lead or slide.conclusion or slide.footnotes:
             ctx.add(
@@ -1063,6 +1083,11 @@ def parse_deck(text: str) -> Deck:
             )
             slide_css.setdefault(k, []).append((fi, body))
     finish_tokens(deck, ctx)
+    slide_tok = {  # `sizes:` / `style:` lines inside a slide: that slide only
+        ci: found
+        for ci, c in enumerate(chunks)
+        if (found := take_slide_tokens(lines, inside, c.start, c.end))
+    }
     for r in recs:
         # a record belongs to the first slide that ends after its line (blank separator slides are dropped)
         k = next((ci for ci, c in enumerate(chunks) if c.end > r.idx), len(chunks) - 1)
@@ -1074,6 +1099,10 @@ def parse_deck(text: str) -> Deck:
         ctx.slide = idx + 1
         try:
             slide = parse_slide(chunk, lines, inside, ctx, idx, by_chunk.get(idx))
+            if idx in slide_tok:
+                slide.tokens, rules = slide_tokens(deck, slide_tok[idx], ctx)
+                slide.css += rules
+                note_stated(deck, "style")
             for fi, body in slide_css.get(idx, []):
                 slide.css += parse_css(body, fi + 2, ctx, deck)
             deck.slides.append(slide)

@@ -26,9 +26,9 @@ from .design import design_diagnostics
 from .ir import Chart, Container, Deck, Diagnostic, Image, Media, Placed, Shape, Table, Text
 from .layout import css, measure
 from .layout.chartnote import chart_size, opt_pt
-from .layout.tablehl import hl_rows
+from .layout.tablehl import hl_cell, hl_rows
 from .layout.tables import table_grid
-from .theme import Theme
+from .theme import Theme, slide_theme
 from .units import EMU_PER_PT, slide_size
 
 _TOL = int(EMU_PER_PT)  # 1pt slack for rounding
@@ -263,18 +263,19 @@ def _table_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
     _rows, _cols, anchors = table_grid(t)
     zebra = "zebra" in t.classes or flag(t.attrs.get("zebra"))
     body_fill = theme.table_body_fill_of(p.style.fill)
-    hl = hl_rows(t)
+    hl = hl_cell(t)
+    rows_hl = hl_rows(t)
     top = behind[0] if behind else None
     # per kind: (ratio, need, ink, backs, explicit run color, explicit cell color)
     groups: dict[str, list[tuple[float, float, str, list[str], bool, bool]]] = {}
     for r, c, ct in anchors:
         hdr, fcol = r < t.header_rows, c < t.header_cols
         kind = "header" if hdr else "first column" if fcol else "body"
-        if kind != "header" and r in hl:
-            kind = "emphasised rows"
+        if kind != "header" and hl(r, c):
+            kind = "emphasised rows" if r in rows_hl else "emphasised columns"
         elif kind == "body" and zebra and (r - t.header_rows) % 2 == 1:
             kind = "banded rows"
-        fill = theme.table_cell_fill(r, c, t.header_rows, t.header_cols, body_fill, zebra, r in hl)
+        fill = theme.table_cell_fill(r, c, t.header_rows, t.header_cols, body_fill, zebra, hl(r, c))
         cst = ct.style
         if cst and cst.fill:
             fill = cst.fill
@@ -284,7 +285,7 @@ def _table_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
         if cst and cst.opacity is not None and 0 <= cst.opacity < 1:
             backs = [_blend((b, cst.opacity), top) for b in backs]
         st = theme.table_cell_style(
-            p.style, hdr, fcol, ct.colspan, cst, theme.table_hl_fill_of(body_fill) if r in hl else None
+            p.style, hdr, fcol, ct.colspan, cst, theme.table_hl_fill_of(body_fill) if hl(r, c) else None
         )
         for q in ct.paragraphs:
             pst = st.merged(q.style)
@@ -658,7 +659,8 @@ def lint(deck: Deck, placed: list[list[Placed]], theme: Theme) -> list[Diagnosti
     measure.set_tokens(theme.layout)
     for i, items in enumerate(placed):
         try:
-            out.extend(lint_slide(items, deck, theme, i))
+            slide_th = slide_theme(theme, deck.slides[i]) if i < len(deck.slides) else theme
+            out.extend(lint_slide(items, deck, slide_th, i))
         except Exception as e:  # the linter must never break a build
             out.append(
                 Diagnostic(

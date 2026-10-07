@@ -59,7 +59,8 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
 - [ ] DL2 Port of an agent's python-pptx deck (`bench/lengthbench/t2/slidemark-ported`): ≥ 95% of its decisions statable
       with tokens or attributes (no `css` fence, no `@html` needed), deck ≤ 30% of `build.py` tokens (now 60/64 = 94%
       incl. 9 CSS-only, 2,283 tokens = 43%; the 4 missing: KPI divider rule, exact row height, a colour per bar, a
-      manual per-point label position). Same measure on the 5- and 25-slide decks.
+      manual per-point label position). DL2 part 1 (2026-10-07): CSS-only rows 0, the port uses no css fence and no
+      `@html`: 1,577 tokens = 29.96%, accepted, 0 warnings. Open: the 4 missing rows, the 5- and 25-slide decks.
 - [ ] DL3 Every element kind (title, lead, box, KPI, list item, table cell, chart point/series, image, step, row, cover)
       accepts `{x y w h size color fill border align valign bold rotate shape z}` on its own line, with pinned values
       never grown or moved by a layout pass; per-cell `{fill color}` on a table cell, per-point `{color label}` on a

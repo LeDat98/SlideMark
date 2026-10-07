@@ -93,8 +93,21 @@ style: top.bar=primary top.bar_h=0.12in title.rule=secondary kpi.stripe=secondar
 | `footer.color=` `footer.size=` | the footer text and the slide number (CSS `.caption`) |
 | `lead.bold=on` `lead.border-left="4pt solid secondary"` | any CSS property of `lead` `conclusion` `footnote` `subtitle` `box` `chart` (`lead.color` is the theme field) |
 | `kpi.label.size=20` `kpi.label.bold=on` `kpi.value.color=` `kpi.note.color=teal` | the KPI label (`.kpi h2`), number and caption line; `kpi.size` / `kpi.color` stay the number's class style |
-| `sizes: conclusion=24` | the conclusion bar text size |
+| `sizes: conclusion=24` `sizes: kpi=34` | the conclusion bar text size; the KPI number's size |
 | `sizes: heading=20!` | `!` pins a size: the layout never grows it (`{size=}` and CSS already do) |
+
+**Text look in one token.** A bare element or class name takes the look as words: `style: kpi.label="20 bold primary" kpi.note="20 bold teal" steps-card="24 bold center" heading=center conclusion="24 bold" lead="bold secondary" title=primary`. Words: a number = size (pt), `bold` `italic` `underline`, `left|center|right|justify`, anything else = a color; each word is the same token written long (`kpi.label.size=20 kpi.label.bold=on kpi.label.color=primary`). Names: `title heading body lead subtitle conclusion footnote footer num box chart kpi steps-card steps-arrow rows rows-num` and `kpi.label` / `kpi.value` / `kpi.note`. A word it cannot place is a `bad-token` warning that lists the words. `fonts: font="Yu Gothic"` sets heading, body and ea at once (`mono` keeps its own).
+
+**Per slide.** `sizes:` and `style:` lines work inside a slide too, with the same keys as the header; they change that slide only (sizes, class and element styles, `kpi.*`, `layout.*`; chrome such as `top.bar` stays deck-wide). A line counts only when every word is `key=value`, so prose like `style: modern` stays text.
+
+```markdown
+# 海外展開の重点地域
+sizes: heading=26! body=24!
+## タイ
+- 工場の生産能力を1.5倍に
+```
+
+**KPI row.** `@kpi` on the slide (not inside a box) makes every `##` box a KPI card, the same as `{.kpi}` on each; `style: kpi.h=4.4in` sets the height of a lone KPI row's cards (without it the cards take a share of the body, `layout.kpi_lone_h`).
 
 A declared color name beats the CSS color of the same name (`colors: teal=#2A9D8F` makes `teal` yours everywhere).
 `slide { border-top }` in CSS is not drawn (`css-unsupported` names `top.bar`). `layout.html_footer=on` draws the deck `footer:` and
@@ -468,6 +481,8 @@ Attributes on a table (`{...}` on the line before a GFM table, or on a `table` f
 | `.zebra` | alternate row fill | |
 | `hl` | emphasise the body rows whose **first cell** equals one of these values (comma list; quote a value that holds a comma): tinted fill + bold text | `hl=冷凍食品,海外` |
 
+| `hlcol` | emphasise whole body columns: header texts or 1-based numbers (comma list); the same look as `hl` | `hlcol=2027計画` or `hlcol=3` |
+
 Numeric columns are right-aligned automatically.
 
 **Row emphasis.** `hl=` takes the first-cell values of the rows to stress, the same option name a chart uses:
@@ -475,6 +490,8 @@ Numeric columns are right-aligned automatically.
 body fill by `table.hl.strength` 0.2; `none` = bold only), `table.hl.color` (default: the cell ink, made readable),
 `table.hl.bold`; CSS `tr.hl { background: ...; color: ... }` overrides them. An unknown value is a warning
 (`table-hl`) with the closest first cell. `<tr class="hl">` in HTML tables does the same.
+
+**Column emphasis.** `hlcol=` does the same for whole body columns, named by their header text or a 1-based number (`{hlcol=2027計画}`, `{hlcol=2,4}`); with `hl=` both apply. Same look tokens. An unknown name is a `table-hl` warning that lists the header cells; the importer reads the column back (`hlcol=3` in the shape name).
 
 **Gantt.** `{.gantt}` on a table draws every filled body cell after the first column as a native bar spanning its
 merged range (`<` continues the bar), with the cell text inside; cells holding only `―`, `-` or nothing stay empty.

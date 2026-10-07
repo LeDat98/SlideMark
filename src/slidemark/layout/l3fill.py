@@ -1707,6 +1707,9 @@ def _fit_lone_kpi(
     )
     stretch = to_body and lt.kpi_to_body and lt.body_valign != "top"
     limit = round(max(lt.kpi_lone_h, lt.kpi_to_body_h if stretch else 0.0) * body.h)
+    own_h = to_emu(lt.kpi_h) if lt.kpi_h is not None else 0  # `kpi.h=4.4in`: the author's own card height
+    if own_h > 0:
+        limit = min(own_h, body.h)
     if fixed:
         g, label_hi, cap_hi = 1.0, label0, cap0
     # largest step of the growth (1 = full, 0 = the sizes the slide had) whose card stays within the share
@@ -1719,6 +1722,8 @@ def _fit_lone_kpi(
         if card_h <= limit:
             break
     floor = min(round(max(lt.kpi_lone_min_h, lt.kpi_to_body_h if stretch else 0.0) * body.h), limit)
+    if own_h > 0:
+        floor = limit
     extra = max(
         floor - card_h, 0
     )  # a short row still fills its share of the body: the air goes into the card

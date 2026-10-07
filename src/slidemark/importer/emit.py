@@ -276,6 +276,7 @@ def table_lines(
     classes=None,
     header_rows: int = 1,
     hl_rows: set[int] = frozenset(),
+    hl_cols: set[int] = frozenset(),
 ) -> tuple[list[str], int]:
     """GFM table with ``<`` / ``^`` merge markers. Returns (lines, merged cells dropped).
 
@@ -289,7 +290,7 @@ def table_lines(
     out = []
     for ri, row in enumerate(rows):
         cells = []
-        for c in row + [CellT()] * (ncols - len(row)):
+        for ci, c in enumerate(row + [CellT()] * (ncols - len(row))):
             if c.hmerge and c.vmerge:
                 lost += 1
                 cells.append("")
@@ -302,7 +303,7 @@ def table_lines(
                     [r for p in c.paras for r in (p.runs + [RunT(text="\n")])][:-1] if c.paras else [],
                     accent=accent,
                     classes=classes,
-                    plain_bold=(ri < header_rows or ri in hl_rows),
+                    plain_bold=(ri < header_rows or ri in hl_rows or (ci in hl_cols and ri >= header_rows)),
                     cell=True,
                 )
                 cells.append(txt)
