@@ -35,35 +35,11 @@ def have_soffice() -> bool:
     return find_soffice() is not None
 
 
-# Office fonts are missing on Linux. Map them to metric-compatible (or same-script) fonts so previews wrap
-# text like PowerPoint does: Calibri -> Carlito, Arial -> Liberation Sans, Yu Gothic/Meiryo -> IPA Gothic.
-_ALIASES = {
-    "Calibri": ["Carlito", "Liberation Sans"],
-    "Calibri Light": ["Carlito", "Liberation Sans"],
-    "Arial": ["Liberation Sans"],
-    "Consolas": ["Liberation Mono", "DejaVu Sans Mono"],
-    "Yu Gothic": ["IPAPGothic", "IPAGothic"],
-    "Yu Gothic UI": ["IPAPGothic", "IPAGothic"],
-    "Meiryo": ["IPAPGothic", "IPAGothic"],
-    "MS Gothic": ["IPAGothic"],
-    "MS PGothic": ["IPAPGothic"],
-}
-
-
-def _fonts_conf(directory: str) -> str:
-    rules = "".join(
-        f"<alias binding='same'><family>{name}</family><prefer>"
-        + "".join(f"<family>{f}</family>" for f in fams)
-        + "</prefer></alias>"
-        for name, fams in _ALIASES.items()
-    )
-    path = Path(directory) / "fonts.conf"
-    path.write_text(
-        "<?xml version='1.0'?><!DOCTYPE fontconfig SYSTEM 'fonts.dtd'><fontconfig>"
-        f"<include ignore_missing='yes'>/etc/fonts/fonts.conf</include>{rules}</fontconfig>",
-        encoding="utf-8",
-    )
-    return str(path)
+# Office fonts are missing on Linux and what fontconfig falls back to differs between machines. The repo-local
+# ``fonts/fonts.conf`` maps every Office / brand family to one installed family (Meiryo, Yu Gothic ->
+# IPAPGothic; Arial, Calibri, Inter -> Liberation Sans; Georgia, Times -> Liberation Serif), so a preview, a
+# golden image and a round-trip measure are the same on every machine. See docs/RENDERING.md.
+FONTS_CONF = Path(__file__).resolve().parent / "fonts" / "fonts.conf"
 
 
 def _deck_locale(pptx: Path) -> str | None:
@@ -140,8 +116,8 @@ def _convert_once(pptx: Path, out_dir: Path, timeout: int) -> None:
         if locale:
             _locale_profile(profile, locale)
         env = dict(os.environ)
-        if sys.platform.startswith("linux"):  # fontconfig aliases only matter where Office fonts are missing
-            env["FONTCONFIG_FILE"] = _fonts_conf(profile)
+        if sys.platform.startswith("linux") and "FONTCONFIG_FILE" not in env and FONTS_CONF.is_file():
+            env["FONTCONFIG_FILE"] = str(FONTS_CONF)  # an explicit FONTCONFIG_FILE of the caller wins
         subprocess.run(cmd, check=True, capture_output=True, timeout=timeout, env=env)
 
 

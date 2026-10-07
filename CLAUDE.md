@@ -16,6 +16,9 @@ uv venv .venv && uv pip install -e ".[dev,html]" --python .venv   # html = Playw
 .venv/bin/python bench/count_tokens.py --record   # token metrics, append to bench/history.jsonl
 .venv/bin/python scripts/gallery.py               # rebuild examples -> docs/gallery PNGs + README section
 ```
+Previews use the repo's `src/slidemark/fonts/fonts.conf` (Meiryo / Yu Gothic -> IPAPGothic, Arial / Inter -> Liberation
+Sans, Georgia -> Liberation Serif) so renders and goldens are the same everywhere: `docs/RENDERING.md`. Optional:
+`apt-get install fonts-noto-cjk` (~60 MB) gives a real bold CJK face, but goldens are made without it.
 
 ## Architecture (contract: `src/slidemark/ir.py`)
 `parser/` Markdown → `Deck` · `layout/` `Slide` → `list[Placed]` (absolute EMU) · `render/` → .pptx ·
