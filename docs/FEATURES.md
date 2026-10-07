@@ -71,4 +71,9 @@ step does not apply (no visual risk to lint, or no syntax).
 | `@rows`: an ordered list alone on the slide as numbered bars (`rows` / `rows-num` classes, `layout.rows*`, importer folds `Row N` back) | x | x | x | x | x | x | x | - |
 | `@steps` extras: `num` / `steps.caption` caption line, cyclic `steps-arrow.fill=a,b`, `.steps-card` / `:nth-child` CSS, `render.chevron_shape=pentagon` | x | x | x | x | x | x | - | - |
 | Chart options `gap=` `marker=` `size=`, `labels=outside\|inside\|center\|above\|below`, `hl=` names a series, `render.chart_grid`, `colors=` takes names from `colors:` | x | x | x | x | x | x | - | - |
+| DL2 part 2 (`docs/DESIGN_COVERAGE.md`): `kpi.rule=` divider between the KPI number and caption (caption split into its own box, importer folds it back) | x | x | x | x | x | x | - | - |
+| Exact table row height `{rowh=0.8in,1.05in}`: pinned rows skip every stretch / growth pass (`tables.pinned`), overflow in a pinned row warns, importer emits `rowh=` | x | x | x | x | x | x | x | - |
+| One colour per bar of a one-series column/bar (`colors=` with one entry per category, `hl=` still wins) | x | x | x | x | x | x | - | - |
+| Per-point label position `labels=above,below,above,above` on line / column / bar (wrong count warns with the category count) | x | x | x | x | x | x | - | - |
+| `h=` `y=` `w=` on `.kpi` cards in a row place the row (`layout/kpirow.py`); the sparse passes leave it where it is | x | x | x | x | x | x | - | - |
 | Cover: `cover.bar` / `cover.band=none`, full-bleed rule over a slide `bg=`; `layout.html_footer` draws `footer:` / `num:` on `@html` slides | x | x | x | x | x | x | - | - |

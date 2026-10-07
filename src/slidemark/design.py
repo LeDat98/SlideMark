@@ -65,7 +65,7 @@ IGNORED_OPTIONS = {"totals", "percent", "grouped"}  # derived from the chart dat
 FIELD_DEFAULTS: dict[str, dict[str, Any]] = {
     "image": {"fit": "contain"},
     "media": {"poster": None, "autoplay": False, "loop": False},
-    "table": {"col_widths": None, "header_rows": 1, "header_cols": 0},
+    "table": {"col_widths": None, "rowh": None, "header_rows": 1, "header_cols": 0},
 }
 # per run: a field that is set is inline emphasis (`==x==` = accent color, `[x]{.class}`, badge = highlight)
 RUN_CHOICES = ("color", "highlight")

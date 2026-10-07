@@ -343,6 +343,8 @@ def _import_with(
             info: dict = {}
             lines = build_slide(n, sdc, deck, [], lambda *a: "", classes, info)
             lines = tag_boxes(lines, ent)
+            if any(i.kind == "table" for i in sdc.items):  # pinned rows must not look like a density clue
+                lines = _table_widths(lines, sdc, _trial_head(header, css_head))
             tried, dense = _dense_decision(lines, info, sdc, deck, _trial_head(header, css_head), theme)
             if tried:
                 flags[n] = dense
@@ -454,7 +456,13 @@ def _shorten(lines, info, sd, deck, classes, header) -> list[str]:
 
 
 def _table_widths(lines: list[str], sd: SlideData, header: list[str]) -> list[str]:
-    """Add ``{widths=a:b:c}`` to the tables whose rebuilt column widths differ from the original's.
+    """``{rowh=...}`` first (pinned rows change the text size and so the widths), then ``{widths=...}``."""
+    return _table_options(_table_options(lines, sd, header, "rowh"), sd, header, "widths")
+
+
+def _table_options(lines: list[str], sd: SlideData, header: list[str], what: str) -> list[str]:
+    """Add ``{widths=a:b:c}`` (or ``{rowh=...}``) to the tables whose rebuilt column widths (row heights)
+    differ from the original's.
 
     The automatic widths follow the text and hug numeric tables; explicit ``widths`` (or a CSS-free
     hand-sized table) are not stored in the .pptx except as the finished column widths.
@@ -472,15 +480,18 @@ def _table_widths(lines: list[str], sd: SlideData, header: list[str]) -> list[st
         )
         if len(got) != len(tables):
             return lines
-        bad = []
+        bad: dict[int, list[str]] = {}
         for k, (a, b) in enumerate(zip(tables, got, strict=True)):
             if len(a.col_w) != len(b.col_w):
                 continue
             ta, tb = sum(a.col_w), sum(b.col_w)
-            if abs(ta - tb) > 0.03 * ta or any(
-                abs(x / ta - y / tb) > 0.04 for x, y in zip(a.col_w, b.col_w, strict=True)
+            if what == "widths" and (
+                abs(ta - tb) > 0.03 * ta
+                or any(abs(x / ta - y / tb) > 0.04 for x, y in zip(a.col_w, b.col_w, strict=True))
             ):
-                bad.append(k)
+                bad.setdefault(k, []).append("widths=" + ":".join(map(str, _units(list(a.col_w)))))
+            if what == "rowh" and (rowh := _row_pins(a.row_h, b.row_h)):
+                bad.setdefault(k, []).append(rowh)
         if not bad:
             return lines
         out: list[str] = []
@@ -493,7 +504,7 @@ def _table_widths(lines: list[str], sd: SlideData, header: list[str]) -> list[st
             if starts:
                 k += 1
                 if k in bad:
-                    w = "widths=" + ":".join(map(str, _units(list(tables[k].col_w))))
+                    w = " ".join(bad[k])
                     if out and out[-1].startswith("{") and out[-1].endswith("}"):
                         out[-1] = out[-1][:-1] + " " + w + "}"
                     else:
@@ -502,6 +513,29 @@ def _table_widths(lines: list[str], sd: SlideData, header: list[str]) -> list[st
         return out
     except Exception:
         return lines
+
+
+def _row_pins(orig: list[int], trial: list[int]) -> str | None:
+    """``rowh=...`` when the rebuilt row heights differ from the original's (a pinned table): equal rows give
+    one value, a header that differs from equal body rows two, anything else one value per row."""
+    if len(orig) != len(trial) or not orig or sum(orig) <= 0:
+        return None
+    if all(abs(x - y) <= max(0.12 * max(x, y), 0.06 * 914400) for x, y in zip(orig, trial, strict=True)):
+        return None  # (the automatic layout differs a little between a trial slide and the real deck)
+
+    def inch(v: int) -> str:
+        return f"{max(round(v / 914400, 2), 0.15):g}in"
+
+    body = orig[1:] or orig
+    if all(abs(h - body[0]) <= 0.03 * body[0] for h in body):
+        vals = (
+            [inch(sum(orig) / len(orig))]
+            if len(orig) < 2 or abs(orig[0] - body[0]) <= 0.03 * body[0]
+            else [inch(orig[0]), inch(body[0])]
+        )
+    else:
+        vals = [inch(h) for h in orig]
+    return "rowh=" + ",".join(vals)
 
 
 # --------------------------------------------------------------------------- density

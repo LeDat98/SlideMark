@@ -27,7 +27,7 @@ from ..ir import Chart, Code, Image, Paragraph, Placed, Run, Series, Style, Tabl
 from ..layout import chartnote, measure
 from ..layout.css import border_spec, cell_insets
 from ..layout.tablehl import hl_names, hl_rows, join_names
-from ..layout.tables import column_widths, compact_header, table_grid
+from ..layout.tables import column_widths, compact_header, pinned, table_grid
 from ..theme import Theme
 from ..units import EMU_PER_PT
 from . import waterfall as wfall
@@ -211,14 +211,16 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             tblPr.remove(child)
     cw = pl.element.attrs.get("_col_w") or column_widths(t, ncols, anchors, pl.w)
     rh = pl.element.attrs.get("_row_h") or [max(pl.h // nrows, 1)] * nrows
-    if pl.element.attrs.get(
-        "_row_h"
+    if pl.element.attrs.get("_row_h") and not pinned(
+        t
     ):  # a stretched table: header rows stay compact, the body takes the slack
         rh = compact_header(t, anchors, cw, pl.style, pl.font_scale, rh, measure.tokens().table_header_max)
     for i, w in enumerate(cw[:ncols]):
         tbl.columns[i].width = Emu(int(w))
     for i, h in enumerate(rh[:nrows]):
         tbl.rows[i].height = Emu(int(h))
+    if pinned(t):  # the frame is exactly its pinned rows tall
+        gf.height = Emu(int(sum(rh[:nrows])))
     border = hex6(theme, theme.table_border)
     body_fill = theme.table_body_fill_of(pl.style.fill)  # CSS `table { background }` = the body cell fill
     t_border = None
@@ -491,6 +493,45 @@ def _pie_point_labels(ser, pal, n, theme, kind, fg, size, nf, lab_pct, vals=()) 
                 dl.position = pos
 
 
+_BAR_WORDS = {"outside", "inside", "center"}
+
+
+def _point_labels(
+    ser, pos: dict[int, XL_LABEL_POSITION], default, size_pt: float, ink, nf, inside_ink=None
+) -> None:
+    """Data labels with a position of their own per point (``labels=above,below,...``, collisions).
+
+    A series-level ``c:dLbls`` overrides the plot-level one, so its shared settings are repeated. ``ink``
+    is the label color; ``inside_ink(i)`` (bars) gives the ink of point ``i`` when its label sits inside the
+    bar (chosen for the fill under it)."""
+    dls = ser.data_labels
+    dls.show_value = True
+    dls.font.size = Pt(size_pt)
+    dls.font.color.rgb = ink
+    dls.position = default
+    if nf:
+        dls.number_format, dls.number_format_is_linked = nf, False
+    for i, where in sorted(pos.items()):
+        dl = ser.points[i].data_label
+        dl.font.size = Pt(size_pt)
+        inside = where in (
+            XL_LABEL_POSITION.INSIDE_END,
+            XL_LABEL_POSITION.CENTER,
+            XL_LABEL_POSITION.INSIDE_BASE,
+        )
+        dl.font.color.rgb = (
+            RGBColor.from_string(inside_ink(i)) if (inside and inside_ink is not None) else ink
+        )
+        dl.position = where
+        el = dl._dLbl
+        if el is not None and nf:
+            nfe = el.makeelement(qn("c:numFmt"), {"formatCode": nf, "sourceLinked": "0"})
+            anchor = el.find(qn("c:spPr"))
+            if anchor is None:
+                anchor = el.find(qn("c:txPr"))
+            anchor.addprevious(nfe)
+
+
 def _below_labels(ser, idxs: list[int], theme: Theme, size_pt: float, fg, nf) -> None:
     """Move the data labels of the points ``idxs`` of a line series below the point (the series default is
     above). A series-level ``c:dLbls`` overrides the plot-level one, so its shared settings are repeated."""
@@ -734,6 +775,21 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     if isinstance(cl, str):
         cl = [p.strip() for p in cl.replace(";", ",").split(",") if p.strip()]
     pal = theme.chart_palette(cl)
+    # one series of bars with a color per bar (`colors=a,b,c`, one per category): a `c:dPt` fill per point
+    point_cols = (
+        pal
+        if (
+            kind in ("column", "bar")
+            and not wf
+            and real_series == 1
+            and isinstance(cl, list)
+            and ncat > 1
+            and len(cl) == ncat
+        )
+        else None
+    )
+    point_words = opts.get("label_points")  # `labels=above,below,...`: a position per category
+    point_words = [str(w) for w in point_words] if isinstance(point_words, (list, tuple)) else None
     # number formats
     pct_flag = flag(opts.get("percent"))
     nf = opts.get("fmt") or opts.get("number_format") or opts.get("format")
@@ -805,6 +861,11 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             else:
                 ser.format.fill.solid()
                 ser.format.fill.fore_color.rgb = RGBColor.from_string(color)
+                if point_cols and si == 0:
+                    for pi, pc in enumerate(point_cols):
+                        pt = ser.points[pi]
+                        pt.format.fill.solid()
+                        pt.format.fill.fore_color.rgb = RGBColor.from_string(pc)
                 if lab_on and kind in ("bar", "column") and lpos in ("inside", "center"):
                     sdl = ser.data_labels  # inside the bar: the ink is chosen per series fill
                     sdl.show_value = True
@@ -816,6 +877,16 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     if nf:
                         sdl.number_format = nf
                         sdl.number_format_is_linked = False
+                    if point_cols:  # each bar has its own fill: its label gets its own ink
+                        _point_labels(
+                            ser,
+                            dict.fromkeys(range(ncat), _LABEL_POS[lpos]),
+                            _LABEL_POS[lpos],
+                            label_pt(kind, ncat, size, theme.render),
+                            fg,
+                            nf,
+                            lambda i: _ink_hex(theme, point_cols[i], label_color_on(point_cols[i], theme)),
+                        )
                 if lab_on and kind in ("stacked-bar", "stacked-column"):  # labels sit inside the fill
                     sdl = ser.data_labels
                     sdl.show_value = True
@@ -832,6 +903,26 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     sdl.number_format_is_linked = False
                     fits = seg_fits_cache.setdefault("f", chartnote.seg_fits(ch, pl, theme, seg_pt))
                     _hide_labels(sdl, [ci for ci in range(ncat) if fits.get((si, ci)) is False])
+    if point_words and lab_on and kind in ("column", "bar"):  # `labels=outside,inside,...`: per category
+        for si, ser in enumerate(chart.plots[0].series):
+            if si >= real_series:
+                continue
+            own = pal[si % len(pal)]
+
+            def ink_in(i: int, own=own) -> str:
+                c = point_cols[i] if point_cols else own
+                return _ink_hex(theme, c, label_color_on(c, theme))
+
+            where = {i: _LABEL_POS[w] for i, w in enumerate(point_words[:ncat]) if w in _LABEL_POS}
+            _point_labels(
+                ser,
+                where,
+                _LABEL_POS.get(lpos, XL_LABEL_POSITION.OUTSIDE_END),
+                label_pt(kind, ncat, size, theme.render),
+                fg,
+                nf,
+                ink_in,
+            )
     if kind == "doughnut":
         hole = chart.plots[0]._element.find(qn("c:holeSize"))
         if hole is not None:
@@ -889,10 +980,15 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             lo, hi, unit = note_plan.axis
         if kind == "line" and lab_on:  # close lines: their labels alternate above / below
             lpt = label_pt(kind, ncat, size, theme.render)
-            for si, idxs in label_collisions(
-                [s.values for s in series], lo, hi, lpt, pl.h / EMU_PER_PT, theme.render
-            ).items():
-                _below_labels(chart.plots[0].series[si], idxs, theme, lpt, fg, nf)
+            close = label_collisions([s.values for s in series], lo, hi, lpt, pl.h / EMU_PER_PT, theme.render)
+            manual = {i: _LABEL_POS[w] for i, w in enumerate(point_words or []) if w in _LABEL_POS}
+            if manual:  # the author named the position of these categories: the collision rule yields
+                for si, ser in enumerate(chart.plots[0].series):
+                    where = {i: XL_LABEL_POSITION.BELOW for i in close.get(si, []) if i not in manual}
+                    _point_labels(ser, {**where, **manual}, XL_LABEL_POSITION.ABOVE, lpt, fg, nf)
+            else:
+                for si, idxs in close.items():
+                    _below_labels(chart.plots[0].series[si], idxs, theme, lpt, fg, nf)
         if wf and wf["axis"] and wf["axis"][0] < 0:
             chart.category_axis.tick_label_position = XL_TICK_LABEL_POSITION.LOW
         if unit:

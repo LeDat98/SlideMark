@@ -266,6 +266,32 @@ def right_align_numbers(t: Table) -> Table:
     return t.model_copy(update={"rows": rows}) if changed else t
 
 
+def row_pins(t: Table, nrows: int | None = None) -> list[int | None]:
+    """Pinned height (EMU) of every row from ``rowh`` (``None`` = free); the last value repeats."""
+    n = len(t.rows) if nrows is None else nrows
+    vals = t.rowh or []
+    out: list[int | None] = []
+    for r in range(n):
+        v = vals[min(r, len(vals) - 1)] if vals else "auto"
+        try:
+            out.append(max(to_emu(v), 1) if v != "auto" else None)
+        except (ValueError, TypeError):
+            out.append(None)
+    return out
+
+
+def pinned(t: Table) -> bool:
+    """The author pinned row heights (``{rowh=...}``): no pass stretches, shrinks or regrows this table's
+    rows (or its text, which would then outgrow the pins). Every layout pass and the renderer call this
+    one guard."""
+    return bool(t.rowh) and any(v != "auto" for v in t.rowh)
+
+
+def pin_rows(t: Table, heights: list[int]) -> list[int]:
+    """``heights`` with every pinned row at its pinned value."""
+    return [p if p is not None else h for h, p in zip(heights, row_pins(t, len(heights)), strict=True)]
+
+
 def row_heights(
     t: Table, anchors: list[tuple[int, int, Cell]], widths: list[int], base: Style, scale: float
 ) -> list[int]:

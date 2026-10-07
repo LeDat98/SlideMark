@@ -89,6 +89,7 @@ style: top.bar=primary top.bar_h=0.12in title.rule=secondary kpi.stripe=secondar
 | `top.bar=<color>` `top.bar_h=0.1in` | a full-width strip on the top edge of every slide but the cover (`bottom.bar` / `bottom.bar_h`: the bottom edge) |
 | `title.rule=<color>` `title.rule_h=2pt` | a rule on the bottom edge of the slide title |
 | `kpi.stripe=<color>` `kpi.stripe_h=6pt` | a stripe on the top edge of every `.kpi` card |
+| `kpi.rule=<color>` `kpi.rule_h=1pt` `kpi.rule_w=100%` | a divider rule between the number and its caption in every `.kpi` card (off by default). The caption becomes its own text box under the rule; `layout.kpi_rule_gap_em` is the air around it |
 | `bullet=■` `bullet.color=<color>` | the glyph and color of bullet lists (default `•`, text color) |
 | `footer.color=` `footer.size=` | the footer text and the slide number (CSS `.caption`) |
 | `lead.bold=on` `lead.border-left="4pt solid secondary"` | any CSS property of `lead` `conclusion` `footnote` `subtitle` `box` `chart` (`lead.color` is the theme field) |
@@ -294,6 +295,15 @@ conclusion bar under it attaches to the table (`bar_attach=grow|move|off`, gap `
 (`steps_to_body_fill`, card text up to `steps_to_body_text_max_pt`); `kpi_to_body=off` / `steps_to_body=off`
 restore the content-sized look.
 
+**Place a KPI row yourself.** `h=` `y=` `w=` on the `.kpi` cards of one row size and place the row, not the card
+(an `x=` still makes a card absolute): the row is as tall as the largest `h=` (a share of the body), starts at `y=`
+(from the top of the body), and a card with `w=` takes that width, the others share the rest. The cards keep
+their columns; no pass stretches, shifts or grows a row you placed.
+
+```markdown
+## 売上高 {.kpi .hero w=45% h=55% y=24%}
+```
+
 **Hero KPI.** A wider card gets a bigger number (never wrapping), so a ratio grid makes one KPI the hero:
 `@2:1:1:1` before the cards gives the first twice the width. Shorter without an `@` line: add `.hero` to the
 card, `## 売上高 {.kpi .hero}` (a `.hero` card weighs `layout.kpi_hero_w` = 2 normal ones; an explicit `@` grid
@@ -417,11 +427,11 @@ Chart options go in the fence attributes:
 |---|---|---|
 | `title` | text | none |
 | `legend` | `bottom`, `right`, `top`, `left`, `none` | `bottom` when >1 series, else `none` |
-| `labels` | `on` (values; on a pie/doughnut the share, `render.chart_pie_labels`), `percent` / `value` (pie/doughnut), `off`; or a position (implies `on`): `outside` `inside` `center` on bar/column (`inside` / `center` on stacked), `above` `below` `left` `right` `center` on line, `outside` `inside` `center` `best` on pie | `off` |
+| `labels` | `on` (values; on a pie/doughnut the share, `render.chart_pie_labels`), `percent` / `value` (pie/doughnut), `off`; or a position (implies `on`): `outside` `inside` `center` on bar/column (`inside` / `center` on stacked), `above` `below` `left` `right` `center` on line, `outside` `inside` `center` `best` on pie; **one word per category** (`labels=above,below,above,above`, `auto` = the automatic collision rule) on line and column/bar overrides the position of each point; a wrong count warns with the category count | `off` |
 | `totals` | stacked kinds: `off` drops, `on` forces the stack total at the end of each stack (default: shown with `labels=on`) | `on` with labels |
 | `fmt` | Excel number format for labels and the value axis, e.g. `0.0`, `#,##0`, `0%` | general |
 | `min`, `max` | value axis bounds | auto |
-| `colors` | comma list of color names (theme, or declared in `colors:`) or hex, one per series (per point for pie) | theme palette |
+| `colors` | comma list of color names (theme, or declared in `colors:`) or hex, one per series (per point for pie; **one-series column/bar with as many colors as categories: one per bar**, `hl=` still wins for its point; another count warns) | theme palette |
 | `axis` | `off` hides the value axis and gridlines, `on` keeps them | auto: bar/column with `labels=on` and <= 4 categories hide them (the labels carry the numbers) |
 | `gap` | gap between bars, 0-500 (% of a bar): `gap=80` | `render.chart_gap` |
 | `marker` | line / radar marker size in pt, 2-72: `marker=9` | theme |
@@ -453,6 +463,7 @@ Attributes on a table (`{...}` on the line before a GFM table, or on a `table` f
 |---|---|---|
 | `widths` | column width ratios | `widths=3:1:1:1` |
 | `align` | per-column alignment letters `l` `c` `r` | `align=lcrr` |
+| `rowh` | exact row height: one value pins every row, a list pins row by row (the last repeats, `auto` frees a row). Pinned rows are never stretched, shrunk or regrown (text size included); text that outgrows a row warns `overflow` | `rowh=0.8in` or `rowh=0.8in,1.05in` |
 | `header` | number of header rows (0 = none) | `header=2` |
 | `hcol` | number of header columns | `hcol=1` |
 | `.zebra` | alternate row fill | |

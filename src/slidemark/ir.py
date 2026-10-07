@@ -211,6 +211,9 @@ class Table(ElementBase):
     header_rows: int = 1
     header_cols: int = 0
     col_widths: list[Length] | None = None  # relative weights or lengths
+    rowh: list[str] | None = (
+        None  # `{rowh=0.8in,1.05in}`: exact row heights ("auto" = free); the last repeats
+    )
 
 
 class Code(ElementBase):

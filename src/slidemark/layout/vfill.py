@@ -19,7 +19,7 @@ from ..ir import Chart, Container, Image, Media, Placed, Shape, Table, Text
 from ..units import EMU_PER_PT
 from . import measure
 from .grid import Rect
-from .tables import row_heights, table_grid
+from .tables import pinned, row_heights, table_grid
 
 
 def _contains(a: Placed, b: Placed) -> bool:
@@ -64,6 +64,7 @@ def _grow_table(p: Placed, peer_pt: float = 0.0) -> Placed:
     if (
         not rh
         or not cw
+        or pinned(t)
         or t.attrs.get("_row_cap")  # already grown by the layout's table text step
         or len(rh) != nrows
         or not tk.table_vtext_min_rows <= nrows <= tk.table_vtext_max_rows
@@ -136,6 +137,7 @@ def _fit_table(p: Placed, target: int, peer_pt: float, beside: bool = False) -> 
     if (
         not rh
         or not cw
+        or pinned(t)
         or len(rh) != nrows
         or (t.attrs.get("_row_cap") is True and not t.attrs.get("_twrap"))
         or sum(rh) >= target
@@ -341,7 +343,7 @@ def _fill(
         want = []
         for r, row in enumerate(rows):
             kinds = {
-                Table
+                ("pinned" if pinned(items[i].element) else Table)
                 if isinstance(items[i].element, Table)
                 else "chev"
                 if _is_chevron(items[i])
