@@ -486,8 +486,11 @@ def _shorten(lines, info, sd, deck, classes, header) -> list[str]:
 
 
 def _table_widths(lines: list[str], sd: SlideData, header: list[str]) -> list[str]:
-    """``{rowh=...}`` first (pinned rows change the text size and so the widths), then ``{widths=...}``."""
-    return _table_options(_table_options(lines, sd, header, "rowh"), sd, header, "widths")
+    """``{rowh=...}`` first (pinned rows change the text size and so the widths), then ``{widths=...}``, then
+    ``rowh`` again: the rows of a table read with its automatic (hugging) widths are not the rows it has with
+    the stated widths (a narrow column wraps, its row grows to twice the original's)."""
+    first = _table_options(lines, sd, header, "rowh")
+    return _table_options(_table_options(first, sd, header, "widths"), sd, header, "rowh")
 
 
 def _table_options(lines: list[str], sd: SlideData, header: list[str], what: str) -> list[str]:
@@ -535,6 +538,9 @@ def _table_options(lines: list[str], sd: SlideData, header: list[str], what: str
                 k += 1
                 if k in bad:
                     w = " ".join(bad[k])
+                    if what == "rowh" and out and out[-1].startswith("{") and "rowh=" in out[-1]:
+                        out.append(ln)  # (pinned by an earlier pass: the trial still differs, do not repeat)
+                        continue
                     if out and out[-1].startswith("{") and out[-1].endswith("}"):
                         out[-1] = out[-1][:-1] + " " + w + "}"
                     else:

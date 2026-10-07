@@ -82,6 +82,9 @@ class Thresholds:
     bar_lum: float = 0.25  # the bar is dark (relative luminance)
     same_fill: float = 12.0  # RGB distance under which two fills are one fill
     ink_near: float = 12.0  # a text colour this close to the deck ink is the ink
+    anchor_tol: float = (
+        0.03  # a row of cards this close (share of H) to a body edge / the middle is anchored there
+    )
 
 
 TH3 = Thresholds()
@@ -427,6 +430,23 @@ def _band_parts(card: Item, data: SlideData, H: int) -> tuple[Item, list[Item]] 
     return (h, body) if body else None
 
 
+def _anchor(cards: list[Item], deck) -> str | None:
+    """Where the row of cards sits in the body (``top`` / ``center`` / ``bottom``): the edge or the middle of
+    the body area it is nearest to, within ``TH3.anchor_tol`` of the slide height; None when it floats."""
+    top, bottom = deck.body_top, deck.body_bottom
+    if not top or bottom <= top:
+        return "top"
+    y0 = min(c.y for c in cards)
+    y1 = max(c.y + c.h for c in cards)
+    near = {
+        "top": abs(y0 - top),
+        "bottom": abs(y1 - bottom),
+        "center": abs((y0 + y1) / 2 - (top + bottom) / 2),
+    }
+    word, dist = min(near.items(), key=lambda t: t[1])
+    return word if dist <= TH3.anchor_tol * deck.height else None
+
+
 def _glyph_bullets(paras: list[ParaT]) -> str | None:
     """The glyph every paragraph of the body starts with (``■ text``), or None."""
     firsts = []
@@ -510,6 +530,8 @@ def _apply_bands(
     hcol = _color([p for h in heads for p in h.paras])
     if hcol and _dist(hcol, "FFFFFF") > TH3.ink_near:
         _put(found, "heading.band.color", name_or_hex(deck, hcol))
+    _put(found, "box.h", _length(_modal([float(c.h) for c in cards]) or cards[0].h))  # exact card height
+    _put(found, "box.anchor", _anchor(cards, deck))
 
 
 # --------------------------------------------------------------------------- 4. full-width takeaway bar

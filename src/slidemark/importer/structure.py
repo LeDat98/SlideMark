@@ -50,6 +50,11 @@ class DeckInfo:
     foreign: bool = False  # no stored design part: geometry recognition (recognise2) is allowed
     palette: list[str] = field(default_factory=list)  # RRGGBB the build's default chart palette draws
     card_shadow: str | None = None  # foreign deck: the shadow most cards share (written as ``card.shadow=``)
+    body_top: int = (
+        0  # foreign deck: where the rebuilt body starts (EMU; 0 = unknown), set with ``layout.top_gap``
+    )
+    body_bottom: int = 0  # ... and where it ends above the footer row
+    arrow_point: float | None = None  # foreign deck: the deck-wide ``steps-arrow.point``
 
 
 @dataclass

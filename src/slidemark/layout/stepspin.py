@@ -5,6 +5,8 @@ conclusion bar). A deck that states one of the three tokens wants that number: t
 growth and stretch passes, after ``_restore_pins``), so no earlier pass can change what the token says.
 
 * ``steps-arrow.h``  every arrow is that tall (the point keeps its share of the height);
+* ``steps-arrow.point`` every arrow's point is that share of its shorter side deep (the preset's ``adj``);
+* the group starts at the body top when a height is stated and nothing sits above the arrows;
 * ``steps.gap``      the cards start that far under the arrows (the token is also ``layout.steps_gap``);
 * ``steps-card.h``   every card is that tall; without it the card keeps its bottom edge (a stretched card
   follows the arrows' new height).
@@ -23,6 +25,26 @@ def _arrow(p: Placed) -> bool:
     return isinstance(p.element, Shape) and str(p.element.attrs.get("shape_name", "")).endswith(" arrow")
 
 
+def _chevron(p: Placed) -> bool:
+    return isinstance(p.element, Shape) and p.element.shape == "chevron"
+
+
+def pin_point(out: list[Placed], theme) -> list[Placed]:
+    """Every chevron / pentagon of ``out`` with ``steps-arrow.point`` as its point depth (the share of the
+    shorter side that is the preset's ``adj``): a growth pass that rescaled it is undone."""
+    point = getattr(theme, "steps_arrow_point", None)
+    if not point:
+        return out
+    return [
+        p.model_copy(
+            update={"element": p.element.model_copy(update={"attrs": {**p.element.attrs, "adj": point}})}
+        )
+        if _chevron(p)
+        else p
+        for p in out
+    ]
+
+
 def _card(p: Placed) -> bool:
     return "steps-card" in getattr(p.element, "classes", ()) and not isinstance(p.element, Shape)
 
@@ -39,15 +61,15 @@ def pinned(theme) -> bool:
     return bool(theme.steps_arrow_h or theme.steps_card_h)
 
 
-def pin_steps(out: list[Placed], theme) -> list[Placed]:
-    """The ``@steps`` arrows and cards of ``out`` at the heights / gap the tokens state. Never raises."""
+def pin_steps(out: list[Placed], theme, body_top: int | None = None) -> list[Placed]:
+    """The ``@steps`` arrows and cards of ``out`` at the height, gap and point of the tokens (no raise)."""
     try:
-        return _pin(out, theme)
+        return _pin(pin_point(out, theme), theme, body_top)
     except Exception:
         return out
 
 
-def _pin(out: list[Placed], theme) -> list[Placed]:
+def _pin(out: list[Placed], theme, body_top: int | None = None) -> list[Placed]:
     arrow_h, card_h, gap = _len(theme.steps_arrow_h), _len(theme.steps_card_h), _len(theme.steps_gap)
     if not (arrow_h or card_h or gap):
         return out
@@ -56,6 +78,8 @@ def _pin(out: list[Placed], theme) -> list[Placed]:
     if not arrows or not cards:
         return out
     top = min(a.y for a in arrows)
+    if body_top is not None and pinned(theme) and min(p.y for p in out) >= top - 2:
+        top = body_top  # exact heights: the group the author placed starts at the body top (no centring pass)
     old_bottom = max(a.y + a.h for a in arrows)
     old_gap = min(c.y for c in cards) - old_bottom
     new_h = arrow_h or max(a.h for a in arrows)

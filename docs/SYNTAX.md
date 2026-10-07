@@ -264,6 +264,10 @@ height is pinned: no stretch or growth pass changes it, and the conclusion bar f
 sets the bar's height). Without `steps-card.h` the cards keep their bottom edge. `steps-arrow.color=bg steps-arrow.align=left`
 set the arrow text's ink and alignment. A bad value is `bad-token` with a hint; a token without `@steps` is `attr-ignored`.
 The importer writes all of these from the original's geometry.
+`steps-arrow.point=0.5` is the point depth of every arrow (the preset's `adj`: a share of the arrow's shorter side, `0.5` = the
+PowerPoint preset, `30%` works too; the build's own is `layout.chevron_adj`, 0.3). It is one depth: the layout does not search flatter points
+for text room any more, and a growth pass cannot rescale it. It also draws the arrows of a plain `@chevron` strip. With a stated
+arrow or card height the group starts at the body top (no centring), where a foreign deck draws it.
 
 Looks are tokens: `style: steps-arrow.fill=accent steps-card.fill=#EEF2FF` (classes `steps-arrow` / `steps-card`,
 or per step `## 設計 {.accent}`), `layout.steps_gap` (arrow row to cards), `layout.steps_arrow_aspect` /
@@ -304,6 +308,19 @@ style: heading.band=primary heading.rule=accent heading.rule_h=0.06in item.borde
 - 主力3ブランドの価格改定
 - 不採算SKUを15%削減
 ```
+
+**Box height and anchor.** `style: box.h=4.2in box.anchor=top` makes every `##` box card of the slide (or of the deck, in the header)
+exactly 4.2 in tall and puts the row at the top of the body: `top`, `center` or `bottom` (without `box.anchor` the row keeps the
+layout's place, moved up only to stay in the body). Without `box.h` the cards are as tall as their content (and stretched); `box.anchor`
+alone only moves the row. The heading, band, badge and icon keep their place on the card's top edge, the last text box grows with the
+card, a note under the cards follows the last row, rows of a grid keep their gaps. KPI, step and item cards are not boxes (`kpi.h` is
+theirs); a box with its own `{h=}` is left alone. The importer writes both for a header-band card row it reads (`top` when the cards
+start at the body top, `center` / `bottom` at the middle / bottom of the body, nothing when the row floats).
+
+**Page margin and body top.** `style: margin=0.6in layout.top_gap=0.45in` set the side margin (title, body, footer) and the gap between the
+title area (or the lead line) and the body: a deck made elsewhere often has 0.6 in and 0.45 in where the build has 0.5 in and 0.25 in,
+so every body item would sit a little off. The importer writes both deck-wide when most slides agree (the left edge that is also a
+right edge, the commonest distance from the title's bottom to the first item; slides that start with a lead line are left out).
 
 **Card stripes.** A stripe on one edge of every card, in a colour per card: `style: box.stripe=primary,secondary,accent` (a list is applied in reading order and cycles, like `steps-arrow.fill=a,b`), `box.stripe_h=6pt` (thickness), `box.stripe.side=top|left|right|bottom` (default `top`). The same three tokens exist for item cards (`item.stripe` `item.stripe_h` `item.stripe.side`, side default `left`), KPI cards (`kpi.stripe` `kpi.stripe_h` `kpi.stripe.side`) and `@rows` bars (`rows.stripe=a,b`, always on the left, width `layout.rows_stripe_w`). `## 現状 {stripe=teal}` colours that one card and still takes its place in the cycle. A stripe is drawn from the final card rectangle (a card a pass stretched keeps it), named `Stripe` (a KPI stripe `rule`), and the importer drops the shape and keeps the tokens. Only cards with a fill or border get one (`{.plain}` boxes do not).
 
@@ -880,9 +897,11 @@ the older fallback (boxes, plain text) stays. Decks with their own design part a
 | a slide-filling rectangle behind the cover | `@bg=primary dark` (a declared colour name when the fill matches one, else `#hex`) |
 | a thin bar at the cover's left / a strip on its top or bottom edge | `cover.bar=#E08A1E` (`@edge` at the slide edge) + `cover.bar_w`, `cover.top_bar` / `cover.bottom_bar` (+ `_h`), with `cover.band=none cover.band_h=66%` placing the title block where the text was |
 | thin full-width strips on the top / bottom edge of most slides | `top.bar` / `bottom.bar` (+ `_h`) |
+| content that starts at another margin (0.6 in left and right) / another distance under the title (0.45 in) | `margin=0.6in layout.top_gap=0.45in` in the header |
+| a row of tall header-band cards from the body top | `box.h=4.2in box.anchor=top` on the slide (+ `heading.band=` `bullet=■`) |
 | a thin full-width line under the title band on most slides (a short segment at its left end) | `title.rule=#E08A1E title.rule_h=0.06in` (`title.rule2` + `title.rule2_w`) |
 | a bare number text at the bottom right equal to the slide number | `num: on` (it is not a footnote) |
-| a row of chevron / pentagon shapes of one size, each with a card under it | `@3 steps` + `style: steps-arrow.fill=a,b,c steps-arrow.size=24 steps-card.size=26`; pentagons: `render.chevron_shape=pentagon`; the exact geometry `steps-arrow.h=0.75in steps-card.h=2.7in steps.gap=0.2in`, arrow ink `steps-arrow.color= steps-arrow.bold=on steps-arrow.align=left` |
+| a row of chevron / pentagon shapes of one size, each with a card under it | `@3 steps` + `style: steps-arrow.fill=a,b,c steps-arrow.size=24 steps-card.size=26`; pentagons: `render.chevron_shape=pentagon`; the exact geometry `steps-arrow.h=0.75in steps-card.h=2.7in steps.gap=0.2in`, arrow ink `steps-arrow.color= steps-arrow.bold=on steps-arrow.align=left`; the point depth of the original's `a:avLst` as `steps-arrow.point=0.5` (deck-wide when most arrows share it) |
 | a full-width dark filled bar in the lower part with one text in it, nothing but the footer below it | the `>` conclusion + `conclusion.fill=` (when it is not `primary`), `conclusion.size=` and, under a steps row, `conclusion.h=` |
 | a shadow (`a:outerShdw`) on the cards of the deck | `card.shadow="0 3 6 #00000040"` in the header when most cards (at least two, at least half) share it; a card with another shadow says `{shadow="..."}`, one with none `{shadow=off}`; when the cards differ every box states its own. A shadow that only the theme's effect style gives (`a:effectRef`, no `a:outerShdw`) is not read |
 | a body table row whose cells share a tinted fill the other rows do not (zebra rows are plain) | `{hl=<first cell>}` + `style: table.hl.fill=#FDF1DE table.hl.strength=1` |

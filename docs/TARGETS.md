@@ -98,6 +98,9 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       and on `bench/lengthbench/t2/python-pptx`, no broken slide, and the imported deck.md ≤ 40% of build.py tokens.
       Font floor (docs/RENDERING.md, 2026-10-07): 0.00 on both decks, so the 21-25 point gap is design only; previews now
       use `src/slidemark/fonts/fonts.conf` (deterministic fallbacks).
+      Part 2 lane I (2026-10-07, geometry leftovers): `box.h` + `box.anchor`, deck `margin=` / `layout.top_gap=` from the
+      content, `steps-arrow.point`, plain-table `rowh=` after `widths=`; round trip t4 23.2 -> 17.3, t2 19.0 -> 13.4 (lane
+      E / F state before it); still open: header band height, lead / card text offsets, shadows (LibreOffice artifact).
 - [ ] DL4 `shape=` on any box / step / row names any of the ≥ 150 PowerPoint preset shapes; connectors with
       arrowheads, dash and curve; freeform paths from inline SVG as native geometry; images with crop, radius, mask and
       opacity; text outline / shadow / glow; per-shape gradient, pattern and line dash. Gate: a shape-gallery example
