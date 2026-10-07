@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 from .read import CellT, ChartT, ParaT, RunT
 
@@ -36,7 +37,7 @@ def esc_line_start(line: str) -> str:
 
 
 def _fmt_key(r: RunT) -> tuple:
-    return (r.bold, r.italic, r.strike, r.sup, r.sub, r.code, r.color, r.badge, r.link)
+    return (r.bold, r.italic, r.strike, r.sup, r.sub, r.code, r.color, r.badge, r.link, r.span)
 
 
 def _merge(runs: list[RunT]) -> list[RunT]:
@@ -71,6 +72,17 @@ def inline(
     imp_color = getattr(implied, "color", None)
     imp_bold = bool(getattr(implied, "bold", None))
     imp_italic = bool(getattr(implied, "italic", None))
+    shades = (accent or "").split("|")
+    runs = [  # a colour the markup cannot say must not split a run (`**a****b**`)
+        replace(r, color=None)
+        if r.color
+        and not r.span
+        and r.color != imp_color
+        and r.color not in shades
+        and (classes or {}).get(r.color) not in ("success", "danger")
+        else r
+        for r in runs
+    ]
     parts: list[str] = []
     all_bold = bool(runs) and all(r.bold for r in runs if r.text.strip())
     for r in _merge(runs):
@@ -109,6 +121,10 @@ def inline(
                 body = f"=={body}=="
             elif r.color and not r.badge and (cname := (classes or {}).get(r.color)) in ("success", "danger"):
                 body = f"[{body}]{{.{cname}}}"
+        if (
+            r.span and not r.code
+        ):  # recognise2: a run of its own size / colour -> `[text]{size=26 color=#E08A1E}`
+            body = f"[{body}]{{{r.span}}}"
         if r.badge:
             cls = _badge_class(r.badge, classes or {})
             body = f"[{body}]{{.badge{(' .' + cls) if cls else ''}}}"
@@ -352,6 +368,9 @@ def chart_lines(ch: ChartT) -> list[str]:
         "axis",
         "overlap",
         "step",
+        "colors",
+        "size",
+        "gap",
         "hl",
         "note",
     ):

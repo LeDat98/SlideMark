@@ -30,6 +30,7 @@ class RunT:
     badge: str | None = None  # highlight color RRGGBB when the run is a badge
     link: str | None = None
     size: float | None = None
+    span: str = ""  # recognise2: ``size=26 color=#E08A1E`` the importer writes as ``[text]{...}``
 
 
 @dataclass
@@ -57,6 +58,7 @@ class CellT:
     paras: list[ParaT] = field(default_factory=list)
     hmerge: bool = False
     vmerge: bool = False
+    fill: str | None = None  # RRGGBB of an explicit solid cell fill
 
 
 @dataclass
@@ -67,6 +69,9 @@ class ChartT:
     series: list[tuple[str, list[float | None]]]
     options: dict[str, str]
     totals: list[int] = field(default_factory=list)  # waterfall: indexes of the `=` total bars
+    look: dict = field(
+        default_factory=dict
+    )  # recognise2.read_chart_look: series / point fills, label size, gap
 
 
 @dataclass
@@ -94,6 +99,8 @@ class Item:
     col_w: list[int] = field(default_factory=list)  # table: column widths (EMU)
     row_h: list[int] = field(default_factory=list)  # table: row heights (EMU)
     steps: bool = False  # chevron: an ``@steps`` arrow with the text of its card folded in
+    zebra: bool = False  # table: recognise2 saw alternating plain row fills (``{.zebra}``)
+    size: float | None = None  # table: the body text size recognise2 states (``{size=}``)
     hl: str = ""  # table: the `hl=` first-cell values (the renderer appends them to the shape name)
     hlcol: str = ""  # table: the `hlcol=` column numbers (1-based, comma list; the same shape-name suffix)
     gantt: bool = False  # table: bars (filled shapes over body cells) were folded into it (`{.gantt}`)
@@ -526,7 +533,16 @@ def read_chart(shape, ctx: ReadCtx) -> ChartT | None:
     if fmt:
         opts["fmt"] = fmt
     _read_decisions(chart, plot, kind, data, cats, opts)
-    return ChartT(kind=kind, title=title, categories=cats, series=data, options=opts)
+    from .recognise2 import read_chart_look
+
+    return ChartT(
+        kind=kind,
+        title=title,
+        categories=cats,
+        series=data,
+        options=opts,
+        look=read_chart_look(chart, kind, len(data), len(cats)),
+    )
 
 
 def _read_decisions(chart, plot, kind: str, data, cats, opts: dict[str, str]) -> None:
@@ -799,6 +815,13 @@ def _radius(geom, box) -> float | None:
     return None
 
 
+def _cell_fill(tc) -> str | None:
+    """RRGGBB of an explicit solid fill on a table cell (``a:tcPr``), else None."""
+    pr = tc.find(qn("a:tcPr"))
+    fill = pr.find(qn("a:solidFill")) if pr is not None else None
+    return _hex(fill) if fill is not None else None
+
+
 def _int(v) -> int | None:
     return int(v) if isinstance(v, str) and v.lstrip("-").isdigit() else None
 
@@ -1010,6 +1033,7 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
                             paras=paras,
                             hmerge=tc.get("hMerge") in ("1", "true"),
                             vmerge=tc.get("vMerge") in ("1", "true"),
+                            fill=_cell_fill(tc),
                         )
                     )
                 rows.append(row)

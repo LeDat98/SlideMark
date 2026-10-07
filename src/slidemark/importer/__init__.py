@@ -6,11 +6,13 @@ import copy
 import math
 import re
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 from ..ir import Diagnostic
 from ..render.design_part import read_design_part
 from ..theme import DEFAULT, JP_BUSINESS, MIDNIGHT, Theme
+from . import recognise2
 from .design import (
     claim_fences,
     css_fence,
@@ -27,7 +29,7 @@ from .design import (
     tag_boxes,
     token_lines,
 )
-from .look import color_similarity, derive_tokens
+from .look import _keep_valid, color_similarity, derive_tokens
 from .read import ReadCtx, SlideData, read_sections, read_slide
 from .structure import DeckInfo, build_slide, notes_lines
 
@@ -211,6 +213,17 @@ def _drawn_accent(theme, tokens: dict, accent: str) -> str:
         return accent
 
 
+def _default_palette(theme, tokens: dict) -> list[str]:
+    """RRGGBB colours the build draws chart series with when the deck states none (never raises)."""
+    try:
+        from ..theme import apply_tokens
+
+        th, _ = apply_tokens(theme, {k: str(v) for k, v in tokens.items()})
+        return [c.lstrip("#").upper() for c in th.chart_palette()]
+    except Exception:
+        return []
+
+
 def _import_with(
     prs, out_dir, diags: list[Diagnostic], src_name: str, own_tokens: dict[str, str]
 ) -> tuple[str, list[Diagnostic]]:
@@ -248,8 +261,13 @@ def _import_with(
         footers=footers,
         sections=read_sections(prs),
         margin_x=to_emu(theme.margin_x),
+        margin_y=to_emu(theme.margin_y),
         gap=to_emu(theme.gap),
+        foreign=not design and not recognise2.is_slidemark_deck(datas),
+        palette=_default_palette(theme, {**(design.get("tokens") or {}), **own_tokens}),
     )
+    if deck.foreign:
+        deck.ink = recognise2.deck_ink(datas, colors.get("bg", "FFFFFF"), H)
     rules = design_rules(design)
     deck.implied = {r: implied_style(rules, r, colors) for r in ("lead", "conclusion", "footnote")}
     deck.css_heading = heading_sized(rules)
@@ -318,6 +336,8 @@ def _import_with(
         )
     elif own_tokens:
         header.extend(token_lines(own_tokens))
+    if deck.foreign:  # DL3d: chrome drawn with loose shapes (cover bars, edge strips, title rule) -> tokens
+        header.extend(token_lines(_keep_valid(recognise2.deck_tokens(datas, deck))))
     size = _size_token(W, H)
     if size:
         header.append(f"size: {size}")
@@ -329,7 +349,7 @@ def _import_with(
     if any(
         sd.num_field or any(i.ph == "sldNum" or i.name.lower() == "slide number" for i in sd.items)
         for sd in datas
-    ):
+    ) or (deck.foreign and recognise2.has_page_numbers(datas, W, H)):
         header.append("num: on")
     # pass 1: which slides need ``dense`` (on a copy: building a slide edits its data)
     flags: dict[int, bool] = {}
@@ -448,7 +468,9 @@ def _shorten(lines, info, sd, deck, classes, header) -> list[str]:
             trial = [*lines[:at], *(["@" + " ".join(new)] if new else []), *lines[at + 1 :]]
             tsd = _read_trial(head + "\n".join(trial) + "\n", deck)
             got: dict = {}
-            build_slide(1, tsd, deck, [], lambda *a: "", classes, got)
+            build_slide(
+                1, tsd, replace(deck, foreign=False), [], lambda *a: "", classes, got
+            )  # (built shapes)
             # the shorter line must give the same grid and (nearly) the same boxes as the full one
             if got.get("tokens") == tokens and _geom_err(sd, tsd) <= base_err + 0.08:
                 return trial

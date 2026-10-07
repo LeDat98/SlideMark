@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from functools import cmp_to_key
 
 from ..ir import Diagnostic
-from . import forms2
+from . import forms2, recognise2
 from .emit import (
     _attr,
     chart_lines,
@@ -41,9 +41,13 @@ class DeckInfo:
         default_factory=list
     )  # PowerPoint sections (name, slide numbers)
     margin_x: int = 0  # theme side margin and column gap (EMU); 0 = unknown
+    margin_y: int = 0  # theme top margin (EMU); recognise2 sizes the title area from it
     gap: int = 0
     implied: dict[str, object] = field(default_factory=dict)  # role (lead, ...) -> Style a css rule gives it
     css_heading: bool = False  # a css rule sets the font size of ## headings (sizes say nothing about a KPI)
+    ink: str = ""  # RRGGBB of the commonest body run colour (recognise2 compares span colours to it)
+    foreign: bool = False  # no stored design part: geometry recognition (recognise2) is allowed
+    palette: list[str] = field(default_factory=list)  # RRGGBB the build's default chart palette draws
 
 
 @dataclass
@@ -1165,8 +1169,10 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
         align = None if b.item.gantt else _table_align(b.item.rows, hdr)
         attrs = (
             ([".gantt"] if b.item.gantt else [])
+            + ([".zebra"] if b.item.zebra else [])
             + ([f"header={hdr}"] if hdr > 1 else [])
             + ([f"align={align}"] if align else [])
+            + ([f"size={b.item.size:g}"] if b.item.size else [])
             + ([_attr("hl", hl)] if hl else [])
             + ([f"hlcol={b.item.hlcol}"] if b.item.hlcol else [])
         )
@@ -1251,6 +1257,7 @@ def build_slide(
     from . import vocab  # (it needs Block from this module)
 
     fold_into_tables(data)
+    found = recognise2.recognise(data, deck, n)  # DL3d lane C: designed shapes -> tokens (foreign decks)
     vform = vocab.extract(
         data
     )  # DL3b: the named shapes of @timeline / @funnel / ... fold back into their source
@@ -1377,6 +1384,8 @@ def build_slide(
             "> "
             + one_line(lead[0].paras, accent=deck.accent, classes=classes, implied=deck.implied.get("lead"))
         )
+    if (style_line := found.style_line()) is not None:  # per-slide tokens a recognition states
+        lines.append(style_line)
     n_boxes = sum(1 for b in grid if b.kind == "box")
     if not groups and arrows and "chevron" not in tokens and n_boxes > 1 and arrows >= n_boxes - 1:
         tokens.append("flow")
@@ -1431,6 +1440,7 @@ def build_slide(
         extra.append("items")  # `@4 items`: the item cards are the boxes' bullets
     if rows_mode == "plain":
         extra.append("plain")  # `@rows plain`: bars without number badges
+    extra.extend(found.words)  # `bg=primary dark` of a cover drawn over a slide-filling rectangle
     if data.transition:
         extra.append("t=" + data.transition)
     if data.build:
