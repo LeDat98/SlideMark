@@ -691,6 +691,22 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       Blind judge round 7: run 1 3.5 (rank 1), python-pptx 3.0, run 2 3.0 (the judge: G spends accent and scale on
       the figure that matters, I spreads them; both leave one-bullet boxes and a plain list on slide 8). Decks in
       `bench/lengthbench/t2/slidemark-ac7-{1,2}/`.
+- [ ] DL3b open-brief measurement (2026-10-07, `bench/lengthbench/t4`, content only, forms the agent's): two
+      SlideMark runs with the 16 forms in SKILL.md used 10 and 9 distinct forms (gate ≥ 7 met) at 6–7 calls, 67–87 s,
+      48–53% of the python-pptx cost; python-pptx used 11 forms at 11 calls, 196 s. Blind judge round 8 (with a
+      variety score): python-pptx 3.5 (variety 4), SlideMark 3.0 (3) and 2.5 (2.5), ranked O > N > P: "N and P are
+      nearly the same deck: one template with small swaps"; "O treats the numbers as the content" (big-number tiles,
+      targets beside their base, a hero panel for the price change), SlideMark "sets the same facts as sentences in
+      boxes, tables and sparse timelines". Also: both SlideMark agents stopped with `design-slide` warnings left
+      (advisory), red spent on several things (accent in `palette=` again), cover half blank, thin timelines, icons as
+      decoration. Neither arm passed `agent_accept` on the open brief: all three split "A：B" facts into table cells
+      (the string check is too strict for an open brief; count a string present when all its segments are).
+      Gate "monotony note disappears" NOT met. Next: (1) make `design-*` count as real warnings in the recipe
+      ("0 warnings" includes them) and measure the call cost; (2) a `design-slide` hint that names the forms that
+      fit the slide's content kind (numbers → `@kpi` / `@statement`, a sequence → `@timeline` / `@steps`, a
+      comparison → `@vs` / table, a share → chart), still as options; (3) timeline / cover / icon-list defaults that
+      fill their space (sparse cue already fires); (4) `palette` must not include the accent unless the agent says
+      `palette=…,accent!`; (5) accept.json segments.
 - [ ] DL ladder (owner, 2026-10-07, `docs/TARGETS.md` "DL"): next gates are DL2 (close the 9 CSS-only + 4 missing
       decisions; port ≤ 30% tokens with no css/@html), DL3 (element-level `{…}` on every kind, decision-fuzz test),
       AC7 (design-mode calls back to ≤ 5: give the agent a per-slide fit map in the build line so it stops opening
