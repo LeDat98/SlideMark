@@ -83,6 +83,14 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       forms, and the blind judge's "monotony" note disappears.
 - [x] DL3c Design feedback, tightened (2026-10-07, lane H: `design-none` names the missing lines; `design-slide` checks form + emphasis (or `@noemph`) + values (or `@defaults`); facts line `9/14 slides decided form+emphasis+values; short: …`; all 22 examples and both SKILL.md patterns pass; 207 tests) (`docs/DESIGN_REQUIRED.md` "Tightened rules"): `design-none` names the
       missing header lines; `design-slide` checks form + emphasis + values per slide; facts line lists what is short.
+- [ ] DL3d Foreign-deck round trip (owner, 2026-10-07, `bench/lengthbench/t4/roundtrip`): `slidemark import` of a
+      deck made elsewhere (the python-pptx open-brief deck) rebuilt with `build` must look like the original.
+      Measured by `bench/roundtrip_compare.py` (side-by-side sheet + per-slide pixel difference). Today the text,
+      charts and tables survive but the design falls off: cover background and bars, per-card stripe colours,
+      big-number tiles, mixed run sizes in one line, per-point chart colours, chevron colours + cards + takeaway
+      bar, table row highlight, dark statement panel, numbered badges, quote card; two slides break (badge text
+      and the quote mark become the title). Gate: mean per-slide difference ≤ 8 (golden tolerance) on that deck
+      and on `bench/lengthbench/t2/python-pptx`, no broken slide, and the imported deck.md ≤ 40% of build.py tokens.
 - [ ] DL4 `shape=` on any box / step / row names any of the ≥ 150 PowerPoint preset shapes; connectors with
       arrowheads, dash and curve; freeform paths from inline SVG as native geometry; images with crop, radius, mask and
       opacity; text outline / shadow / glow; per-shape gradient, pattern and line dash. Gate: a shape-gallery example
