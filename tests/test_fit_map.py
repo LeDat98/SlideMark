@@ -130,9 +130,9 @@ def test_cover_names_title_size_and_composition(tmp_path):
 
 
 def test_took_and_ignored_attributes(tmp_path):
-    md = "# T\n> lead\n## a {.kpi h=55% size=30 bold=true}\n1\nc\n## b {.kpi}\n2\nc\n@end\n- x\n"
+    md = "# T\n> lead\n## a {.kpi h=55% size=30 fit=cover}\n1\nc\n## b {.kpi}\n2\nc\n@end\n- x\n"
     line = one(md, tmp_path)
-    assert re.search(r"took h size=30, ignored bold(, sparse: \d+% free)?$", line), line
+    assert re.search(r"took h size=30, ignored fit(, sparse: \d+% free)?$", line), line
     beside = one("# T\n> lead\n## a {.kpi h=55%}\n1\nc\n## b {.kpi}\n2\nc\n@end\n- x\n", tmp_path)
     assert "took h" in beside and "ignored" not in beside  # a pinned row beside a list took the height too
     alone = one("# T\n> lead\n## a {.kpi h=55%}\n1\nc\n## b {.kpi}\n2\nc\n", tmp_path)

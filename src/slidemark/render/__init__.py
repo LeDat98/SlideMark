@@ -13,8 +13,10 @@ from pptx.enum.dml import MSO_LINE
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE, MSO_SHAPE_TYPE
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.ns import qn
+from pptx.oxml.xmlchemy import OxmlElement
 from pptx.util import Emu, Pt
 
+from .. import shapes as shape_table
 from ..ir import (
     Chart,
     Code,
@@ -520,7 +522,19 @@ def _round(shp, st: Style, pl: Placed) -> None:
         shp.adjustments[0] = min(emu(st.radius) / short, 0.5)
 
 
+def _set_adj(shp, value: float) -> None:
+    """The first adjust handle of ``shp`` (a pill's corner share); a preset without one keeps its look."""
+    try:
+        shp.adjustments[0] = value
+    except (IndexError, ValueError):
+        pass
+
+
 def _autoshape(rc: RenderCtx, slide, pl: Placed, kind, name: str):
+    """A native auto shape of ``pl``; ``{shape=hexagon}`` (``Style.shape``) swaps the preset geometry."""
+    spec = shape_table.SHAPES.get(pl.style.shape or "")
+    if spec is not None:
+        kind = shape_table.member(pl.style.shape)
     shp = slide.shapes.add_shape(kind, Emu(pl.x), Emu(pl.y), Emu(pl.w), Emu(pl.h))
     shp.name = name
     style_el = shp._element.find(qn("p:style"))
@@ -530,7 +544,74 @@ def _autoshape(rc: RenderCtx, slide, pl: Placed, kind, name: str):
         shp._element.remove(style_el)
     _style_shape(rc, shp, pl.style, pl)
     _round(shp, pl.style, pl)
+    if spec is not None and spec[1] is not None:  # `shape=pill`: the corners are half the short side
+        _set_adj(shp, spec[1])
     return shp
+
+
+def _frame(rc: RenderCtx, s, pl: Placed, name: str, st: Style) -> None:
+    """A plain plate behind a table / chart (fill, border, shadow, corners): drawn first, the object on it."""
+    kind = MSO_SHAPE.ROUNDED_RECTANGLE if st.radius else MSO_SHAPE.RECTANGLE
+    _autoshape(rc, s, pl.model_copy(update={"style": st}), kind, f"{name} frame")
+
+
+def _chart_frame(rc: RenderCtx, s, pl: Placed, name: str) -> Placed:
+    """``{fill= line= radius= shadow= shape= pad=}`` on a chart: the plate behind it and the plot area inside
+    ``pad`` of it. Returns the box the chart itself takes."""
+    st = pl.style
+    if st.fill or st.line or st.shadow:
+        _frame(
+            rc,
+            s,
+            pl,
+            name,
+            Style(
+                fill=st.fill or ("bg" if st.shadow else None),
+                line=st.line,
+                line_width=st.line_width,
+                line_dash=st.line_dash,
+                radius=st.radius,
+                shadow=st.shadow,
+                shape=st.shape,
+                opacity=st.opacity,
+            ),
+        )
+    try:
+        pad = max(to_emu(st.padding), 0) if st.padding is not None else 0
+    except ValueError:
+        pad = 0
+    if not pad:
+        return pl
+    return pl.model_copy(
+        update={"x": pl.x + pad, "y": pl.y + pad, "w": max(pl.w - 2 * pad, 1), "h": max(pl.h - 2 * pad, 1)}
+    )
+
+
+def _style_placeholder(rc: RenderCtx, shp, st: Style, pl: Placed) -> None:
+    """A title placeholder with its own look (``# T {fill=accent radius=12 shape=pill}``): fill, border,
+    shadow and preset geometry on the placeholder itself, so the slide keeps its native title."""
+    if st.rotation:  # (the placeholder already exists, so the generic rotation of new shapes misses it)
+        shp.rotation = st.rotation % 360
+    if not (st.fill or st.line or st.shape or st.shadow or st.radius):
+        return
+    _style_shape(rc, shp, st, pl)
+    prst = (
+        shape_table.prst(st.shape) if st.shape in shape_table.SHAPES else "roundRect" if st.radius else None
+    )
+    if prst is None:
+        return
+    spPr = shp._element.spPr
+    geom = spPr.find(qn("a:prstGeom"))
+    if geom is None:
+        geom = OxmlElement("a:prstGeom")
+        geom.append(OxmlElement("a:avLst"))
+        spPr.find(qn("a:xfrm")).addnext(geom)
+    geom.set("prst", prst)
+    adj = shape_table.SHAPES[st.shape][1] if st.shape in shape_table.SHAPES else None
+    if prst == "roundRect" and adj is None and st.radius:
+        adj = min(emu(st.radius) / max(min(pl.w, pl.h), 1), 0.5)
+    if adj is not None:
+        _set_adj(shp, adj)
 
 
 def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_placeholder: bool) -> None:
@@ -543,16 +624,16 @@ def _render_item(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pla
         first = list(s.shapes)[before:]
         _side_lines(rc, s, pl, st, first[0].name if first else _name(pl, {}))
     if st.rotation:
-        for shp in list(s.shapes)[before:]:
-            tag = etree.QName(shp._element).localname
-            if tag == "graphicFrame":
-                rc.diag(
-                    "css-unsupported",
-                    f"rotate() on a {el.type} is not drawn (PowerPoint cannot rotate tables and charts)",
-                    "remove the transform from tables and charts",
-                )
-            elif tag != "cxnSp":
-                shp.rotation = st.rotation % 360
+        if isinstance(el, (Table, Chart)):
+            rc.diag(
+                "css-unsupported",
+                f"rotate on a {el.type} is not drawn (PowerPoint cannot rotate tables and charts)",
+                "remove the rotation from tables and charts, or rotate the box around them",
+            )
+        else:
+            for shp in list(s.shapes)[before:]:
+                if etree.QName(shp._element).localname != "cxnSp":
+                    shp.rotation = st.rotation % 360
 
 
 def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_placeholder: bool) -> None:
@@ -560,7 +641,7 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
     st = pl.style
     name = _name(pl, counters)
     if isinstance(el, Container):
-        if st.fill or st.line:
+        if st.fill or st.line or st.shape:
             kind = MSO_SHAPE.ROUNDED_RECTANGLE if st.radius else MSO_SHAPE.RECTANGLE
             _autoshape(rc, s, pl, kind, name)
         if (
@@ -582,14 +663,17 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             tree = shp._element.getparent()
             tree.remove(shp._element)
             tree.append(shp._element)  # keep layout z-order
+            _style_placeholder(rc, shp, st, pl)
             tf = shp.text_frame
-        elif st.fill or st.line:
+        elif st.fill or st.line or st.shape:
             kind = MSO_SHAPE.ROUNDED_RECTANGLE if st.radius else MSO_SHAPE.RECTANGLE
             shp = _autoshape(rc, s, pl, kind, name)
             tf = shp.text_frame
         else:
             shp = s.shapes.add_textbox(Emu(pl.x), Emu(pl.y), Emu(pl.w), Emu(pl.h))
             shp.name = name
+            if st.shadow:  # a text box without a fill: the shadow follows the glyphs
+                apply_shadow(rc, shp._element.spPr, st, pl.w, pl.h)
             tf = shp.text_frame
         gap = el.attrs.get("para_gap")
         fill_text(
@@ -637,12 +721,16 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
                 shp.text_frame.word_wrap = False
             if inset := el.attrs.get("icon_inset"):  # room for the icon the layout placed before the text
                 shp.text_frame.margin_left = Emu(shp.text_frame.margin_left + int(inset))
-        if el.shape == "chevron":
+        if el.shape == "chevron" and not st.shape:
             shp.adjustments[0] = float(el.attrs.get("adj", rc.theme.layout.chevron_adj))
     elif isinstance(el, Table):
+        if st.shadow:  # a table cannot carry an effect: a plate of the page colour behind it does
+            rows = el.attrs.get("_row_h") or []
+            plate = pl.model_copy(update={"h": max(pl.h, round(sum(rows)))})  # (rows may outgrow the box)
+            _frame(rc, s, plate, name, Style(fill="bg", shadow=st.shadow))
         add_table(rc, s, pl, name)
     elif isinstance(el, Chart):
-        add_chart(rc, s, pl, name)
+        add_chart(rc, s, _chart_frame(rc, s, pl, name), name)
     elif isinstance(el, Image):
         if not add_image(rc, s, pl, name):
             _placeholder(rc, s, pl, name, f"[image: {el.alt or el.src[:60]}]")
@@ -658,6 +746,7 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             st,
             pl.font_scale,
             para_gap=False,
+            mono=st.font,  # `{font=Consolas}` on a code block (the theme's mono font is the default)
         )
     elif isinstance(el, Raw) and el.kind == "math" and add_math(rc, s, pl, name):
         pass

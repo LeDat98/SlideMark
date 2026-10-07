@@ -111,6 +111,7 @@ def _format_run(
     text: str,
     scale: float = 1.0,
     squeeze: float = 0.0,
+    mono: str | None = None,
 ) -> None:
     theme = rc.theme
     f = r.font
@@ -147,7 +148,7 @@ def _format_run(
         etree.SubElement(hl, qn("a:srgbClr")).set("val", hex6(theme, run.highlight, theme.render.highlight))
         rpr.remove(hl)
         insert_rpr_child(rpr, hl)
-    latin = theme.fonts.mono if run.code else (style.font or theme.fonts.body)
+    latin = (mono or theme.fonts.mono) if run.code else (style.font or theme.fonts.body)
     ea = style.font_ea or theme.fonts.ea
     for tag, face in (("a:latin", latin), ("a:ea", ea)):
         el = etree.Element(qn(tag))
@@ -208,6 +209,7 @@ def fill_text(
     gap_em: float | None = None,
     box_w: int | None = None,
     squeeze: bool = True,
+    mono: str | None = None,
 ) -> None:
     """Write ``paragraphs`` into text frame ``tf`` using the (already merged) ``style``.
 
@@ -278,7 +280,7 @@ def fill_text(
                     rsize = (
                         min(run.size * scale, size) if run.size else size
                     )  # `kpi.unit.size`: never above the number
-                    _format_run(rc, r, run, pst, rsize, seg[a:b], scale, sq)
+                    _format_run(rc, r, run, pst, rsize, seg[a:b], scale, sq, mono)
                 prev = seg
                 prev_r = None if run.highlight else r  # a badge carries its own padding
                 first_text = first_text or seg

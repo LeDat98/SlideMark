@@ -101,6 +101,8 @@ class Item:
     latex: str | None = None  # math: the equation as LaTeX (``` math fence)
     missing: tuple[str, str] | None = None  # image: a "[image: label]" placeholder of a file that was absent
     line_color: str | None = None  # RRGGBB of a solid outline (box classes color the card border)
+    rot: float = 0.0  # clockwise degrees (`a:xfrm rot`): written back as `{rotate=}`
+    shadow: str | None = None  # an outer shadow as "x y blur #RRGGBB[AA]" in pt: written back as `{shadow=}`
 
     @property
     def cx(self) -> float:
@@ -797,6 +799,36 @@ def _int(v) -> int | None:
     return int(v) if isinstance(v, str) and v.lstrip("-").isdigit() else None
 
 
+def _rot_of(el) -> float:
+    """Clockwise rotation (degrees, 0..360) of a shape or picture; 0 when it has none."""
+    xf = el.find(qn("p:spPr") + "/" + qn("a:xfrm"))
+    if xf is None:
+        xf = el.find(qn("p:xfrm"))
+    try:
+        return round((int(xf.get("rot") or 0) / 60000) % 360, 2) if xf is not None else 0.0
+    except ValueError:
+        return 0.0
+
+
+def _shadow_of(el) -> str | None:
+    """``"x y blur #RRGGBB[AA]"`` (pt, the form ``{shadow=}`` takes) of the first outer shadow."""
+    sh = el.find(qn("p:spPr") + "/" + qn("a:effectLst") + "/" + qn("a:outerShdw"))
+    if sh is None:
+        return None
+    try:
+        dist, ang = int(sh.get("dist") or 0) / 12700, int(sh.get("dir") or 0) / 60000
+        blur = int(sh.get("blurRad") or 0) / 12700
+    except ValueError:
+        return None
+    clr = sh.find(qn("a:srgbClr"))
+    color = "#" + (clr.get("val") if clr is not None else "000000")
+    alpha = clr.find(qn("a:alpha")) if clr is not None else None
+    if alpha is not None and (alpha.get("val") or "").isdigit():
+        color += f"{round(int(alpha.get('val')) / 100000 * 255):02X}"
+    x, y = dist * math.cos(math.radians(ang)), dist * math.sin(math.radians(ang))
+    return " ".join(f"{round(v, 1) + 0.0:g}" for v in (x, y, blur)) + f" {color}"
+
+
 def _arrow(ln, tag: str) -> bool:
     end = ln.find(qn(tag)) if ln is not None else None
     return end is not None and (end.get("type") or "none") != "none"
@@ -927,6 +959,8 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
             radius=radius,
             paras=paras,
             has_slidenum=num,
+            rot=_rot_of(el),
+            shadow=_shadow_of(el),
         )
         data.items.append(it)
     elif tag == "pic":
@@ -954,6 +988,9 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
             img = sh.image
             blob_ext = (img.blob, img.ext)
         it = _new(ctx, "image", box, sid=sh.shape_id, name=name, img=blob_ext, alt=_alt(el, name))
+        pic_geom = el.find(qn("p:spPr") + "/" + qn("a:prstGeom"))
+        it.prst = pic_geom.get("prst") if pic_geom is not None else None
+        it.rot, it.shadow = _rot_of(el), _shadow_of(el)
         src = el.find(qn("p:blipFill") + "/" + qn("a:srcRect"))
         it.cropped = src is not None and any(int(src.get(k) or 0) != 0 for k in ("l", "t", "r", "b"))
         data.items.append(it)

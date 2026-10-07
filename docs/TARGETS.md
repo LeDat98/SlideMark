@@ -69,6 +69,11 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       never grown or moved by a layout pass; per-cell `{fill color}` on a table cell, per-point `{color label}` on a
       chart; `@free` keeps a 12-column snap (`@free grid`) so absolute slides cost few tokens. Gate: a decision-fuzz
       test (50 random decision sets × 11 element kinds, 0 silent no-ops: each either changes the XML or warns).
+      Lane I (2026-10-07, `tests/test_element_control.py`): 16 kinds × 22 keys decided in `honour.py` (285 honoured,
+      67 ignored with a hint), `rotate` `shape` (59 names) `z` `shadow` on every kind that draws a shape, pins restored
+      after every pass (`Placed.pin`), `@free grid` (`x=3c w=4c`), list-item / `@rows` row attributes, importer reads
+      `shape` `rotate` `shadow` back; fuzz = 50 sets × 16 kinds, 0 silent. Open: per-cell `{fill color}` on a table
+      cell, per-point `{color label}` on a chart.
 - [ ] DL3b Composition vocabulary (owner, 2026-10-07: "rich to the point of no limit"): ≥ 15 new forms, each one
       `@word` line with secondary attributes and tokens, importer round trip, in SKILL.md in one line each:
       timeline (h/v, milestones), comparison / vs (two columns with a verdict), 2x2 matrix with axis labels,

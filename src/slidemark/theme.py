@@ -75,6 +75,7 @@ class LayoutTokens(BaseModel):
     cell_pad_y: Length = "0.05in"
     dense_tight: float = 0.7  # gap / padding factor on dense slides
     kpi_min_h: Length = "1.1in"
+    z_default: int = 5  # stacking level of a shape without `{z=}` (z=1 sits behind it, z=9 in front, 1..9)
     icon_head: float = 1.2  # icon side / heading font size
     icon_kpi: float = 2.0  # icon side / kpi label font size
     icon_gap: float = 0.4  # gap between icon and text, in icon sides

@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from ..ir import Chart, Container, Deck, Link, Paragraph, Run, Slide, Table, Text
+from ..ir import Chart, Container, Deck, Link, Paragraph, Run, Slide, Style, Table, Text
 from .attrs import (
     FLAGS,
     STANDALONE,
@@ -523,7 +523,14 @@ def _merge_text(blocks: list[Text], role: str) -> Text:
     for b in blocks:
         paras.extend(b.paragraphs)
     first = blocks[0]
-    return Text(role=role, paragraphs=paras, line=first.line, style=first.style, classes=first.classes)  # type: ignore[arg-type]
+    return Text(
+        role=role,  # type: ignore[arg-type]
+        paragraphs=paras,
+        line=first.line,
+        style=first.style,
+        classes=first.classes,
+        box=first.box,
+    )
 
 
 def _at_has_word(items: list[Item], word: str) -> bool:
@@ -770,6 +777,15 @@ def parse_slide(
         slide.layout = slide.layout or "blank"
         slide.html = html_src
     _infer_cover(slide, index, ctx)
+    if "grid" in slide.classes and slide.layout != "free":
+        slide.classes.remove("grid")
+        ctx.add(
+            "warning",
+            "'@grid' needs a @free slide",
+            slide.line,
+            "unknown-token",
+            "write `@free grid`: x y w h then snap to 12 columns and 12 rows (x=3c w=4c)",
+        )
     slide.links = _resolve_links(slide_links, len(slide.elements), "slide", ctx, slide, slide.elements)
     for box, raw in ctx.box_links:
         box.links = _resolve_links(raw, len(box.children), "box", ctx, box, box.children)
@@ -1031,6 +1047,11 @@ def _infer_cover(slide: Slide, index: int, ctx: Ctx | None = None) -> None:
             "write the line without '## ' (use '## ' boxes on content slides)",
         )
     slide.subtitle = _merge_text(texts, "subtitle")
+    if boxes:  # `## sub {x= y= size=}`: the box's own attributes style and place the subtitle
+        b = boxes[0]
+        slide.subtitle.box = slide.subtitle.box or b.box
+        if b.style is not None:
+            slide.subtitle.style = (slide.subtitle.style or Style()).merged(b.style)
     slide.elements = []
     if slide.layout is None:
         slide.layout = "cover" if index == 0 else "section"

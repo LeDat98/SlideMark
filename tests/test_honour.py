@@ -12,7 +12,7 @@ import pytest
 from PIL import Image
 
 from slidemark.build import build
-from slidemark.honour import ATTRS, HONOURED, IGNORED, LABEL, STYLE_NEEDS, audit, honoured
+from slidemark.honour import ATTRS, HONOURED, IGNORED, LABEL, NEEDS, STYLE_NEEDS, audit, honoured
 from slidemark.parser import parse
 from slidemark.template import deck_theme
 
@@ -25,7 +25,8 @@ PROBES: dict[str, str] = {
     "cover": "# T {A}\n## sub\n",
     "box": "# T\n> lead\n## a {<A>}\n- x\n- y\n## b\n- y\n## c\n- z\n",
     "kpi": "# T\n> lead\n## L1 {.kpi <A>}\n12\ncap\n## L2 {.kpi}\n34\ncap\n## L3 {.kpi}\n56\ncap\n",
-    "step": "# T\n@3 steps\n## a {<A>}\n- x\n## b\n- y\n## c\n- z\n",
+    # (the conclusion bar stretches the cards: a step's valign needs room)
+    "step": "# T\n@3 steps\n## a {<A>}\n- x\n## b\n- y\n## c\n- z\n\n> the conclusion\n",
     "chevron": "# T\n@3 chevron\n## a {<A>}\n- x\n## b\n- y\n## c\n- z\n",
     "text": "# T\n> lead\n{A}\nParagraph one\n\nParagraph two\n",
     "callout": "# T\n> lead\n{A}\n> [!note] hello\n",
@@ -34,6 +35,9 @@ PROBES: dict[str, str] = {
     "chart": "# T\n> lead\n{A}\n```column\n,a,b\nS,1,2\n```\n",
     "code": "# T\n> lead\n{A}\n```python\nprint(1)\n```\n",
     "rows": "# T\n@rows\n{A}\n1. one\n2. two\n3. three\n",
+    "item": "# T\n## a\n@1x2\n### one {.item <A>}\n### two {.item}\n## b\n- y\n",
+    "row": "# T\n@rows\n1. one {<A>}\n2. two\n3. three\n",
+    "list item": "# T\n> lead\n- one {<A>}\n- two\n- three\n",
 }
 EXTRA_HEAD = {
     "chevron": "style: layout.chevron_steps=off\n",
@@ -61,6 +65,10 @@ VALUES: dict[str, list[str]] = {
     "pad": ["pad=20pt"],
     "fit": ["fit=cover"],
     "icon": ["icon=chart"],
+    "shadow": ["shadow=on"],
+    "rotate": ["rotate=15"],
+    "shape": ["shape=hexagon"],
+    "z": ["z=1"],
 }
 TABLE_ALIGN = ["align=lr", "align=rl"]  # a table's align is one letter per column
 
@@ -128,6 +136,8 @@ def test_documented_attributes_are_in_the_table():
             documented |= set(re.findall(r"`([a-z ]+)`", cell)[0].split())
         elif group == "Style":
             documented |= set(re.findall(r"`([a-z]+)`", cell))
+        elif group == "Element":
+            documented |= set(re.findall(r"`([a-z]+)`", cell))
         elif group == "Image":
             documented |= {re.findall(r"`([a-z]+)=", cell)[0]}
     assert documented == {
@@ -136,11 +146,18 @@ def test_documented_attributes_are_in_the_table():
         "color",
         "fill",
         "line",
+        "font",
         "align",
         "valign",
         "bold",
+        "italic",
         "radius",
+        "opacity",
         "pad",
+        "shadow",
+        "rotate",
+        "shape",
+        "z",
         "fit",
     }
     assert documented <= set(ATTRS), documented - set(ATTRS)
@@ -168,6 +185,13 @@ def test_table_matches_layout_and_renderer(kind, tmp_probe):
         expect = honoured(kind, attr)
         if kind == "table" and attr == "align":
             expect = True
+        if (kind, attr) in NEEDS:  # honoured beside its companion, silent alone
+            comp = VALUES[NEEDS[kind, attr][0]][0]
+            with_comp, _ = _slide_xml(_deck(kind, comp), tmp_probe)
+            changed = any(
+                _slide_xml(_deck(kind, f"{comp} {v}"), tmp_probe)[0] != with_comp for v in VALUES[attr]
+            )
+            expect = True
         if changed != expect:
             wrong.append(
                 f"{kind}.{attr}: table says {'honoured' if expect else 'ignored'}, "
@@ -194,6 +218,12 @@ def test_ignored_attribute_warns_with_a_hint(kind, tmp_probe):
 def test_honoured_attribute_is_silent(kind, tmp_probe):
     for attr in HONOURED[kind].split():
         v = VALUES[attr][0]
+        if (kind, attr) in NEEDS:  # silent beside its companion, a hint alone
+            comp = VALUES[NEEDS[kind, attr][0]][0]
+            v = f"{comp} {v}"
+            alone = [d for d in _diags(_deck(kind, VALUES[attr][0]), tmp_probe) if d.rule == "attr-ignored"]
+            assert alone and alone[0].message.startswith(f"{attr}="), f"{kind}.{attr} alone is not reported"
+            assert LABEL[kind] in alone[0].message
         assert not [d for d in _diags(_deck(kind, v), tmp_probe) if d.rule == "attr-ignored"], (
             f"{kind}.{attr}"
         )
@@ -283,7 +313,7 @@ def test_audit_reports_honoured_cells_too(tmp_probe):
 
 def test_check_reports_it_too(tmp_probe):
     """lint_deck gets ``attr-ignored`` from ``check`` / ``review`` too (no .pptx written)."""
-    got = _diags(HEAD + "# T\n> lead\n## a {.kpi bold=true}\n1\nc\n## b {.kpi}\n2\nc\n@end\n- x\n", tmp_probe)
+    got = _diags(HEAD + "# T\n> lead\n## a {.kpi fit=cover}\n1\nc\n## b {.kpi}\n2\nc\n@end\n- x\n", tmp_probe)
     assert any(d.rule == "attr-ignored" for d in got)
 
 
@@ -406,11 +436,12 @@ def test_short_chevron_row_is_judged_as_steps(tmp_probe):
     compact = _warn("# T\n@3 chevron\n## a {h=30%}\n- x\n## b\n- y\n## c\n- z\n", tmp_probe)
     assert compact  # (without chevron_steps=off the row is steps)
     off = _diags(
-        HEAD + "style: layout.chevron_steps=off\n# T\n@3 chevron\n## a {h=30%}\n- x\n## b\n- y\n## c\n- z\n",
+        HEAD
+        + "style: layout.chevron_steps=off\n# T\n@3 chevron\n## a {radius=9}\n- x\n## b\n- y\n## c\n- z\n",
         tmp_probe,
     )
     assert [d.message for d in off if d.rule == "attr-ignored"] == [
-        "h= on a compact @chevron box is not honoured"
+        "radius= on a compact @chevron box is not honoured"
     ]
 
 

@@ -193,12 +193,9 @@ def add_svg(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
         return False
     try:
         iw, ih = svg_size(svg)
-        x, y, w, h = pl.x, pl.y, pl.w, pl.h
-        if im.fit != "stretch" and w and h:
-            s = min(w / iw, h / ih)
-            dw, dh = round(iw * s), round(ih * s)
-            top = pl.style.valign == "top"
-            x, y, w, h = x + (w - dw) // 2, y + (0 if top else (h - dh) // 2), dw, dh
+        from .objects import picture_rect
+
+        x, y, w, h, _crop = picture_rect(pl, iw, ih, "stretch" if im.fit == "stretch" else "contain")
         w_px, h_px = max(round(w / EMU_PER_PX), 1), max(round(h / EMU_PER_PX), 1)
         png = _rasterize(rc, svg, w_px, h_px)
         if not png:
@@ -215,6 +212,9 @@ def add_svg(rc: RenderCtx, slide, pl: Placed, name: str) -> bool:
         pic = slide.shapes.add_picture(BytesIO(png), Emu(x), Emu(y), Emu(w), Emu(h))
         pic.name = name
         pic._element.nvPicPr.cNvPr.set("descr", im.alt or "")
+        from .objects import _style_picture
+
+        _style_picture(rc, pic, pl.style, w, h)
         part_ = slide.part
         partname = part_.package.next_partname("/ppt/media/svg%d.svg")
         svg_part = Part(partname, "image/svg+xml", part_.package, svg.encode("utf-8"))

@@ -569,12 +569,13 @@ def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: boo
         el = g.element.model_copy(
             update={"attrs": {k: v for k, v in g.element.attrs.items() if k != "para_gap"}}
         )
+        own = getattr(c.element, "style", None)  # `## a {valign=top}` on the step: the author's anchor wins
         res[id(m)] = g.model_copy(
             update={
                 "y": ctop + pad_v,
                 "h": card_h - 2 * pad_v,
                 "element": el,
-                "style": g.style.model_copy(update={"valign": "middle"}),
+                "style": g.style.model_copy(update={"valign": (own.valign if own else None) or "middle"}),
             }
         )
     inside = [p for p in items if _is_rule(p)]

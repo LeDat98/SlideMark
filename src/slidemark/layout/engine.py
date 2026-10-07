@@ -465,17 +465,36 @@ def _pad(style: Style, default: float = 0.0) -> int:
         return round(default)
 
 
+_CELLS = re.compile(r"^\s*(-?\d+(?:\.\d+)?)c\s*$")
+GRID_N = 12  # `@free grid`: 12 columns and 12 rows over the body
+
+
 def _len(ctx: _Ctx, value, ref: int, el=None) -> int | None:
     try:
         return to_emu(value, ref)
     except (ValueError, TypeError):
-        ctx.diag(
-            "bad-length",
-            f"invalid length {value!r}",
-            "use e.g. 50%, 2in, 36pt, 3cm, 120px",
-            line=getattr(el, "line", None),
-        )
+        hint = "use e.g. 50%, 2in, 36pt, 3cm, 120px"
+        if isinstance(value, str) and _CELLS.match(value):
+            hint = "grid units (3c) need a `@free grid` slide: write `@free grid` before the blocks"
+        ctx.diag("bad-length", f"invalid length {value!r}", hint, line=getattr(el, "line", None))
         return None
+
+
+def _dim(ctx: _Ctx, value, ref: int, el, pos: bool) -> int | None:
+    """One ``x y w h`` value of ``el`` against the parent size ``ref``. On a ``@free grid`` slide a percentage
+    snaps to the nearest 1/12 and ``3c`` is a grid unit: a position ``x=3c`` is the left edge of column 3
+    (``y`` likewise for rows), a size ``w=4c`` is four columns wide."""
+    if isinstance(value, str) and "grid" in ctx.slide.classes and ctx.slide.layout == "free":
+        if m := _CELLS.match(value):
+            n = float(m.group(1))
+            return round(ref * (max(n - 1, 0.0) if pos else n) / GRID_N)
+        v = value.strip()
+        if v.endswith("%"):
+            try:
+                return round(ref * round(float(v[:-1]) / 100 * GRID_N) / GRID_N)
+            except ValueError:
+                pass
+    return _len(ctx, value, ref, el)
 
 
 # --------------------------------------------------------------------------- geometry helpers
@@ -495,16 +514,124 @@ def _apply_box(ctx: _Ctx, el, rect: Rect, absolute: bool) -> Rect:
         return rect
     x, y, w, h = rect.x, rect.y, rect.w, rect.h
     if absolute:
-        if b.x is not None and (v := _len(ctx, b.x, rect.w, el)) is not None:
+        if b.x is not None and (v := _dim(ctx, b.x, rect.w, el, True)) is not None:
             x = rect.x + v
-        if b.y is not None and (v := _len(ctx, b.y, rect.h, el)) is not None:
+        if b.y is not None and (v := _dim(ctx, b.y, rect.h, el, True)) is not None:
             y = rect.y + v
         w, h = max(rect.right - x, 0), max(rect.bottom - y, 0)
-    if b.w is not None and (v := _len(ctx, b.w, rect.w, el)) is not None:
+    if b.w is not None and (v := _dim(ctx, b.w, rect.w, el, False)) is not None:
         w = v
-    if b.h is not None and (v := _len(ctx, b.h, rect.h, el)) is not None:
+    if b.h is not None and (v := _dim(ctx, b.h, rect.h, el, False)) is not None:
         h = v
     return Rect(x, y, w, h)
+
+
+def _in_cell(ctx: _Ctx, el, cell: Rect) -> Rect:
+    """``el.box`` resized inside its grid cell; a chart / picture left smaller than it by ``w=`` / ``h=``
+    sits where ``align=`` (left|center|right) and ``valign=`` (top|middle|bottom) say (default: top left)."""
+    r = _apply_box(ctx, el, cell, False)
+    st = getattr(el, "style", None)
+    if st is None or not isinstance(el, (Chart, Image, Media)) or (r.w >= cell.w and r.h >= cell.h):
+        return r
+    ax = {"center": 0.5, "right": 1.0}.get(st.align or "", 0.0)
+    ay = {"middle": 0.5, "bottom": 1.0}.get(st.valign or "", 0.0)
+    return Rect(cell.x + round((cell.w - r.w) * ax), cell.y + round((cell.h - r.h) * ay), r.w, r.h)
+
+
+def _pin_rect(ctx: _Ctx, el, r: Rect, W: int, H: int) -> Rect:
+    """``r`` (the default rect of a slide-level text: title, subtitle) with the pinned parts of ``el.box``
+    applied: ``x y`` from the slide's top-left corner, ``w h`` of the slide size; the rest stays as it was."""
+    b: Box | None = getattr(el, "box", None)
+    if b is None:
+        return r
+    x, y, w, h = r.x, r.y, r.w, r.h
+    for key, ref, pos in (("x", W, True), ("y", H, True), ("w", W, False), ("h", H, False)):
+        val = getattr(b, key)
+        if val is not None and (v := _dim(ctx, val, ref, el, pos)) is not None:
+            if key == "x":
+                x = v
+            elif key == "y":
+                y = v
+            elif key == "w":
+                w = v
+            else:
+                h = v
+    return Rect(x, y, max(w, 0), max(h, 0))
+
+
+def _stamp_pin(ctx: _Ctx, el, start: int, siblings: list) -> None:
+    """Record what the layout placed for an author-pinned block (``{x= y= w= h=}``). ``ctx.out[start:]``
+    is the block: its first item is the block itself, the rest its children. No later pass may change a
+    pinned component: ``_restore_pins`` puts it back (``Placed.pin``)."""
+    b: Box | None = getattr(el, "box", None)
+    if b is None or len(ctx.out) <= start or (kpirow.pinned(el) and kpirow.any_pinned(siblings)):
+        return
+    p = ctx.out[start]
+    pin = (
+        p.x if b.x is not None else None,
+        p.y if b.y is not None else None,
+        p.w if b.w is not None else None,
+        p.h if b.h is not None else None,
+        len(ctx.out) - start,
+    )
+    if any(v is not None for v in pin[:4]):
+        p.pin = pin
+
+
+def _valign_cards(out: list[Placed]) -> list[Placed]:
+    """``## box {valign=middle|bottom}``: the content of a card (all under its heading) sits in the middle
+    or at the bottom of the card as it ended up, after every pass that stretched it (run once, at the end)."""
+    for i, c in enumerate(out):
+        el = c.element
+        va = _own_valign(el) if isinstance(el, Container) and "kpi" not in el.classes else None
+        if va is None or c.h <= 0:
+            continue
+        kids: list[int] = []
+        for j in range(i + 1, len(out)):
+            q = out[j]
+            if not (c.x <= q.x + q.w // 2 <= c.x + c.w and c.y <= q.y + q.h // 2 <= c.y + c.h):
+                break
+            kids.append(j)
+        heads = [out[j] for j in kids if getattr(out[j].element, "role", None) == "heading"]
+        top = max((q.y + q.h for q in heads), default=c.y)
+        body = [j for j in kids if out[j].y >= top - 1 and getattr(out[j].element, "role", None) != "heading"]
+        if not body:
+            continue
+        lo, hi = min(out[j].y for j in body), max(out[j].y + out[j].h for j in body)
+        pad = max(lo - top, 0)  # the air the card keeps between its heading (or edge) and its content
+        room = c.y + c.h - pad - hi  # free height under the content down to the same air at the bottom
+        dy = room if va == "bottom" else room // 2
+        if dy > 0:
+            for j in body:
+                out[j] = out[j].model_copy(update={"y": out[j].y + dy})
+    return out
+
+
+def _stack(items: list[Placed], default: int) -> list[Placed]:
+    """Stacking order: items drawn later sit in front. ``{z=1..9}`` moves a shape (a box with all its
+    children) to that level; a shape without one is at ``layout.z_default``; a level keeps source order."""
+    if not any(p.style.z is not None for p in items):
+        return items
+    return sorted(items, key=lambda p: default if p.style.z is None else p.style.z)  # stable
+
+
+def _restore_pins(out: list[Placed]) -> list[Placed]:
+    """Put every pinned component back where the placement left it: a pass that grew, shrank, centred or
+    shifted a block the author placed is undone; the children of a moved block move with it."""
+    for i, p in enumerate(out):
+        if p.pin is None:
+            continue
+        x, y, w, h, n = p.pin
+        dx = (x - p.x) if x is not None else 0
+        dy = (y - p.y) if y is not None else 0
+        upd = {k: v for k, v in (("w", w), ("h", h)) if v is not None and v != getattr(p, k)}
+        if dx or dy or upd:
+            out[i] = p.model_copy(update={"x": p.x + dx, "y": p.y + dy, **upd})
+            if dx or dy:
+                for j in range(i + 1, min(i + n, len(out))):
+                    q = out[j]
+                    out[j] = q.model_copy(update={"x": q.x + dx, "y": q.y + dy})
+    return out
 
 
 def _css_width(ctx: _Ctx, el, r: Rect, inherit: Style) -> Rect:
@@ -537,7 +664,7 @@ def _cover_explicit(ctx: _Ctx, *els) -> bool:
     for el in els:
         if el is None:
             continue
-        if _explicit_size(ctx, el):
+        if _explicit_size(ctx, el) or getattr(el, "box", None) is not None:  # (a pinned box too)
             return True
         if ctx.css.active and any(v is not None for k, v in ctx.css.own(el).__dict__.items() if k != "color"):
             return True  # (a rule that only sets the color, like the ink of `dark` / `bg=`, keeps the cover)
@@ -1002,6 +1129,18 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         if rect.w <= 0 or rect.h <= 0:
             return
     if isinstance(el, (Text, Shape)):
+        orig = id(el)
+        if isinstance(el, Text) and any(
+            p.style is not None and (p.style.fill or p.style.line) for p in el.paragraphs
+        ):
+            # `- item {fill=}`: only a row of `@rows` has a bar to fill; a list item is text (see honour.py)
+            plain = [
+                p.model_copy(update={"style": p.style.merged(fast_style(fill="", line=""))})
+                if p.style is not None and (p.style.fill or p.style.line)
+                else p
+                for p in el.paragraphs
+            ]
+            el = el.model_copy(update={"paragraphs": plain})
         st = _text_style(ctx, el, inherit)
         eff = _grown(ctx, el, measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size))
         need = _text_need(ctx, el, st, rect.w, eff)
@@ -1022,7 +1161,6 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
                 ctx.over.append(_label(el))
         if isinstance(el, Text) and "callout" in el.classes:
             rect = Rect(rect.x, rect.y, rect.w, min(rect.h, round(need)))  # callouts never stretch
-        orig = id(el)
         if (pg := _para_gap(ctx, el)) is not None:  # spread paragraphs: the renderer writes spcBef
             el = el.model_copy(update={"attrs": {**el.attrs, "para_gap": pg}})
         ctx.emit(el, rect, st, eff)
@@ -1169,8 +1307,10 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
     hst = _text_style(ctx, h_el, fast_style())
     if kpi:
         body_size = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k
+        own_al = c.style.align if c.style is not None else None  # `{align=left}` on the card: its label too
         hst = hst.merged(
-            fast_style(align="center", color="muted", bold=False, font_size=body_size), ctx.css.own(h_el)
+            fast_style(align=own_al or "center", color="muted", bold=False, font_size=body_size),
+            ctx.css.own(h_el),
         )  # `.kpi h2 {..}` still wins over the label defaults
     if band:
         hst = hst.merged(
@@ -1356,7 +1496,12 @@ def _place_container(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> Non
     """Place a box and its children; CSS ``rotate()`` turns the whole subtree about the box center."""
     start = len(ctx.out)
     _place_container0(ctx, c, rect, inherit)
-    deg = _cstyle(ctx, c).rotation if ctx.css.active else None
+    own = _cstyle(ctx, c) if (ctx.css.active or c.style is not None) else None
+    deg = own.rotation if own is not None else None
+    if own is not None and own.z is not None:  # `{z=}`: the whole box (heading, children) sits at that level
+        for q in ctx.out[start:]:
+            if q.style.z is None:
+                q.style = q.style.merged(fast_style(z=own.z))
     if deg and len(ctx.out) > start:
         subtree = ctx.out[start + 1 :]  # the card (first item) already carries the rotation in its style
         if not css.rotate_placed(subtree, rect.x + rect.w / 2, rect.y + rect.h / 2, deg):
@@ -1676,6 +1821,14 @@ def _kpi_children(ctx: _Ctx, children: list, width: int, box: Container | None =
     )
     vcss, ccss = ctx.css.kpi_styles(box) if box is not None else (fast_style(), fast_style())
     big, cap = big.merged(vcss), cap.merged(ccss)
+    # `{color= bold=}` on the card style the number, `{align= valign=}` place the text
+    own = getattr(box, "style", None)
+    if own is not None:
+        big = big.merged(
+            fast_style(**{k: v for k in ("color", "bold") if (v := getattr(own, k)) is not None})
+        )
+        if own.align is not None:
+            big, cap = big.merged(fast_style(align=own.align)), cap.merged(fast_style(align=own.align))
     paras: list[Paragraph] = []
     for j, p in enumerate(ch.paragraphs):
         if j == 0:
@@ -1692,7 +1845,13 @@ def _kpi_children(ctx: _Ctx, children: list, width: int, box: Container | None =
             p = split_unit(p, th.kpi_unit_size, th.kpi_unit_color)
         paras.append(p.model_copy(update={"style": st.merged(p.style)}))
     new = ch.model_copy(
-        update={"paragraphs": paras, "style": fast_style(align="center", valign="middle").merged(ch.style)}
+        update={
+            "paragraphs": paras,
+            "style": fast_style(
+                align="center",
+                valign=own.valign if own is not None and own.valign is not None else "middle",
+            ).merged(ch.style),
+        }
     )
     return children[:i] + [new] + children[i + 1 :]
 
@@ -1792,6 +1951,12 @@ def _roomy_paragraphs(ctx: _Ctx, flow: list, nat: list, area: Rect, inherit: Sty
         nat[k] = round(_natural_height(ctx, ch, area.w, inherit) or 0)
 
 
+def _own_valign(owner) -> str | None:
+    """``middle`` / ``bottom`` when the author wrote ``valign=`` on this box (a theme class never does)."""
+    st = getattr(owner, "style", None)
+    return st.valign if st is not None and st.valign in ("middle", "bottom") else None
+
+
 def _place_stack(
     ctx: _Ctx, children: list, area: Rect, inherit: Style, gap: int, owner, *, center: bool = False
 ) -> dict[int, Rect]:
@@ -1800,7 +1965,9 @@ def _place_stack(
     for i, ch in enumerate(children):
         if _is_abs(ch, children):
             rects[i] = _apply_box(ctx, ch, area, True)
+            n0 = len(ctx.out)
             _place_block(ctx, ch, rects[i], inherit)
+            _stamp_pin(ctx, ch, n0, children)
     flow = [(i, ch) for i, ch in enumerate(children) if not _is_abs(ch, children)]
     if not flow:
         return rects
@@ -1829,9 +1996,11 @@ def _place_stack(
     used = 0
     for (i, ch), n in zip(flow, nat, strict=True):
         h = n if n is not None else flex_h
-        r = _css_width(ctx, ch, _apply_box(ctx, ch, Rect(area.x, y, area.w, h), False), inherit)
+        r = _css_width(ctx, ch, _in_cell(ctx, ch, Rect(area.x, y, area.w, h)), inherit)
         rects[i] = r
+        n0 = len(ctx.out)
         _place_block(ctx, ch, r, inherit)
+        _stamp_pin(ctx, ch, n0, children)
         y += h + gap
         used += h + gap
     used -= gap
@@ -2257,7 +2426,9 @@ def _place_blocks(
     for i, b in enumerate(blocks):
         if _is_abs(b, blocks):
             rects[i] = _apply_box(ctx, b, area, True)
+            n0 = len(ctx.out)
             _place_block(ctx, b, rects[i], inherit)
+            _stamp_pin(ctx, b, n0, blocks)
     flow = [(i, b) for i, b in enumerate(blocks) if not _is_abs(b, blocks)]
     if not flow:
         _emit_links(ctx, links or [], rects)
@@ -2422,12 +2593,16 @@ def _place_blocks(
         if cjk_cap is not None and chev_eff is not None:  # CJK lines never break (fallback fonts run wider)
             chev_eff = min(chev_eff, cjk_cap)
     for (i, blk), r in zip(flow, cells, strict=True):
-        r = r if row_pin is not None else _css_width(ctx, blk, _apply_box(ctx, blk, r, False), inherit)
+        r = r if row_pin is not None else _css_width(ctx, blk, _in_cell(ctx, blk, r), inherit)
         rects[i] = r
         if "chevron" in flags and isinstance(blk, (Text, Shape, Container)):
+            n0 = len(ctx.out)
             rects[i] = _place_chevron(ctx, blk, r, inherit, chev_eff, chev_h)
+            _stamp_pin(ctx, blk, n0, blocks)
         else:
+            n0 = len(ctx.out)
             _place_block(ctx, blk, r, inherit)
+            _stamp_pin(ctx, blk, n0, blocks)
             if isinstance(blk, (Image, Media)) and _text_mate(flow):
                 _top_align(ctx.out[-1])
     if "chevron" not in flags:
@@ -2626,6 +2801,13 @@ def _chevron_base(ctx: _Ctx, blk, inherit: Style) -> tuple[Shape, Style]:
     st = _chevron_font(ctx, sh, _text_style(ctx, sh, inherit))
     # the preset text rectangle already starts a point depth inside both ends: add only a small padding
     st = st.merged(fast_style(padding=ctx.lt.chevron_pad, align="center", valign="middle"))
+    if sh.style is not None:  # `{pad= align= valign=}` on the box: the author's text placement wins
+        own = {
+            k: v
+            for k, f in (("padding", "padding"), ("align", "align"), ("valign", "valign"))
+            if (v := getattr(sh.style, f)) is not None
+        }
+        st = st.merged(fast_style(**own))
     ctx.chev_memo[key] = (blk, inherit, sh, st)
     return sh, st
 
@@ -2634,7 +2816,8 @@ def _chevron_geom(
     ctx: _Ctx, blk, rect: Rect, inherit: Style, hcap: int | None = None
 ) -> tuple[Shape, Style, Rect]:
     sh, st = _chevron_base(ctx, blk, inherit)
-    if hcap is not None:
+    pinned_h = getattr(blk, "box", None) is not None and blk.box.h is not None
+    if hcap is not None and not pinned_h:  # (a pinned `h=` is the author's: the row height does not cap it)
         rect = Rect(rect.x, rect.y, rect.w, min(rect.h, hcap))
     if icon := _icon_name(blk):  # the icon sits left of the text: reserve its room as a left inset
         side = min(round(ctx.lt.icon_head * (st.font_size or 18) * EMU_PER_PT), round(0.4 * rect.h))
@@ -3737,7 +3920,6 @@ def _rows_list(ctx: _Ctx, slide: Slide, kind: str) -> Text | None:
         isinstance(el, Text)
         and el.role == "body"
         and "callout" not in el.classes
-        and el.box is None
         and not slide.links
         and el.paragraphs
         and all(
@@ -3774,7 +3956,11 @@ def _layout_rows(ctx: _Ctx, el: Text, body: Rect, sg: int) -> _Ctx | None:
     bar_st = fast_style().merged(*_class_styles(ctx, Shape(classes=["rows"])), ctx.css.own(el))
     num_cls = th.classes.get("rows-num") or fast_style()
     st0 = _styled(ctx, el, _role_style(ctx, "body"))
+    own = el.style  # the author's `{align= valign= radius= rotate= z=}` on the list
+    group = {k: getattr(st0, k) for k in ("rotation", "z")}  # the whole list turns / stacks, not each bar
+    st0 = fast_style(**{k: v for k, v in st0.__dict__.items() if k not in group})
     explicit = _explicit_size(ctx, el)
+    start = len(ctx.out)
     pad = _emu(lt.rows_pad)
     size = st0.font_size or 18
     if not explicit:
@@ -3791,8 +3977,8 @@ def _layout_rows(ctx: _Ctx, el: Text, body: Rect, sg: int) -> _Ctx | None:
     st_txt = st0.merged(
         fast_style(
             font_size=size,
-            align="left",
-            valign="middle",
+            align=(own.align if own is not None and own.align else "left"),
+            valign=(own.valign if own is not None and own.valign else "middle"),
             padding_left=str(round((lead + pad) / EMU_PER_PT, 2)) + "pt",
         )
     )
@@ -3808,8 +3994,15 @@ def _layout_rows(ctx: _Ctx, el: Text, body: Rect, sg: int) -> _Ctx | None:
     y = body.y
     for i, p in enumerate(plain):
         base = fast_style().merged(bar_st, st_txt)
+        if p.style is not None:  # `1. text {fill=accent line=danger}`: this row's own bar
+            base = base.merged(fast_style(fill=p.style.fill, line=p.style.line))
         ctx.emit(
-            Shape(shape="rect", paragraphs=[p], attrs={"shape_name": f"Row {i + 1}"}, classes=["rows"]),
+            Shape(
+                shape="rounded-rect" if st0.radius else "rect",
+                paragraphs=[p],
+                attrs={"shape_name": f"Row {i + 1}"},
+                classes=["rows"],
+            ),
             Rect(body.x, y, body.w, h),
             base.merged(
                 fast_style(padding_top="0pt", padding_bottom="0pt", padding_right=f"{pad / EMU_PER_PT:g}pt")
@@ -3867,6 +4060,13 @@ def _layout_rows(ctx: _Ctx, el: Text, body: Rect, sg: int) -> _Ctx | None:
                 ),
             )
         y += h + gap
+    if group["z"] is not None:
+        for q in ctx.out[start:]:
+            q.style = q.style.merged(fast_style(z=group["z"]))
+    if group["rotation"]:
+        css.rotate_placed(
+            ctx.out[start:], body.x + body.w / 2, body.y + (y - gap - body.y) / 2, group["rotation"]
+        )
     return ctx
 
 
@@ -4379,7 +4579,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 t_st = t_st.merged(fast_style(valign="bottom"))
                 if theme.title_band:
                     t_st = t_st.merged(fast_style(color=theme.title_band_color))
-                t_r = Rect(Mx, by, inner_w, round(band_h * 0.65))
+                t_r = _pin_rect(ctx, slide.title, Rect(Mx, by, inner_w, round(band_h * 0.65)), W, H)
                 t_st = _styled(ctx, slide.title, t_st, classes=False)
                 t_fs = fit_text(slide.title, t_r, t_st)
                 if composed:
@@ -4388,7 +4588,9 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 s_st = _role_style(ctx, "subtitle", cover=True)
                 if theme.title_band:
                     s_st = s_st.merged(fast_style(color=theme.title_band_color))
-                s_r = Rect(Mx, by + round(band_h * 0.68), inner_w, round(band_h * 0.3))
+                s_r = _pin_rect(
+                    ctx, sub, Rect(Mx, by + round(band_h * 0.68), inner_w, round(band_h * 0.3)), W, H
+                )
                 s_st = _styled(ctx, sub, s_st.merged(fast_style(valign="top")), classes=False)
                 s_fs = fit_text(sub, s_r, s_st)
             if composed and t_r is not None:  # title + subtitle: one block, centred on the token line
@@ -4432,6 +4634,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 head_bottom = y
             if kind == "free" and getattr(slide.title, "box", None) is not None:
                 r = _apply_box(ctx, slide.title, Rect(0, 0, W, H), True)  # an explicit title box wins
+            else:
+                r = _pin_rect(ctx, slide.title, r, W, H)  # `# T {x= y= w= h=}`: the title box placed
             st = _styled(ctx, slide.title, st, classes=False)
             put(head, slide.title, r, st, fit_text(slide.title, r, st))
             if (
@@ -4583,7 +4787,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             rctx := _layout_rows(
                 _Ctx(deck, theme, slide, index, W, H, dense_k=ctx.dense_k, tight=ctx.tight, css=ctx.css),
                 rows_el,
-                body,
+                _apply_box(ctx, rows_el, body, True) if rows_el.box is not None else body,
                 sg,
             )
         )
@@ -4840,6 +5044,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     ctx.diags += ctx.css.diagnostics()
     deck.diagnostics.extend(ctx.diags)
     if final_ctx:
+        final_ctx.out = _valign_cards(final_ctx.out)
+        final_ctx.out = _restore_pins(
+            final_ctx.out
+        )  # the explicit wins: no pass moved what the author pinned
         final_ctx.out = expand_notes(
             final_ctx.out,
             theme,
@@ -4886,4 +5094,4 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         "asked": dict(final_ctx.asked) if final_ctx else {},
         "dense_k": ctx.dense_k,
     }
-    return head + chrome + (final_ctx.out if final_ctx else []) + tail
+    return _stack(head + chrome + (final_ctx.out if final_ctx else []) + tail, ctx.lt.z_default)
