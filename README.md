@@ -61,6 +61,25 @@ Cùng một agent (Sonnet), cùng đề bài, mỗi bên chạy 1 lần, đo t�
 | 15 | 5 / 11 | 40 s / 140 s | 6,7k / 18,2k | 40% |
 | 25 | 7 / 10 | 70 s / 198 s | 7,5k / 41,5k | 32% |
 
+### Thiết kế là quyết định của agent (2026-10-07)
+
+SlideMark hỗ trợ quyết định thiết kế chứ không thay agent quyết định. Từ wave 3, SKILL.md yêu cầu agent nêu rõ
+lựa chọn của mình cho cả deck (`colors:` `fonts:` `sizes:` `style:` `footer:`) và từng slide (dạng, một điểm
+nhấn, ghi đè vị trí/cỡ/màu khi cần); `build` cảnh báo `design-none` / `design-slide` và in dòng
+`design: colors fonts sizes style footer; 14/14 slides carry choices`. Không có lựa chọn nào được coi là "đúng"
+(`docs/DESIGN_REQUIRED.md`, `docs/DESIGN_FREEDOM.md`).
+
+Cùng đề 15 slide, giám khảo thiết kế chấm mù (Opus, cùng một vòng):
+
+| Deck | Điểm | Lần gọi | Thời gian | Chi phí | Token mã nguồn |
+|---|---|---|---|---|---|
+| SlideMark wave 3 (nêu quyết định) | **3,5** | 9 | 90 s | 61% | 1,6k |
+| SlideMark wave 2 (chỉ nội dung) | 3,0 | 5 | 36 s | 34% | 1,3k |
+| python-pptx | 2,5 | 11 | 140 s | 100% | 5,3k |
+
+Toàn bộ thiết kế mà agent python-pptx tự viết (64 quyết định) nêu lại được trong SlideMark với 43% token
+(`bench/lengthbench/t2/slidemark-ported/REPORT.md`, `docs/DESIGN_COVERAGE.md`).
+
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
