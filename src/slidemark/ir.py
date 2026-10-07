@@ -145,6 +145,7 @@ class Run(Model):
     color: str | None = None
     highlight: str | None = None
     link: str | None = None  # URL, or "#<slide-id>" / "#3" for an internal jump
+    size: float | None = None  # pt of this run alone (None = the paragraph's); set by `kpi.unit.size`
 
 
 class Paragraph(Model):

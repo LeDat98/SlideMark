@@ -5,6 +5,7 @@ All notable changes. Versions follow semver once 0.1.0 is published.
 ## Unreleased (0.1.0 candidate)
 
 ### Design freedom
+- DL2 lane G: `kpi.band=<color>` (`kpi.band.color`, `kpi.band.size`: a header band behind the label of every `.kpi` card) and `kpi.unit.size=22` (`kpi.unit.color`: the trailing unit of a KPI value in its own run size, `Run.size`); `sizes: kpi=NN` now sets the KPI number size (it was a silent no-op) and counts as an explicit size; KPI value width estimates measure the unit at its own size; t2 / t3 ports re-done with every form that exists.
 - DL2 lane F: `@items` / `box.items=cards` (item cards), `@num` (numbered heading badges), `heading.rule`, `title.rule2`, `@rows plain` with `rows.glyph` / `rows.stripe`, cover `bar@edge` / `rule_w` / `rule_pos` / `stripes`, `render.chevron_shape` as a list, `table.num_pad`, `kpi.fill` / `kpi.line`; lint reads a KPI label against a tall stripe.
 - No fixed look: every color, font, size, spacing, band, card style and layout constant is a token
   (`slidemark tokens`); built-in themes are YAML presets (`src/slidemark/presets/`); `theme: none` is a neutral canvas.

@@ -40,6 +40,7 @@ from .gantt import expand_gantt
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
 from .kpirule import expand_kpi_rule
+from .kpiunit import split_unit, value_em
 from .l3fill import (
     _body_items,
     align_chevron_table,
@@ -801,14 +802,16 @@ def _kpi_grow(ctx: _Ctx, grow: float, box: Container | None = None, width: int |
     return max(min(g, _kpi_fit(ctx, box, width)), 1.0) if width else g
 
 
-def _kpi_row_em(ctx: _Ctx, box: Container | None, own: float) -> float:
-    """Em width of the widest number among the KPI cards of the slide (one size per row)."""
+def _kpi_row_em(ctx: _Ctx, box: Container | None, own: float, size: float = 36) -> float:
+    """Em width of the widest number among the KPI cards of the slide (one size per row); a unit set by
+    ``kpi.unit.size`` counts at its own size (``size`` = the number's)."""
     best = own
+    unit = ctx.theme.kpi_unit_size
     for e in ctx.slide.elements:
         if isinstance(e, Container) and "kpi" in e.classes:
             t = next((c for c in e.children if isinstance(c, Text) and c.paragraphs), None)
             if t is not None:
-                best = max(best, measure.text_em(t.paragraphs[0].plain, bold=True))
+                best = max(best, value_em(t.paragraphs[0], size, unit))
     return best
 
 
@@ -820,16 +823,17 @@ def _kpi_fit(ctx: _Ctx, box: Container | None, width: int) -> float:
     if text is None:
         return 1.0
     big = (ctx.theme.classes.get("kpi") or _base_classes()["kpi"]).merged(ctx.css.kpi_styles(box)[0])
-    em = _kpi_row_em(ctx, box, measure.text_em(text.paragraphs[0].plain, bold=True))
+    ref = big.font_size or 36
+    em = _kpi_row_em(ctx, box, value_em(text.paragraphs[0], ref, ctx.theme.kpi_unit_size), ref)
     avail = width / EMU_PER_PT * 0.72
-    size = min(big.font_size or 36, avail / max(em, 1e-6))  # the size the number has after its own shrink
+    size = min(ref, avail / max(em, 1e-6))  # the size the number has after its own shrink
     return avail * ctx.lt.kpi_fit_margin / max(em * size, 1e-6)
 
 
 def _kpi_explicit(ctx: _Ctx, box: Container | None) -> bool:
     if box is None:
         return False
-    if _explicit_size(ctx, box):
+    if _explicit_size(ctx, box) or "kpi" in ctx.theme.sizes:  # `sizes: kpi=` is the author's number size
         return True
     return ctx.css.active and any(st.font_size is not None for st in ctx.css.kpi_styles(box))
 
@@ -1160,7 +1164,7 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
     """(heading element, merged style, autofit scale, band fill) of a box, or ``None`` without a heading."""
     if c.title is None or not c.title.paragraphs:
         return None
-    band, band_ink = (None, "bg") if kpi else ctx.theme.heading_band_for(c.classes)
+    band, band_ink = ctx.theme.kpi_band_for() if kpi else ctx.theme.heading_band_for(c.classes)
     h_el = c.title if c.title.role == "heading" else c.title.model_copy(update={"role": "heading"})
     hst = _text_style(ctx, h_el, fast_style())
     if kpi:
@@ -1178,6 +1182,12 @@ def _heading_parts(ctx: _Ctx, c: Container, pad: int, kpi: bool):
                 padding=f"{round(pad / EMU_PER_PT, 2)}pt",
             )
         )
+        if kpi:  # a KPI band is slimmer than a box band
+            air = f"{round(pad / EMU_PER_PT * ctx.lt.kpi_band_pad, 2)}pt"
+            hst = hst.merged(fast_style(padding_top=air, padding_bottom=air))
+        if kpi and ctx.theme.kpi_band_size:  # `kpi.band.size=`: the label size on the band (pinned)
+            hst = hst.merged(fast_style(font_size=ctx.theme.kpi_band_size))
+            h_el = h_el.model_copy(update={"attrs": {**h_el.attrs, "pin_size": True}})
     eff = measure.effective_scale(hst.font_size or 18, ctx.scale, ctx.theme.min_font_size)
     fixed = _explicit_size(ctx, h_el) or _explicit_size(ctx, c.title)
     if ctx.head_grow and ctx.grow > 1.0 and ctx.scale >= 1.0 and not kpi and not fixed:
@@ -1216,7 +1226,7 @@ def _head_metrics(
     h_el, hst, eff, band = parts
     icon = _icon_name(c)
     num = None if icon or kpi else _num_of(c)  # `@num`: a numbered badge takes the icon's place
-    mark = bool(icon) or num is not None
+    mark = (bool(icon) and not kpi) or num is not None  # a KPI icon sits above the label, not in the band
     isz, shift = (0, 0)
     if icon:
         isz, shift = _icon_side(ctx, hst, eff, kpi)
@@ -1375,7 +1385,7 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
         (h_el, hst, eff, band), isz, shift, hh = metrics
         icon = _icon_name(c)
         num = None if icon or kpi else _num_of(c)
-        mark = bool(icon) or num is not None
+        mark = (bool(icon) and not kpi) or num is not None
 
         def emit_mark(r: Rect, fill: str | None) -> None:  # the icon or `@num` badge left of the heading
             if icon:
@@ -1385,7 +1395,7 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
                 ctx.emit(badge, r, badge_st)
 
         rule_air, rule_h = _head_rule(ctx, c, kpi, band, pad)
-        if icon and kpi:  # icon centered above the label and the number
+        if icon and kpi and not band:  # icon centered above the label and the number
             ctx.emit(
                 _icon_item(icon),
                 Rect(inner.x + (inner.w - isz) // 2, y, isz, isz),
@@ -1408,6 +1418,13 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
                 _emit_rule(ctx, Rect(rect.x, y, rect.w, rule_h), ctx.theme.heading_rule)
                 y += rule_h
             y += round(pad * 0.5)
+            if icon and kpi:  # a KPI icon sits under the band, centered above the number
+                ctx.emit(
+                    _icon_item(icon),
+                    Rect(inner.x + (inner.w - isz) // 2, y, isz, isz),
+                    fast_style(fill="primary"),
+                )
+                y += isz + round(pad * 0.4)
         else:
             if mark and not kpi:
                 emit_mark(Rect(inner.x, y + (hh - isz) // 2 if num is not None else y, isz, isz), hst.color)
@@ -1603,7 +1620,9 @@ def _box_nat0(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None
             total += isz + round(pad * 0.4)
         r_air, r_h = _head_rule(ctx, c, kpi, band, pad)
         if band:
-            total = hh + r_h + round(pad * 0.5) + pb
+            total = (
+                hh + r_h + round(pad * 0.5) + pb + (isz + round(pad * 0.4) if kpi and _icon_name(c) else 0)
+            )
         else:
             total += hh + (r_air + r_h if r_h else 0) + round(pad * 0.5)
     children = c.children
@@ -1663,12 +1682,14 @@ def _kpi_children(ctx: _Ctx, children: list, width: int, box: Container | None =
             st = big
             size = big.font_size or 36
             ctx.asked["kpi_value"] = size
-            em = _kpi_row_em(ctx, box, measure.text_em(p.plain, bold=True))  # one size per row
+            em = _kpi_row_em(ctx, box, value_em(p, size, th.kpi_unit_size), size)  # one size per row
             avail = width / EMU_PER_PT * 0.72  # headroom: fallback fonts are wider than the estimate
             if em * size > avail:  # one line: shrink the number to the card width
                 st = st.merged(fast_style(font_size=max(round(avail / em, 1), 10)))
         else:
             st = cap
+        if j == 0 and th.kpi_unit_size:  # `kpi.unit.size=`: 億円 / 名 / % smaller than the digits
+            p = split_unit(p, th.kpi_unit_size, th.kpi_unit_color)
         paras.append(p.model_copy(update={"style": st.merged(p.style)}))
     new = ch.model_copy(
         update={"paragraphs": paras, "style": fast_style(align="center", valign="middle").merged(ch.style)}

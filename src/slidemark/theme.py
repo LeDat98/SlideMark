@@ -495,6 +495,7 @@ class LayoutTokens(BaseModel):
         0.1  # a KPI card without `w=` in a row with `w=` cards: at least this x an even column
     )
     kpi_rule_gap_em: float = 0.8  # `kpi.rule`: air above and below the rule, x caption size
+    kpi_band_pad: float = 0.35  # `kpi.band`: air above and below the label in the band, x the card padding
     kpi_lone_fit: float = 0.88  # the number fills at most this share of the card text width (CJK guard)
     kpi_lone_h: float = 0.65  # a lone KPI card is at most this share of the body height
     kpi_lone_min_h: float = 0.5  # ... and at least this share (a short row gets air inside its cards)
@@ -800,6 +801,15 @@ class Theme(BaseModel):
     kpi_rule: str | None = None  # color of a divider rule between the number and its caption in `.kpi` cards
     kpi_rule_h: Length = "1pt"
     kpi_rule_w: Length = "100%"  # ... its width (a share of the card's text width, or a length), centred
+    kpi_band: str | None = (
+        None  # fill of a header band behind the label of every `.kpi` card (None = plain label)
+    )
+    kpi_band_color: str | None = None  # ... the label ink on the band (None = readable on the fill)
+    kpi_band_size: float | None = None  # ... the label size in pt (None = the `kpi.label` size)
+    kpi_unit_size: float | None = (
+        None  # pt of the trailing unit of a KPI value (億円, 名, %); None = the digits' size
+    )
+    kpi_unit_color: str | None = None  # ... its color (None = the number's)
     bullet: str | None = None  # glyph of bullet lists (None = the built-in "•" / "–")
     bullet_color: str | None = None  # ... its color (None = the text color)
     steps_caption: str | None = None  # `@steps`: caption under every card, "{n}" = the step number
@@ -911,6 +921,14 @@ class Theme(BaseModel):
         if band and "muted" in classes and self.muted_band:
             return self.muted_band, self.ink_on(self.muted_band, self.heading_band_color)
         return band, self.heading_band_color
+
+    def kpi_band_for(self) -> tuple[str | None, str]:
+        """(fill, ink) of the header band of a ``.kpi`` card (``kpi.band``): the ink keeps ``kpi.band.color``
+        (else white) while it reads on the fill."""
+        band = self.kpi_band
+        if not band:
+            return None, "bg"
+        return band, self.ink_on(band, self.kpi_band_color or "bg")
 
     def badge_ink(self, highlight: str | None) -> str:
         """Ink of a run on a badge highlight (the badge class color when it is the same fill)."""
@@ -1256,6 +1274,7 @@ def apply_tokens(theme: Theme, tokens: dict[str, str]) -> tuple[Theme, list[Diag
             diags.append(_bad_token(path, raw, why, _HINT_GENERIC))
             continue
         data = trial
+    _derive_kpi_size(data, tokens)
     _derive_muted(data, tokens)
     _derive_surface(data, tokens)
     _derive_table_size(data, tokens)
@@ -1273,6 +1292,16 @@ def slide_theme(theme: Theme, slide: Any) -> Theme:
         return apply_tokens(theme, dict(tokens))[0]
     except Exception:  # noqa: BLE001 - a slide must still lay out
         return theme
+
+
+def _derive_kpi_size(data: dict, tokens: dict[str, str]) -> None:
+    """``sizes: kpi=34`` is the size of the KPI number: the ``kpi`` class font size (``kpi.size=`` wins)."""
+    if "sizes.kpi" not in tokens or "classes.kpi.font_size" in tokens:
+        return
+    size = data.get("sizes", {}).get("kpi")
+    kpi = data.get("classes", {}).get("kpi")
+    if isinstance(size, (int, float)) and isinstance(kpi, dict):
+        kpi["font_size"] = float(size)
 
 
 def _derive_table_size(data: dict, tokens: dict[str, str]) -> None:
@@ -1446,6 +1475,8 @@ _PT_PATHS = {
     "render.chart_line_width",
     "render.chart_pie_line_width",
     "box_num_size",
+    "kpi_band_size",
+    "kpi_unit_size",
 }
 _THEME_COLOR_SUFFIX = ("_fill", "_color", "_band", "_border", "_bar", "_rule", "_stripe")
 _OPTIONAL_COLORS = {
@@ -1462,6 +1493,9 @@ _OPTIONAL_COLORS = {
     "title_rule",
     "kpi_stripe",
     "kpi_rule",
+    "kpi_band",
+    "kpi_band_color",
+    "kpi_unit_color",
     "bullet_color",
     "steps_caption_color",
     "heading_rule",

@@ -275,7 +275,10 @@ def fill_text(
                         _soft_break(para, size)  # phrase break (jbreak): the importer drops it
                     r = para.add_run()
                     r.text = f"{pad}{_join_ranges(seg[a:b])}{pad}"
-                    _format_run(rc, r, run, pst, size, seg[a:b], scale, sq)
+                    rsize = (
+                        min(run.size * scale, size) if run.size else size
+                    )  # `kpi.unit.size`: never above the number
+                    _format_run(rc, r, run, pst, rsize, seg[a:b], scale, sq)
                 prev = seg
                 prev_r = None if run.highlight else r  # a badge carries its own padding
                 first_text = first_text or seg

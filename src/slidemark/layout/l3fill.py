@@ -21,8 +21,9 @@ from __future__ import annotations
 from ..ir import Chart, Container, Image, Media, Placed, Shape, Style, Table, Text
 from ..theme import LayoutTokens
 from ..units import EMU_PER_PT, to_emu
-from . import kpirow, measure
+from . import css, kpirow, measure
 from .grid import Rect
+from .kpiunit import value_em
 from .vfill import _contains
 
 _HEAD_ROLES = {"title", "subtitle", "lead", "conclusion", "caption", "footnote"}
@@ -1508,7 +1509,8 @@ def _value_pt(m: Placed) -> float:
 
 def _value_fit(m: Placed, lt: LayoutTokens) -> float:
     """Largest size (pt) at which the number of ``m`` stays on one line of its text width (CJK guard)."""
-    em = measure.text_em(m.element.paragraphs[0].plain, bold=True)
+    p0 = m.element.paragraphs[0]
+    em = value_em(p0, p0.style.font_size or 36)  # a `kpi.unit.size` tail counts at its own size
     return m.w / EMU_PER_PT * lt.kpi_fit_margin * lt.kpi_lone_fit / max(em, 1e-6)
 
 
@@ -1560,9 +1562,23 @@ def _kpi_text_h(m: Placed) -> float:
 
 
 def _label_h(h: Placed, pt: float) -> int:
-    return round(
+    pv = css.inset_hv(h.style)[1]  # a label on a `kpi.band` carries its padding
+    return pv + round(
         measure.paragraphs_height(h.element.paragraphs, h.w, h.style, pt / max(h.style.font_size or 11, 1e-6))
     )
+
+
+def _banded(parts) -> bool:
+    """The label of every card sits on a `kpi.band` (a filled text box at the card's top edge)."""
+    return bool(parts) and all(h.style.fill for _c, h, _m in parts)
+
+
+def _label_step(h: Placed, inner_pt: float, lt: LayoutTokens) -> float:
+    """The label size a KPI row may step up to; a size the author pinned (`kpi.band.size`) stays."""
+    pt = (h.style.font_size or 11) * h.font_scale
+    if h.element.attrs.get("pin_size"):
+        return pt
+    return _step_up(h.element.paragraphs[0].plain, pt, inner_pt, True, lt, h.style.font_size)
 
 
 def scale_kpi_values(out: list[Placed], body: Rect, lt: LayoutTokens, fixed: bool = False) -> list[Placed]:
@@ -1594,17 +1610,7 @@ def _scale_kpi_values(out: list[Placed], body: Rect, lt: LayoutTokens, fixed: bo
         g_fit = min(_value_fit(m, lt) / s for (_, _, m), s in zip(parts, hero, strict=True))
         gmax = max(min(lt.kpi_lone_value_grow, g_fit, _value_cap(parts, hero, lt)), 1.0)
         label0 = min((h.style.font_size or 11) * h.font_scale for _, h, _ in parts)
-        label_hi = min(
-            _step_up(
-                h.element.paragraphs[0].plain,
-                (h.style.font_size or 11) * h.font_scale,
-                inner_pt,
-                True,
-                lt,
-                h.style.font_size,
-            )
-            for _, h, _ in parts
-        )
+        label_hi = min(_label_step(h, inner_pt, lt) for _, h, _ in parts)
         caps = [
             (m.element.paragraphs[1].style.font_size or 12) * m.font_scale
             for _, _, m in parts
@@ -1724,17 +1730,7 @@ def _fit_lone_kpi(
         ),
         1.0,
     )
-    label_hi = min(
-        _step_up(
-            h.element.paragraphs[0].plain,
-            (h.style.font_size or 11) * h.font_scale,
-            inner_pt,
-            True,
-            lt,
-            h.style.font_size,
-        )
-        for _, h, _ in parts
-    )
+    label_hi = min(_label_step(h, inner_pt, lt) for _, h, _ in parts)
     cap_hi = min(
         (
             _step_up(
@@ -1759,6 +1755,7 @@ def _fit_lone_kpi(
         ),
         default=0.0,
     )
+    band = _banded(parts)
     stretch = to_body and lt.kpi_to_body and lt.body_valign != "top"
     limit = round(max(lt.kpi_lone_h, lt.kpi_to_body_h if stretch else 0.0) * body.h)
     own_h = to_emu(lt.kpi_h) if lt.kpi_h is not None else 0  # `kpi.h=4.4in`: the author's own card height
@@ -1772,7 +1769,7 @@ def _fit_lone_kpi(
         label_pt = label0 + (label_hi - label0) * k
         cap_pt = cap0 + (cap_hi - cap0) * k
         news, hh, mh, pad, gap = _lone_geometry(parts, values, label_pt, cap_pt, lt)
-        card_h = 2 * pad + hh + gap + mh
+        card_h = (hh + gap + mh + pad) if band else (2 * pad + hh + gap + mh)  # a band sits flush on top
         if card_h <= limit:
             break
     floor = min(round(max(lt.kpi_lone_min_h, lt.kpi_to_body_h if stretch else 0.0) * body.h), limit)
@@ -1787,7 +1784,7 @@ def _fit_lone_kpi(
     centre = lt.kpi_lone_bar_center if on_bar else lt.kpi_lone_center
     top = body.y + round((body.h - card_h) * centre)
     top = max(body.y, min(top, body.bottom - card_h))
-    lab_y = top + pad + round(extra * lt.kpi_lone_label_air)
+    lab_y = top if band else top + pad + round(extra * lt.kpi_lone_label_air)
     res: dict[int, Placed] = {}
     for (c, h, m), (h2, m2) in zip(parts, news, strict=True):
         res[id(c)] = c.model_copy(update={"y": top, "h": card_h})
@@ -1805,7 +1802,10 @@ def _lone_geometry(parts, values: list[float], label_pt: float, cap_pt: float, l
     mhs: list[int] = []
     for (_c, h, m), value_pt in zip(parts, values, strict=True):
         hscale = label_pt / max(h.style.font_size or 11, 1e-6)
-        hhs.append(round(measure.paragraphs_height(h.element.paragraphs, h.w, h.style, hscale)))
+        hhs.append(
+            css.inset_hv(h.style)[1]
+            + round(measure.paragraphs_height(h.element.paragraphs, h.w, h.style, hscale))
+        )
         paras = [
             p.model_copy(
                 update={"style": p.style.model_copy(update={"font_size": value_pt if i == 0 else cap_pt})}

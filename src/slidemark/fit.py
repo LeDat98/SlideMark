@@ -166,6 +166,7 @@ def _kpi(cards: list[Placed], items: list[Placed], body: list[int] | None, asked
         if isinstance(p.element, Text)
         and p.element.role == "body"
         and p.element.paragraphs
+        and p.element.attrs.get("shape_name") != "KPI caption"  # `kpi.rule` splits the caption off
         and any(_inside(p, c) for c in cards)
     ]
     values = [v for v in values if v]
