@@ -2,7 +2,7 @@
 
 All notable changes. Versions follow semver once 0.1.0 is published.
 
-## Unreleased (0.1.0 candidate)
+## 0.1.0 (2026-10-07)
 
 ### Design freedom
 - DL3d lane A (foreign-deck round trip): span attributes `[420億円]{size=28 bold=true color=primary}` (exact pt, mixed sizes / colours in one line: paragraphs, list items, `@rows`, table cells, headings, KPI values; the importer writes them back, `importer/runs.py`), per-card stripe colours `box.stripe=a,b,c` / `item.stripe` / `kpi.stripe` + `.stripe_h` / `.stripe.side` / `{stripe=teal}`, number headings `@4 num=text` / `## 01 {.num}` / `box.num.color=a,b,c`, number tiles `@kpi tile`, `cover.bottom.bar`, readable ink on a box with its own `{fill=}`, `<br>` in table cells without a warning; `examples/25-roundtrip-forms.md`.

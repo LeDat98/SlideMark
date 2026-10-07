@@ -5,6 +5,16 @@ theo cú pháp riêng của SlideMark: ngắn gọn, tốn ít token và hỗ tr
 
 > Trạng thái: đang phát triển (đã xong 7 ngày nền móng, đang leo các cấp L2 → L4). Mục tiêu từng cấp L1 → L7: [docs/TARGETS.md](docs/TARGETS.md).
 
+## Cài đặt
+
+```bash
+pip install slidemark            # thư viện + CLI `slidemark`
+pip install "slidemark[html]"    # thêm Playwright nếu dùng khối HTML (cần `playwright install chromium`)
+```
+
+Dùng nhanh: viết `deck.md` theo cú pháp bên dưới rồi chạy `slidemark build deck.md -o deck.pptx`.
+Xem trước ảnh PNG (`slidemark preview`) cần LibreOffice cài sẵn trên máy.
+
 ## Ví dụ
 
 ```markdown
