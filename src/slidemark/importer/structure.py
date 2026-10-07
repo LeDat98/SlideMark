@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from functools import cmp_to_key
 
 from ..ir import Diagnostic
-from . import forms2
+from . import forms2, recognise
 from .emit import (
     _attr,
     chart_lines,
@@ -316,7 +316,7 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
             and len(cand.text) <= 200
             and cand.y >= title.y + 0.5 * title.h
             and (cand.max_size is None or title.max_size is None or cand.max_size <= title.max_size)
-            and len(body) >= 2
+            and len(body) + sum(1 for i in items if i.role == "rec") >= 2  # (claimed shapes count)
             and not cand.name.lower().startswith("heading")
             and not any(
                 c is not cand
@@ -331,6 +331,9 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
             lead = cand
     if lead:
         lead.role = "lead"
+    for it in items:
+        if it.role == "rec":  # claimed by recognise.py: kept out of title / lead / conclusion detection
+            it.role = None
     return title, [i for i in items if i.role is None or i.role.startswith("callout")]
 
 
@@ -526,6 +529,9 @@ def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = Non
             return [Block(it.kind, it.x, it.y, it.w, it.h, item=it)]
         if (it.role or "").startswith("callout"):
             return [Block("callout", it.x, it.y, it.w, it.h, item=it, paras=it.paras, callout=it.role[8:])]
+        if it.rec == "panel" and it.paras:  # recognise.py: one box, its first line the heading
+            rest = Block("text", it.x, it.y, it.w, it.h, paras=it.paras[1:])
+            return [Block("box", it.x, it.y, it.w, it.h, item=it, heading=[it.paras[0]], children=[rest])]
         real = [k for k in kids.get(it.uid, []) if not _is_decor(k, kids)]
         if real:
             return container(it, real, nested)
@@ -1028,9 +1034,14 @@ def _box_class(b: Block, out: Out) -> str | None:
     return None
 
 
+_SPAN_END = re.compile(r"\]\{[^{}]*\}$")
+
+
 def _head(paras: list[ParaT], out: Out) -> str:
     txt = one_line(paras, plain_bold=True, accent=None, classes=out.classes)
-    return txt[:-1] + "\\}" if txt.endswith("}") else txt
+    if txt.endswith("}"):  # a closing brace would read as the box's attributes
+        return txt + " {}" if _SPAN_END.search(txt) else txt[:-1] + "\\}"
+    return txt
 
 
 def _table_align(rows, hdr: int = 1) -> str | None:
@@ -1193,13 +1204,20 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
         alt = (b.item.alt or b.item.name or "image").replace("[", "(").replace("]", ")").replace("\n", " ")
         return [("image", [f"![{alt}]({ref})" + _fit_attr(b.item)])]
     # box
+    if (rec := recognise.box_chunks(b, acc, cls)) is not None:
+        return rec
     mark = "###" if b.sub else "##"
     chunks: list[tuple[str, list[str]]] = []
     kpi = _kpi(b, out.deck.css_heading)
     cname = None if kpi or b.chevron else (b.flag or _box_class(b, out))
     attrs = (".kpi " if kpi else "") + (f".{cname} " if cname else "") + (f"icon={b.icon} " if b.icon else "")
     attrs += " ".join(_control_attrs(b.item if not (b.chevron or b.drawn) else None, out.shadow))
-    head = f"{mark} {_head(b.heading or [], out)}" + (f" {{{attrs.strip()}}}" if attrs.strip() else "")
+    if b.item is not None and b.item.rec_attrs:
+        attrs = (attrs + " " + b.item.rec_attrs).strip() + " "
+    htxt = _head(b.heading or [], out)
+    if attrs.strip() and htxt.endswith(" {}"):
+        htxt = htxt[:-3]  # (the attribute list below ends the line)
+    head = f"{mark} {htxt}" + (f" {{{attrs.strip()}}}" if attrs.strip() else "")
     if b.chevron:
         content = text_lines(b.paras, accent=acc, classes=cls)
         return [("meta", [head, *content])]
@@ -1254,6 +1272,8 @@ def build_slide(
     vform = vocab.extract(
         data
     )  # DL3b: the named shapes of @timeline / @funnel / ... fold back into their source
+    if vform is None:
+        recognise.recognise(data, deck)  # DL3d: forms drawn by hand in a foreign deck (before the title)
     title, pool = classify(data, deck)
     pool = fold_kpi(fold_steps(pool))
     pool, rows_mode = fold_rows(pool)
@@ -1266,7 +1286,10 @@ def build_slide(
     active = vform if vform is not None else form  # the composed form of this slide (either vocabulary)
     by_role = {r: [i for i in data.items if i.role == r] for r in ("lead", "conclusion", "footnote")}
     icons = [i for i in data.items if i.role == "icon"]
-    blocks = make_blocks(pool, deck, icons)
+    badges = [
+        i for i in data.items if i.rec == "num" and i.role == "decor"
+    ]  # (like icons: push a heading down)
+    blocks = make_blocks(pool, deck, [*icons, *badges])
     _attach_icons(icons, blocks)
     if vform is not None and not vform.keep:
         form_extra, blocks = blocks, vform.boxes  # content the form did not draw stays below its boxes
@@ -1437,10 +1460,12 @@ def build_slide(
         extra.append("build")
     if data.hidden:
         extra.append("hidden")
+    extra.extend(data.words)  # recognise.py: `kpi`, `num`, `size=38`
     if info is not None:
         info["extra"] = extra
         info["title_only"] = title_only
     tokens = [*tokens, *links, *extra]
+    lines.extend(data.style_lines)  # recognise.py: slide `sizes:` / `style:` lines
     if info is not None:
         info["pos"] = len(lines)
     if tokens:
