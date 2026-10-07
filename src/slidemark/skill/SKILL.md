@@ -6,6 +6,8 @@ description: Write PowerPoint decks as compact SlideMark text, with your own sta
 # SlideMark
 
 This page is complete: do not look for other docs.
+If `slidemark` is missing: `pip install -U "slidemark[preview]"` (Python 3.10+). `--png` also needs LibreOffice;
+`@html` also needs `pip install "slidemark[html]"` and `playwright install chromium`.
 
 ## Recipe: decide, then write and build in ONE command
 

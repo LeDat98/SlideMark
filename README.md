@@ -9,6 +9,7 @@ theo cú pháp riêng của SlideMark: ngắn gọn, tốn ít token và hỗ tr
 
 ```bash
 pip install slidemark            # thư viện + CLI `slidemark`
+pip install "slidemark[preview]" # thêm pypdfium2 để xuất ảnh PNG (`--png`, `preview`); cần cả LibreOffice
 pip install "slidemark[html]"    # thêm Playwright nếu dùng khối HTML (cần `playwright install chromium`)
 ```
 
@@ -17,8 +18,8 @@ Xem trước ảnh PNG (`slidemark preview`) cần LibreOffice cài sẵn trên 
 
 ### Cài skill cho agent
 
-Agent chỉ nhận đúng một file `SKILL.md` (thư mục `skills/slidemark/`), không cần đọc repo. Máy chạy agent cần
-có sẵn lệnh `slidemark` (`pip install slidemark`).
+Agent chỉ nhận đúng một file `SKILL.md` (thư mục `skills/slidemark/`), không cần đọc repo. Trang đó tự ghi
+lệnh cài `slidemark` và phần thêm cho ảnh PNG, cho HTML, nên máy chạy agent chưa cần cài gì trước.
 
 ```bash
 npx skills add LeDat98/SlideMark -g                # Claude Code, Codex, Cursor… (chuẩn Agent Skills)
