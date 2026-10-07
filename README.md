@@ -88,7 +88,7 @@ Toàn bộ thiết kế mà agent python-pptx tự viết (64 quyết định) n
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-07 · commit `f172859` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-07 · commit `1a9f0fe` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -292,6 +292,20 @@ Nguồn: [`examples/22-en-launch-plan.md`](examples/22-en-launch-plan.md)
 ![22-en-launch-plan slide 5](docs/gallery/22-en-launch-plan/slide-05.png)
 ![22-en-launch-plan slide 6](docs/gallery/22-en-launch-plan/slide-06.png)
 ![22-en-launch-plan slide 7](docs/gallery/22-en-launch-plan/slide-07.png)
+
+### Từ vựng bố cục 2: iconlist, quote, split, proscons, progress, harvey, heatmap, pins
+
+Nguồn: [`examples/24-vocabulary-2.md`](examples/24-vocabulary-2.md)
+
+![24-vocabulary-2 slide 1](docs/gallery/24-vocabulary-2/slide-01.png)
+![24-vocabulary-2 slide 2](docs/gallery/24-vocabulary-2/slide-02.png)
+![24-vocabulary-2 slide 3](docs/gallery/24-vocabulary-2/slide-03.png)
+![24-vocabulary-2 slide 4](docs/gallery/24-vocabulary-2/slide-04.png)
+![24-vocabulary-2 slide 5](docs/gallery/24-vocabulary-2/slide-05.png)
+![24-vocabulary-2 slide 6](docs/gallery/24-vocabulary-2/slide-06.png)
+![24-vocabulary-2 slide 7](docs/gallery/24-vocabulary-2/slide-07.png)
+![24-vocabulary-2 slide 8](docs/gallery/24-vocabulary-2/slide-08.png)
+![24-vocabulary-2 slide 9](docs/gallery/24-vocabulary-2/slide-09.png)
 <!-- gallery:end -->
 
 ## Tài liệu

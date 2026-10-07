@@ -22,6 +22,7 @@ import re
 from collections.abc import Callable, Iterator
 from typing import Any
 
+from . import forms2
 from .ir import Chart, Code, Container, Deck, Diagnostic, Image, Media, Placed, Slide, Table, Text
 
 # The documented attribute keys (docs/SYNTAX.md "Attributes"): position, style, image, plus `icon` on boxes.
@@ -443,6 +444,9 @@ STYLE_NEEDS: list[tuple[re.Pattern[str], Callable[[_Facts], bool], str]] = [
     (re.compile(r"^(footer|num)\."), _Facts.footer, "no footer: set `footer:` or `num: on`"),
     (re.compile(r"^lead\."), _Facts.lead, "no `>` lead line under a title"),
 ]
+
+
+STYLE_NEEDS.extend(forms2.STYLE_NEEDS)  # DL3b part 2: iconlist.* quote.* split.* proscons.* progress.* ...
 
 
 def style_diagnostics(deck: Deck, theme: Any) -> list[Diagnostic]:

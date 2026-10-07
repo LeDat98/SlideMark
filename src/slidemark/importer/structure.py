@@ -9,6 +9,7 @@ from dataclasses import dataclass, field, replace
 from functools import cmp_to_key
 
 from ..ir import Diagnostic
+from . import forms2
 from .emit import (
     _attr,
     chart_lines,
@@ -1218,6 +1219,9 @@ def build_slide(
     pool = fold_kpi(fold_steps(pool))
     pool, rows_mode = fold_rows(pool)
     rows_slide = rows_mode is not None
+    form = forms2.fold(pool, data, deck)  # DL3b part 2: @iconlist @quote @proscons @progress @harvey ...
+    if form is not None:
+        pool = form.pool
     by_role = {r: [i for i in data.items if i.role == r] for r in ("lead", "conclusion", "footnote")}
     icons = [i for i in data.items if i.role == "icon"]
     blocks = make_blocks(pool, deck, icons)
@@ -1287,6 +1291,9 @@ def build_slide(
         tokens, grid, extras = plan_grid(blocks, deck.width, deck.height, gdiag, deck.margin_x, deck.gap)
     if rows_slide:
         tokens = ["rows"]
+    if form is not None:
+        tokens = form.tokens if form.replace_tokens else [*tokens, *form.tokens]
+        grid = [*form.before, *grid, *form.after]
     for g in gdiag:
         diags.append(
             Diagnostic(level="info", message=g, slide=n, rule="import-layout", hint="check the arrangement")
@@ -1332,6 +1339,7 @@ def build_slide(
     extra: list[str] = []
     title_only = (
         title is not None
+        and form is None  # a composed form (its shapes left the pool) is a content slide
         and all(b.kind == "text" for b in blocks)
         and sum(len(b.paras) for b in blocks) + len(by_role["lead"]) <= 2
         and not any(p.marker for b in blocks for p in b.paras)

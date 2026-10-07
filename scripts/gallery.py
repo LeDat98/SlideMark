@@ -32,6 +32,7 @@ TITLES = {
     "19-vi-consulting-brand": "Tiếng Việt: bộ tư vấn theo thương hiệu (theme: none)",
     "20-jp-retail-dense": "Tiếng Nhật: bộ 11 slide dày đặc (biểu đồ cầu, Gantt, ghi chú biểu đồ)",
     "21-jp-dark-pitch": "Tiếng Nhật: pitch tối thiết kế bằng CSS/HTML",
+    "24-vocabulary-2": "Từ vựng bố cục 2: iconlist, quote, split, proscons, progress, harvey, heatmap, pins",
     "22-en-launch-plan": "Tiếng Anh: kế hoạch ra mắt, chevron khớp cột bảng, ghi chú biểu đồ (hl=, note=)",
 }
 
