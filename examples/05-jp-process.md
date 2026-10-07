@@ -3,11 +3,13 @@ lang: ja
 footer: ACME株式会社　社外秘
 num: on
 colors: primary=#1E3A5F secondary=#2F6B9A
+fonts: heading="Yu Gothic" body="Yu Gothic"
+sizes: title=24 body=11
 style: heading.band=secondary
 
 # 業務改革の進め方
 > 4段階で現行業務を可視化し、6か月で定着まで完了させる
-@chevron
+@chevron defaults
 ## Step 1 現状把握
 - 業務ヒアリング
 - 工数データ収集
@@ -30,7 +32,7 @@ style: heading.band=secondary
 ※ 期間は2026年度下期を想定
 
 # 申請業務の新フロー
-@a>b b>c
+@a>b b>c noemph defaults
 ## 申請
 - 申請者がフォームに入力
 - 添付書類はPDFで提出

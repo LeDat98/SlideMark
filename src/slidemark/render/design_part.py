@@ -6,7 +6,7 @@ and does not flag for repair. The item is ``<sm:design xmlns:sm="urn:slidemark:d
     {"v": 1, "theme": "none", "tokens": {"colors.primary": "#7C5CFF"},
      "css": [["h1, h2", "color: #fff; font-size: 54pt"]],
      "slides": [{"id": 256, "css": [...], "html": "<div>..</div>", "title": "Launch", "cls": ["dark"],
-                 "el": [["Signal", "hero", "#intro"]],
+                 "dec": ["noemph"], "el": [["Signal", "hero", "#intro"]],
                  "fences": [{"src": "<div>..</div>", "info": "{render=native}", "first": 1}]}]}
 
 ``el`` lists the ``##`` boxes of a slide that carry a class or id the design refers to (a token class, a css
@@ -25,6 +25,8 @@ from typing import Any
 from xml.sax.saxutils import escape, unescape
 
 from ..ir import CssRule, Deck, Diagnostic, Style
+
+DECISION_CLASSES = ("noemph", "defaults")  # slide directives that only record an author's decision
 
 __all__ = ["style_to_css", "write_design_part", "read_design_part", "design_payload"]
 
@@ -246,6 +248,8 @@ def design_payload(deck: Deck, slide_ids: list[int | None]) -> dict[str, Any]:
             _texts(sl.elements, names, txs)
             if txs:
                 ent["tx"] = txs
+        if dec := [c for c in DECISION_CLASSES if c in sl.classes]:
+            ent["dec"] = dec  # `@noemph` / `@defaults`: no visual trace, kept for the importer
         if recase and sl.title is not None and sl.html is None:
             ent["ttl"] = "".join(p.plain for p in sl.title.paragraphs)
         fences: list[dict[str, Any]] = []

@@ -3,7 +3,9 @@ lang: ja
 footer: ACME株式会社　社外秘
 num: on
 colors: success=#2E7D32
+fonts: heading="Yu Gothic" body="Yu Gothic"
 sizes: lead=18
+style: radius=0
 
 # 中期経営計画 2027–2029
 @section
@@ -15,7 +17,7 @@ sizes: lead=18
 - 主力SaaSの単価向上（+15%）
 - 解約率を1.2%以下へ
 - 営業生産性 1.3倍
-## 新規事業の創出 {.success icon=rocket}
+## 新規事業の創出 {line=success icon=rocket}
 - AI会計アシスタントを2027年に投入
 - 海外（ASEAN）へ展開
 - M&A枠 50億円
@@ -32,7 +34,7 @@ sizes: lead=18
 ※ 目標値は2026年10月時点の計画に基づく
 
 # 年度別ロードマップ
-@flow
+@flow noemph defaults
 ## 2027年度
 - AI会計アシスタント β版
 - 中堅企業プラン刷新

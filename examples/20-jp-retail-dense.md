@@ -4,6 +4,8 @@ footer: さくら食品ストア株式会社　経営企画本部　社外秘
 num: on
 density: dense
 colors: success=#2E7D32 danger=#C00000 muted=#5B6573
+fonts: heading="Yu Gothic" body="Yu Gothic"
+sizes: title=24 body=11
 style: palette=primary,#7FA3C7,#BFC7D1 render.waterfall_up=success render.waterfall_down=danger
 
 # 店舗網再編と収益構造改革
@@ -12,7 +14,7 @@ style: palette=primary,#7FA3C7,#BFC7D1 render.waterfall_up=success render.waterf
 # エグゼクティブサマリー
 > 不採算42店の再編とPB強化で、2029年度に営業利益率を1.8%→3.5%へ引き上げる
 @4
-## 現状 {.danger icon=warning}
+## 現状 {line=danger icon=warning}
 - 既存店売上 3期連続減（年▲1.2%）
 - 218店中 42店が営業赤字
 - 人件費率 14.8%（業界 13.1%）
@@ -26,7 +28,7 @@ style: palette=primary,#7FA3C7,#BFC7D1 render.waterfall_up=success render.waterf
 2. PB比率 18%→30%
 3. AI発注で廃棄を半減
 4. セルフレジ全店導入
-## 目標（2029年度） {.success icon=chart}
+## 目標（2029年度） {line=success icon=chart}
 - 営業利益 ==96億円==（+52億円）
 - 営業利益率 3.5%
 - ROIC 4.1% → 8.0%
@@ -69,7 +71,7 @@ style: palette=primary,#7FA3C7,#BFC7D1 render.waterfall_up=success render.waterf
 ▲3.1%
 前年比、単価上昇で相殺
 @end
-```line {title="年代別の来店頻度（回／月）" legend=bottom fmt="0.0"}
+```line {title="年代別の来店頻度（回／月）" legend=bottom fmt="0.0" hl=60代以上}
 ,2022,2023,2024,2025,2026
 30代以下,5.1,4.8,4.6,4.3,4.1
 40–50代,6.2,6.1,6.0,6.0,5.9
@@ -79,7 +81,7 @@ style: palette=primary,#7FA3C7,#BFC7D1 render.waterfall_up=success render.waterf
 
 # 店舗網再編の方針
 > 42店を4つの打ち手に振り分け、閉店は最小限の11店に抑える
-@4 chevron
+@4 chevron noemph defaults
 ## 統合 11店
 近接店を集約
 ## 小型化 14店
@@ -99,7 +101,7 @@ style: palette=primary,#7FA3C7,#BFC7D1 render.waterfall_up=success render.waterf
 
 # PB（プライベートブランド）強化
 > PB比率を30%へ高め、粗利率を1.6pt改善する
-@aab/aac
+@aab/aac noemph
 ```stacked-column {title="カテゴリー別PB比率（%）" legend=bottom labels=on}
 ,2026,2027,2028,2029
 日配,9,11,13,15
@@ -118,7 +120,7 @@ style: palette=primary,#7FA3C7,#BFC7D1 render.waterfall_up=success render.waterf
 
 # 店舗オペレーション改革
 > 発注・レジ・品出しの3領域で、年間 260万人時（全体の18%）を削減する
-@3
+@3 noemph defaults
 ## AI発注
 - 対象：日配・惣菜・青果
 - 欠品率 4.2% → 1.5%
@@ -144,7 +146,7 @@ style: palette=primary,#7FA3C7,#BFC7D1 render.waterfall_up=success render.waterf
 
 # 財務計画
 > 3年間で投資 168億円、2029年度にROIC 8.0%を達成する
-@1:1
+@1:1 defaults
 ```waterfall {title="営業利益の増減要因（億円）" labels=on note="PBと省人化で+55億円"}
 ,2026見込,再編,PB,省人化,AI発注,その他,2029目標
 営業利益,44,18,24,31,12,-33,=
@@ -186,7 +188,7 @@ style: palette=primary,#7FA3C7,#BFC7D1 render.waterfall_up=success render.waterf
 
 # 本日のご決議事項
 > 中期計画の基本方針と、2027年度の投資 82億円のご承認をお願いしたい
-@3:2
+@3:2 noemph
 ## ご決議事項 {.primary}
 1. 店舗網再編と収益構造改革の基本方針（2027–2029年度）
 2. 2027年度投資 82億円（再編 28億円、省人化 30億円、IT・物流 24億円）

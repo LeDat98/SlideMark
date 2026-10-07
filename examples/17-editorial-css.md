@@ -3,6 +3,7 @@ lang: en
 num: on
 colors: bg=#F6F1E7 fg=#1D1A16 primary=#1D1A16 accent=#C2410C surface=#EFE6D6 border=#1D1A16
 fonts: heading="Georgia" body="Georgia"
+sizes: title=32 body=18
 ```css
 h1 { font-size: 34pt; letter-spacing: -0.5pt }
 .lead { color: #C2410C; font-style: italic }
@@ -19,14 +20,16 @@ Annual review of the specialty coffee market, 2026
 
 # Three shifts in how people drink coffee
 > Ritual over speed: customers pay for time, not caffeine
+@defaults
 ## At home
-Home espresso machines sold 2.1M units, up ==34%== since 2023.
+Home espresso machines sold 2.1M units, up 34% since 2023.
 ## On the move
-Cold brew cans grew to ==18%== of ready-to-drink sales.
+Cold brew cans grew to 18% of ready-to-drink sales.
 ## In the café
 Average visit time rose from 11 to ==19 minutes==.
 
 # Numbers that matter
+@noemph defaults
 ## Market size {.kpi}
 $4.8B
 +12% year on year
@@ -39,7 +42,7 @@ median, US cities
 
 # Where the growth comes from
 @1
-```table {widths=2:1:1:1}
+```table {widths=2:1:1:1 hl="Ready to drink"}
 Segment,2024,2026,Change
 Home brewing gear,$1.1B,$1.6B,+45%
 Café drinks,$2.3B,$2.6B,+13%
@@ -50,7 +53,7 @@ Fastest growing: ready to drink
 ※ Source: industry panel, 1,200 retailers, September 2026
 
 # Outlook
-@html
+@html noemph defaults
 ```html
 <div style="height:100%;display:grid;grid-template-columns:1.2fr 1fr;gap:40px;padding:56px 64px;background:#1D1A16;color:#F6F1E7;font-family:Georgia,serif">
   <div style="display:flex;flex-direction:column;justify-content:center">

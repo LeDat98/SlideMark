@@ -128,14 +128,14 @@ def test_class_line_on_text_and_stack_token_survive():
         t1 = _roundtrip(Path(tmp), src)
     slide4 = t1.split("# Where the growth comes from")[1].split("# Outlook")[0]
     assert "@1\n" in slide4 and "@1x2" not in slide4
-    assert "{widths=2:1:1:1}" in slide4
+    assert "widths=2:1:1:1" in slide4 and 'hl="Ready to drink"' in slide4
     assert "{.sticker}\nFastest growing: ready to drink" in slide4
     assert "width: fit-content" in t1
 
 
 def test_html_slide_and_design_come_back(tmp_path):
     t1 = _roundtrip(tmp_path, EXAMPLE.read_text(encoding="utf-8"))
-    assert "# Outlook\n@html\n```html\n" in t1
+    assert "# Outlook\n@html noemph defaults\n```html\n" in t1  # the two decisions ride in the design part
     d0, d1 = parse(EXAMPLE.read_text(encoding="utf-8")), parse(t1)
     assert d0.slides[4].html == d1.slides[4].html
     assert {r.selector for r in d0.css} == {r.selector for r in d1.css}

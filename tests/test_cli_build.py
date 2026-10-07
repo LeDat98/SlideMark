@@ -11,11 +11,15 @@ from slidemark.cli import main
 from slidemark.preview import contact_sheet, have_soffice
 
 FACTS_DECK = """colors: primary=#2B6CB0
+fonts: heading=Georgia
+sizes: title=30
+style: radius=8
 
 # Cover
 
 ---
 # Numbers
+@noemph
 
 ```column {title="Sales" legend=bottom}
 ,Q1,Q2
@@ -30,6 +34,7 @@ FACTS_DECK = """colors: primary=#2B6CB0
 
 ---
 # Plain
+@1 defaults
 
 - ==one==
 - two
@@ -37,8 +42,9 @@ FACTS_DECK = """colors: primary=#2B6CB0
 
 BULLET_DECK = "# Hello\n\n* one\n* two\n"
 SAME_WARNING = (
-    "colors: primary=#2B6CB0\n\n# A\n@dense\n![x](nope.png)\n\n---\n# B\n@dense\n![x](nope.png)\n\n"
-    "---\n# C\n@dense\n- ok\n"
+    "colors: primary=#2B6CB0\nfonts: heading=Georgia\nsizes: title=30\nstyle: radius=8\n\n"
+    "# A\n@dense noemph\n![x](nope.png)\n\n---\n# B\n@dense noemph\n![x](nope.png)\n\n"
+    "---\n# C\n@1 dense noemph\n- ok\n"
 )
 
 

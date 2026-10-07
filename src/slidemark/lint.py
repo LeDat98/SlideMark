@@ -12,7 +12,7 @@ Rules (all warnings, cheap to read for an agent):
 - ``tiny-text``: text renders below the theme's minimum font size.
 - ``alt``: an image without alt text.
 - ``connector-crosses``: a connector runs through a block that is not one of its ends.
-- ``design-none`` / ``design-slide``: the deck states no design / these slides carry no design choice
+- ``design-none`` / ``design-slide``: header lines not stated / slides short of a form, one emphasis or values
   (deck-level, see ``design.py``; added by ``lint_deck``, not by ``lint``).
 - ``attr-ignored``: an attribute or ``style:`` token the layout does not honour where it was written
   (``honour.py``; added by ``lint_deck``).

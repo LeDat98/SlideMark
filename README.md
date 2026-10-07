@@ -66,7 +66,7 @@ Cùng một agent (Sonnet), cùng đề bài, mỗi bên chạy 1 lần, đo t�
 SlideMark hỗ trợ quyết định thiết kế chứ không thay agent quyết định. Từ wave 3, SKILL.md yêu cầu agent nêu rõ
 lựa chọn của mình cho cả deck (`colors:` `fonts:` `sizes:` `style:` `footer:`) và từng slide (dạng, một điểm
 nhấn, ghi đè vị trí/cỡ/màu khi cần); `build` cảnh báo `design-none` / `design-slide` và in dòng
-`design: colors fonts sizes style footer; 14/14 slides carry choices`. Không có lựa chọn nào được coi là "đúng"
+`design: colors fonts sizes style footer; 14/14 slides decided form+emphasis+values`. Không có lựa chọn nào được coi là "đúng"
 (`docs/DESIGN_REQUIRED.md`, `docs/DESIGN_FREEDOM.md`).
 
 Cùng đề 15 slide, giám khảo thiết kế chấm mù (Opus, cùng một vòng):
@@ -88,7 +88,7 @@ Toàn bộ thiết kế mà agent python-pptx tự viết (64 quyết định) n
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-07 · commit `f172859` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-07 · commit `aa76a9b` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 

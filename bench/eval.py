@@ -61,7 +61,7 @@ def parse_task(text: str) -> tuple[list[str], str]:
 ADVISORY_RULES = (
     "design-none",
     "design-slide",
-)  # "no design stated" / "slides carry no choice": advice, not defects
+)  # "design: fonts: not stated" / "slides short of a decision": advice, not defects
 
 
 def is_asset_missing(d) -> bool:

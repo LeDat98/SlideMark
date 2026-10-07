@@ -3,6 +3,8 @@ lang: ja
 footer: ACME株式会社　社外秘
 num: on
 colors: success=#2E7D32 danger=#C00000 muted=#5B6573
+fonts: heading="Yu Gothic" body="Yu Gothic"
+sizes: title=24 body=11
 style: kpi.font_size=36
 
 # 2026年度 上期業績サマリー
@@ -29,7 +31,7 @@ style: kpi.font_size=36
 ※ 営業利益は全社共通費配賦後
 
 # 通期見通しの修正
-@a>b a>c
+@a>b a>c defaults
 ## 修正の前提
 - SaaS事業の新規受注が想定を上回るペースで推移
 - 下期の大型案件（3件、計4.2億円）の受注確度が上昇
@@ -37,7 +39,7 @@ style: kpi.font_size=36
 - ハードウェア事業は在庫評価損 0.6億円を織り込み
 ## 売上高
 - 期初計画：120億円
-- 修正後：==126億円==（+5.0%）
+- 修正後：126億円（+5.0%）
 ## 営業利益
 - 期初計画：14億円
 - 修正後：==15.5億円==（+10.7%）

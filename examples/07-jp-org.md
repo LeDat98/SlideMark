@@ -3,11 +3,13 @@ lang: ja
 footer: ACME株式会社　社外秘
 num: on
 colors: danger=#C00000
+fonts: heading="Yu Gothic" body="Yu Gothic"
+sizes: title=24 body=11
 style: render.connector_width=3
 
 # 推進体制
 > 社長直轄のPMOを設置し、3つの分科会で横断的に推進する
-@a>b a>c a>d
+@a>b a>c a>d noemph defaults
 ## ステアリングコミッティ
 - 議長：代表取締役社長
 - 月1回、重要事項を意思決定
@@ -26,6 +28,7 @@ style: render.connector_width=3
 ※ 各分科会は隔週で進捗をPMOへ報告
 
 # リスクと対応策
+@defaults
 ## 要員不足 {.danger}
 - 影響：大 / 発生可能性：中
 - 対応：外部パートナー2社と契約済み

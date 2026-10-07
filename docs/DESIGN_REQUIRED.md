@@ -57,6 +57,8 @@ The first `design-slide` counted any attribute as a choice, so `{.kpi}` or `labe
   and lists the slides short of a group: `slides 4 (values), 8 (form, emphasis)`.
 - Still advisory (warnings never cost a rebuild by themselves), and the eval counts them as `design` not as
   first-pass failures.
+- Implemented in DL3c (`src/slidemark/design.py`; message and hint texts in `docs/SYNTAX.md` "Diagnostics: design
+  feedback"). Emphasis is counted per element; `@noemph` and `@defaults` are slide directives with no visual effect.
 
 ## Syntax depth (owner, 2026-10-07): "detailed syntax with secondary attributes, choices without limit"
 
