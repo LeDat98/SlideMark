@@ -5,6 +5,7 @@ All notable changes. Versions follow semver once 0.1.0 is published.
 ## Unreleased (0.1.0 candidate)
 
 ### Design freedom
+- DL3b part 1 (composition vocabulary): `@timeline` (h / v, marks), `@vs` (verdict, winner), `@matrix` (axis labels + arrows), `@funnel`, `@pyramid`, `@cycle`, `@agenda`, `@statement`, each one `@word` line with secondary keys (`dir=` `marks=` `x=` `y=` `align=` `valign=` + `size=` `fill=` `gap=`) and `<form>.*` tokens; native custom-geometry stages and arc arrows; importer round trip; `examples/23-vocabulary.md`.
 - DL2 lane F: `@items` / `box.items=cards` (item cards), `@num` (numbered heading badges), `heading.rule`, `title.rule2`, `@rows plain` with `rows.glyph` / `rows.stripe`, cover `bar@edge` / `rule_w` / `rule_pos` / `stripes`, `render.chevron_shape` as a list, `table.num_pad`, `kpi.fill` / `kpi.line`; lint reads a KPI label against a tall stripe.
 - No fixed look: every color, font, size, spacing, band, card style and layout constant is a token
   (`slidemark tokens`); built-in themes are YAML presets (`src/slidemark/presets/`); `theme: none` is a neutral canvas.

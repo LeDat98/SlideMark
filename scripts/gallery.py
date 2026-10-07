@@ -33,6 +33,7 @@ TITLES = {
     "20-jp-retail-dense": "Tiếng Nhật: bộ 11 slide dày đặc (biểu đồ cầu, Gantt, ghi chú biểu đồ)",
     "21-jp-dark-pitch": "Tiếng Nhật: pitch tối thiết kế bằng CSS/HTML",
     "22-en-launch-plan": "Tiếng Anh: kế hoạch ra mắt, chevron khớp cột bảng, ghi chú biểu đồ (hl=, note=)",
+    "23-vocabulary": "Từ vựng bố cục: @timeline, @vs, @matrix, @funnel, @pyramid, @cycle, @agenda, @statement",  # noqa: E501
 }
 
 

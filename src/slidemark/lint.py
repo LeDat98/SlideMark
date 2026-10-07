@@ -463,7 +463,7 @@ def _has_text(p: Placed) -> bool:
 
 
 def _is_line(p: Placed) -> bool:
-    return isinstance(p.element, Shape) and p.element.shape in ("line", "arrow-right", "connector")
+    return isinstance(p.element, Shape) and p.element.shape in ("line", "arrow-right", "connector", "arc")
 
 
 def _is_band(p: Placed) -> bool:

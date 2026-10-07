@@ -64,6 +64,10 @@ class Block:
     links: list[str] = field(default_factory=list)  # box: link tokens between its children
     card: bool = False  # box: an ``Item N`` card (a bullet drawn as a card by ``@items``)
     items: bool = False  # box: its bullets were item cards (the slide gets the ``items`` word)
+    flag: str = ""  # box: a class the form says (``accent`` = the current milestone, ``hero`` = the winner)
+    marks: list[int] = field(
+        default_factory=list
+    )  # text: paragraph indexes that take ``{.accent}`` (@agenda)
 
 
 # --------------------------------------------------------------------------- classification
@@ -1095,6 +1099,8 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     acc, cls = out.deck.accent, out.classes
     if b.kind == "text":
         lines = text_lines(b.paras, accent=acc, classes=cls)
+        if b.marks and len(lines) == len(b.paras):  # @agenda: the current item
+            lines = [ln + " {.accent}" if i in b.marks else ln for i, ln in enumerate(lines)]
         return [("text", lines)] if lines else []
     if b.kind == "code":
         text = "\n".join("".join(r.text.replace("\n", "\n") for r in p.runs) for p in b.paras)
@@ -1162,7 +1168,7 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
     mark = "###" if b.sub else "##"
     chunks: list[tuple[str, list[str]]] = []
     kpi = _kpi(b, out.deck.css_heading)
-    cname = None if kpi or b.chevron else _box_class(b, out)
+    cname = None if kpi or b.chevron else (b.flag or _box_class(b, out))
     attrs = (".kpi " if kpi else "") + (f".{cname} " if cname else "") + (f"icon={b.icon}" if b.icon else "")
     head = f"{mark} {_head(b.heading or [], out)}" + (f" {{{attrs.strip()}}}" if attrs else "")
     if b.chevron:
@@ -1213,7 +1219,12 @@ def build_slide(
     classes: dict[str, str],
     info: dict | None = None,
 ) -> list[str]:
+    from . import vocab  # (it needs Block from this module)
+
     fold_into_tables(data)
+    form = vocab.extract(
+        data
+    )  # DL3b: the named shapes of @timeline / @funnel / ... fold back into their source
     title, pool = classify(data, deck)
     pool = fold_kpi(fold_steps(pool))
     pool, rows_mode = fold_rows(pool)
@@ -1222,6 +1233,10 @@ def build_slide(
     icons = [i for i in data.items if i.role == "icon"]
     blocks = make_blocks(pool, deck, icons)
     _attach_icons(icons, blocks)
+    if form is not None and not form.keep:
+        form_extra, blocks = blocks, form.boxes  # content the form did not draw stays below its boxes
+    else:
+        form_extra = []
     arrows = sum(1 for i in pool if i.kind == "shape" and i.prst and "rrow" in i.prst)
     dia = recover_diagram(blocks, data.conns, data.items)
     if dia is not None:
@@ -1287,6 +1302,12 @@ def build_slide(
         tokens, grid, extras = plan_grid(blocks, deck.width, deck.height, gdiag, deck.margin_x, deck.gap)
     if rows_slide:
         tokens = ["rows"]
+    if form is not None:
+        if form.keep:  # @vs / @matrix: the cards are ordinary boxes
+            grid = form.adjust(grid, deck.colors.get("border"))
+        else:
+            grid, extras = form.boxes, form_extra
+        tokens, groups = list(form.tokens), None
     for g in gdiag:
         diags.append(
             Diagnostic(level="info", message=g, slide=n, rule="import-layout", hint="check the arrangement")
@@ -1320,8 +1341,9 @@ def build_slide(
     if not groups and arrows and "chevron" not in tokens and n_boxes > 1 and arrows >= n_boxes - 1:
         tokens.append("flow")
     if info is not None:
-        info["tokens"] = [] if groups else [t for t in tokens if t != "blank"]
+        info["tokens"] = [] if groups or form is not None else [t for t in tokens if t != "blank"]
         info["at"] = None
+        info["form"] = form.form if form is not None else None
     seq = [*grid, *extras]
     links = link_tokens(top, seq, drop_next="flow" in tokens)
     for b in seq:
@@ -1340,6 +1362,7 @@ def build_slide(
         and not arrows
         and not data.conns
     )
+    title_only = title_only and form is None
     if title_only:
         footer_row = any(
             i.role == "decor"

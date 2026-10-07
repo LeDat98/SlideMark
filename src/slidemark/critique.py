@@ -77,7 +77,7 @@ def _size(p: Placed, theme: Theme) -> float:
 def _natural_height(p: Placed, scale: float | None = None) -> float:
     """Measured text height (EMU) of ``p``; visuals count as their box."""
     paras = getattr(p.element, "paragraphs", None)
-    if not paras:
+    if not paras or getattr(p.element, "attrs", {}).get("vert"):  # (a vertical axis label runs along its box)
         return p.h
     ph, pv = _pad(p)
     s = p.font_scale if scale is None else scale
@@ -85,6 +85,8 @@ def _natural_height(p: Placed, scale: float | None = None) -> float:
 
 
 def _lines(p: Placed, theme: Theme, scale: float | None = None) -> int:
+    if p.element.attrs.get("vert"):  # a vertical label is one line along the tall, narrow box
+        return 1
     ph, _pv = _pad(p)
     size = _size(p, theme) if scale is None else (p.style.font_size or theme.sizes.get("body", 18)) * scale
     width_pt = (p.w - ph) / EMU_PER_PT

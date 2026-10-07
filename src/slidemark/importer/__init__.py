@@ -619,7 +619,7 @@ def _add_dense(lines: list[str], info: dict) -> list[str]:
 def _dense_decision(lines, info, sd, deck, header, theme) -> tuple[bool, bool]:
     """(tried, dense): a trial build with the ``dense`` class fits the original's text boxes much better."""
     extra = info.get("extra")
-    if extra is None or info.get("title_only") or "dense" in extra:
+    if extra is None or info.get("title_only") or info.get("form") or "dense" in extra:
         return False, False
     body = theme.sizes.get("body", 18)
     sizes = sorted(

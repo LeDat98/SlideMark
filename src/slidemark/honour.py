@@ -22,6 +22,7 @@ import re
 from collections.abc import Callable, Iterator
 from typing import Any
 
+from . import forms
 from .ir import Chart, Code, Container, Deck, Diagnostic, Image, Media, Placed, Slide, Table, Text
 
 # The documented attribute keys (docs/SYNTAX.md "Attributes"): position, style, image, plus `icon` on boxes.
@@ -62,6 +63,8 @@ LABEL = {
     "chart": "a chart",
     "code": "a code block",
     "rows": "an @rows list",
+    "stage": "a form box",
+    "formtext": "a form's text",
 }
 
 _FIT = "fit= is for images: ![alt](a.png){fit=cover|contain|stretch}"
@@ -69,6 +72,10 @@ _ICON = "icon= goes on a box heading: ## Label {icon=chart}"
 _TITLE_GEO = "titles sit in the title area: @free places them, sizes: title= sizes them"
 _STEP_GEO = "step boxes follow the row: @1:2:1 steps sets column ratios, @free places blocks"
 _CHART = "charts take colors=a,b (series) and size= (text); this does not apply"
+_STAGE_GEO = (
+    "a form places its shapes: @1:2 ratios, gap= and its own tokens set the geometry, @free places blocks"
+)
+_STAGE_TEXT = "size= on the @ line sizes the form's text; fill= and color= go on the box, the rest are tokens"
 _IMAGE = "an image has no text: x y w h line radius opacity fit apply"
 
 
@@ -91,6 +98,8 @@ HONOURED: dict[str, str] = {
     "chart": "x y w h size color font",
     "code": "x y w h size color align valign bold italic fill line radius opacity pad",
     "rows": "x y w h size color font bold italic fill line opacity pad",
+    "stage": "fill color",
+    "formtext": "size color",
 }
 IGNORED: dict[str, dict[str, str]] = {
     "title": {
@@ -147,6 +156,19 @@ IGNORED: dict[str, dict[str, str]] = {
         "fit": _FIT,
         "icon": _ICON,
     },
+    "stage": {
+        **_ig("x y w h", _STAGE_GEO),
+        **_ig("size font bold italic align valign radius opacity pad", _STAGE_TEXT),
+        "line": "a form draws its own outline: fill= and color= apply, its tokens set the rest",
+        "fit": _FIT,
+        "icon": _ICON,
+    },
+    "formtext": {
+        **_ig("x y w h", _STAGE_GEO),
+        **_ig("font bold italic align valign fill line radius opacity pad", _STAGE_TEXT),
+        "fit": _FIT,
+        "icon": _ICON,
+    },
 }
 
 
@@ -178,8 +200,18 @@ def _walk(slide: Slide, theme: Any, index: int) -> Iterator[tuple[Any, str]]:
     if slide.subtitle is not None and covered:
         yield slide.subtitle, "cover"
     rows = "rows" in slide.classes or bool(theme.layout.rows)
+    form = forms.form_of(slide)
+    if form and forms.fits(form, slide) is not None:
+        form = None  # not composed: ordinary blocks
+    drawn = form in ("timeline", "funnel", "pyramid", "cycle")  # boxes become shapes of the form
 
     def rec(el: Any, parent: Container | None) -> Iterator[tuple[Any, str]]:
+        if isinstance(el, Container) and drawn and parent is None:
+            yield el, "stage"
+            return
+        if isinstance(el, Text) and form in ("agenda", "statement") and parent is None and el.role == "body":
+            yield el, "formtext"
+            return
         if isinstance(el, Container):
             if "kpi" in el.classes:  # `y h w` place the row (layout.kpirow), `x` makes the card absolute
                 yield el, "kpi"
@@ -356,6 +388,10 @@ class _Facts:
 
         return any("num" in s.classes and not steps(s) for s in self.deck.slides)
 
+    def has_form(self, name: str) -> bool:
+        """A slide with the composition form ``@name`` (``@timeline`` ...)."""
+        return any(forms.form_of(s) == name for s in self.deck.slides)
+
     def plain_rows(self) -> bool:
         return any({"rows", "plain"} <= set(s.classes) for s in self.deck.slides)
 
@@ -438,6 +474,14 @@ STYLE_NEEDS: list[tuple[re.Pattern[str], Callable[[_Facts], bool], str]] = [
         re.compile(r"^render\.chevron_shape$"),
         _Facts.steps,
         "no @steps / @chevron slide in the deck: the shape is the arrows' own",
+    ),
+    *(
+        (
+            re.compile(rf"^{name}[.-]"),
+            lambda f, name=name: f.has_form(name),
+            f"no @{name} slide in the deck: write `@{name}` under the title of the slide",
+        )
+        for name in forms.FORMS
     ),
     (re.compile(r"^(heading\.|card\.|box\.)"), _Facts.boxes, "no ## box in the deck"),
     (re.compile(r"^(footer|num)\."), _Facts.footer, "no footer: set `footer:` or `num: on`"),

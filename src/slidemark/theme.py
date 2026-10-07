@@ -463,6 +463,33 @@ class LayoutTokens(BaseModel):
     steps_to_body_aspect: float = 2.0  # ... cards at most this x their width tall ...
     steps_to_body_text_max_pt: float = 28  # ... card text grows up to this size (pt, CJK wrap guard) ...
     steps_to_body_top: float = 0.1  # ... and the group sits with this share of the leftover above it
+    # --- DL3b composition vocabulary (`@timeline @vs @matrix @funnel @pyramid @cycle @agenda @statement`)
+    vocab_grow: float = 1.35  # text may grow to this x the theme body size to use the room
+    vocab_grow_box: float = 1.8  # `@vs` cards: their text grows up to this x the body size
+    vocab_fill: float = 0.94  # a text fills at most this share of its box height
+    vocab_top: float = 0.25  # share of the leftover height above a block that does not fill the body
+    timeline_stem: Length = "0.3in"  # dot -> milestone text
+    timeline_text_w: float = 0.4  # `dir=h`: milestone text at most this share of the body width
+    timeline_num_ratio: float = 1.6  # `marks=num`: the dot is this x `timeline.dot.size`
+    vs_badge_ratio: float = 2.6  # badge diameter = this x the body text size (pt), unless `vs.badge.size`
+    vs_gap: Length = "0.12in"  # air between a card and the badge
+    vs_card_min: float = 0.6  # a card is at least this share of the room tall
+    matrix_gap: Length = "0.15in"  # between quadrants
+    matrix_axis_gap: Length = "0.1in"  # axis arrow <-> quadrants <-> label
+    funnel_h_max: Length = "1.3in"  # a stage is at most this tall
+    funnel_solo_share: float = 0.8  # width share of the shapes when no stage has a body
+    cycle_node_ratio: float = 0.24  # node diameter = this x the room height, unless `cycle.node.size`
+    cycle_body_share: float = 0.5  # the ring takes at most (1 - this) of the width: bodies sit outside
+    cycle_arrow_gap: Length = "0.08in"  # air between a node and the arrow that leaves / enters it
+    cycle_node_inner: float = 0.707  # the text width of a node = this x its diameter (the inscribed square)
+    cycle_node_pad: float = 2  # ... minus this padding on each side (pt)
+    cycle_chord_ratio: float = 1.6  # neighbouring nodes are at least this x a diameter apart (centres)
+    agenda_row_max: Length = "1.2in"  # an agenda row is at most this tall
+    agenda_num_ratio: float = 0.5  # number size (pt) = this x the row height, unless `agenda.num.size`
+    agenda_num_w: float = 1.7  # number column = this x the number size
+    statement_max_pt: float = 140  # the big line grows to at most this size (pt)
+    statement_sub_ratio: float = 0.28  # caption line = this x the big line, at least the body size
+    line_probe: float = 1.9  # a caption "fits one line" when its height is under this x its size (pt)
     # --- conclusion bar
     conclusion_min_ratio: float = (
         1.0  # the bar text is at least this x the largest card / box body text (0 = off)
@@ -788,6 +815,52 @@ class Theme(BaseModel):
     rows_glyph: str | None = None  # `@rows plain`: the glyph before every bar text (None = `bullet=`)
     rows_glyph_color: str | None = None  # ... its color (None = `bullet.color`, else the text color)
     rows_stripe: str | None = None  # a left stripe on every `@rows` bar: a color or a list `a,b` (cycled)
+    # --- DL3b composition vocabulary (`@timeline @vs @matrix @funnel @pyramid @cycle @agenda @statement`)
+    timeline_line: str = "muted"  # `@timeline`: the axis line ...
+    timeline_line_w: Length = "3pt"  # ... its thickness
+    timeline_dot: str = "primary"  # ... the milestone dots (`marks=on|num`) ...
+    timeline_dot_size: Length = "0.26in"  # ... their diameter
+    timeline_now: str = "accent"  # ... the dot (and date) of the `{.accent}` milestone
+    timeline_date_color: str | None = None  # ... milestone headings (None = `primary`)
+    vs_badge_text: str = "vs"  # `@vs`: the badge between the two sides ...
+    vs_badge_fill: str = "primary"
+    vs_badge_color: str | None = None  # ... (None = readable on the fill)
+    vs_badge_size: Length | None = None  # ... diameter (None = from the body text size)
+    vs_verdict_fill: str = "primary"  # ... the verdict bar (a third `##` box) ...
+    vs_verdict_color: str | None = None
+    vs_win_line: str = "primary"  # ... the `{.hero}` side's border color ...
+    vs_win_w: float = Field(3, ge=0, le=20)  # ... and its width (pt)
+    vs_win_fill: str | None = None  # ... and fill (None = the card fill)
+    matrix_axis_color: str = "muted"  # `@matrix`: axis arrows and labels ...
+    matrix_axis_size: float | None = None  # ... label size in pt (None = caption size)
+    matrix_axis_w: Length = "2pt"  # ... arrow thickness
+    matrix_fill: str | None = None  # ... quadrant fills `a,b,c,d` (reading order; None = the card fill)
+    funnel_fill: str | None = None  # `@funnel`: stage fills `a,b,c` (cycled; None = tints of primary) ...
+    funnel_color: str | None = None  # ... heading ink (None = readable on the fill)
+    funnel_gap: Length = "0.06in"  # ... air between stages
+    funnel_taper: float = Field(0.3, ge=0, le=0.95)  # ... width of the narrow end / the wide end
+    funnel_share: float = Field(0.5, ge=0.2, le=0.9)  # ... share of the width the shapes take (bodies right)
+    pyramid_fill: str | None = None  # `@pyramid`: same tokens
+    pyramid_color: str | None = None
+    pyramid_gap: Length = "0.06in"
+    pyramid_taper: float = Field(0.2, ge=0, le=0.95)  # ... narrow end / wide end (0 = a point)
+    pyramid_share: float = Field(0.5, ge=0.2, le=0.9)
+    cycle_fill: str | None = None  # `@cycle`: node fills `a,b,c` (cycled; None = primary) ...
+    cycle_color: str | None = None  # ... node heading ink (None = readable on the fill)
+    cycle_arrow: str = "muted"  # ... the curved arrows ...
+    cycle_arrow_w: Length = "3pt"
+    cycle_node_size: Length | None = None  # ... node diameter (None = from the room)
+    agenda_num_size: float | None = None  # `@agenda`: number size in pt (None = from the row height) ...
+    agenda_num_text: str = "{n}"  # ... the number text ("{n}" = 1, "0{n}" = 01, "第{n}章") ...
+    agenda_num_color: str = "primary"
+    agenda_rule: str | None = "border"  # ... rule between rows (none = no rules) ...
+    agenda_rule_w: Length = "1pt"
+    agenda_now: str = "accent"  # ... the `{.accent}` (current) item's number and heading ...
+    agenda_dim: str | None = "muted"  # ... the other items' ink once one is current (none = unchanged)
+    statement_size: float | None = None  # `@statement`: the big line in pt (None = as large as fits) ...
+    statement_color: str | None = None  # ... its color (None = primary)
+    statement_sub_size: float | None = None  # ... the second line (None = from the big line)
+    statement_sub_color: str | None = None  # ... (None = muted)
     table_num_pad: Length | None = None  # right inset of right-aligned (numeric) table cells
     kpi_stripe: str | None = None  # color of a stripe on the top edge of every `.kpi` card
     kpi_stripe_h: Length = "6pt"
@@ -1439,6 +1512,11 @@ _PT_PATHS = {
     "render.chart_line_width",
     "render.chart_pie_line_width",
     "box_num_size",
+    "matrix_axis_size",
+    "agenda_num_size",
+    "statement_size",
+    "statement_sub_size",
+    "vs_win_w",
 }
 _THEME_COLOR_SUFFIX = ("_fill", "_color", "_band", "_border", "_bar", "_rule", "_stripe")
 _OPTIONAL_COLORS = {
@@ -1461,7 +1539,30 @@ _OPTIONAL_COLORS = {
     "rows_glyph_color",
     "box_num_fill",
     "box_num_color",
+    "timeline_date_color",
+    "vs_badge_color",
+    "vs_verdict_color",
+    "vs_win_fill",
+    "funnel_color",
+    "pyramid_color",
+    "cycle_color",
+    "statement_color",
+    "statement_sub_color",
+    "agenda_rule",
+    "agenda_dim",
 }
+# DL3b colour tokens whose name has no colour suffix
+_VOCAB_COLORS = {
+    "timeline_line",
+    "timeline_dot",
+    "timeline_now",
+    "vs_win_line",
+    "cycle_arrow",
+    "agenda_now",
+    "agenda_dim",
+}
+# DL3b tokens holding a list of colours (cycled / read in reading order)
+_VOCAB_LISTS = {"matrix_fill", "funnel_fill", "pyramid_fill", "cycle_fill"}
 _MEDIUM_PT = 2.25  # CSS `medium` border width (3px)
 
 
@@ -1615,6 +1716,7 @@ _DL2_PATHS = {
     "rows_stripe",
     "box_items",
     "render.chevron_shape",
+    *_VOCAB_LISTS,
 }
 _CHEVRON_SHAPES = ("chevron", "pentagon", "homeplate")
 
@@ -1655,12 +1757,15 @@ def _dl2_value(path: str, raw: str, names: set[str] | None) -> list[tuple[str, A
         return [(path, v.lower())]
     if path == "title_rule2":
         return [(path, _opt_color(raw, names))]
-    if path == "rows_stripe":  # one color, or a list that cycles over the bars
+    if path == "rows_stripe" or path in _VOCAB_LISTS:  # one color, or a list that cycles
         if v.lower() in ("none", "null", "off"):
             return [(path, None)]
         items = [p.strip() for p in v.split(",") if p.strip()]
+        key = path.replace("_", ".")
         if not items:
-            raise TokenValueError("rows.stripe needs a color", "write rows.stripe=primary,secondary")
+            raise TokenValueError(f"{key} needs a color", f"write {key}=primary,secondary")
+        if path == "matrix_fill" and len(items) > 4:
+            raise TokenValueError("matrix.fill takes at most four colors", "write matrix.fill=a,b,c,d")
         return [(path, ",".join(_color_value(p, names) for p in items))]
     if path == "box_items":
         if v.lower() not in ("cards", "bullets"):
@@ -1728,6 +1833,12 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
         "render.chart_grid",
         "render.chart_pie_line",
     ):
+        return [(path, _color_value(raw, names))]
+    if path in ("vs_badge_text", "agenda_num_text"):
+        return [(path, _unquote(raw))]
+    if len(parts) == 1 and leaf in _VOCAB_COLORS:
+        if leaf in _OPTIONAL_COLORS and _unquote(raw).lower() in ("none", "null", "off"):
+            return [(path, None)]
         return [(path, _color_value(raw, names))]
     if len(parts) == 1 and leaf.endswith(_THEME_COLOR_SUFFIX) and leaf in Theme.model_fields:
         if leaf in _OPTIONAL_COLORS and _unquote(raw).lower() in ("none", "null", "off"):

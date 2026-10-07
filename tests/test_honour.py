@@ -34,6 +34,8 @@ PROBES: dict[str, str] = {
     "chart": "# T\n> lead\n{A}\n```column\n,a,b\nS,1,2\n```\n",
     "code": "# T\n> lead\n{A}\n```python\nprint(1)\n```\n",
     "rows": "# T\n@rows\n{A}\n1. one\n2. two\n3. three\n",
+    "stage": "# T\n@funnel\n## a {<A>}\n- x\n## b\n- y\n## c\n- z\n",
+    "formtext": "# T\n@statement\n{A}\nbig line\n\ncaption\n",
 }
 EXTRA_HEAD = {"chevron": "style: layout.chevron_steps=off\n"}
 # values that change the output (any of them differing from the baseline counts as honoured)

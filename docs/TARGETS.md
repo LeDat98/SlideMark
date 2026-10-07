@@ -66,7 +66,7 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       never grown or moved by a layout pass; per-cell `{fill color}` on a table cell, per-point `{color label}` on a
       chart; `@free` keeps a 12-column snap (`@free grid`) so absolute slides cost few tokens. Gate: a decision-fuzz
       test (50 random decision sets × 11 element kinds, 0 silent no-ops: each either changes the XML or warns).
-- [ ] DL3b Composition vocabulary (owner, 2026-10-07: "rich to the point of no limit"): ≥ 15 new forms, each one
+- [ ] DL3b Composition vocabulary (owner, 2026-10-07: "rich to the point of no limit"; part 1 done: timeline, vs, matrix, funnel, pyramid, cycle, agenda, statement = 8 forms): ≥ 15 new forms, each one
       `@word` line with secondary attributes and tokens, importer round trip, in SKILL.md in one line each:
       timeline (h/v, milestones), comparison / vs (two columns with a verdict), 2x2 matrix with axis labels,
       funnel, pyramid, cycle, icon list, quote, big statement (one number / one sentence), image + text split,
