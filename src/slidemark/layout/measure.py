@@ -27,6 +27,7 @@ SAFETY = 1.03  # estimate inflation
 # call ``set_tokens(theme.layout)`` before measuring, so both sides agree. The aliases below are the schema
 # defaults, kept for code and tests that want "the usual value".
 _tok = LayoutTokens()
+_dense = 1.0  # dense factor of the slide being laid out (set_dense)
 LINE_LATIN = _tok.line_latin
 LINE_CJK = _tok.line_cjk
 PARA_GAP = _tok.para_gap
@@ -36,8 +37,16 @@ CELL_PAD_Y = to_emu(_tok.cell_pad_y)
 
 def set_tokens(tokens: LayoutTokens) -> None:
     """Line heights, paragraph gap and cell paddings used by every measure in this process."""
-    global _tok
+    global _tok, _dense
     _tok = tokens
+    _dense = 1.0
+
+
+def set_dense(k: float) -> None:
+    """The dense factor of the slide being laid out (< 1 on a dense slide): a growth ceiling counts from the
+    role size of the theme, so a dense slide may grow text back up to ``grow_max`` x that size."""
+    global _dense
+    _dense = min(max(k, 0.2), 1.0)
 
 
 def tokens() -> LayoutTokens:
@@ -46,6 +55,29 @@ def tokens() -> LayoutTokens:
 
 def para_gap() -> float:
     return _tok.para_gap
+
+
+def grow_ratio(lt: LayoutTokens, dense_k: float = 1.0) -> float:
+    """The deck-wide growth ceiling (``layout.grow_max``) as a factor on a size that already carries the
+    dense factor: text may reach ``grow_max`` x its role size. 1.0 = growth off."""
+    return max(lt.grow_max, 1.0) / max(min(dense_k, 1.0), 0.2)
+
+
+def ceiling(lt: LayoutTokens) -> float:
+    """``layout.grow_max`` as the factor a size of the slide being laid out may reach (dense slides count
+    from the theme's role size, see ``set_dense``)."""
+    return max(lt.grow_max, 1.0) / _dense
+
+
+def grow_cap(lt: LayoutTokens, base_pt: float | None, cur_pt: float, abs_pt: float) -> float:
+    """Largest growth factor (>= 1) of text now drawn at ``cur_pt`` whose role size is ``base_pt``.
+
+    Every growth pass asks this instead of dividing its own absolute cap ``abs_pt`` by the current size:
+    the smaller of that cap and ``layout.grow_max`` x the role size wins. ``grow_max <= 1`` returns 1.0."""
+    if lt.grow_max <= 1.0:
+        return 1.0
+    cap = min(abs_pt, ceiling(lt) * (base_pt or cur_pt))
+    return max(cap / max(cur_pt, 1e-6), 1.0)
 
 
 def cell_pad() -> tuple[int, int]:

@@ -14,6 +14,11 @@ Each line says the form actually used, text sizes reached (``asked->reached`` wh
 space in the body (below / beside the content), and which author attributes took effect or were ignored
 (``took size=44, ignored h y``; the ``attr-ignored`` warnings carry the hints). On by default; ``--quiet``
 or the header line ``fit: off`` turns it off.
+
+A slide whose body stays more than ``layout.sparse_note`` empty after every growth pass (text growth stops at
+``layout.grow_max``) ends its line with ``sparse: 42% free`` instead of the plain free-space fact, and gets
+one ``sparse`` info diagnostic (``sparse_findings``): a composition cue (merge, add a figure, change the
+form), never a size cue. Both read the same number.
 """
 
 from __future__ import annotations
@@ -21,7 +26,7 @@ from __future__ import annotations
 from typing import Any
 
 from .honour import audit
-from .ir import Chart, Code, Container, Deck, Image, Media, Placed, Raw, Shape, Table, Text
+from .ir import Chart, Code, Container, Deck, Diagnostic, Image, Media, Placed, Raw, Shape, Table, Text
 from .theme import DEFAULT_SIZES, Theme
 from .units import EMU_PER_PT
 
@@ -116,6 +121,27 @@ def _free(body: list[int] | None, items: list[Placed]) -> str | None:
     return "fills body" if below < 0.05 else None
 
 
+def _free_share(body: list[int] | None, items: list[Placed]) -> float | None:
+    """The share of the body rectangle outside the bounding box of the content (0..1), or ``None``."""
+    from .layout.engine import _content_bottom
+
+    if not body or not items or body[2] <= 0 or body[3] <= 0:
+        return None
+    bx, by, bw, bh = body
+    left, right = max(min(p.x for p in items), bx), min(max(p.x + p.w for p in items), bx + bw)
+    top, bottom = max(min(p.y for p in items), by), min(_content_bottom(items), by + bh)
+    return 1.0 - max(right - left, 0) * max(bottom - top, 0) / (bw * bh)
+
+
+# the `sparse` info: (rule, message, hint); the fit-line suffix and the diagnostic read one share
+SPARSE = (
+    "sparse",
+    "slide {n} is sparse ({pct}% free)",
+    "merge it into a neighbour, add a figure/table/chart, or change its form (@rows, @items, @steps, side by "
+    "side); bigger text is capped by layout.grow_max={cap:g}",
+)
+
+
 def _first_text(items: list[Placed], within: list[Placed] | None = None) -> Placed | None:
     for p in items:
         if isinstance(p.element, Text) and p.element.role == "body" and p.element.paragraphs:
@@ -182,7 +208,7 @@ def _boxes(cards: list[Placed], items, theme, dense_k):
 def _table(p: Placed, theme, dense_k):
     t: Table = p.element
     cols = max((sum(c.colspan for c in r) for r in t.rows), default=0)
-    asked = _asked(theme, "table", dense_k)
+    asked = _asked(theme, "table", dense_k, t.style.font_size if t.style is not None else None)
     base = p.style.font_size
     reached = float(base) * p.font_scale if base else None
     extra = []
@@ -236,16 +262,17 @@ def _set_ignored(slide, theme: Theme, index: int) -> list[str]:
     return out
 
 
-def _slide_line(deck: Deck, slide, items: list[Placed], theme: Theme, i: int) -> str:
+def _slide_line(deck: Deck, slide, items: list[Placed], theme: Theme, i: int) -> tuple[str, int | None]:
+    """(the fit line, the percent of the body left free when the slide counts as sparse, else ``None``)."""
     n = i + 1
     if slide.html is not None:
         shapes = sum(1 for p in items if not _chrome(p))
-        return f"slide {n}: html, {_n(shapes, 'shape')}"
+        return f"slide {n}: html, {_n(shapes, 'shape')}", None
     fit: dict[str, Any] = deck.attrs.get("_fit", {}).get(i) or {}
     kind, body = fit.get("kind"), fit.get("body")
     asked, dense_k = fit.get("asked") or {}, float(fit.get("dense_k") or 1.0)
     if kind in ("cover", "section"):
-        return _cover_line(slide, items, theme, n, kind, extra=_set_ignored(slide, theme, i))
+        return _cover_line(slide, items, theme, n, kind, extra=_set_ignored(slide, theme, i)), None
 
     inner = [p for p in items if not _chrome(p)]
     cards = [p for p in inner if isinstance(p.element, Container)]
@@ -321,13 +348,16 @@ def _slide_line(deck: Deck, slide, items: list[Placed], theme: Theme, i: int) ->
             bar_in = [bar]
     names = " + ".join(name for name, _ in parts) or "title only"
     facts = [f for _, fs in parts for f in fs]
-    free = _free(
-        body, [*(p for p in inner if not isinstance(p.element, Shape) or p.element.shape != "line"), *bar_in]
-    )
-    if free and kind not in ("free",):
+    seen = [*(p for p in inner if not isinstance(p.element, Shape) or p.element.shape != "line"), *bar_in]
+    free = _free(body, seen)
+    share = _free_share(body, seen) if inner and kind not in ("free",) else None
+    sparse = round(share * 100) if share is not None and share > theme.layout.sparse_note else None
+    if sparse is None and free and kind not in ("free",):
         facts.append(free)
     facts += _set_ignored(slide, theme, i)
-    return f"slide {n}: " + ", ".join([names, *facts])
+    if sparse is not None:  # the composition cue ends the line (it replaces the plain free-space fact)
+        facts.append(f"sparse: {sparse}% free")
+    return f"slide {n}: " + ", ".join([names, *facts]), sparse
 
 
 def _cover_line(slide, items: list[Placed], theme: Theme, n: int, kind: str, extra: list[str]) -> str:
@@ -349,15 +379,37 @@ def _cover_line(slide, items: list[Placed], theme: Theme, n: int, kind: str, ext
     return f"slide {n}: {kind}, " + ", ".join([*facts, *extra])
 
 
-def fit_lines(deck: Deck, placed: list[list[Placed]], theme: Theme) -> list[str]:
-    """One line per slide; a slide the map cannot read gets ``(no fit data)``. Never raises."""
+def fit_report(deck: Deck, placed: list[list[Placed]], theme: Theme) -> tuple[list[str], list[Diagnostic]]:
+    """(one fit line per slide, one ``sparse`` info per slide that stays sparse). Never raises.
+
+    A slide the map cannot read gets ``(no fit data)``. The info is level ``info`` (a composition cue must not
+    cost a rebuild); its percent is the one printed at the end of the slide's fit line."""
     out: list[str] = []
+    diags: list[Diagnostic] = []
+    rule, msg, hint = SPARSE
     for i, (slide, items) in enumerate(zip(deck.slides, placed, strict=False)):
         try:
-            out.append(_slide_line(deck, slide, items, theme, i))
+            line, sparse = _slide_line(deck, slide, items, theme, i)
         except Exception:
             out.append(f"slide {i + 1}: (no fit data)")
-    return out
+            continue
+        out.append(line)
+        if sparse is not None:
+            diags.append(
+                Diagnostic(
+                    level="info",
+                    message=msg.format(n=i + 1, pct=sparse),
+                    slide=i + 1,
+                    rule=rule,
+                    hint=hint.format(cap=theme.layout.grow_max),
+                )
+            )
+    return out, diags
 
 
-__all__ = ["fit_lines"]
+def fit_lines(deck: Deck, placed: list[list[Placed]], theme: Theme) -> list[str]:
+    """One line per slide (see ``fit_report``)."""
+    return fit_report(deck, placed, theme)[0]
+
+
+__all__ = ["fit_lines", "fit_report"]

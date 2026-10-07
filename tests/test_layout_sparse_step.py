@@ -36,8 +36,11 @@ def lay_with(md: str, **tokens):
 
 
 def test_sparse_slide_takes_the_step_and_does_not_overflow():
-    placed0, _ = lay_with(DENSE + TWO_CARDS, sparse_step=1.0, sparse_step_min=1.0, l3_fill=False)
-    placed1, deck = lay_with(DENSE + TWO_CARDS, l3_fill=False)
+    # (the deck-wide ceiling, layout.grow_max, is tested in test_grow_max.py: the step's own cap here)
+    placed0, _ = lay_with(
+        DENSE + TWO_CARDS, sparse_step=1.0, sparse_step_min=1.0, l3_fill=False, grow_max=3.0
+    )
+    placed1, deck = lay_with(DENSE + TWO_CARDS, l3_fill=False, grow_max=3.0)
     (s0,) = body_sizes(placed0)
     (s1,) = body_sizes(placed1)
     assert s1 > s0 * 1.1

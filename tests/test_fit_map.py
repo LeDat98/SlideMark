@@ -80,7 +80,7 @@ def test_list_names_items_and_size(tmp_path):
     line = one("# T\n> lead\n- one\n- two\n- three\n", tmp_path)
     assert line.startswith("slide 1: lead + list 3 items ")
     assert re.search(r"list 3 items 11->\d+pt \(grown\)", line)
-    assert re.search(r"free (\d+% above, )?\d+% below", line)
+    assert re.search(r"free (\d+% above, )?\d+% below|sparse: \d+% free", line)
 
 
 def test_chart_names_kind_series_labels_and_hl(tmp_path):
@@ -132,7 +132,7 @@ def test_cover_names_title_size_and_composition(tmp_path):
 def test_took_and_ignored_attributes(tmp_path):
     md = "# T\n> lead\n## a {.kpi h=55% size=30 bold=true}\n1\nc\n## b {.kpi}\n2\nc\n@end\n- x\n"
     line = one(md, tmp_path)
-    assert line.endswith("took h size=30, ignored bold"), line
+    assert re.search(r"took h size=30, ignored bold(, sparse: \d+% free)?$", line), line
     beside = one("# T\n> lead\n## a {.kpi h=55%}\n1\nc\n## b {.kpi}\n2\nc\n@end\n- x\n", tmp_path)
     assert "took h" in beside and "ignored" not in beside  # a pinned row beside a list took the height too
     alone = one("# T\n> lead\n## a {.kpi h=55%}\n1\nc\n## b {.kpi}\n2\nc\n", tmp_path)

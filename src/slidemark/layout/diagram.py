@@ -909,7 +909,7 @@ def _fill_tree(items: list, body: Rect, lt, reserve: int) -> list:
         return True
 
     tf = 1.0
-    for k in range(max(round((lt.tree_text_max - 1.0) / 0.05), 0), 0, -1):
+    for k in range(max(round((min(lt.tree_text_max, measure.ceiling(lt)) - 1.0) / 0.05), 0), 0, -1):
         if fits(round(1.0 + 0.05 * k, 2)):
             tf = round(1.0 + 0.05 * k, 2)
             break

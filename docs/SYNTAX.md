@@ -342,6 +342,17 @@ conclusion bar under it attaches to the table (`bar_attach=grow|move|off`, gap `
 (`steps_to_body_fill`, card text up to `steps_to_body_text_max_pt`); `kpi_to_body=off` / `steps_to_body=off`
 restore the content-sized look.
 
+**Growth ceiling (`layout.grow_max`, default 1.5).** One deck-wide limit on text growth: no growth pass (list,
+cards, `@steps` cards and labels, lone table text, KPI number / label / caption, chevron text, the general sparse
+growth and sparse step) takes text beyond `grow_max` x the size of its role, on top of the pass's own absolute cap
+(`list_text_max_pt`, `card_fill_text_max_pt`, `steps_to_body_text_max_pt`, `table_free_text_max_pt`,
+`kpi_lone_value_max_pt`, `chevron_text_max_pt` ...); the smaller wins. Only text is capped: rows, cards and gaps may
+still stretch to fill the body. Write it as a token, `style: grow.max=1.3` (or `layout.grow_max=1.3`);
+`grow.max=1` switches text growth off entirely. A pinned size (`size=`, CSS, `sizes: body=14!`) is never grown, a
+table with `{size=22}` stays at 22pt. A dense slide counts from the theme's role size (it may grow back to
+`grow_max` x that). A slide that stays empty after growth is named by its fit line and a `sparse` info (below):
+change its form, not its type size.
+
 **Place a KPI row yourself.** `h=` `y=` `w=` on the `.kpi` cards of one row size and place the row, not the card
 (an `x=` still makes a card absolute): the row is as tall as the largest `h=` (a share of the body), starts at `y=`
 (from the top of the body), and a card with `w=` takes that width, the others share the rest. The cards keep
@@ -667,6 +678,7 @@ A line is `slide N: <form> [+ <form>], <facts>`:
 | `A->Bpt (shrunk to fit / grown)` | the text size asked (the role size in `sizes:`, `kpi.value.size=`, `{size=}`) against the size drawn; a size within 4% of the ask prints once. Sizes you pin (`size=`, `sizes: body=14!`) never move |
 | `value`, `card text`, `text`, `at` | which text: the KPI number, step card text, box text, table text |
 | `free N% below / above / right / beside` | the empty part of the body under (over, beside) the content, from 10% (above: 20%); `fills body` when nothing is left |
+| `sparse: 42% free` | last on the line: the body stays more than `layout.sparse_note` (0.35) empty after every growth pass (text is capped by `layout.grow_max`); replaces `free N% ...`. A composition cue, not a size cue (see `sparse` below) |
 | `conclusion bar attached` | the `>` bar moved up under a lone table |
 | chart facts | `labels on`, `hl=<points>`, `note` when the option took; table facts `zebra`, `hl N rows` |
 | `took size=44 icon` | the attributes written on the slide's elements that the layout honoured (`size` with its value) |
@@ -674,6 +686,16 @@ A line is `slide N: <form> [+ <form>], <facts>`:
 
 `--quiet` (`-q`) or the header line `fit: off` leaves the lines out; the lines stay out of `check`. A slide the map
 cannot read prints `slide N: (no fit data)`.
+
+### `sparse`
+
+An **info** (it must not cost a rebuild), once per content slide that ends sparse, on the same number as the end of
+its fit line: `info slide 7 sparse: slide 7 is sparse (42% free) -> merge it into a neighbour, add a figure/table/chart,
+or change its form (@rows, @items, @steps, side by side); bigger text is capped by layout.grow_max=1.5`. Several
+sparse slides print one line (`info slides 7,9 sparse: slide 7 is sparse (42% free); slide 9 ...`). The free share is
+the part of the body rectangle outside the bounding box of the content (chrome and a conclusion bar attached to the
+body count as content); covers, sections, `@free` and `@html` slides are never sparse. `layout.sparse_note` is the
+threshold (`0.99` silences it); the check lives in `src/slidemark/fit.py` (`SPARSE`, `fit_report`).
 
 ### `attr-ignored`
 

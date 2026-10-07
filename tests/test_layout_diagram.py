@@ -319,7 +319,9 @@ def test_chevron_only_slide_is_not_a_thin_band():
     chev = [p for p in placed if isinstance(p.element, Shape) and p.element.shape == "chevron"]
     assert len(chev) == 4
     h = max(p.h for p in chev)
-    assert 1.2 * IN <= h <= 2.0 * IN + 1  # grown, bounded
+    assert (
+        1.2 * IN <= h <= 2.4 * IN
+    )  # grown, bounded (text stops at layout.grow_max: the row takes the height)
     assert all(p.font_scale >= 1.0 for p in chev)
     assert not [d for d in deck.diagnostics if d.rule == "overflow"]
 

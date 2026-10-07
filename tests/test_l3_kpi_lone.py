@@ -53,9 +53,9 @@ def _value_pt(placed):
 @pytest.mark.parametrize("src", [JA, EN3, EN_BAR])
 def test_lone_kpi_cards_are_content_sized_and_centered(src):
     placed, _, theme = lay(
-        "", 1, src=src, kpi_to_body=False
-    )  # content-sized (kpi_to_body: test_sparse_wave2)
-    off, _, _ = lay("", 1, src=src, kpi_lone=False)
+        "", 1, src=src, kpi_to_body=False, grow_max=3.0
+    )  # content-sized (kpi_to_body: test_sparse_wave2; the deck-wide ceiling: test_grow_max)
+    off, _, _ = lay("", 1, src=src, kpi_lone=False, grow_max=3.0)
     cs = cards(placed)
     assert len(cs) >= 3 and len({c.h for c in cs}) == 1 and len({c.y for c in cs}) == 1
     body_top = max(

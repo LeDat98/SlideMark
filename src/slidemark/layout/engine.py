@@ -793,9 +793,9 @@ def _kpi_grow(ctx: _Ctx, grow: float, box: Container | None = None, width: int |
     The sparse completion (``ctx.air``) also grows a KPI row that stands alone, unless the author set the
     size (``{size=}`` on the card, a CSS rule on ``.kpi``). Growth never makes a number wrap: it is capped
     so the widest number of the row still fits one line with a safety margin."""
-    if ctx.lt.kpi_grow_max <= 1.0:
+    if ctx.lt.kpi_grow_max <= 1.0 or ctx.lt.grow_max <= 1.0:
         return 1.0
-    g = min(max(grow, 1.0), ctx.lt.kpi_grow_max)
+    g = min(max(grow, 1.0), ctx.lt.kpi_grow_max, measure.grow_ratio(ctx.lt, ctx.dense_k))
     if not _has_kpi_text(ctx) and (ctx.air <= 0 or _kpi_explicit(ctx, box)):
         return 1.0
     return max(min(g, _kpi_fit(ctx, box, width)), 1.0) if width else g
@@ -861,6 +861,7 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
         ctx.grow > 1.0
         and ctx.scale >= 1.0
         and not pinned(el)
+        and getattr(getattr(el, "style", None), "font_size", None) is None  # `{size=22}` is the author's call
         and not (ctx.css.active and ctx.css.own(el).font_size is not None)
         and not _cells_sized(el)
     ):  # sparse slide: table text grows too (less than box text)
@@ -879,6 +880,7 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
         ctx.lt.body_size_unify
         and ctx.scale >= 1.0
         and not pinned(el)
+        and getattr(getattr(el, "style", None), "font_size", None) is None
         and _has_box_text(ctx)
         and not _tables_alone(ctx)
     ):
@@ -903,6 +905,16 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
                 eff = _no_new_wraps(ctx, el, ncols, anchors, width, st, eff0, eff)
     elif eff > eff0 * 1.001:
         eff = _no_new_wraps(ctx, el, ncols, anchors, width, st, eff0, eff)
+    top_eff = measure.grow_ratio(
+        ctx.lt, ctx.dense_k
+    )  # layout.grow_max: table text never beyond this x its size
+    if (
+        ctx.lt.body_size_unify and not _tables_alone(ctx) and _has_box_text(ctx)
+    ):  # ... or the box text beside it
+        box = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
+        top_eff = max(top_eff, box / max(st.font_size or 14, 1e-6))
+    if eff > top_eff and eff > eff0 * 1.001:
+        eff = max(top_eff, eff0)
     size = (st.font_size or 14) * eff
     b = getattr(el, "box", None)
     if (
@@ -3052,7 +3064,9 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
         best_g = fin.grow
         for f in [1.0] + [round(1.0 + 0.05 * i, 2) for i in range(1, steps + 1)]:
             g = round(fin.grow * f, 2)
-            if g > fin.grow and (g * body_pt0 > ctx.lt.balance_max_pt or g > max(ctx.lt.grow_max, fin.grow)):
+            if g > fin.grow and (
+                g * body_pt0 > ctx.lt.balance_max_pt or g > max(ctx.lt.grow_normal_max, fin.grow)
+            ):
                 break
             c = run(body, grow=g, expand=fin.expand, lone_air=ctx.lt.balance_text_air, grow_base=fin.grow)
             if c.over or not c.out:
@@ -4249,6 +4263,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     dense = deck.density == "dense" or "dense" in slide.classes
     ctx.dense_k = theme.dense_scale if dense else 1.0
     ctx.tight = ctx.lt.dense_tight if dense else 1.0
+    measure.set_dense(ctx.dense_k)
 
     kind = slide.layout
     if kind not in ("cover", "section", "blank", "center", "content", "free"):
@@ -4582,6 +4597,12 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             stepped: list[float] = [1.0, 1.0]  # sparse step, growth before it
 
             def run(area: Rect, **kw) -> _Ctx:
+                cap_g = round(
+                    measure.grow_ratio(ctx.lt, ctx.dense_k), 3
+                )  # layout.grow_max: deck-wide ceiling
+                for k_ in ("grow", "step"):
+                    if kw.get(k_, 1.0) > cap_g:
+                        kw[k_] = cap_g
                 if stepped[0] > 1.0:  # every later run keeps the slide's sparse step
                     kw.setdefault("step", stepped[0])
                     kw.setdefault("roomy", True)
@@ -4622,7 +4643,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 if very:
                     top = max(top, min(ctx.lt.grow_very_sparse, ctx.lt.grow_very_sparse_max_pt / body_pt))
                 if ctx.dense_k >= 1.0:
-                    top = min(top, max(ctx.lt.grow_max, 1.0))
+                    top = min(top, max(ctx.lt.grow_normal_max, 1.0))
                 n = round((top - 1.05) / 0.05)
                 for g in [round(top - 0.05 * i, 2) for i in range(n + 1)]:
                     c3 = run(body, grow=g)

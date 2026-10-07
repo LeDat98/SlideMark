@@ -50,8 +50,8 @@ def _bodies(placed):
 
 
 def test_short_list_grows_and_leaves_no_floating_block():
-    placed, _, _ = lay("", 1, src=LIST)
-    off, _, _ = lay("", 1, src=LIST, list_fill=False)
+    placed, _, _ = lay("", 1, src=LIST, grow_max=3.0)  # (the deck-wide ceiling, grow_max: test_grow_max.py)
+    off, _, _ = lay("", 1, src=LIST, list_fill=False, grow_max=3.0)
     (b,), (b0,) = _bodies(placed), _bodies(off)
     assert _pt(b) > _pt(b0)
     assert _pt(b) <= 28 + 0.01  # list_text_max_pt
@@ -64,8 +64,8 @@ def test_short_list_grows_and_leaves_no_floating_block():
 
 
 def test_short_list_text_cap_is_a_token():
-    off, _, _ = lay("", 1, src=LIST, list_fill=False)
-    placed, _, _ = lay("", 1, src=LIST, list_text_max_pt=20)
+    off, _, _ = lay("", 1, src=LIST, list_fill=False, grow_max=3.0)
+    placed, _, _ = lay("", 1, src=LIST, list_text_max_pt=20, grow_max=3.0)
     (b,), (b0,) = _bodies(placed), _bodies(off)
     assert _pt(b) <= max(20, _pt(b0)) + 0.01  # the pass never grows past its cap (and never shrinks)
 
@@ -89,8 +89,10 @@ def test_a_lone_paragraph_and_a_pinned_size_are_not_grown():
 
 
 def test_cards_alone_stretch_down_the_body():
-    placed, _, _ = lay("", 1, src=CARDS)
-    off, _, _ = lay("", 1, src=CARDS, cards_to_body=False)
+    placed, _, _ = lay(
+        "", 1, src=CARDS, grow_max=3.0
+    )  # (a ceiling that keeps the text small keeps the cards compact)
+    off, _, _ = lay("", 1, src=CARDS, cards_to_body=False, grow_max=3.0)
     cs = [p for p in placed if isinstance(p.element, Container)]
     cs0 = [p for p in off if isinstance(p.element, Container)]
     assert len(cs) == 3 and len({c.h for c in cs}) == 1
@@ -163,13 +165,13 @@ def _table(placed):
 
 
 def test_lone_table_text_grows_up_to_the_token_max():
-    placed, _, _ = lay("", 1, src=TABLE)
-    off, _, _ = lay("", 1, src=TABLE, table_free=False)
+    placed, _, _ = lay("", 1, src=TABLE, grow_max=3.0)
+    off, _, _ = lay("", 1, src=TABLE, table_free=False, grow_max=3.0)
     t, t0 = _table(placed), _table(off)
     assert _pt(t) > _pt(t0)
     assert _pt(t) <= 22 + 0.01
     assert t.h > t0.h
-    capped, _, _ = lay("", 1, src=TABLE, table_free_text_max_pt=16)
+    capped, _, _ = lay("", 1, src=TABLE, table_free_text_max_pt=16, grow_max=3.0)
     assert _pt(_table(capped)) <= max(16, _pt(t0)) + 0.01
 
 
@@ -213,7 +215,7 @@ def test_table_text_never_wraps_more_cjk_lines():
 
 def test_table_pptx_font_size_follows_the_layout(tmp_path: Path):
     out = tmp_path / "t.pptx"
-    build(TABLE + BAR, out)
+    build(TABLE.replace(HEAD, HEAD + "style: grow.max=3\n") + BAR, out)  # (the ceiling: test_grow_max.py)
     slide = Presentation(out).slides[0]
     tbl = next(s for s in slide.shapes if s.has_table).table
     size = tbl.cell(1, 0).text_frame.paragraphs[0].runs[0].font.size.pt

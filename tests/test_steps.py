@@ -180,8 +180,8 @@ def test_sparse_steps_use_the_body(tmp_path):
     arrows = [sh[f"Step {i} arrow"] for i in range(1, 5)]
     cards = [sh[f"Step {i} card"] for i in range(1, 5)]
     texts = [s for n, s in sh.items() if n.startswith("Text")]
-    assert min(_max_pt(t) for t in texts) >= 20  # 11pt theme text grew (was 11)
-    assert min(_max_pt(a) for a in arrows) >= 22  # the label grew and stayed on one line
+    assert min(_max_pt(t) for t in texts) >= 16  # 11pt theme text grew to the ceiling (layout.grow_max 1.5 x)
+    assert min(_max_pt(a) for a in arrows) >= 18  # the label grew and stayed on one line
     assert all(len(a.text_frame.text.splitlines()) == 1 for a in arrows)
     span = max(c.top + c.height for c in cards) - min(a.top for a in arrows)
     body = prs.slide_height - sh["Title"].top - sh["Title"].height
