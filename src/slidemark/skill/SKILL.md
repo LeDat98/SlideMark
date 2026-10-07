@@ -206,7 +206,7 @@ rows), `.badge` (inline pill). On a heading, `size` `fill` `color` style the who
 ## Components
 
 - **KPI row:** `@kpi` under the title makes every `##` box a card; `style: kpi.h=4.4in` sets card height, `kpi.rule=border`
-  draws a rule between number and note; place the row yourself with `{.kpi .hero w=45% h=55% y=24%}` (shares of the body).
+  draws a rule between number and note, `kpi.band=primary` a label band, `kpi.unit.size=22` a smaller unit (億円 %); place the row yourself with `{.kpi .hero w=45% h=55% y=24%}` (shares of the body).
   **KPI card:** `## Label {.kpi icon=yen}` + value line + caption line; `{.kpi .hero}` = the lead metric,
   wider with a bigger number. Up to 4 in a row; `@end` + a list or table below them.
 - **Callout:** `> [!note] text` (`tip` `warn` `caution`), at slide level or inside a box.
