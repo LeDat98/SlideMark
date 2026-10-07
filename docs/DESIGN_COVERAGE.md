@@ -4,7 +4,7 @@ Reference: `bench/lengthbench/t2/python-pptx/build.py` (an agent's 15-slide deck
 `docs/DESIGN_REQUIRED.md`: every value the agent decided with python-pptx must be statable in SlideMark in the
 shortest unambiguous form, as a token (`style:` / `colors:` / `sizes:`), an attribute (`{key=value}`) or a
 fence option, never a theme-specific code path. Status: **covered** (before this wave), **new** (added in design
-wave 3, lane 2), **CSS only** (statable, but only with a ` ```css ` fence; none left), **missing** (not statable; reason given).
+wave 3, lanes 2, B, C, E), **CSS only** (statable, but only with a ` ```css ` fence; none left), **missing** (not statable; none left).
 
 Tests: `tests/test_design_coverage.py` (parser, render, importer, bad values). Syntax: `docs/SYNTAX.md`.
 
@@ -62,10 +62,10 @@ fixed cost, while t3 pays for 25 slides of per-slide choices (+755 tokens over i
 | Card fill + border | L114 | `.kpi` card = `card` class | covered |
 | Top colour stripe | L115 | `style: kpi.stripe=secondary kpi.stripe_h=6pt` | new |
 | Label 20 bold navy | L116 | `style: kpi.label="20 bold primary"` (long form `kpi.label.size=20 ...`) | new (was CSS only) |
-| Value 34 / 54 pt | L118 | `sizes: kpi=34`, per slide `sizes: kpi=54` inside the slide (auto-fit to the card) | covered |
-| Divider rule between value and note | L121 | none: the rule needs the caption's position inside the number's text frame | missing |
+| Value 34 / 54 pt | L118 | `sizes: kpi=34`, per slide `sizes: kpi=54` inside the slide (auto-fit to the card) | new (DL2) |
+| Divider rule between value and note | L121 | `style: kpi.rule=border kpi.rule_h=1pt` (the caption becomes its own box under the rule) | new (lane C) |
 | Note / delta 20 bold teal | L122 | `style: kpi.note="20 bold teal"` | new (was CSS only) |
-| Card height 4.4 in | L110 | `style: kpi.h=4.4in` (a lone row); `{h=4.4in}` on one card | new (DL2) |
+| Card height 4.4 in | L110 | `style: kpi.h=4.4in` (a lone row); `{h=4.4in}` on one card (places the row, `layout/kpirow.py`) | new (DL2) |
 | One card in another colour | n/a | `## A {.kpi fill=accent}` | covered |
 | Every box of the slide is a KPI card | `kpi_slide` | `@kpi` (instead of `{.kpi}` on each `##`) | new (DL2) |
 
@@ -84,7 +84,7 @@ fixed cost, while t3 pays for 25 slides of per-slide choices (+755 tokens over i
 | Decision | python-pptx | SlideMark form | Status |
 |---|---|---|---|
 | Column widths | L273-275 | `{widths=3.9:2.8:2.8:2.6}` | covered |
-| Row height 0.8 / 1.05 in | L267, L277 | automatic (rows grow with the free height, `layout.table_*` tokens); an exact pin is not statable | missing |
+| Row height 0.8 / 1.05 in | L267, L277 | `{rowh=0.8in,1.05in}` (one value pins every row; pinned rows are never stretched) | new |
 | Header fill / colour | L284, L292 | `style: table.header.fill=primary table.header.color=#FFFFFF` | covered |
 | Zebra | L286 | `{.zebra}`, `table.zebra.fill=surface` | covered |
 | Bold first column | L292 | `{hcol=1}` | covered |
@@ -113,8 +113,8 @@ fixed cost, while t3 pays for 25 slides of per-slide choices (+755 tokens over i
 | Line width 3.5 | L359 | `style: render.chart_line_width=3.5` | covered |
 | Marker size 9 | L363 | `marker=9` | new |
 | Per-point colours on a pie | L319-322 | `colors=a,b,c,d` (one per slice) | covered |
-| Per-point colours on a one-series bar | n/a | `hl=` (one emphasised point); a colour per bar is not statable | missing |
-| Per-point label position | L370-371 | automatic collision rule (`render.chart_collide_em`); a manual per-point position is not statable | missing |
+| Per-point colours on a one-series bar | n/a | `colors=a,b,c,d` (one per category on a one-series column/bar; `hl=` still wins for its point) | new |
+| Per-point label position | L370-371 | `labels=above,below,above,above` (one word per category on line / column / bar; `auto` keeps the automatic collision rule) | new |
 | Emphasise a series or a category | n/a | `hl=営業利益` (series wins) or `hl=2027計画`; no match = `chart-hl` warning | new (series) |
 | Pie labels white bold inside | L316-318 | default (`render.chart_pie_label_*`) | covered |
 | Reversed bar categories, no value-axis line | L403, L215 | automatic | covered |
@@ -134,15 +134,19 @@ fixed cost, while t3 pays for 25 slides of per-slide choices (+755 tokens over i
 ## Summary
 
 Rows listed: 70. **covered 38** (4 of them only after a routing fix: `lead.bold`, `conclusion.*`, `footnote.*`, a
-deck-declared colour named like a CSS colour), **new 28** (21 from design wave 3; 6 from the 5- and 25-slide ports, DL2
+deck-declared colour named like a CSS colour), **new 32** (21 from design wave 3; 6 from the 5- and 25-slide ports, DL2
 lane E: chart label weight, size pairs, overlap, step, totals, pie name and outline; DL2 part 1 added `kpi.h`, `@kpi`,
 the cover subtitle colour and moved the KPI label / note, per-slide pins and column emphasis from CSS only to a
-native form), **CSS only 0**, **missing 4** (KPI divider rule, exact table row height, a colour per bar of one series,
-a manual per-point label position).
+native form; DL2 part 2 (lane C, `tests/test_design_coverage2.py`) closed the last 4: KPI divider rule, exact table
+row height, a colour per bar of one series, a manual per-point label position), **CSS only 0**, **missing 0**.
 
 DL2 part 1 (CSS only -> native): `{hlcol=}` (table columns), slide-scoped `sizes:` / `style:` lines (per-slide pins,
 `sizes: kpi=54`, the light cover subtitle), the text shorthand (`kpi.label="20 bold primary"`), `fonts: font=`, `@kpi`,
 `kpi.h=4.4in`. The ported deck (`bench/lengthbench/t2/slidemark-ported/deck.md`) uses no css fence and no `@html`.
+
+Element control found by a real agent run (`bench/lengthbench/t2/slidemark-wave3`): `## 売上高 {.kpi .hero h=55% y=24%}`
+was silently ignored (`y=` made the card absolute and tore it out of the row) -> `h=` `y=` `w=` on KPI cards in a row
+place the row (`docs/SYNTAX.md`, "Place a KPI row yourself").
 
 Silent failures closed in this wave (they looked statable and did nothing):
 

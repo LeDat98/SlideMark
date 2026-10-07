@@ -394,6 +394,31 @@ def fold_steps(pool: list[Item]) -> list[Item]:
     return [new.get(i.uid, i) for i in pool if i.uid not in drop]
 
 
+def fold_kpi(pool: list[Item]) -> list[Item]:
+    """``kpi.rule`` splits a KPI card's text into ``KPI value`` and ``KPI caption`` boxes: put them back.
+
+    The caption's paragraphs join the value box (the card holds one text again, as `_kpi` expects); the
+    caption leaves the pool. A caption without a value box above it stays as it is."""
+    caps = [i for i in pool if i.kind == "text" and (i.name or "") == "KPI caption"]
+    vals = [i for i in pool if i.kind == "text" and (i.name or "") == "KPI value"]
+    if not caps or not vals:
+        return pool
+    drop: set[int] = set()
+    new: dict[int, Item] = {}
+    for cap in caps:
+        above = [
+            v
+            for v in vals
+            if v.uid not in new and abs(v.x - cap.x) <= 2 and abs(v.w - cap.w) <= 2 and v.y + v.h <= cap.y + 2
+        ]
+        if not above:
+            continue
+        v = max(above, key=lambda i: i.y)
+        new[v.uid] = replace(v, paras=[*v.paras, *cap.paras], h=cap.y + cap.h - v.y, name="Text")
+        drop.add(cap.uid)
+    return [new.get(i.uid, i) for i in pool if i.uid not in drop]
+
+
 _ROW = re.compile(r"Row (\d+)( num)?")
 
 
@@ -1157,7 +1182,7 @@ def build_slide(
 ) -> list[str]:
     fold_into_tables(data)
     title, pool = classify(data, deck)
-    pool = fold_steps(pool)
+    pool = fold_kpi(fold_steps(pool))
     pool, rows_slide = fold_rows(pool)
     by_role = {r: [i for i in data.items if i.role == r] for r in ("lead", "conclusion", "footnote")}
     icons = [i for i in data.items if i.role == "icon"]

@@ -33,12 +33,13 @@ from ..ir import (
 from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
-from . import css, measure
+from . import css, kpirow, measure
 from .chartnote import expand_notes, scale_warning
 from .diagram import fill_tree
 from .gantt import expand_gantt
 from .grid import GridSpec, Rect, auto_spec, cell_rects, parse_spec, tree_areas
 from .grid import row_heights as grid_row_heights
+from .kpirule import expand_kpi_rule
 from .l3fill import (
     _body_items,
     align_chevron_table,
@@ -56,7 +57,16 @@ from .pills import expand_pills, has_pills
 from .score import score as score_layout
 from .search import alternatives
 from .sparsefill import fill_table_free, fill_text_list, lone_table
-from .tables import capped_width, column_widths, right_align_numbers, row_heights, table_grid
+from .tables import (
+    capped_width,
+    column_widths,
+    pin_rows,
+    pinned,
+    right_align_numbers,
+    row_heights,
+    row_pins,
+    table_grid,
+)
 from .vfill import fill_body
 
 _SIZE_KEY = {
@@ -84,6 +94,7 @@ _INHERIT_FIELDS = (
 )
 _VISUALS = (Image, Media, Chart, Table, Code)
 _TOL = 1.01
+_PIN_TOL = 1.08  # a pinned row warns only when the text clearly needs more (measurement is an estimate)
 _SPAN_BLOCKS = (Image, Media, Chart, Code, Raw)  # a lone one after a full box row spans the width
 SPARSE_LINES = 2
 SPARSE_LINE_EM = 22  # a "short" line
@@ -469,6 +480,8 @@ def _len(ctx: _Ctx, value, ref: int, el=None) -> int | None:
 
 def _is_abs(el) -> bool:
     b: Box | None = getattr(el, "box", None)
+    if kpirow.pinned(el):  # `y=` / `h=` / `w=` on a KPI card in a row size and place the row, not the card
+        return False
     return b is not None and (b.x is not None or b.y is not None)
 
 
@@ -743,8 +756,8 @@ def _cells_sized(el: Table) -> bool:
 
 def _table_size_explicit(ctx: _Ctx, el: Table) -> bool:
     """The author fixed the table text size (``sizes: table=``, CSS, ``{size=}``): it never grows further."""
-    if "sizes.table" in (ctx.deck.tokens or {}) or _explicit_size(ctx, el):
-        return True
+    if pinned(el) or "sizes.table" in (ctx.deck.tokens or {}) or _explicit_size(ctx, el):
+        return True  # pinned rows (`rowh=`) hold the text size too: grown text would outgrow them
     return _cells_sized(ctx.css.table(el))  # CSS td / th font-size and {size=} on a cell
 
 
@@ -845,6 +858,7 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
     if (
         ctx.grow > 1.0
         and ctx.scale >= 1.0
+        and not pinned(el)
         and not (ctx.css.active and ctx.css.own(el).font_size is not None)
         and not _cells_sized(el)
     ):  # sparse slide: table text grows too (less than box text)
@@ -859,7 +873,13 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
             t = max(t, min(want, ctx.grow * 1.1))
         eff *= t
         ctx.grew = True
-    elif ctx.lt.body_size_unify and ctx.scale >= 1.0 and _has_box_text(ctx) and not _tables_alone(ctx):
+    elif (
+        ctx.lt.body_size_unify
+        and ctx.scale >= 1.0
+        and not pinned(el)
+        and _has_box_text(ctx)
+        and not _tables_alone(ctx)
+    ):
         box = ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k * ctx.grow
         have = (st.font_size or 14) * eff
         if (
@@ -892,7 +912,34 @@ def _table_geom(ctx: _Ctx, el: Table, width: int):
         width = capped_width(el, ncols, anchors, width, size)  # a few short columns: numbers stay near labels
     cw = column_widths(el, ncols, anchors, width, size)
     rh = row_heights(el, anchors, cw, st, eff)
+    if pinned(el):  # `rowh=`: the author's heights, whatever the text needs (overflow is reported)
+        rh = pin_rows(el, rh)
     return st, eff, anchors, cw, rh
+
+
+def _pinned_rows(ctx: _Ctx, el: Table, anchors, cw: list[int], st: Style, eff: float, avail: int) -> None:
+    """Warn when text outgrows a pinned row (``rowh=``) or the pinned table is taller than its area."""
+    nat = row_heights(el, anchors, cw, st, eff)
+    pins = row_pins(el, len(nat))
+    bad = [(r, n, p) for r, (n, p) in enumerate(zip(nat, pins, strict=True)) if p and n > p * _PIN_TOL]
+    if bad:
+        r, n, p = bad[0]
+        more = f" (and {len(bad) - 1} more)" if len(bad) > 1 else ""
+        need = max(n for _r, n, _p in bad) / EMU_PER_INCH
+        ctx.diag(
+            "overflow",
+            f"table row {r + 1} needs {n / EMU_PER_INCH:.2f}in but rowh pins it to "
+            f"{p / EMU_PER_INCH:.2f}in{more}",
+            f"raise rowh to {need:.2f}in or more, shorten the cell text, or lower sizes: table=",
+        )
+    total = sum(pin_rows(el, nat))
+    if total > avail * _TOL:
+        ctx.diag(
+            "overflow",
+            f"table rows pinned by rowh need {total / EMU_PER_INCH:.2f}in "
+            f"but the area is {avail / EMU_PER_INCH:.2f}in",
+            "lower rowh, drop rows, or move the table to its own slide",
+        )
 
 
 def _no_new_wraps(ctx: _Ctx, el: Table, ncols: int, anchors, width: int, st: Style, eff0: float, eff: float):
@@ -976,9 +1023,15 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
         if not rh or not cw:  # an empty table places nothing
             return
         total = sum(rh)
+        pins = pinned(el)
+        if pins:
+            _pinned_rows(ctx, el, _anchors, cw, st, eff, rect.h)
         if total > rect.h * _TOL:
-            ctx.over.append(_label(el))
-        elif rect.h > total:  # spare room: rows grow up to ctx.lt.table_grow, cell text stays centered
+            if not pins:  # pinned rows cannot shrink: the warning above says what to change
+                ctx.over.append(_label(el))
+        elif (
+            rect.h > total and not pins
+        ):  # spare room: rows grow up to ctx.lt.table_grow, cell text stays centered
             target = min(rect.h, round(total * _table_grow(ctx)))
             if ctx.lt.table_row_max_em > 0:  # rows stretch, but a row is never more than N text heights
                 row_cap = round(ctx.lt.table_row_max_em * (st.font_size or 14) * eff * EMU_PER_PT)
@@ -995,7 +1048,12 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
                 attrs["_twrap"] = True  # wrap pass: the vertical fill may still fit it to the gutter
         ctx.emit(
             (el if "gantt" in el.classes else right_align_numbers(el)).model_copy(update={"attrs": attrs}),
-            Rect(rect.x, rect.y, min(rect.w, sum(cw)), min(total, rect.h) if total > rect.h else total),
+            Rect(
+                rect.x,
+                rect.y,
+                min(rect.w, sum(cw)),
+                total if pins else (min(total, rect.h) if total > rect.h else total),
+            ),
             st,
             eff,
         )
@@ -2163,7 +2221,22 @@ def _place_blocks(
                 tgap = tail_area.y - grid_area.bottom
                 ty = grid_area.y + used + tgap
                 tail_area = Rect(area.x, ty, area.w, max(area.bottom - ty, 0))
-    if "chevron" not in flags and ctx.depth == 0:
+    row_pin: list[Rect] | None = None
+    if "chevron" not in flags and gs.areas is None and len(gs.rows) == 1:
+        row_pin = kpirow.pin_row(
+            cells,
+            [b for _, b in flow],
+            area,
+            gap,
+            lambda v, ref, el: _len(ctx, v, ref, el),
+            ctx.lt.kpi_pin_min_w,
+        )
+    if row_pin is not None:  # `.kpi {h= y= w=}`: the row takes the cards' own geometry
+        cells = row_pin
+        if tail_area is not None:
+            ty = max(tail_area.y, cells[0].bottom + gap)
+            tail_area = Rect(area.x, ty, area.w, max(area.bottom - ty, 0))
+    elif "chevron" not in flags and ctx.depth == 0:
         cells = _hug_beside_visual(ctx, gs, flow, cells, inherit)
     start = len(ctx.out)
     chev_eff: float | None = None  # one text size for the whole chevron row
@@ -2217,7 +2290,7 @@ def _place_blocks(
         if cjk_cap is not None and chev_eff is not None:  # CJK lines never break (fallback fonts run wider)
             chev_eff = min(chev_eff, cjk_cap)
     for (i, blk), r in zip(flow, cells, strict=True):
-        r = _css_width(ctx, blk, _apply_box(ctx, blk, r, False), inherit)
+        r = r if row_pin is not None else _css_width(ctx, blk, _apply_box(ctx, blk, r, False), inherit)
         rects[i] = r
         if "chevron" in flags and isinstance(blk, (Text, Shape, Container)):
             rects[i] = _place_chevron(ctx, blk, r, inherit, chev_eff, chev_h)
@@ -2801,6 +2874,8 @@ def _spread(ctx: _Ctx, fin: _Ctx, run, body: Rect, elements: list) -> _Ctx:
     """
     if fin.scale < 1.0 or fin.over or not any(isinstance(e, (Container, Table)) for e in elements):
         return fin
+    if kpirow.any_pinned(elements):  # shifting re-runs the slide in a lower area: `y=` would move with it
+        return fin
     left = body.bottom - _bottom(fin)
     left0 = left
     keep = round(ctx.lt.left_keep * body.h)
@@ -3027,8 +3102,8 @@ def _needs_complete(ctx: _Ctx, fin: _Ctx, body: Rect, elements: list) -> bool:
     lt = ctx.lt
     if lt.sparse_left_max <= 0 or not lt.grow or fin.scale < 1.0 or fin.over or not fin.out:
         return False
-    if not all(isinstance(e, (Text, Container)) for e in elements):
-        return False
+    if not all(isinstance(e, (Text, Container)) for e in elements) or kpirow.any_pinned(elements):
+        return False  # (a KPI row with its own h= y= w= is where the author put it)
     bg = ctx.slide.background or ""
     if "." in bg or "(" in bg:  # a picture / gradient behind the text: the author placed it, do not move it
         return False
@@ -4182,6 +4257,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
 
     # ---- body with global autofit
     elements = list(slide.elements)
+    pinned_kpi = kpirow.any_pinned(elements)  # `.kpi {h= y= w=}`: the row stays where the author put it
     final_ctx: _Ctx | None = None
     fit_body = body
     rows_el = _rows_list(ctx, slide, kind) if body is not None and body.h > 0 else None
@@ -4315,7 +4391,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 final_ctx.out,
                 body,
                 ctx.lt.body_free_max,
-                "top" if final_ctx.completed else ctx.lt.body_valign,
+                "top" if final_ctx.completed or pinned_kpi else ctx.lt.body_valign,
                 ctx.lt.body_spread_max,
                 _emu(ctx.lt.top_gap) if (slide.conclusion or slide.footnotes) else 0,
                 ctx.lt.center_min_fill,
@@ -4337,7 +4413,9 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 bool(final_ctx.completed) or _block_h(final_ctx.out) < ctx.lt.center_min_fill * body.h,
                 bool(slide.footnotes),
             )
-            if fill_cards_to_bar(final_ctx.out, body, ctx.lt, *to_bar_args, small) is not None:
+            if pinned_kpi:  # the author placed a KPI row: no fill pass moves or stretches its cards
+                pass
+            elif fill_cards_to_bar(final_ctx.out, body, ctx.lt, *to_bar_args, small) is not None:
                 to_bar = to_bar_args  # applied after the lead / footnote growth (it moves the body edges)
             else:
                 final_ctx.out = fill_row(
@@ -4348,14 +4426,15 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     sparse=bool(final_ctx.completed or linked_sparse),
                 )
             small_body = theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt
-            final_ctx.out = fill_panels(
-                final_ctx.out,
-                body,
-                ctx.lt,
-                consulting=final_ctx.dense_k < 1.0 or small_body,
-                title_scale=theme.render.chart_title_scale,
-            )
-            final_ctx.out = fill_chevron_row(final_ctx.out, body, ctx.lt)
+            if not pinned_kpi:
+                final_ctx.out = fill_panels(
+                    final_ctx.out,
+                    body,
+                    ctx.lt,
+                    consulting=final_ctx.dense_k < 1.0 or small_body,
+                    title_scale=theme.render.chart_title_scale,
+                )
+                final_ctx.out = fill_chevron_row(final_ctx.out, body, ctx.lt)
         edge0 = _edges(final_ctx.out, tail)
         if (
             ctx.dense_k >= 1.0
@@ -4423,6 +4502,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             and final_ctx.out
             and not slide.links
             and not has_bar  # a conclusion bar anchors the block (fill_cards_to_bar owns that case)
+            and not pinned_kpi
             and final_ctx.dense_k >= 1.0
             and theme.sizes.get("body", DEFAULT_SIZES["body"]) > ctx.lt.grow_small_pt
         ):  # normal density: a block that still leaves a band under it sits at the optical center
@@ -4480,6 +4560,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         final_ctx.out = expand_pills(
             final_ctx.out, theme, lambda pl, cell: _pill_style(ctx, pl, cell), ctx.lt.pill_h
         )
+    if final_ctx and theme.kpi_rule:  # `kpi.rule=<color>`: number and caption become two boxes around a rule
+        final_ctx.out = expand_kpi_rule(final_ctx.out, theme, ctx.lt.kpi_rule_gap_em)
     chrome = [Placed(element=el, x=r.x, y=r.y, w=max(r.w, 0), h=max(r.h, 0), style=st) for el, r, st in rules]
     deck.attrs.setdefault("_fit", {})[index] = {  # what the fit map (fit.py) cannot read off the Placed items
         "kind": kind,

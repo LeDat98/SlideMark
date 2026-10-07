@@ -307,6 +307,49 @@ def _apply_slice_line(ch: Chart, v: str, ctx: Ctx, line: int | None) -> None:
         ch.options["slice_line_w"] = float(num)
 
 
+def _n_categories(ch: Chart) -> int:
+    return max([len(ch.categories), *(len(s.values) for s in ch.series)], default=0)
+
+
+def _apply_point_labels(ch: Chart, value: str, ctx: Ctx, line: int | None) -> None:
+    """``labels=above,below,above,above``: one position per category (``auto`` keeps the automatic rule).
+
+    Line and column / bar charts only; a wrong count warns with the category count (missing = ``auto``)."""
+    fam = _label_family(ch.kind)
+    words = [w.strip() for w in re.split(r"[,;]", value) if w.strip()]
+    ok = LABEL_POS.get(fam, ())
+    if fam not in ("line", "bar") or not words:
+        ctx.warn(
+            f"per-point label positions do not fit a {ch.kind} chart",
+            line,
+            "bad-chart-option",
+            "labels=a,b,c (one word per category) works on line, column and bar charts; use labels=on",
+        )
+        ch.options["labels"] = "on"
+        return
+    bad = [w for w in words if w != "auto" and w not in ok]
+    if bad:
+        ctx.warn(
+            f"labels={bad[0]} does not fit a {ch.kind} chart",
+            line,
+            "bad-chart-option",
+            f"on a {ch.kind} chart each category's label is one of: {'/'.join(ok)}/auto",
+        )
+        words = ["auto" if w in bad else w for w in words]
+    n = _n_categories(ch)
+    if n and len(words) != n:
+        ctx.warn(
+            f"labels lists {len(words)} positions for {n} categories",
+            line,
+            "bad-chart-option",
+            f"give exactly {n} words, one per category, e.g. labels={','.join((words * n)[:n])}",
+        )
+        words = (words + ["auto"] * n)[:n]
+    ch.options["labels"] = "on"
+    if any(w != "auto" for w in words):
+        ch.options["label_points"] = words
+
+
 def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) -> dict[str, str]:
     """Consume chart option keys from ``kv`` into ``ch``; returns the keys left for the generic path."""
     from .attrs import VALID_KEYS
@@ -325,6 +368,8 @@ def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) ->
                 o["legend"] = low
             else:
                 _bad(ctx, k, v, "/".join(LEGEND), line)
+        elif k == "labels" and re.search(r"[,;]", low):
+            _apply_point_labels(ch, low, ctx, line)
         elif k == "labels":
             if low in _TRUE:
                 o["labels"] = "on"
@@ -472,6 +517,19 @@ def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) ->
             known = {*THEME_COLORS, *ctx.colors}
             if parts and all(p in known or _HEX.match(p) for p in parts):
                 o["colors"] = parts
+                n = _n_categories(ch)
+                if (
+                    ch.kind in ("column", "bar")
+                    and len(ch.series) == 1
+                    and len(parts) > 1
+                    and n != len(parts)
+                ):
+                    ctx.warn(
+                        f"colors lists {len(parts)} colors for a one-series chart of {n} bars",
+                        line,
+                        "bad-chart-option",
+                        f"give 1 color for all bars or exactly {n} (one per bar); only the first is used",
+                    )
             else:
                 ctx.warn(
                     f"bad chart colors '{v}'",
@@ -579,6 +637,44 @@ def _apply_table_hlcol(t: Table, value: str, ctx: Ctx, line: int | None) -> None
         t.attrs["hlcol"] = sorted(good)
 
 
+_ROWH_MAX_IN = 10.0
+_ROWH_MIN_IN = 0.15  # a bare `0.8` means pt: it would be a sliver
+_FREE_ROW = ("auto", "-", "_", "")
+
+
+def _apply_rowh(t: Table, value: str, ctx: Ctx, line: int | None) -> None:
+    """``rowh=0.8in`` pins every row, ``rowh=0.8in,1.05in`` row by row (the last value repeats), ``auto``
+    frees a row. A bad value warns and leaves the table unpinned."""
+    from ..units import EMU_PER_INCH, to_emu
+
+    hint = "rowh is a length with a unit per row (0.15in-10in), e.g. rowh=0.8in or rowh=0.8in,1.05in"
+    parts = [p.strip().lower() for p in re.split(r"[,:;]", value.strip())]
+    out: list[str] = []
+    for p in parts:
+        if p in _FREE_ROW:
+            out.append("auto")
+            continue
+        try:
+            emu = to_emu(p) if "%" not in p else -1
+        except ValueError:
+            emu = -1
+        if not _ROWH_MIN_IN * EMU_PER_INCH <= emu <= _ROWH_MAX_IN * EMU_PER_INCH:
+            ctx.warn(f"bad rowh '{value}'", line, "bad-table-option", hint)
+            return
+        out.append(p)
+    nrows = len(t.rows)
+    if nrows and len(out) > nrows:
+        ctx.warn(
+            f"rowh has {len(out)} values for {nrows} rows",
+            line,
+            "bad-table-option",
+            f"give {nrows} values or fewer (the last repeats), e.g. rowh={','.join(out[:nrows])}",
+        )
+        out = out[:nrows]
+    if any(p != "auto" for p in out):
+        t.rowh = out
+
+
 def apply_table_kv(t: Table, kv: dict[str, str], ctx: Ctx, line: int | None) -> dict[str, str]:
     """Consume widths/align/header/hcol/hl from ``kv``; returns the remaining keys."""
     rest: dict[str, str] = {}
@@ -611,6 +707,8 @@ def apply_table_kv(t: Table, kv: dict[str, str], ctx: Ctx, line: int | None) -> 
                 mean = sum(w) / len(w)
                 w = (w + [mean] * n)[:n]
             t.col_widths = w  # type: ignore[assignment]
+        elif k == "rowh":
+            _apply_rowh(t, v, ctx, line)
         elif k == "align":
             letters = v.strip().lower()
             if not letters or any(ch not in _AMAP for ch in letters):

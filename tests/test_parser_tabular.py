@@ -13,7 +13,8 @@ def _chart(fence_info: str, body: str = ",a,b\ns,1,2"):
 def test_chart_options_normalized():
     c, d = _chart(
         'column {title=T legend=RIGHT labels=yes fmt="#,##0.0" min=0 max=１００ '
-        'colors="primary, #1D4ED8 ,accent" axis=off}'
+        'colors="primary, #1D4ED8 ,accent" axis=off}',
+        ",a,b,c\ns,1,2,3",  # three colors on a one-series chart: one per bar (any other count warns)
     )
     assert c.title == "T"
     assert c.options == {

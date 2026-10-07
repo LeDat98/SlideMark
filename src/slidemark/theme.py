@@ -480,6 +480,10 @@ class LayoutTokens(BaseModel):
     kpi_lone_text_max_pt: float = 24.0  # ... to at most this size
     kpi_lone_pad_em: float = 0.35  # card padding above the label and below the caption, x number size
     kpi_lone_gap_em: float = 0.35  # gap between the label and the number, x label size
+    kpi_pin_min_w: float = (
+        0.1  # a KPI card without `w=` in a row with `w=` cards: at least this x an even column
+    )
+    kpi_rule_gap_em: float = 0.8  # `kpi.rule`: air above and below the rule, x caption size
     kpi_lone_fit: float = 0.88  # the number fills at most this share of the card text width (CJK guard)
     kpi_lone_h: float = 0.65  # a lone KPI card is at most this share of the body height
     kpi_lone_min_h: float = 0.5  # ... and at least this share (a short row gets air inside its cards)
@@ -763,6 +767,9 @@ class Theme(BaseModel):
     title_rule_h: Length = "2pt"
     kpi_stripe: str | None = None  # color of a stripe on the top edge of every `.kpi` card
     kpi_stripe_h: Length = "6pt"
+    kpi_rule: str | None = None  # color of a divider rule between the number and its caption in `.kpi` cards
+    kpi_rule_h: Length = "1pt"
+    kpi_rule_w: Length = "100%"  # ... its width (a share of the card's text width, or a length), centred
     bullet: str | None = None  # glyph of bullet lists (None = the built-in "•" / "–")
     bullet_color: str | None = None  # ... its color (None = the text color)
     steps_caption: str | None = None  # `@steps`: caption under every card, "{n}" = the step number
@@ -1422,6 +1429,7 @@ _OPTIONAL_COLORS = {
     "bottom_bar",
     "title_rule",
     "kpi_stripe",
+    "kpi_rule",
     "bullet_color",
     "steps_caption_color",
 }

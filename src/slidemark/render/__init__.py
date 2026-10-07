@@ -362,7 +362,7 @@ def _name(pl: Placed, counters: dict[str, int]) -> str:
     el = pl.element
     if getattr(el, "id", None):
         return str(el.id)
-    if isinstance(el, (Container, Shape)) and el.attrs.get("shape_name"):
+    if isinstance(el, (Container, Shape, Text)) and el.attrs.get("shape_name"):
         return str(el.attrs["shape_name"])  # `@steps` arrows and cards: the importer reads them back
     if isinstance(el, Text):
         field = el.attrs.get("field")

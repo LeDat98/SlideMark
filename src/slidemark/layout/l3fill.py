@@ -21,7 +21,7 @@ from __future__ import annotations
 from ..ir import Chart, Container, Image, Media, Placed, Shape, Style, Table, Text
 from ..theme import LayoutTokens
 from ..units import EMU_PER_PT, to_emu
-from . import measure
+from . import kpirow, measure
 from .grid import Rect
 from .vfill import _contains
 
@@ -1364,7 +1364,7 @@ def grow_chevron_table(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[
 
 
 def _grow_chevron_table(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed]:
-    from .tables import row_heights, table_grid
+    from .tables import pinned, row_heights, table_grid
 
     if not lt.l3_fill or body.h <= 0 or lt.chevron_table_fill <= 0 or lt.chevron_text_max_pt <= 0:
         return out
@@ -1387,7 +1387,7 @@ def _grow_chevron_table(out: list[Placed], body: Rect, lt: LayoutTokens) -> list
     rh, cw = t.attrs.get("_row_h"), t.attrs.get("_col_w")
     slack = 0
     nat: list[int] = []
-    if rh and cw:
+    if rh and cw and not pinned(t):  # pinned rows never give height back
         _n, _c, anchors = table_grid(t)
         nat = row_heights(t, anchors, cw, tp.style, tp.font_scale)
         if len(nat) == len(rh):
@@ -1491,7 +1491,9 @@ def _kpi_parts(items: list[Placed], cards: list[Placed]) -> list[tuple[Placed, P
             return None
         if not heads[0].element.paragraphs or not mains[0].element.paragraphs:
             return None
-        if c.element.box is not None or mains[0].element.box is not None:
+        if (
+            c.element.box is not None and not kpirow.pinned(c.element)  # h= y= w= place the row, not the text
+        ) or mains[0].element.box is not None:
             return None
         parts.append((c, heads[0], mains[0]))
     return parts
@@ -1677,8 +1679,8 @@ def _fit_lone_kpi(
     if not cards or any("kpi" not in c.element.classes for c in cards) or len({c.y for c in cards}) != 1:
         return out
     parts = _kpi_parts(items, cards)
-    if parts is None:
-        return out
+    if parts is None or any(kpirow.pinned(c.element) for c in cards):
+        return out  # (a row the author sized and placed keeps its cards: only the text may grow, see scale)
     seen = {id(c) for c in cards} | {id(p) for part in parts for p in part[1:]}
     if any(id(p) not in seen for p in items):
         return out  # icons, notes or other blocks share the body

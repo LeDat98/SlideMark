@@ -25,7 +25,7 @@ from ..units import EMU_PER_PT
 from . import measure
 from .grid import Rect
 from .l3fill import _body_items, _spread, _text_pad
-from .tables import row_heights, table_grid
+from .tables import pinned, row_heights, table_grid
 from .vfill import _contains
 
 
@@ -166,6 +166,7 @@ def _fill_table_free(out: list[Placed], body: Rect, lt: LayoutTokens, bar: bool)
     if (
         not rh
         or not cw
+        or pinned(t)
         or len(rh) != nrows
         or nrows > lt.table_free_max_rows
         or any(c.style is not None and c.style.font_size is not None for row in t.rows for c in row)
