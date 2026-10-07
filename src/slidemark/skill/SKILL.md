@@ -201,7 +201,8 @@ rows), `.badge` (inline pill). On a heading, `size` `fill` `color` style the who
 
 ## Components
 
-- **KPI card:** `## Label {.kpi icon=yen}` + value line + caption line; `{.kpi .hero}` = the lead metric,
+- **KPI row:** `@kpi` under the title makes every `##` box a card; `style: kpi.h=4.4in` sets card height.
+  **KPI card:** `## Label {.kpi icon=yen}` + value line + caption line; `{.kpi .hero}` = the lead metric,
   wider with a bigger number. Up to 4 in a row; `@end` + a list or table below them. Alone on the slide
   they take `h=55%` / `y=` from the first card (beside other content: `attr-ignored`).
 - **Callout:** `> [!note] text` (`tip` `warn` `caution`), at slide level or inside a box.
@@ -216,21 +217,22 @@ rows), `.badge` (inline pill). On a heading, `size` `fill` `color` style the who
 Table: ` ```table ` fence with CSV (first row = header; quote cells with commas: `"1,240"`), or a GFM table.
 Options on the fence or the line before: `{widths=3:1:1 align=lrr header=1 hcol=1 .zebra}` (one `align` letter
 per column); `.gantt` draws filled period cells as bars; `hl=Metro,Kyoto` emphasises the rows whose first cell
-matches. Merge: a lone `<` joins the cell to the left, `^` the cell above.
+matches, `hlcol=Q3` a column. Merge: a lone `<` joins the cell to the left, `^` the cell above.
 
 Chart fence kinds: `column bar line area pie doughnut scatter radar stacked-column stacked-bar waterfall` (waterfall: one row, `=` cell = total). CSV body:
 first row = categories (first cell empty), then one row per series (name first). Options: `title="..."`
 `labels=on|percent|off` `legend=bottom|right|top|none` `fmt="0.0"|"#,##0"|"0%"` `min=` `max=`
 `colors=primary,accent,#888888` (names from `colors:` work) `gap=80` `marker=9` `size=14` (exact)
-`labels=outside|inside|above|below` `axis=off`; takeaway: `hl=Metro note="Metro: 40% of visits"` (`hl=` names a
+`labels=outside|inside|above|below` (`+name` on a pie) `labels.bold=on` `labels.color=` `size=16,14` (labels, axis)
+`legend.size=` `overlap=-5` `step=200` `totals=off` `slice.line=bg` `axis=off`; takeaway: `hl=Metro note="Metro: 40% of visits"` (`hl=` names a
 category or a series). Numbers may be
 `1,240`, `12%`, `▲3`; a decimal comma needs quotes (`"1,6"`). One value axis.
 
-## Design tokens (header lines)
+## Design tokens (header lines; `sizes:` / `style:` lines inside a slide change that slide only)
 
 - `colors:` `bg fg primary accent surface border muted danger success` or any new name (`brand=#FF5A1F`).
   `primary` colours KPI numbers, badges, bars, charts and the title band.
-- `fonts:` `heading body mono ea` (ea = Japanese/Chinese text).
+- `fonts:` `heading body mono ea` (ea = Japanese/Chinese text) or `font="Yu Gothic"` for all three.
 - `sizes:` pt per role: `title heading body lead conclusion caption footnote table code cover-title`; a trailing
   `!` (`heading=20!`) pins the size against automatic growth.
 - `style:` `radius=14` `gap=12pt` `padding=12pt` `shadow="0 6 18 #00000055"` `card.fill=#141A2E` (`none` =
@@ -238,7 +240,8 @@ category or a series). Numbers may be
   `heading.band=primary` `table.header.fill=primary`
   `palette=primary,accent,#FF5A1F` (chart series) `h1.letter-spacing=2pt` (any `selector.css-property`)
   `hero.fill=#FF5A1F` (your own class, used as `## X {.hero}`). Chrome: `top.bar=primary` `title.rule=secondary` `kpi.stripe=secondary` `kpi.label.size=20` `bullet=■` `lead.bold=on`
-  `footer.color=muted` `steps-arrow.fill=a,b` `rows-num.fill=a,b` `cover.bar=teal` `render.chart_grid=border`
+  `footer.color=muted` `steps-arrow.fill=a,b` `rows-num.fill=a,b` `cover.bar=teal` `render.chart_grid=border`. A text look in one token:
+  `kpi.label="20 bold primary"` `steps-card="24 bold center"` `heading=center` (size, bold, italic, left/center/right, colour)
   (a token whose element the deck lacks, or `chevron.fill`, warns `attr-ignored`).
 - A ` ```css ` fence (header = whole deck, in a slide = that slide) styles `slide h1 h2 p li .lead
   .conclusion .footnote .box .kpi table th td tr code img .chart` and your `{.class}`: colours, gradients,
