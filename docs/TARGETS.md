@@ -87,6 +87,8 @@ python-pptx, output 7.6k = 42%).
 - [ ] AC7 Calls in design mode: median ≤ 5, p90 ≤ 7 (python-pptx 11). Means: the build line must give the agent what it
       now opens images for (per-slide `fit:` map, the `design:` and `look:` lines, `--png` sheet in the same call) so
       a deciding agent still ends in 3–4 calls.
+      Built (wave 4, lane A): per-slide fit lines in `build` (`fit.py`), `attr-ignored` (`honour.py`), SKILL.md recipe with
+      `--png sheet.png` + one Read as the only look; the gate stays open until fresh-agent runs measure the median.
 - [ ] AC8 Cost in design mode ≤ 50% of the python-pptx arm; output tokens ≤ 35% (now 61% / 42%).
 - [ ] AC9 Wall time from brief to hand-back ≤ 50% of the python-pptx arm (now 64%; 90 s vs 140 s).
 

@@ -415,6 +415,9 @@ def cmd_build(args: argparse.Namespace) -> int:
         _say(str(f))
     for line in _grouped(deck.diagnostics):
         _say(line)
+    if not args.quiet and str(deck.attrs.get("fit", "on")).lower() != "off":
+        for line in deck.attrs.get("fit_map") or []:  # how each slide came out (fit.py)
+            _say(line)
     from .design import facts as _design_facts
 
     if line := _design_facts(deck):
@@ -640,6 +643,9 @@ def make_parser() -> argparse.ArgumentParser:
     b.add_argument("--save", metavar="PATH", help="also write the (fixed) source text here, e.g. with stdin")
     b.add_argument("--no-fix", action="store_true", help="do not apply or write back mechanical fixes")
     b.add_argument("--png", metavar="PATH.png", help="also render one contact-sheet PNG of all slides")
+    b.add_argument(
+        "-q", "--quiet", action="store_true", help="no per-slide fit map (also: header line `fit: off`)"
+    )
     b.set_defaults(func=cmd_build)
 
     c = sub.add_parser("check", help="print diagnostics for a .md or .json deck, one per line")

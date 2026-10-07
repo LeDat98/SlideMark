@@ -48,3 +48,6 @@ All notable changes. Versions follow semver once 0.1.0 is published.
   language); foreign python-pptx decks import at 0.975 fidelity.
 - `python -m slidemark.xsd deck.pptx`: ECMA-376 schema validation (markup compatibility resolved to the
   fallback); `bench/xsd_fuzz.py` validates fuzzed decks. CI on Python 3.10–3.12 with a coverage report.
+- `build` prints one fit line per slide (form used, text size asked->reached, free space, attributes that took or
+  were ignored; `--quiet` / `fit: off`) and warns `attr-ignored` for attributes and `style:` tokens the layout does
+  not honour, with the form that works. `{.kpi h= y=}` on a lone KPI row pins the whole row.

@@ -53,6 +53,7 @@ HEADER_KEYS = (
     "num",
     "density",
     "sections",
+    "fit",
     "colors",
     "fonts",
     "sizes",
@@ -145,6 +146,14 @@ def _set_header(deck: Deck, key: str, value: str, ctx: Ctx, line: int) -> None:
             deck.attrs["sections"] = "off"
         else:
             ctx.warn(f"bad sections '{value}'", line, "bad-header", "use sections: on or sections: off")
+    elif k == "fit":  # `fit: off` drops the per-slide fit map from the build output
+        v = value.lower()
+        if v in ("on", "true", "yes", "1", ""):
+            deck.attrs["fit"] = "on"
+        elif v in ("off", "false", "no", "0"):
+            deck.attrs["fit"] = "off"
+        else:
+            ctx.warn(f"bad fit '{value}'", line, "bad-header", "use fit: on or fit: off")
     elif k == "marp":
         ctx.warn(
             "Marp header 'marp: true' ignored",

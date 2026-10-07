@@ -47,6 +47,12 @@ def build_deck(deck: Deck, out: str | Path, base_dir: str | Path | None = None) 
             close_shared()  # one Playwright at a time: the renderer opens its own for pictures
     seen = {(d.rule, d.slide) for d in deck.diagnostics}
     deck.diagnostics.extend(d for d in lint_deck(deck, placed, theme) if (d.rule, d.slide) not in seen)
+    try:  # the per-slide fit map of `slidemark build` (fit.py): read off the layout result, never fatal
+        from .fit import fit_lines
+
+        deck.attrs["fit_map"] = fit_lines(deck, placed, theme)
+    except Exception:
+        deck.attrs.pop("fit_map", None)
     from .render import render  # python-pptx loads only when a file is written
 
     render(deck, placed, theme, out)
