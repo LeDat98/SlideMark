@@ -38,3 +38,29 @@ show decks where every slide carries decisions, and the eval judges those runs.
   actually used, text size asked->reached, free space in the body, which attributes took / were ignored
   (`src/slidemark/fit.py`; `--quiet` or `fit: off` turns it off). With 0 warnings the fit lines are what an agent
   checks its decisions against; the only look left is `--png sheet.png` in the same build plus one Read.
+
+## Tightened rules (owner, 2026-10-07): three groups per slide, four lines per deck
+
+The first `design-slide` counted any attribute as a choice, so `{.kpi}` or `labels=on` passed. From DL3 on:
+
+- `design-none` names each missing header line: `colors:` `fonts:` `sizes:` `style:` (a deck `css` fence or a
+  theme file stands in for `style:`; `theme:` alone never counts).
+- `design-slide` checks three groups on every content slide and names the missing ones:
+  1. **form**: a layout directive or a block kind that is not the default list (`@N` grids, `@steps` `@chevron`
+     `@rows` `@items` `@kpi` `@timeline` … `@free` `@html`, a table, a chart, boxes with headings);
+  2. **emphasis**: exactly one stated emphasis (`.hero`, `hl=`, `==x==`, `{.accent}`, `note=`) or an explicit
+     `@noemph` (the agent decided the slide has no focal figure);
+  3. **values**: at least one chosen value on this slide (`size=` `color=` `fill=` `x y w h` `colors=` `widths=`
+     `rowh=` `labels=<pos>`, a slide `sizes:` / `style:` line) or `@defaults` (the agent decided the deck frame
+     already serves this slide).
+- The facts line reads `design: colors fonts sizes style footer; 9/14 slides decided form+emphasis+values`
+  and lists the slides short of a group: `slides 4 (values), 8 (form, emphasis)`.
+- Still advisory (warnings never cost a rebuild by themselves), and the eval counts them as `design` not as
+  first-pass failures.
+
+## Syntax depth (owner, 2026-10-07): "detailed syntax with secondary attributes, choices without limit"
+
+Every form takes secondary attributes on its own line (`@timeline dir=v marks=year`, `@steps num shape=pentagon`),
+every element kind takes the full attribute set (`x y w h size color fill line radius shadow align valign bold
+italic font opacity pad rotate shape z`), and the composition vocabulary grows until an agent rarely needs
+`@html` for a business slide (DL3b in `docs/TARGETS.md`).

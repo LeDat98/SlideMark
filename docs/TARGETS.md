@@ -66,6 +66,15 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       never grown or moved by a layout pass; per-cell `{fill color}` on a table cell, per-point `{color label}` on a
       chart; `@free` keeps a 12-column snap (`@free grid`) so absolute slides cost few tokens. Gate: a decision-fuzz
       test (50 random decision sets × 11 element kinds, 0 silent no-ops: each either changes the XML or warns).
+- [ ] DL3b Composition vocabulary (owner, 2026-10-07: "rich to the point of no limit"): ≥ 15 new forms, each one
+      `@word` line with secondary attributes and tokens, importer round trip, in SKILL.md in one line each:
+      timeline (h/v, milestones), comparison / vs (two columns with a verdict), 2x2 matrix with axis labels,
+      funnel, pyramid, cycle, icon list, quote, big statement (one number / one sentence), image + text split,
+      agenda / section with numbers, pros / cons, progress bars, harvey balls, heatmap table, map pins (on an
+      image). Gate: an open 15-slide brief (content only, no slide kinds) built by a fresh agent uses ≥ 7 distinct
+      forms, and the blind judge's "monotony" note disappears.
+- [ ] DL3c Design feedback, tightened (`docs/DESIGN_REQUIRED.md` "Tightened rules"): `design-none` names the
+      missing header lines; `design-slide` checks form + emphasis + values per slide; facts line lists what is short.
 - [ ] DL4 `shape=` on any box / step / row names any of the ≥ 150 PowerPoint preset shapes; connectors with
       arrowheads, dash and curve; freeform paths from inline SVG as native geometry; images with crop, radius, mask and
       opacity; text outline / shadow / glow; per-shape gradient, pattern and line dash. Gate: a shape-gallery example
