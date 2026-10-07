@@ -877,6 +877,10 @@ the older fallback (boxes, plain text) stays. Decks with their own design part a
 | table cells with runs of another size or colour | `[9,800円]{size=26 color=#E08A1E}` spans against the table's base size `{size=15}` (a table's text size is `size=`) and the deck ink; a glyph cell (`▶`) keeps its colour |
 | a chart with per-bar / per-series fills, label size, gap | `colors=#E08A1E,#1F5FA8,#1F5FA8` (one per bar on a one-series bar/column, else per series / slice), `size=18`, `gap=45` (only what differs from the build's default palette and gap) |
 | the one big card beside a chart (a total, then coloured values) | a `##` box with spans, `@2:1` kept |
+| pentagons / chevrons of one size, a card under each (a little narrower than its arrow) holding its own text, a `STEP n` caption under every card (`importer/recognise3.py`, thresholds `TH3`) | `@4 steps num` + `steps-arrow.fill=a,b` + `steps.caption_color=` `steps.caption_size=` (`steps.caption="Phase {n}"` when the pattern is not `STEP {n}`), `steps-card.bold` `steps-card.align` `steps-card.fill` `steps-card.line`; text sizes are left out on purpose (an explicit size turns the sparse-group layout off and the strip sticks to the title) |
+| equal cards, each with a centred label on top, a big number, an optional thin divider rule, a coloured delta below, an optional top stripe | `@kpi` + `kpi.rule=#C9D2DE kpi.rule_h= kpi.rule_w=1.68in`, `kpi.stripe= kpi.stripe_h=`, `kpi.label.size/bold/color`, `kpi.note.size/bold/color`, `kpi.color`, `kpi.fill` `kpi.line`, `kpi.h=4.4in`, `sizes: kpi=34`; centred is the default (a left-aligned card in the group: not read) |
+| equal cards with a dark header rectangle holding the title on the top edge and a body of `■ text` lines | boxes (`@4`) with `heading.band=primary heading.align=center`, `- text` bullets with `bullet=■ bullet.color=#2A9D8F`, `card.line=`, `sizes: heading=20! body=22!` |
+| a filled bar low on the slide that ends above the footer text (up to 93% of the height; `recognise2` stops at 90%), one text in it, dark | the `>` conclusion + `conclusion.fill=` + `conclusion.size=` |
 
 ```markdown
 # 3年間のプロダクト計画
