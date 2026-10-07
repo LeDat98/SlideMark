@@ -15,6 +15,18 @@ pip install "slidemark[html]"    # thêm Playwright nếu dùng khối HTML (c�
 Dùng nhanh: viết `deck.md` theo cú pháp bên dưới rồi chạy `slidemark build deck.md -o deck.pptx`.
 Xem trước ảnh PNG (`slidemark preview`) cần LibreOffice cài sẵn trên máy.
 
+### Cài skill cho agent
+
+Agent chỉ nhận đúng một file `SKILL.md` (thư mục `skills/slidemark/`), không cần đọc repo. Máy chạy agent cần
+có sẵn lệnh `slidemark` (`pip install slidemark`).
+
+```bash
+npx skills add LeDat98/SlideMark -g                # Claude Code, Codex, Cursor… (chuẩn Agent Skills)
+
+claude plugin marketplace add LeDat98/SlideMark    # hoặc cài dạng plugin của Claude Code
+claude plugin install slidemark@slidemark
+```
+
 ## Ví dụ
 
 ```markdown
