@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from functools import cmp_to_key
 
 from ..ir import Diagnostic
-from . import forms2, recognise, recognise2
+from . import forms2, recognise, recognise2, recognise3
 from .emit import (
     _attr,
     chart_lines,
@@ -1342,6 +1342,7 @@ def build_slide(
 
     fold_into_tables(data)
     found = recognise2.recognise(data, deck, n)  # DL3d lane C: designed shapes -> tokens (foreign decks)
+    recognise3.recognise(data, deck, n, found)  # DL3d part 2: lane E forms
     vform = vocab.extract(
         data
     )  # DL3b: the named shapes of @timeline / @funnel / ... fold back into their source
