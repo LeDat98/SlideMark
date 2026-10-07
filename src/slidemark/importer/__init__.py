@@ -32,6 +32,7 @@ from .design import (
 from .look import _keep_valid, color_similarity, derive_tokens
 from .read import ReadCtx, SlideData, read_sections, read_slide
 from .runs import is_slidemark_deck
+from .shadows import card_shadow
 from .structure import DeckInfo, build_slide, notes_lines
 
 __all__ = ["import_pptx"]
@@ -269,6 +270,7 @@ def _import_with(
     )
     if deck.foreign:
         deck.ink = recognise2.deck_ink(datas, colors.get("bg", "FFFFFF"), H)
+        deck.card_shadow = card_shadow(datas, W, H)
     emit.set_palette(colors)
     rules = design_rules(design)
     deck.implied = {r: implied_style(rules, r, colors) for r in ("lead", "conclusion", "footnote")}
@@ -340,6 +342,8 @@ def _import_with(
         header.extend(token_lines(own_tokens))
     if deck.foreign:  # DL3d: chrome drawn with loose shapes (cover bars, edge strips, title rule) -> tokens
         header.extend(token_lines(_keep_valid(recognise2.deck_tokens(datas, deck))))
+        if deck.card_shadow:  # most cards share one shadow: `card.shadow=`; the others say `{shadow=}`
+            header.extend(token_lines(_keep_valid({"classes.card.shadow": deck.card_shadow})))
     size = _size_token(W, H)
     if size:
         header.append(f"size: {size}")

@@ -419,6 +419,15 @@ def _chevron_steps(data: SlideData, deck, n: int, found: Found) -> None:
     asz = _modal([r.size for a in row for p in a.paras for r in p.runs if r.size and r.text.strip()])
     if asz:
         found.style["steps-arrow.size"] = f"{asz:g}"
+    ink = _modal(
+        [r.color.upper() for a in row for p in a.paras for r in p.runs if r.text.strip() and r.color]
+    )
+    if ink:
+        found.style["steps-arrow.color"] = name_or_hex(deck, ink)
+    if all(r.bold for a in row for p in a.paras for r in p.runs if r.text.strip()):
+        found.style["steps-arrow.bold"] = "on"
+    if all(p.align == "l" for a in row for p in a.paras if p.plain.strip()):
+        found.style["steps-arrow.align"] = "left"
     inside = [
         t
         for t in data.items
@@ -435,6 +444,28 @@ def _chevron_steps(data: SlideData, deck, n: int, found: Found) -> None:
     surf = deck.colors.get("surface", "")
     if len(fills) == 1 and _dist(next(iter(fills)), surf) > T.same_fill:
         found.style["steps-card.fill"] = name_or_hex(deck, next(iter(fills)))
+    # exact geometry (DL3d part 2): the layout chooses these itself, the original states them
+    found.style["steps-arrow.h"] = _length(_modal([float(c.h) for c in row]) or row[0].h)
+    found.style["steps-card.h"] = _length(_modal([float(c.h) for c in cards]) or cards[0].h)
+    gaps = [float(k.y - (a.y + a.h)) for a, k in zip(row, cards, strict=True)]
+    found.style["steps.gap"] = _length(max(_modal(gaps) or 0.0, 0.0))
+    below = [
+        b
+        for b in data.items
+        if b.kind in ("shape", "text")
+        and _is_hex(b.fill)
+        and _foreign_name(b)
+        and b.role is None
+        and b not in row
+        and b not in cards
+        and b.y >= max(k.y + k.h for k in cards) - 0.02 * H
+        and b.w >= T.bar_min_w * deck.width
+        and b.h <= T.bar_max_h * H
+        and b.y + b.h <= T.footer_y * H
+        and _lum(b.fill.upper()) < T.bar_lum
+    ]
+    if below:  # the takeaway bar under the cards (the next step claims it as the conclusion)
+        found.style["conclusion.h"] = _length(min(below, key=lambda b: b.y).h)
 
 
 # --------------------------------------------------------------------------- 1b. takeaway bar

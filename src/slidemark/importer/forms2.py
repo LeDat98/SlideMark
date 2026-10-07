@@ -112,7 +112,11 @@ def _quote(pool: list[Item], data: SlideData, deck, Block) -> Folded | None:
     if text is None:
         return None
     by = next((it for it in pool if it.name == "Quote by"), None)
-    gone = {it.uid for it in pool if it.name in ("Quote text", "Quote by", "Quote mark", "Quote panel")}
+    gone = {
+        it.uid
+        for it in pool
+        if it.name in ("Quote text", "Quote by", "Quote mark", "Quote panel", "Quote bar")
+    }
     lines = []
     for p in text.paras:
         if p.plain.strip():

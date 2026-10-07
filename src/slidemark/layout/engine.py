@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .. import forms, icons
+from .. import forms, forms3, icons
 from ..ir import (
     Box,
     Cell,
@@ -33,7 +33,7 @@ from ..ir import (
 from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
-from . import cardlook, css, forms2, kpirow, measure, vocab
+from . import cardlook, css, forms2, kpirow, measure, stepspin, vocab
 from .chartnote import expand_notes, scale_warning
 from .diagram import fill_tree
 from .gantt import expand_gantt
@@ -1473,7 +1473,7 @@ def _num_item(ctx: _Ctx, n: int, hst: Style, eff: float, band: str | None) -> tu
     fill = cardlook.pick(th.box_num_fill, n - 1) or (hst.color if on_band else None) or "primary"
     ink = cardlook.pick(th.box_num_color, n - 1) or th.ink_on(fill, band if on_band else "bg")
     el = Shape(
-        shape="ellipse",
+        shape=forms3.num_shape(th.box_num_shape, "ellipse"),  # `box.num.shape=square|circle|rounded`
         paragraphs=[Paragraph(runs=[Run(text=str(n), bold=True)])],
         attrs={"shape_name": f"Num {n}"},
         classes=["num"],
@@ -1681,7 +1681,14 @@ def _steps_parts(
         a_style = None
         if cyc_a and theme is not None:
             fill = cyc_a[i % len(cyc_a)]
-            a_style = Style(fill=fill, color=theme.ink_on(fill, theme.title_band_color or "bg"))
+            own = theme.classes.get(
+                "steps-arrow"
+            )  # `steps-arrow.color=bg`: the stated ink wins over the pick
+            a_style = Style(
+                fill=fill,
+                color=(own.color if own is not None and own.color else None)
+                or theme.ink_on(fill, theme.title_band_color or "bg"),
+            )
         arrows.append(
             Container(
                 title=b.title,
@@ -2820,7 +2827,15 @@ def _chevron_base(ctx: _Ctx, blk, inherit: Style) -> tuple[Shape, Style]:
     sh = _chevron_shape(blk)
     st = _chevron_font(ctx, sh, _text_style(ctx, sh, inherit))
     # the preset text rectangle already starts a point depth inside both ends: add only a small padding
-    st = st.merged(fast_style(padding=ctx.lt.chevron_pad, align="center", valign="middle"))
+    own_align = next(  # `steps-arrow.align=left`: a class the box carries sets the text alignment
+        (
+            k.align
+            for c in reversed(getattr(sh, "classes", ()))
+            if (k := ctx.theme.classes.get(c)) is not None and k.align
+        ),
+        None,
+    )
+    st = st.merged(fast_style(padding=ctx.lt.chevron_pad, align=own_align or "center", valign="middle"))
     if sh.style is not None:  # `{pad= align= valign=}` on the box: the author's text placement wins
         own = {
             k: v
@@ -4061,7 +4076,7 @@ def _layout_rows(ctx: _Ctx, el: Text, body: Rect, sg: int) -> _Ctx | None:
             badge = Paragraph(runs=[Run(text=str(i + 1), bold=True)], style=None)
             ctx.emit(
                 Shape(
-                    shape="rect",
+                    shape=forms3.num_shape(th.rows_num_shape, "rect"),  # `rows-num.shape=circle`
                     paragraphs=[badge],
                     attrs={"shape_name": f"Row {i + 1} num"},
                     classes=["rows-num"],
@@ -4847,6 +4862,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             st = _conclusion_style(ctx, slide, st, index)
             h = max(round(_text_need(ctx, c, st, inner_w, 1.0)), round(0.4 * EMU_PER_INCH))
             h = min(h, round(H * ctx.lt.footnote_max))
+            if theme.conclusion_h:  # `conclusion.h=1.05in`: the bar is exactly this tall
+                h = max(_emu(theme.conclusion_h), 1)
             eff = fit_text(c, Rect(0, 0, inner_w, h), st)
             put(tail, c, Rect(Mx, bottom - h, inner_w, h), st, eff)
             bottom = bottom - h - max(sg, round(gap * ctx.lt.conclusion_gap))  # one card gutter above the bar
@@ -5018,12 +5035,15 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     ctx.lt,
                     _emu(ctx.lt.top_gap) if (slide.conclusion or slide.footnotes) else 0,
                 )
-            final_ctx.out = fill_steps(
-                final_ctx.out,
-                body,
-                ctx.lt,
-                theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt,
-            )
+            if not stepspin.pinned(
+                theme
+            ):  # `steps-card.h=` / `steps-arrow.h=`: the cards keep the stated height
+                final_ctx.out = fill_steps(
+                    final_ctx.out,
+                    body,
+                    ctx.lt,
+                    theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt,
+                )
             final_ctx.out = align_chevron_table(final_ctx.out, body, ctx.lt)
             final_ctx.out = grow_chevron_table(final_ctx.out, body, ctx.lt)
             final_ctx.out = fill_body(
@@ -5161,6 +5181,11 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         final_ctx.out = _restore_pins(
             final_ctx.out
         )  # the explicit wins: no pass moved what the author pinned
+        final_ctx.out = stepspin.pin_steps(final_ctx.out, theme)  # `steps-arrow.h` `steps-card.h` `steps.gap`
+        if (
+            theme.steps_card_h
+        ):  # a pinned card row is a block: the conclusion bar follows it, one gutter below
+            tail = stepspin.bar_follows(final_ctx.out, tail, max(sg, round(gap * ctx.lt.conclusion_gap)))
         final_ctx.out = expand_notes(
             final_ctx.out,
             theme,

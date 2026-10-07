@@ -832,10 +832,16 @@ def _quote(ctx, slide: Slide, body: Rect, sg: int) -> bool:
         _bad(ctx, "align", align)
         align = "left"
     base = _base(ctx)
-    fill = _paint(ctx, slide.attrs.get("fill"), None, "fill")
+    fill = _paint(ctx, slide.attrs.get("fill"), _paint(ctx, th.quote_fill, None, "quote.fill"), "fill")
+    bar = _paint(ctx, th.quote_bar, None, "quote.bar")  # `quote.bar=accent`: a bar on the card's left edge
+    bar_w = _length(ctx, th.quote_bar_w, body.w, _pt(8)) if bar and fill else 0
     card = _card(ctx)
     pad = _pt((base.font_size or 18) * 1.0) if fill else 0
-    width = round(body.w * th.quote_width) - 2 * pad
+    width = round(body.w * th.quote_width) - 2 * pad - bar_w
+    card_h = None  # `quote.h=3in` / `full`: the card has this height (None = as tall as its content)
+    if fill and th.quote_h:
+        full = str(th.quote_h).lower() == "full"
+        card_h = body.h if full else min(_length(ctx, th.quote_h, body.h, 0), body.h)
     pinned = _attr_size(ctx, slide) or th.quote_size
     body_pt = th.sizes.get("body", 18) * ctx.dense_k
     cap = pinned or min(body_pt * th.quote_grow, _grow_cap(ctx, body_pt) * 1.6)
@@ -843,7 +849,8 @@ def _quote(ctx, slide: Slide, body: Rect, sg: int) -> bool:
     mark_col = _paint(ctx, th.quote_mark_color, "accent", "quote.mark.color")
     by_col = _paint(ctx, th.quote_by_color, "muted", "quote.by.color")
     mark = (th.quote_mark or "\u201c")[:2]
-    inner = body.h - 2 * pad
+    inner = (card_h or body.h) - 2 * pad
+    by_align = str(th.quote_by_align or align).lower()
 
     def parts(S: float):
         qst = base.merged(
@@ -858,7 +865,7 @@ def _quote(ctx, slide: Slide, body: Rect, sg: int) -> bool:
         by_pt = max(S * th.quote_by_ratio, th.min_font_size)
         by_runs = [Run(text="\u2014 ")] + (who or []) if who else []
         by_para = [Paragraph(runs=by_runs)] if by_runs else []
-        bst = qst.merged(fast_style(font_size=by_pt, color=by_col))
+        bst = qst.merged(fast_style(font_size=by_pt, color=by_col, align=by_align))
         bh = round(_need(by_para, bst, width)) if by_para else 0
         air = _length(ctx, slide.attrs.get("gap"), body.w, _pt(S * 0.5))
         return qst, bst, mark_pt, mark_h, qh, bh, by_para, air, mark_h + qh + bh + air * (2 if by_para else 1)
@@ -873,15 +880,31 @@ def _quote(ctx, slide: Slide, body: Rect, sg: int) -> bool:
     qst, bst, mark_pt, mark_h, qh, bh, by_para, air, total = got
     if total > inner * 1.01:
         ctx.over.append("quote")
-    x = body.x + {"left": 0, "center": (body.w - width) // 2 - pad, "right": body.w - width - 2 * pad}[align]
-    y = body.y + max((body.h - total) // 2, 0)
+    x = (
+        body.x
+        + {
+            "left": 0,
+            "center": (body.w - width - bar_w) // 2 - pad,
+            "right": body.w - width - bar_w - 2 * pad,
+        }[align]
+    )
+    if card_h:  # a card of its own height: it sits at the top of the body, its content centred in it
+        cy, ch = body.y, card_h
+        y = cy + max((ch - total) // 2, 0)
+    else:
+        y = body.y + max((body.h - total) // 2, 0)
+        cy, ch = y - pad, total + 2 * pad
     if fill:
         ctx.emit(
             _shape_el("Quote panel", "quote-panel"),
-            Rect(x, y - pad, width + 2 * pad, total + 2 * pad),
+            Rect(x, cy, width + 2 * pad + bar_w, ch),
             fast_style(fill=fill, line=None, radius=card.radius),
         )
-    tx = x + pad
+        if bar_w:
+            ctx.emit(
+                _shape_el("Quote bar", "quote-bar"), Rect(x, cy, bar_w, ch), fast_style(fill=bar, line=None)
+            )
+    tx = x + pad + bar_w
     ctx.emit(
         _text_el("Quote mark", [Paragraph(runs=[Run(text=mark, bold=True)])], "quote-mark"),
         Rect(tx, y, width, mark_h),

@@ -163,7 +163,7 @@ Three things are not blocks and have fixed places:
 | `> text` as the last thing on the slide | **conclusion**: a bar at the bottom |
 | `※ text` or `^ text` | **footnote**: small text at the bottom (sources, notes) |
 
-A `>` anywhere else is a quote.
+A `>` anywhere else is a quote. `style: conclusion.h=1.05in` makes the bar exactly that tall (default: its text's height).
 
 `@end` on its own line closes the current `##` box: what follows belongs to the slide again (a table under a
 row of chevron boxes). Without it a box runs to the end of the slide; `check` hints when the last box holds a
@@ -258,6 +258,13 @@ step also fills the slide (`style: layout.chevron_steps=off` keeps the thin stri
 
 `@4 steps num` adds a caption line first in every card (`STEP 1` ...); `style: steps.caption="STEP {n}" steps.caption_color=teal steps.caption_size=14` sets its text, color and size for every `@steps` slide (a size of its own: `layout.steps_caption_ratio` x body). `steps-arrow.fill=primary,secondary` (a list) cycles the arrow colors over the steps, `steps-card.fill=a,b` the cards; `steps-card.size=24 steps-card.bold=on` style the card text. `render.chevron_shape=pentagon` draws flat-tailed arrows (the importer reads them as chevrons); a list names the arrows in reading order, the last word repeats: `render.chevron_shape=pentagon,chevron` (first arrow flat, the rest notched). CSS reaches both parts: `.steps-arrow:nth-child(even) { background: ... }`, `.steps-card { ... }`.
 
+**Exact geometry.** `style: steps-arrow.h=0.45in steps-card.h=2.7in steps.gap=0.2in` states the arrow row height, the card height and
+the arrow-to-card gap in lengths: the layout would choose all three itself (arrow aspect, stretch to the bar, sparse growth). A card
+height is pinned: no stretch or growth pass changes it, and the conclusion bar follows the cards one gutter below (`conclusion.h=`
+sets the bar's height). Without `steps-card.h` the cards keep their bottom edge. `steps-arrow.color=bg steps-arrow.align=left`
+set the arrow text's ink and alignment. A bad value is `bad-token` with a hint; a token without `@steps` is `attr-ignored`.
+The importer writes all of these from the original's geometry.
+
 Looks are tokens: `style: steps-arrow.fill=accent steps-card.fill=#EEF2FF` (classes `steps-arrow` / `steps-card`,
 or per step `## 設計 {.accent}`), `layout.steps_gap` (arrow row to cards), `layout.steps_arrow_aspect` /
 `steps_arrow_min_h` / `steps_arrow_max_h` (arrow height), `layout.steps_arrow_text_ratio` (arrow text vs card
@@ -284,11 +291,11 @@ style: rows.glyph=■ rows.glyph.color=accent rows.stripe=primary,secondary
 - 改定は2027年5月出荷分から
 ```
 
-Looks: classes `rows` (bar: `rows.fill=surface`) and `rows-num` (badge: `rows-num.fill=primary,secondary` cycles), `layout.rows_h` (bar height, 1.05in), `rows_gap`, `rows_pad`, `rows_text_ratio` / `rows_text_max_pt` (text size; `{size=}` pins it). The bars are native rectangles named `Row N` and `Row N num`; the importer folds them back to `@rows`.
+Looks: classes `rows` (bar: `rows.fill=surface`) and `rows-num` (badge: `rows-num.fill=primary,secondary` cycles; `rows-num.shape=square|circle|rounded`, default `square`), `layout.rows_h` (bar height, 1.05in), `rows_gap`, `rows_pad`, `rows_text_ratio` / `rows_text_max_pt` (text size; `{size=}` pins it). The bars are native rectangles named `Row N` and `Row N num`; the importer folds them back to `@rows`.
 
 **Item cards.** `@4 items` draws the bullets of every `##` box as cards (a `1xN` grid inside the box, one card per bullet, a deeper bullet joins the card above); `style: box.items=cards` does it for every slide. The cards are the class `item`: `style: item.fill=bg item.line=border item.border-left="5pt solid secondary" item.size=14 item.bold=off item.valign=middle` (defaults: `bg` fill, the card line, text vertically centred; `item.color` `item.align` `item.radius` work too). Text size, bold and valign act on the card text, never on a heading band. A box that holds anything but bullets keeps them as bullets (info `items-skipped`). `### text {.item}` sub-boxes are the same cards, so `item.*` and `{size=}` reach them too. Shapes: `Item N`; the importer reads cards back as bullets and adds `items`.
 
-**Numbered boxes.** `@4 num` puts a circle with 1..n left of every `##` heading (with `heading.band` inside the band): `style: box.num.fill=primary box.num.color=bg box.num.size=20` (fill defaults to `primary`, or the heading ink on a band; digit color to a readable ink; digit size to the heading size, the circle is `layout.num_badge_ratio` = 1.9 x the digit). Not on `###`, KPI cards or `@steps`. Shapes: `Num N` (decor: the importer drops them and adds `num`).
+**Numbered boxes.** `@4 num` puts a circle with 1..n left of every `##` heading (with `heading.band` inside the band): `style: box.num.fill=primary box.num.color=bg box.num.size=20` (fill defaults to `primary`, or the heading ink on a band; digit color to a readable ink; digit size to the heading size, the circle is `layout.num_badge_ratio` = 1.9 x the digit). Not on `###`, KPI cards or `@steps`. `box.num.shape=circle|square|rounded` (default `circle`) draws the badge as that shape (`rect` / `ellipse` / `roundRect`). Shapes: `Num N` (decor: the importer drops them and adds `num`).
 
 ```markdown
 style: heading.band=primary heading.rule=accent heading.rule_h=0.06in item.border-left="5pt solid secondary" item.size=14
@@ -442,7 +449,10 @@ the same words. Example: `examples/24-vocabulary-2.md`.
 Details. `@iconlist`: the text column is `Iconlist N`, the icon a native `icon <name>` shape; an unknown icon is `unknown-icon` with
 a did-you-mean, a missing one `iconlist-icon` (info); `iconlist.icon.size` is a length, else 2.2 x the title size
 (`iconlist.icon_ratio`); `fill=` puts each item on a card. `@quote`: the text grows up to `quote.grow` x body (`quote.size`
-or `size=` pins it); shapes `Quote mark` / `Quote text` / `Quote by` (`Quote panel` with `fill=`); `-- name` and `~ name` also
+or `size=` pins it); shapes `Quote mark` / `Quote text` / `Quote by` (`Quote panel` with `fill=` or the deck-wide `quote.fill=<c>`;
+`quote.bar=<c> quote.bar_w=0.15in` adds a bar on the card's left edge, `Quote bar`; `quote.h=3in|full` gives the card that height
+(`full` = the whole body, content centred in it, card at the top), `quote.width=1` makes it as wide as the body (default 0.82);
+`quote.by.align=right` aligns the `— Name` line, default = the quote's `align=`); `-- name` and `~ name` also
 read as attributions, and so does a final `. — Name` of one joined `>` paragraph. `@split`: the text side is laid out by
 the ordinary engine on a slide as wide as that side (title, lead, boxes, bars, footer, every growth pass), so any content
 works there; `bleed=on` runs the image over the slide height to the edge, otherwise it is inset by the slide margins
@@ -848,7 +858,8 @@ shape name (`Card 3`, `Text 5`, `Title`) is a built deck and is never read by ge
 | cards whose first line is `01 02 03` (1.2 x the body), stripe on top | `## [01]{color=#1F5FA8} {.s1}` + body, `sizes: heading=44! body=30!`, `sN.border-top=` |
 | a filled square / circle holding only `1 2 3 ...` inside a wide bar, bars alone on the slide (a lead above and a footnote below are fine) | `@rows` with `rows-num.fill=#a,#b,#c`, `rows.fill=`, `rows.size=` |
 | the same badges above a card body, or bars beside other content | the slide word `num` (the badges leave, `box.num.fill=` keeps their colour) |
-| a big quote glyph + one text + a `— name` line (+ panel) | `@quote fill= size=` and `quote.mark.color=` (the glyph is never the title) |
+| badges that are squares (beside cards) or circles / rounded (in bars) | `box.num.shape=square` (default circle), `rows-num.shape=circle\|rounded` (default square): only what differs from the default |
+| a big quote glyph + one text + a `— name` line (+ panel) | `@quote fill= size=` and `quote.mark.color=` (the glyph is never the title); a bar on the card's left edge: `quote.bar= quote.bar_w=`; the card's height and width: `quote.h= quote.width=`; a right-aligned name line: `quote.by.align=right` |
 | a dark filled rectangle with 3-7 short lines of different sizes | one box `{fill=#122B4A color=#FFFFFF}`: label heading, every line a span of its own size (`[9,800円]{size=40 bold=true}`); with `num` on the slide it is a `.kpi` card (so `num` skips it) |
 | bars with a left stripe whose one line mixes label, figure and note sizes | `@rows plain` + `rows.stripe=` (bars alone on the slide) or boxes with a stripe class; runs that differ from the first one are spans: `**売上高** [420億円]{size=34 bold=true color=#1F5FA8}` |
 | a dark filled card holding one text (not full width) | `{fill=#122B4A color=#FFFFFF}` on the box |
@@ -871,8 +882,9 @@ the older fallback (boxes, plain text) stays. Decks with their own design part a
 | thin full-width strips on the top / bottom edge of most slides | `top.bar` / `bottom.bar` (+ `_h`) |
 | a thin full-width line under the title band on most slides (a short segment at its left end) | `title.rule=#E08A1E title.rule_h=0.06in` (`title.rule2` + `title.rule2_w`) |
 | a bare number text at the bottom right equal to the slide number | `num: on` (it is not a footnote) |
-| a row of chevron / pentagon shapes of one size, each with a card under it | `@3 steps` + `style: steps-arrow.fill=a,b,c steps-arrow.size=24 steps-card.size=26`; pentagons: `render.chevron_shape=pentagon` |
-| a full-width dark filled bar in the lower part with one text in it, nothing but the footer below it | the `>` conclusion + `conclusion.fill=` (when it is not `primary`) and `conclusion.size=` |
+| a row of chevron / pentagon shapes of one size, each with a card under it | `@3 steps` + `style: steps-arrow.fill=a,b,c steps-arrow.size=24 steps-card.size=26`; pentagons: `render.chevron_shape=pentagon`; the exact geometry `steps-arrow.h=0.75in steps-card.h=2.7in steps.gap=0.2in`, arrow ink `steps-arrow.color= steps-arrow.bold=on steps-arrow.align=left` |
+| a full-width dark filled bar in the lower part with one text in it, nothing but the footer below it | the `>` conclusion + `conclusion.fill=` (when it is not `primary`), `conclusion.size=` and, under a steps row, `conclusion.h=` |
+| a shadow (`a:outerShdw`) on the cards of the deck | `card.shadow="0 3 6 #00000040"` in the header when most cards (at least two, at least half) share it; a card with another shadow says `{shadow="..."}`, one with none `{shadow=off}`; when the cards differ every box states its own. A shadow that only the theme's effect style gives (`a:effectRef`, no `a:outerShdw`) is not read |
 | a body table row whose cells share a tinted fill the other rows do not (zebra rows are plain) | `{hl=<first cell>}` + `style: table.hl.fill=#FDF1DE table.hl.strength=1` |
 | table cells with runs of another size or colour | `[9,800円]{size=26 color=#E08A1E}` spans against the table's base size `{size=15}` (a table's text size is `size=`) and the deck ink; a glyph cell (`▶`) keeps its colour |
 | a chart with per-bar / per-series fills, label size, gap | `colors=#E08A1E,#1F5FA8,#1F5FA8` (one per bar on a one-series bar/column, else per series / slice), `size=18`, `gap=45` (only what differs from the build's default palette and gap) |

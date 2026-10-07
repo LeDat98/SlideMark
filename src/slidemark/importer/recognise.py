@@ -253,6 +253,24 @@ def _split_head(it: Item, data: SlideData) -> Item:
 # --------------------------------------------------------------------------- quote card
 
 
+def _inch(emu: float) -> str:
+    return f"{round(emu / EMU_IN, 2):g}in"
+
+
+def _quote_card(panel: Item, by: Item, deck) -> list[str]:
+    """``quote.h`` (card height), ``quote.width`` (card width share of the body) and ``quote.by.align`` of a
+    quote card the layout would draw smaller or left-aligned: only what differs from the default."""
+    toks = [f"quote.h={_inch(panel.h)}"]
+    body_w = deck.width - 2 * (deck.margin_x or 0)
+    if body_w > 0:
+        share = min(panel.w / body_w, 1.0)
+        if abs(share - 0.82) > 0.03:
+            toks.append(f"quote.width={share:.2f}".rstrip("0").rstrip("."))
+    if (by.paras[0].align if by.paras else None) == "r":
+        toks.append("quote.by.align=right")
+    return toks
+
+
 def _quote(data: SlideData, deck) -> bool:
     live = _live(data)
     marks = [
@@ -306,6 +324,9 @@ def _quote(data: SlideData, deck) -> bool:
         _claim(panel, "quote")
         if (st := _stripe(panel, data, deck)) is not None:
             _claim(st[1], "quote", "decor")
+            if st[0] == "left":  # the card's left bar: `quote.bar=<colour> quote.bar_w=`
+                toks += [f"quote.bar=#{_hex(st[1].fill)}", f"quote.bar_w={_inch(st[1].w)}"]
+        toks += _quote_card(panel, by, deck)
     if c := _text_color(mk):
         toks.append(f"quote.mark.color=#{c}")
     _add_style(data, toks)
@@ -402,6 +423,14 @@ def _others_in_body(data: SlideData, deck, taken: set[int]) -> bool:
     return False
 
 
+def _badge_shape(badges: list[Item]) -> str | None:
+    """``square`` / ``circle`` / ``rounded``: the geometry every badge of the group has (None = mixed)."""
+    kinds = {
+        "circle" if b.prst == "ellipse" else "rounded" if b.prst == "roundRect" else "square" for b in badges
+    }
+    return kinds.pop() if len(kinds) == 1 else None
+
+
 def _apply_badges(data, deck, badges: list[Item], hosts: list[Item], labels: list[Item]) -> bool:
     W = deck.width
     fills = [_hex(b.fill) or "000000" for b in badges]
@@ -434,6 +463,8 @@ def _apply_badges(data, deck, badges: list[Item], hosts: list[Item], labels: lis
             toks.append("rows-num.fill=" + _ranks([f"#{f}" for f in fills]))
         if ink and ink not in ("FFFFFF",):
             toks.append(f"rows-num.color=#{ink}")
+        if (shape := _badge_shape(badges)) not in (None, "square"):  # (square is the rows default)
+            toks.append(f"rows-num.shape={shape}")
         bar_fills = {_hex(h.fill) for h in hosts}
         surf = (deck.colors.get("surface") or "").upper()
         if len(bar_fills) == 1 and (bf := next(iter(bar_fills))) and bf != surf:
@@ -441,14 +472,23 @@ def _apply_badges(data, deck, badges: list[Item], hosts: list[Item], labels: lis
         size = max((_size_of(h.paras[0]) or 0) for h in hosts)
         if size:
             toks.append(f"rows.size={size:g}")
+        bars = sorted(
+            hosts, key=lambda h: h.y
+        )  # the bar height and the air between bars, when not the default
+        if abs(bars[0].h - 1.05 * EMU_IN) > 0.02 * EMU_IN:
+            toks.append(f"layout.rows_h={_inch(bars[0].h)}")
+        if len(bars) > 1 and abs((bars[1].y - bars[0].y - bars[0].h) - 0.17 * EMU_IN) > 0.02 * EMU_IN:
+            toks.append(f"layout.rows_gap={_inch(max(bars[1].y - bars[0].y - bars[0].h, 0))}")
     else:
         for b in badges:
             _claim(b, "num", "decor")
         data.words.append("num")
         if any(f != prim for f in fills):
-            toks.append(f"box.num.fill=#{fills[0]}")
+            toks.append("box.num.fill=" + _ranks([f"#{f}" for f in fills]))  # (a list cycles over the boxes)
         if ink and ink not in ("FFFFFF",):
             toks.append(f"box.num.color=#{ink}")
+        if (shape := _badge_shape(badges)) not in (None, "circle"):  # (circle is the @num default)
+            toks.append(f"box.num.shape={shape}")
         for st in stripes:
             if st is not None:
                 _claim(st[1], "num", "decor")

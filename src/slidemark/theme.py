@@ -18,7 +18,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .contrast import best_ink, nearest_passing, ratio
-from .forms2 import Forms2Tokens
+from .forms3 import Forms3Tokens
 from .ir import Diagnostic, Length, Style
 
 PRESET_DIR = Path(__file__).parent / "presets"
@@ -772,7 +772,7 @@ def _base_classes() -> dict[str, Style]:
     }
 
 
-class Theme(Forms2Tokens):  # Forms2Tokens: the DL3b part 2 tokens (iconlist.*, quote.*, ...)
+class Theme(Forms3Tokens):  # Forms2/3Tokens: DL3b part 2 + DL3d part 2 tokens (quote.*, steps-card.h ...)
     model_config = ConfigDict(extra="forbid")
 
     name: str
@@ -1874,8 +1874,11 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
     passes as a possibly later-declared color. Raises :class:`TokenValueError` (message + one-line hint).
     """
     from .forms2 import normalize as forms2_normalize
+    from .forms3 import normalize as forms3_normalize
 
     if (got := forms2_normalize(path, raw, names)) is not None:  # DL3b part 2: iconlist.* quote.* ...
+        return got
+    if (got := forms3_normalize(path, raw, names)) is not None:  # DL3d part 2: steps-card.h quote.bar ...
         return got
     parts = path.split(".")
     leaf = parts[-1]

@@ -49,6 +49,7 @@ class DeckInfo:
     ink: str = ""  # RRGGBB of the commonest body run colour (recognise2 compares span colours to it)
     foreign: bool = False  # no stored design part: geometry recognition (recognise2) is allowed
     palette: list[str] = field(default_factory=list)  # RRGGBB the build's default chart palette draws
+    card_shadow: str | None = None  # foreign deck: the shadow most cards share (written as ``card.shadow=``)
 
 
 @dataclass
@@ -1157,6 +1158,8 @@ def _control_attrs(it: Item | None, common: str | None = None) -> list[str]:
         out.append(f"shape={name}")
     if it.shadow and it.shadow != common:
         out.append(f'shadow="{it.shadow}"')
+    elif common and not it.shadow and it.fill and it.prst in (None, "rect", "roundRect"):
+        out.append("shadow=off")  # a card without the deck-wide shadow
     return out
 
 
@@ -1457,6 +1460,8 @@ def build_slide(
     out = Out(deck, n, diags, save_image, classes)
     shared = Counter(it.shadow for it in data.items if it.shadow and it.fill).most_common(1)
     out.shadow = shared[0][0] if shared and shared[0][1] >= 2 else None
+    if deck.foreign:  # the deck-wide `card.shadow=` is the common one: a box without it says `shadow=off`
+        out.shadow = deck.card_shadow
     lines: list[str] = []
     if title is not None:
         lines.append("# " + _head(title.paras, out))

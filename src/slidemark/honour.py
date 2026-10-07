@@ -464,6 +464,9 @@ class _Facts:
     def lead(self) -> bool:
         return any(s.lead is not None for s in self.deck.slides)
 
+    def conclusion(self) -> bool:
+        return any(s.conclusion is not None and bool(s.conclusion.paragraphs) for s in self.deck.slides)
+
     def never(self) -> bool:
         return False
 
@@ -506,6 +509,11 @@ STYLE_NEEDS: list[tuple[re.Pattern[str], Callable[[_Facts], bool], str]] = [
         re.compile(r"^(kpi[.-]|layout\.kpi)"),
         _Facts.kpi,
         "no `.kpi` card in the deck: ## Label {.kpi} + value line + caption line",
+    ),
+    (
+        re.compile(r"^conclusion\.h$"),
+        _Facts.conclusion,
+        "no `>` conclusion bar in the deck: end a slide with `> text` (the bar is conclusion.h tall)",
     ),
     (
         re.compile(r"^(steps?[.-]|layout\.steps)"),
