@@ -84,13 +84,13 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
 ### AC7–AC9: cost of decisions (the design mode must not undo the cost advantage)
 Measured on the 15-slide brief, fresh Sonnet, SKILL.md only (wave 3 baseline: 9 calls, 90 s, cost 61% of
 python-pptx, output 7.6k = 42%).
-- [ ] AC7 Calls in design mode: median ≤ 5, p90 ≤ 7 (python-pptx 11). Means: the build line must give the agent what it
+- [x] AC7 Calls in design mode: median ≤ 5, p90 ≤ 7 (python-pptx 11) (2026-10-07, fit map + `attr-ignored` + one-look recipe: runs of 4 and 5 calls, 1 and 2 builds, 1 and 2 image reads; median of the three design-mode runs 5). Means: the build line must give the agent what it
       now opens images for (per-slide `fit:` map, the `design:` and `look:` lines, `--png` sheet in the same call) so
       a deciding agent still ends in 3–4 calls.
       Built (wave 4, lane A): per-slide fit lines in `build` (`fit.py`), `attr-ignored` (`honour.py`), SKILL.md recipe with
       `--png sheet.png` + one Read as the only look; the gate stays open until fresh-agent runs measure the median.
-- [ ] AC8 Cost in design mode ≤ 50% of the python-pptx arm; output tokens ≤ 35% (now 61% / 42%).
-- [ ] AC9 Wall time from brief to hand-back ≤ 50% of the python-pptx arm (now 64%; 90 s vs 140 s).
+- [x] AC8 Cost in design mode ≤ 50% of the python-pptx arm; output tokens ≤ 35% (2026-10-07: 29% and 35% of cost, 21% and 24% of output tokens over the two AC7 runs; the wave-3 run before the fit map was 61% / 42%).
+- [x] AC9 Wall time from brief to hand-back ≤ 50% of the python-pptx arm (2026-10-07: 29 s and 39 s vs 140 s = 21% / 28%).
 
 ## L1: Works (target: day 2)
 - [x] Title, text, nested lists, inline styles, images, tables with merges, code, charts, notes → native objects

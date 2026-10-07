@@ -684,6 +684,13 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       `run()` layouts (34 → 88 runs, 42 distinct) and every chevron re-derived its geometry and `ink_on`.
       Fixed with a per-slide run memo (`_clone_ctx`), a per-run chevron base cache and a cached `_hex_norm`:
       39–47 ms/slide first pass (faster than before wave 2), layouts and renders byte-identical.
+- [x] AC7–AC9 (2026-10-07): per-slide fit lines in the build output (`src/slidemark/fit.py`), `attr-ignored` for
+      author choices the layout does not honour (`src/slidemark/honour.py`, probed table, `{h= y=}` on a lone KPI row
+      now honoured), recipe "0 warnings + fit lines = done, one look at most". Two fresh runs on the 15-slide brief:
+      4 and 5 calls (was 9), 29 s and 39 s (was 90 s), cost 29% and 35% of python-pptx (was 61%), both accepted.
+      Blind judge round 7: run 1 3.5 (rank 1), python-pptx 3.0, run 2 3.0 (the judge: G spends accent and scale on
+      the figure that matters, I spreads them; both leave one-bullet boxes and a plain list on slide 8). Decks in
+      `bench/lengthbench/t2/slidemark-ac7-{1,2}/`.
 - [ ] DL ladder (owner, 2026-10-07, `docs/TARGETS.md` "DL"): next gates are DL2 (close the 9 CSS-only + 4 missing
       decisions; port ≤ 30% tokens with no css/@html), DL3 (element-level `{…}` on every kind, decision-fuzz test),
       AC7 (design-mode calls back to ≤ 5: give the agent a per-slide fit map in the build line so it stops opening
