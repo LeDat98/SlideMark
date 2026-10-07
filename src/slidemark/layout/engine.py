@@ -159,6 +159,7 @@ class _Ctx:
     over: list[str] = field(default_factory=list)
     diags: list[Diagnostic] = field(default_factory=list)
     css: css.CssIndex = field(default_factory=lambda: _NOCSS)  # selector matching of the slide's css rules
+    chev_memo: dict = field(default_factory=dict)  # (box id, inherit id) -> (box, inherit, shape, style)
 
     @property
     def lt(self) -> LayoutTokens:
@@ -2404,15 +2405,29 @@ def _chevron_font(ctx: _Ctx, sh: Shape, st: Style) -> Style:
     return st.merged(fast_style(font_size=max(st.font_size or 18, floor)))
 
 
+def _chevron_base(ctx: _Ctx, blk, inherit: Style) -> tuple[Shape, Style]:
+    """The chevron shape of ``blk`` and its text style (font floor and padding included).
+
+    Neither depends on the rect: a row asks for them ~100 times per run (width ladder, caps, heights), so
+    they are computed once per run and box (Styles and the shape are never mutated)."""
+    key = (id(blk), id(inherit))
+    hit = ctx.chev_memo.get(key)
+    if hit is not None and hit[0] is blk and hit[1] is inherit:
+        return hit[2], hit[3]
+    sh = _chevron_shape(blk)
+    st = _chevron_font(ctx, sh, _text_style(ctx, sh, inherit))
+    # the preset text rectangle already starts a point depth inside both ends: add only a small padding
+    st = st.merged(fast_style(padding=ctx.lt.chevron_pad, align="center", valign="middle"))
+    ctx.chev_memo[key] = (blk, inherit, sh, st)
+    return sh, st
+
+
 def _chevron_geom(
     ctx: _Ctx, blk, rect: Rect, inherit: Style, hcap: int | None = None
 ) -> tuple[Shape, Style, Rect]:
-    sh = _chevron_shape(blk)
-    st = _chevron_font(ctx, sh, _text_style(ctx, sh, inherit))
+    sh, st = _chevron_base(ctx, blk, inherit)
     if hcap is not None:
         rect = Rect(rect.x, rect.y, rect.w, min(rect.h, hcap))
-    # the preset text rectangle already starts a point depth inside both ends: add only a small padding
-    st = st.merged(fast_style(padding=ctx.lt.chevron_pad, align="center", valign="middle"))
     if icon := _icon_name(blk):  # the icon sits left of the text: reserve its room as a left inset
         side = min(round(ctx.lt.icon_head * (st.font_size or 18) * EMU_PER_PT), round(0.4 * rect.h))
         sh = sh.model_copy(
@@ -2468,8 +2483,7 @@ def _chevron_nominal(ctx: _Ctx, flow: list, inherit: Style) -> float:
     for _i, blk in flow:
         if not isinstance(blk, (Text, Shape, Container)):
             continue
-        sh = _chevron_shape(blk)
-        st = _chevron_font(ctx, sh, _text_style(ctx, sh, inherit))
+        _sh, st = _chevron_base(ctx, blk, inherit)
         effs.append(
             measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size) * ctx.chev_grow
         )
@@ -3820,6 +3834,22 @@ def _attach_bar(
     return [p.model_copy(update={"y": y}) if p.element is bar and y < p.y else p for p in tail]
 
 
+def _clone_ctx(c: _Ctx) -> _Ctx:
+    """A copy of a finished run that shares nothing mutable with it (lists, dicts, sets and Placed items)."""
+    return replace(
+        c,
+        alts=list(c.alts),
+        band_h=dict(c.band_h),
+        gaps=dict(c.gaps),
+        text_out=dict(c.text_out),
+        boxes={k: list(v) for k, v in c.boxes.items()},
+        centered=set(c.centered),
+        out=[p.model_copy() for p in c.out],
+        over=list(c.over),
+        diags=list(c.diags),
+    )
+
+
 def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     slide = _chevron_steps(slide, theme.layout)
     try:
@@ -4147,6 +4177,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             isinstance(e, Text) and e.role == "body" and "callout" not in e.classes for e in elements
         )
 
+        runs: dict[tuple, _Ctx] = {}  # one slide's finished runs: the search passes re-ask the same questions
+
         def solve(arrange: str | None = None, complete: bool = False) -> _Ctx:
             stepped: list[float] = [1.0, 1.0]  # sparse step, growth before it
 
@@ -4155,6 +4187,9 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     kw.setdefault("step", stepped[0])
                     kw.setdefault("roomy", True)
                     kw.setdefault("grow_base", stepped[1])
+                key = (arrange, area.x, area.y, area.w, area.h, tuple(sorted(kw.items())))
+                if (hit := runs.get(key)) is not None:
+                    return _clone_ctx(hit)  # callers edit what they get: hand out a copy
                 c = _Ctx(
                     deck,
                     theme,
@@ -4173,6 +4208,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 _place_blocks(
                     c, elements, area, slide_inherit, _slide_grid(ctx), slide.classes, sgap, None, slide.links
                 )
+                runs[key] = _clone_ctx(c)
                 return c
 
             for s in _SCALES:
