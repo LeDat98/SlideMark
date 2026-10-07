@@ -707,6 +707,15 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       comparison → `@vs` / table, a share → chart), still as options; (3) timeline / cover / icon-list defaults that
       fill their space (sparse cue already fires); (4) `palette` must not include the accent unless the agent says
       `palette=…,accent!`; (5) accept.json segments.
+- [ ] Session stop (owner, 2026-10-07): DL3d part 2 merged (lanes E, F, G, H, I). Round trip: t4 36.2 -> 17.3,
+      t2 38.1 -> 13.4 (gate 8). Font floor 0 (deterministic fonts.conf); all goldens green incl. 19.
+      OPEN, pushed red: `tests/test_import_tokens.py` t4 gate (imported deck.md 41% of build.py, gate 40%; lanes F/I
+      added geometry tokens after lane G's diet) and `test_the_committed_decks_build_to_themselves`. Next: diet round 2
+      (glyph-bullet lines as `bullet=`, `box.stripe` instead of `sN.border-top`, drop geometry tokens equal to
+      defaults). OPEN, not started: gallery regression found by the owner (wave-2 defaults rewrite the author's form:
+      `chevron_steps=on` turns full chevrons into small arrows over hollow cards; cards stretched hollow; gantt cells
+      filled; tree text smaller). Fix: `chevron_steps` default off, no hollow stretch, restore gantt and tree sizes,
+      `scripts/gallery_diff.py` against 8db059d, regenerate goldens and gallery.
 - [ ] DL ladder (owner, 2026-10-07, `docs/TARGETS.md` "DL"): next gates are DL2 (close the 9 CSS-only + 4 missing
       decisions; port ≤ 30% tokens with no css/@html), DL3 (element-level `{…}` on every kind, decision-fuzz test),
       AC7 (design-mode calls back to ≤ 5: give the agent a per-slide fit map in the build line so it stops opening

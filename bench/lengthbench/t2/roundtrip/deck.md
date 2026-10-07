@@ -1,7 +1,7 @@
 colors: primary=#142B4D secondary=#1F5FA8 muted=#59626E accent=#2A9D8F tint=#C9D2DE orange=#E09F1F tint2=#EEF2F7
 fonts: body="Yu Gothic" heading="Yu Gothic"
-style: table_header_fill=primary radius=0 kpi.label.size=20 kpi.label.bold=on kpi.label.color=primary kpi.note.size=20 kpi.note.bold=on kpi.note.color=#2A9D8F kpi.color=secondary kpi.line=tint kpi.rule=tint kpi.rule_h=1.4pt kpi.rule_w=1.68in kpi.stripe=secondary kpi.stripe_h=7pt heading.band=primary heading.align=center bullet=■ bullet.color=#2A9D8F card.line=tint steps.caption_color=#2A9D8F steps.caption_size=14 steps-arrow.fill=primary,secondary,primary,secondary steps-card.bold=on steps-card.align=center steps-card.line=tint table.zebra.fill=tint2 kpi.h=4.9in
-style: cover.band=none cover.pad=0.44in cover.band_h=61% cover.rule=orange cover.rule_h=0.06in cover.bar=accent top.bar=primary top.bar_h=0.12in title.height=0.65in title.rule=secondary title.rule_h=0.03in render.chevron_shape=pentagon
+style: table_header_fill=primary radius=0 kpi.label.size=20 kpi.label.bold=on kpi.label.color=primary kpi.note.size=20 kpi.note.bold=on kpi.note.color=#2A9D8F kpi.color=secondary kpi.line=tint kpi.rule=tint kpi.rule_h=1.4pt kpi.rule_w=1.68in kpi.stripe=secondary kpi.stripe_h=7pt heading.band=primary heading.align=center bullet=■ bullet.color=#2A9D8F card.line=tint box.anchor=top steps.caption_color=#2A9D8F steps.caption_size=14 steps-arrow.fill=primary,secondary,primary,secondary steps-card.bold=on steps-card.align=center steps-card.line=tint table.zebra.fill=tint2 kpi.h=4.9in
+style: cover.band=none cover.pad=0.44in cover.band_h=61% cover.rule=orange cover.rule_h=0.06in cover.bar=accent top.bar=primary top.bar_h=0.12in title.height=0.65in title.rule=secondary title.rule_h=0.03in margin=0.6in layout.top_gap=0.45in render.chevron_shape=pentagon steps-arrow.point=0.5
 lang: ja
 footer: 青葉フーズ株式会社
 num: on
@@ -41,6 +41,7 @@ style: kpi.h=4.4in
 ```
 
 # 4つの重点戦略
+style: box.h=4.4in
 sizes: heading=20! body=22!
 ## 既存事業の収益改善
 - 主力3ブランドの価格改定
@@ -113,6 +114,7 @@ sizes: kpi=54
 **+5pt**
 
 # 海外展開の重点地域
+style: box.h=4.6in
 sizes: heading=26! body=24!
 ## タイ
 - 工場の生産能力を1.5倍に

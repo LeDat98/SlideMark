@@ -1,7 +1,7 @@
 colors: fg=#122B4A primary=#122B4A secondary=#1F5FA8 accent=#E08A1E teal=#1B8A8F muted=#6B7582 tint=#EEF2F7
 fonts: body=Meiryo heading=Meiryo
 style: title_band=primary table_header_fill=primary radius=0 s1.border-top="9pt solid secondary" s2.border-top="9pt solid teal" s3.border-top="9pt solid accent" ls1.border-left="9pt solid secondary" rows.fill=tint steps-arrow.fill=secondary,teal,accent steps-arrow.size=24 steps-arrow.color=bg steps-arrow.bold=on steps-arrow.align=left steps-card.size=26 steps-arrow.h=0.75in steps.gap=0.2in
-style: cover.band=none cover.band_h=66% cover.bar=accent cover.bottom_bar=secondary cover.bottom_bar_h=0.6in title.height=0.95in title.rule=accent title.rule_h=0.06in render.chevron_shape=pentagon
+style: cover.band=none cover.band_h=66% cover.bar=accent cover.bottom_bar=secondary cover.bottom_bar_h=0.6in title.height=0.95in title.rule=accent title.rule_h=0.06in margin=0.6in layout.top_gap=0.45in render.chevron_shape=pentagon steps-arrow.point=0.5
 lang: ja
 footer: 北斗クラウド株式会社　取締役会資料
 num: on
@@ -110,7 +110,7 @@ sizes: heading=32! body=23!
 
 # 主なリスクと対策
 style: table.zebra.fill=bg table.body.fill=tint
-{.zebra align=lcl size=22 widths=5:1:6}
+{.zebra align=lcl size=22 rowh=0.7in,1.07in widths=5:1:6}
 | リスク | | 対策 |
 |-|-|-|
 | **大手の参入による価格競争：** | [**▶**]{size=20 color=#E08A1E} | 業種特化機能で差別化 |
@@ -149,7 +149,7 @@ sizes: heading=18!
 ## 女性管理職比率を2029年度に25%へ（2026年度 14%） {fill=primary}
 
 # お客様の声
-style: quote.bar=accent quote.bar_w=0.15in quote.h=4.9in quote.width=0.98 quote.by.align=right
+style: quote.bar=accent quote.bar_w=0.15in quote.h=4.9in quote.width=1 quote.by.align=right
 @quote fill=tint size=38
 > **「月末の締め作業が3日から半日になった。現場が自分で使えるのが一番の違いです」**
 >
