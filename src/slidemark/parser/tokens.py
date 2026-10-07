@@ -188,10 +188,18 @@ def style_css_rules(deck: Deck, ctx: Ctx) -> list[CssRule]:
     return rules
 
 
+def note_stated(deck: Deck, key: str) -> None:
+    """Record that the header stated ``key`` (colors/fonts/sizes/style/css): the design feedback reads it."""
+    stated = deck.attrs.setdefault("design_stated", [])
+    if key not in stated:
+        stated.append(key)
+
+
 def set_token(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int) -> None:
     from ..theme import TokenValueError, canonical_token, normalize_token
 
     if _style_css(deck, group, key, value, ctx, line):
+        note_stated(deck, group)
         return
     path, hint = canonical_token(group, key)
     if path is None:
@@ -215,6 +223,7 @@ def set_token(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int)
         value = first
     deck.tokens[path] = value
     deck.attrs.setdefault("_token_src", {})[path] = (line, key, value)
+    note_stated(deck, group)
 
 
 def finish_tokens(deck: Deck, ctx: Ctx) -> None:

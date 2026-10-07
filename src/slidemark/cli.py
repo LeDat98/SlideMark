@@ -44,7 +44,7 @@ def _add_layout_diagnostics(deck: Deck, input_path: str) -> None:
     """Run layout + lint like build() does and append their diagnostics (deduped by rule and slide)."""
     try:
         from .layout import layout_slide
-        from .lint import lint
+        from .lint import lint_deck
         from .template import deck_theme, template_size
 
         deck.attrs.setdefault("base_dir", str(Path(input_path).resolve().parent))
@@ -54,7 +54,7 @@ def _add_layout_diagnostics(deck: Deck, input_path: str) -> None:
             deck.size = size
         placed = [layout_slide(slide, deck, theme, i) for i, slide in enumerate(deck.slides)]
         seen = {(d.rule, d.slide) for d in deck.diagnostics}
-        deck.diagnostics.extend(d for d in lint(deck, placed, theme) if (d.rule, d.slide) not in seen)
+        deck.diagnostics.extend(d for d in lint_deck(deck, placed, theme) if (d.rule, d.slide) not in seen)
     except NotImplementedError:
         pass  # layout/lint not available in this build: parser diagnostics only
     except Exception as e:  # check must not traceback on a layout bug
@@ -414,6 +414,10 @@ def cmd_build(args: argparse.Namespace) -> int:
     for f in fixed:
         _say(str(f))
     for line in _grouped(deck.diagnostics):
+        _say(line)
+    from .design import facts as _design_facts
+
+    if line := _design_facts(deck):
         _say(line)
     if args.png:
         _contact_png(out, Path(args.png))

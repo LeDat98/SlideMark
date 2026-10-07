@@ -30,6 +30,7 @@ from .tokens import (
     THEME_MAPS,
     TOKEN_GROUPS,
     finish_tokens,
+    note_stated,
     parse_token_line,
     parse_token_map,
     style_css_rules,
@@ -1048,6 +1049,7 @@ def parse_deck(text: str) -> Deck:
     for fi, body in css_fences:
         if first_line is None or fi < first_line:
             deck.css += parse_css(body, fi + 2, ctx, deck, header=True)
+            note_stated(deck, "css")
         else:
             # the slide whose chunk starts last before the fence (blank separator slides are dropped)
             k = max(

@@ -125,3 +125,9 @@ def test_reference_answers_pass(name):
     for f in files:
         r = ev.score(f.read_text(encoding="utf-8"))
         assert r["first_pass"], (f.name, r["rules"])
+
+
+def test_design_feedback_is_advisory_for_first_pass():
+    r = ev.score("# Review\n- Revenue grew\n- Costs fell\n\n# Next\n- Hire\n- Ship\n")
+    assert r["first_pass"] and r["warnings"] == 0
+    assert r["design"] == ["design-none", "design-slide"]

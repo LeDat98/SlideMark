@@ -16,7 +16,7 @@ def test_version(capsys):
 
 def test_check_ok(tmp_path, capsys):
     f = tmp_path / "a.md"
-    f.write_text("# A\n- x\n", encoding="utf-8")
+    f.write_text("colors: primary=#2B6CB0\n\n# A\n@dense\n- x\n", encoding="utf-8")
     assert main(["check", str(f)]) == 0
     assert capsys.readouterr().out.startswith("ok")
 

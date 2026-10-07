@@ -18,7 +18,8 @@ Usage:
 A task file may start with ``<!-- tags: jp dense html -->``; the line is stripped before a model sees it.
 Answers may reference media, images and templates that do not exist on disk: those diagnostics
 (``image-missing``, ``missing-media``, ``bad-theme`` "file not found") are counted as ``assets`` and never
-fail the first pass.
+fail the first pass. The design feedback rules (``design-none``, ``design-slide``) are advisory too: they are
+listed under ``design`` and do not count as warnings.
 """
 
 from __future__ import annotations
@@ -55,6 +56,12 @@ def parse_task(text: str) -> tuple[list[str], str]:
     if not m:
         return [], text
     return m.group(1).split(), text[m.end() :].lstrip("\n")
+
+
+ADVISORY_RULES = (
+    "design-none",
+    "design-slide",
+)  # "no design stated" / "slides carry no choice": advice, not defects
 
 
 def is_asset_missing(d) -> bool:
@@ -107,7 +114,12 @@ def score(text: str) -> dict:
             )
     diags = deck.diagnostics
     assets = [d for d in diags if is_asset_missing(d)]
-    bad = [d for d in diags if d.level in ("warning", "error") and not is_asset_missing(d)]
+    advisory = [d for d in diags if d.rule in ADVISORY_RULES]  # design feedback: reported, never a defect
+    bad = [
+        d
+        for d in diags
+        if d.level in ("warning", "error") and not is_asset_missing(d) and d.rule not in ADVISORY_RULES
+    ]
     try:
         import tiktoken
 
@@ -120,6 +132,7 @@ def score(text: str) -> dict:
         "warnings": len(bad),
         "rules": sorted({d.rule or "" for d in bad}),
         "assets": len(assets),
+        "design": sorted(d.rule or "" for d in advisory),
         "tokens": tokens,
     }
 

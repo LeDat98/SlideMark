@@ -509,3 +509,26 @@ from `<style>`), is laid out by Chromium as a whole-slide HTML slide. `data-rend
 | ` ```mermaid ` | diagram |
 | ` ```math ` | native, editable equation (LaTeX subset: `\frac`, `^`, `_`, `\sqrt`, `\sum`, `\int`, Greek, `\times`, ...) |
 | ` ```html ` | HTML/CSS: structural subset, else laid out by Chromium into native shapes/text (CSS grid, flex, cards), else an image; `{render=native\|image}` forces one (canvas, svg, gradients, transforms stay images) |
+
+## Diagnostics: design feedback
+
+`build` and `check` print two deck-level warnings (no slide number, never fixed by `--fix`, never fail a build) that
+tell an agent whether it made design decisions (`docs/DESIGN_REQUIRED.md`):
+
+| Rule | Fires when | Message -> hint |
+|---|---|---|
+| `design-none` | the header has none of `colors:` `fonts:` `sizes:` `style:` and there is no deck-level ` ```css ` fence (`theme: <preset>` alone does not count; `theme: ./brand.yaml` or `template.pptx` does) | `no design stated` -> `state your design: colors: fonts: sizes: style: (or a css fence)` |
+| `design-slide` | slides on which no element carries a choice, listed in one line | `slides 3, 7, 8 carry no design choice` -> `choose the form (list/cards/@steps/@cols/table/chart/@html), one emphasis ({.hero} hl= ==x==) or an override (size= fill= color= align= x y w h) per slide` |
+
+A **choice** is anything written beyond the content and its block kind: `{attrs}` (class, `key=value`) on a heading,
+image or block; an option on a table or chart (`widths=` `align=` `hl=` `.zebra` `legend=` `colors=` ...); an `@`
+directive (`@steps` `@chevron` `@3` / `@2x2` / `@1:2` grids, `@free` `@center` `@blank` `@html` `@bg=` `@dark` `@light`
+`@dense`, `a>b` connectors); a slide ` ```css ` fence; inline emphasis (`==x==`, `[x]{.class}`, badges). Not choices:
+`@build`, `@t=`, `@hidden`, a chart `title=`, plain bold/italic/links, callouts and mermaid diagrams (the block kind).
+Cover and section slides, and slides with nothing but a title (and speaker notes), are exempt.
+
+`build` also prints the stated keys before the `look:` line, one line, no colour:
+`design: colors fonts style footer; 12/15 slides carry choices` (`design: none; 0/15 slides carry choices` when
+nothing is stated). The slide count leaves out the exempt slides, so `n == total` means no `design-slide` warning.
+Keys: `colors fonts sizes style css theme-file footer num`. `slidemark check --format json` carries both warnings
+with their `rule` names (`design-none`, `design-slide`; `slide` is `null`).
