@@ -36,6 +36,59 @@ The product metric is the cost of the agent run that ends with an accepted deck:
 - [x] AC5 Output: median output tokens (thinking included) ≤ 30% of the python-pptx arm (run 6: 21% skill-only, 22% skill-open over 27 runs each)
 - [x] AC6 Trust: median 0 images viewed per run; reviewer-found defects in zero-warning decks ≤ 0.02 per slide (run 6: median 0 images in both arms (4 / 9 of 27 runs looked); blind review 1 verified defect / 54 slides = 0.019, a JA chevron word break, fixed in run 6)
 
+## DL: Design levels (owner, 2026-10-07): spec in `docs/DESIGN_REQUIRED.md`
+A separate ladder for the design side. SlideMark assists the agent's decisions and never replaces them, so the
+bar is "everything an agent decides in python-pptx is statable here, shorter, and the agent is made to decide".
+Measured on the deck-length bench (`bench/lengthbench`, 5/15/25 slides) and the blind judge
+(`bench/design_review_prompt.md`, scores compared within one round only; cross-round noise is ±0.5).
+Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
+
+| Level | Name | One-line meaning |
+|---|---|---|
+| DL1 | Decisions stated | The agent writes its design down; the build shows what was decided |
+| DL2 | Decisions covered | Everything an agent decided in python-pptx is statable natively, in ≤ 30% of its tokens |
+| DL3 | Element control | Any element takes position, size, colour, shape and type on its own line |
+| DL4 | Shape vocabulary | Every PowerPoint shape, line, image and text effect is reachable by name |
+| DL5 | Chart depth | Every chart decision a python-pptx agent makes (combo, 2nd axis, per point) is statable |
+| DL6 | Own master | An agent defines its own master/layouts once in text and every slide uses them |
+| DL7 | Design parity | Agent decks with their own decisions beat the python-pptx arm at half its cost |
+
+- [x] DL1 SKILL.md "Decide first" step; `design-none` / `design-slide` warnings; `design:` facts line; both SKILL.md
+      patterns and all 22 examples state a design with 0 warnings (wave 3, 2026-10-07; fresh-agent run on the 15-slide
+      brief: `14/14 slides carry choices`, judge round 6 rank 1).
+- [ ] DL2 Port of an agent's python-pptx deck (`bench/lengthbench/t2/slidemark-ported`): ≥ 95% of its decisions statable
+      with tokens or attributes (no `css` fence, no `@html` needed), deck ≤ 30% of `build.py` tokens (now 60/64 = 94%
+      incl. 9 CSS-only, 2,283 tokens = 43%; the 4 missing: KPI divider rule, exact row height, a colour per bar, a
+      manual per-point label position). Same measure on the 5- and 25-slide decks.
+- [ ] DL3 Every element kind (title, lead, box, KPI, list item, table cell, chart point/series, image, step, row, cover)
+      accepts `{x y w h size color fill border align valign bold rotate shape z}` on its own line, with pinned values
+      never grown or moved by a layout pass; per-cell `{fill color}` on a table cell, per-point `{color label}` on a
+      chart; `@free` keeps a 12-column snap (`@free grid`) so absolute slides cost few tokens. Gate: a decision-fuzz
+      test (50 random decision sets × 11 element kinds, 0 silent no-ops: each either changes the XML or warns).
+- [ ] DL4 `shape=` on any box / step / row names any of the ≥ 150 PowerPoint preset shapes; connectors with
+      arrowheads, dash and curve; freeform paths from inline SVG as native geometry; images with crop, radius, mask and
+      opacity; text outline / shadow / glow; per-shape gradient, pattern and line dash. Gate: a shape-gallery example
+      round-trips through the importer 100% and renders in LibreOffice and real PowerPoint.
+- [ ] DL5 Charts: combo (`column+line`), secondary axis (`axis2=営業利益`), axis titles and per-axis `fmt=`, log scale,
+      trendline, error bars, data table, 100% stacked, per-point colour / label position, per-series width / dash /
+      marker. Gate: ≥ 90% of the python-pptx chart API decisions in `docs/DESIGN_COVERAGE.md` statable; the 1280-vs-96
+      case (`chart-scale` info) has a one-token answer.
+- [ ] DL6 A deck defines its own master and layouts in text (`master:` block: zones for title / body / footer / number,
+      placeholders, per-layout chrome) in ≤ 40 lines, picks a layout per slide, exports it as `.potx`, and re-imports it;
+      a brand's existing `.potx` layouts are listed and usable by name.
+- [ ] DL7 Blind judge, three briefs (5 / 15 / 25 slides) × 3 fresh runs: SlideMark median ≥ 4.0 and ≥ the python-pptx
+      arm in ≥ 80% of rounds, each deck with its own stated design (no shared look across briefs unless the brief asks),
+      at AC7–AC9 cost.
+
+### AC7–AC9: cost of decisions (the design mode must not undo the cost advantage)
+Measured on the 15-slide brief, fresh Sonnet, SKILL.md only (wave 3 baseline: 9 calls, 90 s, cost 61% of
+python-pptx, output 7.6k = 42%).
+- [ ] AC7 Calls in design mode: median ≤ 5, p90 ≤ 7 (python-pptx 11). Means: the build line must give the agent what it
+      now opens images for (per-slide `fit:` map, the `design:` and `look:` lines, `--png` sheet in the same call) so
+      a deciding agent still ends in 3–4 calls.
+- [ ] AC8 Cost in design mode ≤ 50% of the python-pptx arm; output tokens ≤ 35% (now 61% / 42%).
+- [ ] AC9 Wall time from brief to hand-back ≤ 50% of the python-pptx arm (now 64%; 90 s vs 140 s).
+
 ## L1: Works (target: day 2)
 - [x] Title, text, nested lists, inline styles, images, tables with merges, code, charts, notes → native objects
 - [x] Every example deck opens in LibreOffice without errors; `ruff` + `pytest` green in CI (CI green since run 7)

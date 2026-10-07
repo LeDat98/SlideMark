@@ -684,6 +684,10 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       `run()` layouts (34 → 88 runs, 42 distinct) and every chevron re-derived its geometry and `ink_on`.
       Fixed with a per-slide run memo (`_clone_ctx`), a per-run chevron base cache and a cached `_hex_norm`:
       39–47 ms/slide first pass (faster than before wave 2), layouts and renders byte-identical.
+- [ ] DL ladder (owner, 2026-10-07, `docs/TARGETS.md` "DL"): next gates are DL2 (close the 9 CSS-only + 4 missing
+      decisions; port ≤ 30% tokens with no css/@html), DL3 (element-level `{…}` on every kind, decision-fuzz test),
+      AC7 (design-mode calls back to ≤ 5: give the agent a per-slide fit map in the build line so it stops opening
+      previews; 5 of the 9 wave-3 calls were image views and rebuilds), AC8/AC9 (cost ≤ 50%, time ≤ 50%).
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or
