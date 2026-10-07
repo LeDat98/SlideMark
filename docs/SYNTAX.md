@@ -45,6 +45,7 @@ num: on
 | `num` | `on` / `off`: slide numbers | `off` |
 | `density` | `normal` / `dense` (smaller default type for packed slides) | `normal` |
 | `sections` | `on` / `off`: section slides start PowerPoint sections named after their title | `on` |
+| `fit` | `on` / `off`: the per-slide fit lines of `slidemark build` (below; `--quiet` does the same for one run) | `on` |
 
 | `colors`, `fonts`, `sizes`, `style` | design tokens as `key=value` pairs (below) | from the theme |
 
@@ -261,9 +262,14 @@ Keys:
 | Group | Keys |
 |---|---|
 | Position | `x y w h`, in `%` of the parent area (the body area inside the margins and under the title, not the slide), `in`, `cm`, `mm`, `pt`, `px`; a bare number is pt |
-| Style | `size` (pt; on a `##` box it sizes the box text, not its heading: `sizes: heading=` or `h2.size=` does), `color`, `fill`, `line` (a one-off on one `{.kpi}` card works: `## 売上 {.kpi fill=accent h=4.4in}`), `align`, `valign`, `bold`, `radius`, `pad` |
+| Style | `size` (pt; on a `##` box it sizes the box text, not its heading: `sizes: heading=` or `h2.size=` does), `color`, `fill`, `line` (a one-off on one `{.kpi}` card works: `## 売上 {.kpi fill=accent}`), `align`, `valign`, `bold`, `radius`, `pad` |
 | Image | `fit=contain` (default), `cover`, `stretch` |
 | Classes | theme colors (`.primary`, `.accent`, `.danger`, `.success`, `.muted`), `.plain` (box without card), `.kpi` (big number box) |
+
+An attribute the layout does not honour where it is written is not silent: `build` and `check` print
+`attr-ignored` with the form that works (table under "Build output" below). One KPI row takes its height from the
+first card: `## 売上 {.kpi h=55%}` sets the card height (share of the body) of every card in a row that stands alone on
+the slide (a lead and a conclusion bar may surround it), and `y=` its top offset; the other cards need no copy.
 
 `.muted` on a **box** reads as lower priority, not disabled: muted border and (with a heading band) a muted band; body text keeps its normal ink. Restore grey body text with `style: muted-box.color=muted`; turn the band off with `muted.band=none`. `.muted` on text, spans and badges stays grey text.
 
@@ -571,3 +577,68 @@ Cover and section slides, and slides with nothing but a title (and speaker notes
 nothing is stated). The slide count leaves out the exempt slides, so `n == total` means no `design-slide` warning.
 Keys: `colors fonts sizes style css theme-file footer num`. `slidemark check --format json` carries both warnings
 with their `rule` names (`design-none`, `design-slide`; `slide` is `null`).
+
+## Build output: fit lines and ignored attributes
+
+`slidemark build` prints, in this order: auto-fixes, diagnostics (grouped), **one fit line per slide**, `design:`,
+`look:`, and the facts line. The fit line is read off the layout result (no second layout, no render) and answers what
+an agent otherwise opens an image for: did my choice take effect, and how does the slide sit.
+
+```text
+slide 2: lead + 4 kpi cards 72% of body, value 48->29pt (shrunk to fit), free 12% above, 16% below
+slide 4: 4 boxes (2x2), text 14->24pt (grown), free 17% below, took icon
+slide 5: steps 4, arrows + cards fill 92%, card text 14->24pt (grown)
+slide 6: table 5x4 at 13->18pt (grown), zebra, hl 2 rows, fills body
+slide 8: lead + list 4 items 14->28pt (grown), free 22% below
+slide 11: line chart, 3 series, labels on, hl=北米, note, fills body
+```
+
+A line is `slide N: <form> [+ <form>], <facts>`:
+
+| Part | Says |
+|---|---|
+| form | what the slide became, joined with ` + `: `lead`, `N kpi (hero) cards NN% of body`, `steps N`, `chevron N (compact)`, `N boxes (2x2 / row / stack)`, `table RxC at NNpt`, `<kind> chart, N series`, `list N items NNpt`, `rows N bars`, `image`, `code`, `callout`, `free N blocks, M pinned`; `html, N shapes` for `@html`; `cover` / `section` with the title size and `band composed` or `centred block` (a `{size=}` on the cover title keeps the old centred look) |
+| `A->Bpt (shrunk to fit / grown)` | the text size asked (the role size in `sizes:`, `kpi.value.size=`, `{size=}`) against the size drawn; a size within 4% of the ask prints once. Sizes you pin (`size=`, `sizes: body=14!`) never move |
+| `value`, `card text`, `text`, `at` | which text: the KPI number, step card text, box text, table text |
+| `free N% below / above / right / beside` | the empty part of the body under (over, beside) the content, from 10% (above: 20%); `fills body` when nothing is left |
+| `conclusion bar attached` | the `>` bar moved up under a lone table |
+| chart facts | `labels on`, `hl=<points>`, `note` when the option took; table facts `zebra`, `hl N rows` |
+| `took size=44 icon` | the attributes written on the slide's elements that the layout honoured (`size` with its value) |
+| `ignored h y` | the ones it did not (each also has an `attr-ignored` warning) |
+
+`--quiet` (`-q`) or the header line `fit: off` leaves the lines out; the lines stay out of `check`. A slide the map
+cannot read prints `slide N: (no fit data)`.
+
+### `attr-ignored`
+
+A warning (`attr-ignored: h= on a KPI card beside other content is not honoured -> layout.kpi_to_body_h=0.55 or {.kpi}
+cards alone on the slide (no list, no icon=)`) for every attribute the layout or renderer does not act on, once per
+slide, kind and attribute. The detection is the table `HONOURED` / `IGNORED` in `src/slidemark/honour.py`: for each
+element kind, each attribute of `x y w h size color fill line font align valign bold italic radius opacity pad fit
+icon` is honoured or ignored, never undecided; `tests/test_honour.py` checks that, probes every cell against the real
+layout and renderer, and checks that the warning carries the hint. `@free` honours `x y w h` on every kind. Ignored:
+
+| Kind | Ignored attributes |
+|---|---|
+| `title`, `cover` (slide titles) | `x` `y` `w` `h` `fill` `line` `radius` `fit` `icon` |
+| `box` (a `##` box in any grid, `flow`) | `fit` |
+| `kpi` (cards alone on the slide: `h` `y` pin the row) | `color` `align` `valign` `bold` `fit` |
+| `kpi-row` (cards beside a list, table or icon) | `y` `h` `color` `align` `valign` `bold` `fit` |
+| `step` (box of an `@steps` row) | `x` `y` `w` `h` `valign` `fit` |
+| `chevron` (compact `@chevron` row) | `h` `align` `valign` `radius` `pad` `fit` |
+| `text` (a paragraph or list outside a box) | `radius` `fit` `icon` |
+| `callout` | `y` `fit` `icon` |
+| `image` | `size` `color` `fill` `font` `align` `valign` `bold` `italic` `pad` `icon` |
+| `table` (`align` is one letter per column) | `radius` `pad` `fit` `icon` |
+| `chart` | `fill` `line` `align` `valign` `bold` `italic` `radius` `opacity` `pad` `fit` `icon` |
+| `code` | `font` `fit` `icon` |
+| `rows` (an `@rows` list) | `align` `valign` `radius` `fit` `icon` |
+
+`size=` on a box with no text of its own sizes nothing (it sizes the box text, not its heading): `sizes: heading=` or
+`h2.size=` does. `style:` tokens that need an element the deck does not contain warn the same way, once per token on its
+header line: `kpi.*` without a `.kpi` card, `steps*` / `steps-arrow` without `@steps`, `rows*` without `@rows`,
+`table.*` without a table, `palette` / `render.chart_*` without a chart, `bullet*` without a list, `heading.*` / `card.*`
+without a box, `footer.*` without `footer:` / `num:`, `lead.*` without a lead; the `cover.*` chrome (`rule` `bar`
+`pad` `gap` `footer`) needs the composed cover (`cover.band_h` above 0 and no `{size=}` on the cover title); and
+`chevron.*` styles nothing (arrows follow `primary`, `steps-arrow.fill=` colours `@steps`). The table is `STYLE_NEEDS`
+in the same module.

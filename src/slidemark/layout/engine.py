@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, field, replace
+from typing import Any
 
 from .. import icons
 from ..ir import (
@@ -160,6 +161,7 @@ class _Ctx:
     diags: list[Diagnostic] = field(default_factory=list)
     css: css.CssIndex = field(default_factory=lambda: _NOCSS)  # selector matching of the slide's css rules
     chev_memo: dict = field(default_factory=dict)  # (box id, inherit id) -> (box, inherit, shape, style)
+    asked: dict[str, float] = field(default_factory=dict)  # sizes the author / theme asked for (fit map)
 
     @property
     def lt(self) -> LayoutTokens:
@@ -1491,6 +1493,7 @@ def _kpi_children(ctx: _Ctx, children: list, width: int, box: Container | None =
         if j == 0:
             st = big
             size = big.font_size or 36
+            ctx.asked["kpi_value"] = size
             em = _kpi_row_em(ctx, box, measure.text_em(p.plain, bold=True))  # one size per row
             avail = width / EMU_PER_PT * 0.72  # headroom: fallback fonts are wider than the estimate
             if em * size > avail:  # one line: shrink the number to the card width
@@ -3821,6 +3824,39 @@ def _chevron_steps(slide: Slide, lt: LayoutTokens) -> Slide:
     return new
 
 
+def _kpi_pins(slide: Slide) -> tuple[Slide, tuple[Any, Any]]:
+    """``y=`` / ``h=`` on a ``.kpi`` card of the slide body pin the whole row (the first card that has them).
+
+    They are taken off the cards (a card with ``y`` would leave the row and pile up on the others) and handed
+    to ``fit_lone_kpi``, which honours them when the cards are alone on the slide. Next to other content they
+    have no effect, and ``attr-ignored`` says so. ``@free`` keeps every box as written."""
+    if slide.layout == "free":
+        return slide, (None, None)
+    cards = [
+        e
+        for e in slide.elements
+        if isinstance(e, Container)
+        and "kpi" in e.classes
+        and e.box is not None
+        and (e.box.y is not None or e.box.h is not None)
+    ]
+    if not cards:
+        return slide, (None, None)
+    y = next((c.box.y for c in cards if c.box and c.box.y is not None), None)
+    h = next((c.box.h for c in cards if c.box and c.box.h is not None), None)
+    ids = {id(c) for c in cards}
+
+    def strip(e):
+        if id(e) not in ids:
+            return e
+        box = e.box.model_copy(update={"y": None, "h": None})
+        return e.model_copy(
+            update={"box": box if any(v is not None for v in box.model_dump().values()) else None}
+        )
+
+    return slide.model_copy(update={"elements": [strip(e) for e in slide.elements]}), (y, h)
+
+
 def _attach_bar(
     out: list[Placed], body: Rect, tail: list[Placed], bar: Text | None, lt: LayoutTokens
 ) -> list[Placed]:
@@ -3847,11 +3883,13 @@ def _clone_ctx(c: _Ctx) -> _Ctx:
         out=[p.model_copy() for p in c.out],
         over=list(c.over),
         diags=list(c.diags),
+        asked=dict(c.asked),
     )
 
 
 def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     slide = _chevron_steps(slide, theme.layout)
+    slide, kpi_pin = _kpi_pins(slide)
     try:
         W, H = slide_size(deck.size)
     except ValueError:
@@ -4141,6 +4179,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     # ---- body with global autofit
     elements = list(slide.elements)
     final_ctx: _Ctx | None = None
+    fit_body = body
     rows_el = _rows_list(ctx, slide, kind) if body is not None and body.h > 0 else None
     if (
         rows_el is not None
@@ -4331,10 +4370,15 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         body_now = _shifted(
             body, _edges(final_ctx.out, tail), edge0
         )  # the body after the lead / footnote growth
+        fit_body = body_now
         if kind == "content" and not final_ctx.over and final_ctx.out:  # a lone KPI row: content-sized cards
             fixed = any(
                 isinstance(e, Container) and "kpi" in e.classes and _kpi_explicit(final_ctx, e)
                 for e in slide.elements
+            )
+            pin = (
+                _len(ctx, kpi_pin[0], body_now.h) if kpi_pin[0] is not None else None,
+                _len(ctx, kpi_pin[1], body_now.h) if kpi_pin[1] is not None else None,
             )
             lone = fit_lone_kpi(
                 final_ctx.out,
@@ -4343,6 +4387,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 has_bar,
                 fixed,
                 theme.sizes.get("body", DEFAULT_SIZES["body"]) <= ctx.lt.grow_small_pt,
+                pin,
             )
             final_ctx.out = (
                 scale_kpi_values(final_ctx.out, body_now, ctx.lt, fixed) if lone is final_ctx.out else lone
@@ -4432,4 +4477,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             final_ctx.out, theme, lambda pl, cell: _pill_style(ctx, pl, cell), ctx.lt.pill_h
         )
     chrome = [Placed(element=el, x=r.x, y=r.y, w=max(r.w, 0), h=max(r.h, 0), style=st) for el, r, st in rules]
+    deck.attrs.setdefault("_fit", {})[index] = {  # what the fit map (fit.py) cannot read off the Placed items
+        "kind": kind,
+        "body": [fit_body.x, fit_body.y, fit_body.w, fit_body.h] if fit_body is not None else None,
+        "asked": dict(final_ctx.asked) if final_ctx else {},
+        "dense_k": ctx.dense_k,
+    }
     return head + chrome + (final_ctx.out if final_ctx else []) + tail

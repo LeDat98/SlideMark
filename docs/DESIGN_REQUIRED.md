@@ -30,3 +30,12 @@ This does not prescribe a look (`docs/DESIGN_FREEDOM.md` still holds): no colour
 
 Agents may still write content-only decks (the warnings are advisory), but SKILL.md's recipe and patterns
 show decks where every slide carries decisions, and the eval judges those runs.
+- `attr-ignored` (warning, per slide, element kind and attribute; `style:` tokens once on their header line): a
+  `{key=value}` or `style:` choice the layout does not honour where it was written. The hint names the form that works
+  (`h= on a KPI card beside other content is not honoured -> layout.kpi_to_body_h=0.55 or {.kpi} cards alone on the
+  slide`). Table in `src/slidemark/honour.py`, verified cell by cell in `tests/test_honour.py`; `docs/SYNTAX.md`
+  "Build output". A silent no-op is the reason an agent opens an image.
+- Fit lines (AC7): one line per slide in the `build` output, after the diagnostics and before `design:`: the form
+  actually used, text size asked->reached, free space in the body, which attributes took / were ignored
+  (`src/slidemark/fit.py`; `--quiet` or `fit: off` turns it off). With 0 warnings the fit lines are what an agent
+  checks its decisions against; the only look left is `--png sheet.png` in the same build plus one Read.

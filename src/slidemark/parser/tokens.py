@@ -213,6 +213,8 @@ def note_stated(deck: Deck, key: str) -> None:
 def set_token(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int) -> None:
     from ..theme import TokenValueError, canonical_token, normalize_token
 
+    if group == "style":  # the author's own keys: `attr-ignored` (honour.py) judges them against the deck
+        deck.attrs.setdefault("style_keys", []).append((key.strip(), line))
     if _style_css(deck, group, key, value, ctx, line):
         note_stated(deck, group)
         return
