@@ -621,6 +621,19 @@ class RenderTokens(BaseModel):
     badge_cjk_bold: bool = False  # CJK badge text stays bold (synthetic bold smears small CJK glyphs)
 
 
+_HEX_RE = re.compile(r"#?([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})")
+
+
+@cache
+def _hex_norm(v: str) -> str | None:
+    """``#RRGGBB`` (upper case) of a 3/6-digit hex string, else None (pure: cached per string)."""
+    if not _HEX_RE.fullmatch(v.strip()):
+        return None
+    h = v.strip().lstrip("#")
+    h = "".join(ch * 2 for ch in h) if len(h) == 3 else h
+    return "#" + h.upper()
+
+
 _BASE_COLORS = ("bg", "fg", "surface", "border", "muted")  # never moved by auto ink (muted has its own rule)
 
 
@@ -800,11 +813,7 @@ class Theme(BaseModel):
     def hexval(self, value: str | None) -> str | None:
         """``#RRGGBB`` (upper case) of a theme color name or 3/6-digit hex; None for anything else."""
         v = self.colors.get(value, value) if isinstance(value, str) else None
-        if not isinstance(v, str) or not re.fullmatch(r"#?([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})", v.strip()):
-            return None
-        h = v.strip().lstrip("#")
-        h = "".join(ch * 2 for ch in h) if len(h) == 3 else h
-        return "#" + h.upper()
+        return _hex_norm(v) if isinstance(v, str) else None
 
     def need_for(self, size_pt: float | None) -> float:
         """Contrast ratio text of this size should reach (3:1 for large text, else 4.5:1)."""
