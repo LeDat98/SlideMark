@@ -679,6 +679,11 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       the owner. Deck in `bench/lengthbench/t2/slidemark-wave3/`. Still named: tall cards with one bullet
       (steps, boxes), KPI rows all equal when the agent sets no hero, two reds in the pie (`palette` had the
       accent twice), tiny chart note boxes.
+- [x] Build-time regression after waves 2–3 (2026-10-07): `layout_slide` went from 51 to 64 ms/slide on the
+      examples; all of it on two sparse chevron slides (18 #2, 19 #1) because the sparse passes re-ran identical
+      `run()` layouts (34 → 88 runs, 42 distinct) and every chevron re-derived its geometry and `ink_on`.
+      Fixed with a per-slide run memo (`_clone_ctx`), a per-run chevron base cache and a cached `_hex_norm`:
+      39–47 ms/slide first pass (faster than before wave 2), layouts and renders byte-identical.
 - [ ] Call path (owner, 2026-10-06): the current path is 3 calls (1 read brief + SKILL.md, 2 write + `build` in one
       tool call, 3 read the facts line and hand back). 51/68 run-6 runs took exactly 3; the other 17 (25%) took 4–9,
       mostly from opening preview PNGs and rebuilding. (a) Remove that tail: find what made those agents look or
