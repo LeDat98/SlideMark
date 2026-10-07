@@ -556,6 +556,16 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
         if st.fill or st.line:
             kind = MSO_SHAPE.ROUNDED_RECTANGLE if st.radius else MSO_SHAPE.RECTANGLE
             _autoshape(rc, s, pl, kind, name)
+        if (
+            "kpi" in el.classes and rc.theme.kpi_stripe
+        ):  # `kpi.stripe=<color>`: a stripe on the card's top edge
+            stripe = pl.model_copy(
+                update={
+                    "h": min(max(to_emu(rc.theme.kpi_stripe_h), 1), pl.h),
+                    "style": Style(fill=rc.theme.kpi_stripe, line=None),
+                }
+            )
+            _autoshape(rc, s, stripe, MSO_SHAPE.RECTANGLE, "rule")
     elif isinstance(el, Text):
         field = el.attrs.get("field")
         if use_placeholder:
@@ -603,6 +613,8 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
                 line=el.line,
             )
             kind = MSO_SHAPE.RECTANGLE
+        if el.shape == "chevron" and str(rc.theme.render.chevron_shape).lower() in ("pentagon", "homeplate"):
+            kind = MSO_SHAPE.PENTAGON  # `render.chevron_shape=pentagon`: a flat tail, a pointed head
         shp = _autoshape(rc, s, pl, kind, name)
         if el.paragraphs:
             chev = el.shape == "chevron"

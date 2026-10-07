@@ -73,7 +73,12 @@ _PT_PROPS = {
     "padding-left",
     "margin",
 }
-_CSS_CLASSES = {"lead", "conclusion", "footnote", "subtitle", "box", "kpi", "chart"}
+_CSS_CLASSES = {"lead", "conclusion", "footnote", "subtitle", "box", "kpi", "chart", "caption"}
+# element tokens that are real theme classes: their own meaning wins (`kpi.color` styles the number)
+_REAL_CLASSES = {"kpi"}
+_CLASS_ALIAS = {"footer": "caption", "num": "caption"}  # the footer text and the page number
+# `kpi.label.size=20` -> `.kpi h2 { font-size }`; value = the big number, note = caption = the small line
+_KPI_PARTS = {"label": ".kpi h2", "value": ".kpi .value", "note": ".kpi .caption", "caption": ".kpi .caption"}
 
 
 _HEAD_ALIAS = {"title": "h1", "heading": "h2", "body": "p", "text": "p"}
@@ -109,7 +114,12 @@ def _style_css_key(key: str) -> tuple[str, str, str] | None:
     from .css import SUPPORTED
 
     head, dot, rest = key.strip().partition(".")
-    head = _HEAD_ALIAS.get(head.lower(), head.lower())
+    head = head.lower()
+    sel_kpi = None
+    if head == "kpi" and rest.partition(".")[0].lower() in _KPI_PARTS and "." in rest:
+        part, _, rest = rest.partition(".")
+        sel_kpi = _KPI_PARTS[part.lower()]
+    head = _HEAD_ALIAS.get(head, _CLASS_ALIAS.get(head, head))
     if not dot or (head not in _CSS_ELEMENTS and head not in _CSS_CLASSES):
         return None
     prop = rest.strip().lower().replace("_", "-")
@@ -117,6 +127,8 @@ def _style_css_key(key: str) -> tuple[str, str, str] | None:
     prop = _PROP_ALIAS.get(prop, prop)
     if prop not in SUPPORTED:
         return None
+    if sel_kpi:
+        return sel_kpi, prop, alias
     return (head if head in _CSS_ELEMENTS else "." + head), prop, alias
 
 
@@ -162,8 +174,11 @@ def _style_css(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int
     if prop in _PT_PROPS and re.fullmatch(r"[+-]?(\d+\.?\d*|\.\d+)", value.strip()):
         value = value.strip() + "pt"  # bare numbers are pt in tokens (css needs a unit)
     path, _ = canonical_token(group, key)
-    if path is not None and (sel[0] == "." or path in Theme.model_fields):
-        return False  # existing meanings win: class tokens (card.fill, kpi.color) and Theme fields
+    real = sel[0] == "." and sel[1:] in _REAL_CLASSES and " " not in sel
+    if real and prop in ("border-top", "border-right", "border-bottom", "border-left"):
+        real = False  # a card border is box CSS (the class style only reaches the number's text)
+    if path is not None and (real or path in Theme.model_fields):
+        return False  # existing meanings win: class tokens (kpi.color) and Theme fields (lead.color)
     deck.attrs.setdefault("_style_css", {}).setdefault(sel, []).append((prop, value, line))
     return True
 

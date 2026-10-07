@@ -11,7 +11,29 @@ from ..ir import Chart, Style, Table
 from .ctx import Ctx, closest
 
 LEGEND = ("bottom", "right", "top", "left", "none")
-CHART_KEYS = ("title", "legend", "labels", "fmt", "min", "max", "colors", "axis", "hl", "note")
+CHART_KEYS = (
+    "title",
+    "legend",
+    "labels",
+    "fmt",
+    "min",
+    "max",
+    "colors",
+    "axis",
+    "hl",
+    "note",
+    "gap",
+    "marker",
+    "size",
+)
+# `labels=<word>`: where the data labels sit, by chart family (python-pptx XL_LABEL_POSITION)
+LABEL_POS = {
+    "bar": ("outside", "inside", "center"),
+    "stacked": ("inside", "center"),
+    "line": ("above", "below", "left", "right", "center"),
+    "pie": ("outside", "inside", "center", "best"),
+}
+
 THEME_COLORS = (
     "bg",
     "fg",
@@ -162,20 +184,51 @@ def _apply_hl(ch: Chart, value: str, ctx: Ctx, line: int | None) -> None:
     if ch.kind in ("pie", "doughnut") and len(ch.series) > 1 and len(cats) <= 1:
         cats = [s.name.strip() for s in ch.series]  # one slice per CSV row
     folded = [c.casefold() for c in cats]
+    snames = (
+        [str(x.name).strip() for x in ch.series]
+        if len(ch.series) > 1 and ch.kind not in ("pie", "doughnut")
+        else []
+    )
+    sfolded = [x.casefold() for x in snames]
     good: list[str] = []
+    gser: list[str] = []
     for n in names:
+        j = snames.index(n) if n in snames else sfolded.index(n.casefold()) if n.casefold() in sfolded else -1
+        if j >= 0:  # a series name wins over a category of the same name: that whole series is emphasised
+            if snames[j] not in gser:
+                gser.append(snames[j])
+            continue
         i = cats.index(n) if n in cats else folded.index(n.casefold()) if n.casefold() in folded else -1
         if i < 0:
             ctx.warn(
-                f"hl category '{n}' is not in the chart",
+                f"hl '{n}' is neither a category nor a series of the chart",
                 line,
                 "chart-hl",
-                "categories are: " + ", ".join(cats[:12]) + (" ..." if len(cats) > 12 else ""),
+                "categories are: "
+                + ", ".join(cats[:12])
+                + (" ..." if len(cats) > 12 else "")
+                + ("; series are: " + ", ".join(snames[:8]) if snames else ""),
             )
         elif cats[i] not in good:
             good.append(cats[i])
     if good:
         ch.options["hl"] = good
+    if gser:
+        ch.options["hl_series"] = gser
+
+
+def _label_family(kind: str) -> str:
+    return (
+        "stacked"
+        if kind.startswith("stacked")
+        else "pie"
+        if kind in ("pie", "doughnut")
+        else "line"
+        if kind in ("line", "radar")
+        else "bar"
+        if kind in ("bar", "column")
+        else ""
+    )
 
 
 def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) -> dict[str, str]:
@@ -200,8 +253,57 @@ def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) ->
                 o["labels"] = "off"
             elif low == "percent":
                 o["labels"] = "percent"
+            elif low in {w for ws in LABEL_POS.values() for w in ws}:
+                fam = _label_family(ch.kind)
+                if low in LABEL_POS.get(fam, ()):
+                    o["labels"] = "on"
+                    o["label_pos"] = low
+                else:
+                    ok = "/".join(LABEL_POS.get(fam, ())) or "on/off"
+                    ctx.warn(
+                        f"labels={low} does not fit a {ch.kind} chart",
+                        line,
+                        "bad-chart-option",
+                        f"on a {ch.kind} chart labels is one of: {ok}"
+                        if LABEL_POS.get(fam)
+                        else f"{ch.kind} charts place their labels themselves: use labels=on",
+                    )
+                    o["labels"] = "on"
             else:
-                _bad(ctx, k, v, "on/off/percent", line)
+                _bad(ctx, k, v, "on/off/percent or a position (outside/inside/center/above/below)", line)
+        elif k == "gap":
+            num, _, bad = parse_number(v)
+            if bad or num is None or not 0 <= num <= 500:
+                ctx.warn(
+                    f"bad chart option gap='{v}'",
+                    line,
+                    "bad-chart-option",
+                    "gap is a number 0-500 (% of a bar), e.g. gap=80",
+                )
+            else:
+                o["gap_width"] = num
+        elif k == "size":
+            num, _, bad = parse_number(v)
+            if bad or num is None or not 6 <= num <= 72:
+                ctx.warn(
+                    f"bad chart option size='{v}'",
+                    line,
+                    "bad-chart-option",
+                    "size is the chart text size in pt, 6-72, e.g. size=14",
+                )
+            else:
+                o["size"] = num
+        elif k == "marker":
+            num, _, bad = parse_number(v)
+            if bad or num is None or not 2 <= num <= 72:
+                ctx.warn(
+                    f"bad chart option marker='{v}'",
+                    line,
+                    "bad-chart-option",
+                    "marker is a size in pt, 2-72, e.g. marker=9",
+                )
+            else:
+                o["marker"] = int(num)
         elif k == "axis":
             if low in _TRUE:
                 o["axis"] = "on"
@@ -222,14 +324,16 @@ def apply_chart_kv(ch: Chart, kv: dict[str, str], ctx: Ctx, line: int | None) ->
                 o[k] = num
         elif k == "colors":
             parts = [p.strip() for p in re.split(r"[,;]", v) if p.strip()]
-            if parts and all(p in THEME_COLORS or _HEX.match(p) for p in parts):
+            known = {*THEME_COLORS, *ctx.colors}
+            if parts and all(p in known or _HEX.match(p) for p in parts):
                 o["colors"] = parts
             else:
                 ctx.warn(
                     f"bad chart colors '{v}'",
                     line,
                     "bad-chart-option",
-                    "colors is a comma list of #hex or theme names: " + "/".join(THEME_COLORS),
+                    "colors is a comma list of #hex or color names (colors: line or theme): "
+                    + "/".join(sorted(known)),
                 )
         elif k == "hl":
             _apply_hl(ch, v, ctx, line)

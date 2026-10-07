@@ -7,7 +7,13 @@ from pathlib import Path
 from lxml import etree
 from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.dml.color import RGBColor
-from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION, XL_TICK_LABEL_POSITION
+from pptx.enum.chart import (
+    XL_CHART_TYPE,
+    XL_LABEL_POSITION,
+    XL_LEGEND_POSITION,
+    XL_MARKER_STYLE,
+    XL_TICK_LABEL_POSITION,
+)
 from pptx.enum.dml import MSO_LINE
 from pptx.enum.text import MSO_ANCHOR
 from pptx.oxml import parse_xml
@@ -406,6 +412,18 @@ _PIE_POS = {
 }
 
 
+_LABEL_POS = {
+    "outside": XL_LABEL_POSITION.OUTSIDE_END,
+    "inside": XL_LABEL_POSITION.INSIDE_END,
+    "center": XL_LABEL_POSITION.CENTER,
+    "above": XL_LABEL_POSITION.ABOVE,
+    "below": XL_LABEL_POSITION.BELOW,
+    "left": XL_LABEL_POSITION.LEFT,
+    "right": XL_LABEL_POSITION.RIGHT,
+}
+_PIE_WORDS = {"outside": "outside_end", "inside": "inside_end", "center": "center", "best": "best_fit"}
+
+
 def _pie_pos(theme: Theme):
     """Default label position of a pie wedge (``render.chart_pie_label_pos``; unknown words = best fit)."""
     return _PIE_POS.get(str(theme.render.chart_pie_label_pos).strip().lower().replace("-", "_"))
@@ -637,6 +655,10 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     theme = rc.theme
     opts = {str(k).lower().replace("-", "_"): v for k, v in ch.options.items()}
     kind = ch.kind
+    lpos = str(opts.get("label_pos") or "")
+    if kind in ("pie", "doughnut") and lpos in _PIE_WORDS:  # `labels=outside` on a pie
+        rt = theme.render.model_copy(update={"chart_pie_label_pos": _PIE_WORDS[lpos]})
+        theme = theme.model_copy(update={"render": rt})
     ctype = CHART_TYPES.get(kind, XL_CHART_TYPE.COLUMN_CLUSTERED)
     pie = kind in ("pie", "doughnut")
     series = ch.series
@@ -738,9 +760,9 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             if (pos := _pie_pos(theme)) is not None:
                 dl.position = pos
         elif kind in ("column", "bar"):
-            dl.position = XL_LABEL_POSITION.OUTSIDE_END
+            dl.position = _LABEL_POS.get(lpos, XL_LABEL_POSITION.OUTSIDE_END)
         elif kind == "line":
-            dl.position = XL_LABEL_POSITION.ABOVE
+            dl.position = _LABEL_POS.get(lpos, XL_LABEL_POSITION.ABOVE)
     seg_fits_cache: dict = {}
     for plot in chart.plots:
         for si, ser in enumerate(plot.series):
@@ -775,11 +797,25 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     ser.marker.format.fill.solid()
                     ser.marker.format.fill.fore_color.rgb = RGBColor.from_string(color)
                     ser.marker.format.line.color.rgb = RGBColor.from_string(color)
+                    if (msz := _num(opts.get("marker"))) is not None:  # `marker=9`
+                        ser.marker.style = XL_MARKER_STYLE.CIRCLE
+                        ser.marker.size = int(msz)
                 except Exception:
                     pass
             else:
                 ser.format.fill.solid()
                 ser.format.fill.fore_color.rgb = RGBColor.from_string(color)
+                if lab_on and kind in ("bar", "column") and lpos in ("inside", "center"):
+                    sdl = ser.data_labels  # inside the bar: the ink is chosen per series fill
+                    sdl.show_value = True
+                    sdl.font.size = Pt(label_pt(kind, ncat, size, theme.render))
+                    sdl.font.color.rgb = RGBColor.from_string(
+                        _ink_hex(theme, color, label_color_on(color, theme))
+                    )
+                    sdl.position = _LABEL_POS[lpos]
+                    if nf:
+                        sdl.number_format = nf
+                        sdl.number_format_is_linked = False
                 if lab_on and kind in ("stacked-bar", "stacked-column"):  # labels sit inside the fill
                     sdl = ser.data_labels
                     sdl.show_value = True
@@ -788,7 +824,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                     sdl.font.color.rgb = RGBColor.from_string(
                         _ink_hex(theme, color, label_color_on(color, theme))
                     )
-                    sdl.position = XL_LABEL_POSITION.CENTER
+                    sdl.position = _LABEL_POS.get(lpos, XL_LABEL_POSITION.CENTER)
                     # a zero-width segment gets no (clipped) label: the zero section of the format is empty
                     sdl.number_format = (
                         f"{nf};-{nf};;" if nf and ";" not in nf else (nf or "General;-General;;")
@@ -826,7 +862,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             va.has_major_gridlines = False
         else:
             va.has_major_gridlines = True
-            va.major_gridlines.format.line.color.rgb = rgb(theme, "border")
+            va.major_gridlines.format.line.color.rgb = rgb(theme, theme.render.chart_grid)
             va.format.line.fill.background()
             if nf:
                 va.tick_labels.number_format = nf

@@ -285,10 +285,10 @@ def parse_color(tok: str, names: set[str]) -> str | None:
     m = re.fullmatch(r"var\(\s*--([\w-]+)\s*(?:,.*)?\)", t, re.I | re.S)
     if m:
         return m.group(1)
+    if t in names:  # a name the deck declares (`colors: teal=#2A9D8F`) beats the CSS color of that name
+        return t
     if low in NAMED_COLORS:
         return NAMED_COLORS[low]
-    if t in names:
-        return t
     return None
 
 

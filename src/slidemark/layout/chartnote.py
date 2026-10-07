@@ -54,7 +54,10 @@ def _num(v) -> float | None:
 
 
 def chart_size(pl: Placed, theme: Theme) -> float:
-    """Chart text size in pt, as the renderer computes it."""
+    """Chart text size in pt, as the renderer computes it (a chart option ``size=`` is exact: no growth)."""
+    exact = pl.element.options.get("size") if isinstance(pl.element, Chart) else None
+    if isinstance(exact, (int, float)) and not isinstance(exact, bool):
+        return float(exact) * pl.font_scale
     base = (pl.style.font_size or theme.sizes.get("table", DEFAULT_SIZES["table"])) * pl.font_scale
     return chart_text_pt(base, pl.w, pl.h, theme.render)
 

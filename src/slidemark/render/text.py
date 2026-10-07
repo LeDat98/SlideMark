@@ -168,7 +168,7 @@ def _soft_break(para, size_pt: float) -> None:
     rpr.set("bmk", jbreak.SOFT_BREAK_MARK)
 
 
-def _set_bullet(para, p: Paragraph, size_pt: float) -> None:
+def _set_bullet(para, p: Paragraph, size_pt: float, rc: RenderCtx | None = None) -> None:
     pPr = para._p.get_or_add_pPr()
     pPr.set("eaLnBrk", "1")  # kinsoku line breaking, no hanging punctuation: matches layout.measure
     pPr.set("hangingPunct", "0")
@@ -178,9 +178,14 @@ def _set_bullet(para, p: Paragraph, size_pt: float) -> None:
         pPr.set("indent", str(indent))
         lvl = min(p.level, 3)
         if p.marker == "bullet":
+            theme = rc.theme if rc is not None else None
+            if theme is not None and theme.bullet_color:  # `bullet.color=<color>`
+                clr = etree.SubElement(pPr, qn("a:buClr"))
+                etree.SubElement(clr, qn("a:srgbClr")).set("val", hex6(theme, theme.bullet_color))
             bf = etree.SubElement(pPr, qn("a:buFont"))
             bf.set("typeface", "Arial")
-            etree.SubElement(pPr, qn("a:buChar")).set("char", _BULLETS[lvl])
+            glyph = (theme.bullet if theme is not None and theme.bullet else "")[:1] or _BULLETS[lvl]
+            etree.SubElement(pPr, qn("a:buChar")).set("char", glyph)  # `bullet=■`
         else:
             etree.SubElement(pPr, qn("a:buFont")).set("typeface", "+mj-lt")
             etree.SubElement(pPr, qn("a:buAutoNum")).set("type", _NUMBERING[lvl])
@@ -230,7 +235,7 @@ def fill_text(
             para.line_spacing = pst.line_spacing
         para.space_before = Pt(size * gap) if (i > 0 and para_gap) else Pt(0)
         para.space_after = Pt(0)
-        _set_bullet(para, p, size)
+        _set_bullet(para, p, size, rc)
         sq = 0.0
         cuts: dict[int, list[int]] = {}
         if box_w is not None and not field:

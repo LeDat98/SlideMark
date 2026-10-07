@@ -26,10 +26,33 @@ def apply_hl(
 ) -> list[str]:
     """Emphasise the ``hl=`` categories; returns their names. Never raises: a missing point is skipped."""
     idx = chartnote.resolve_hl(ch, cats)
-    if not idx:
-        return []
     color, rt = hl_color(theme), theme.render
     kind = ch.kind
+    sers = [str(n).strip().casefold() for n in ch.options.get("hl_series") or []]
+    nser = min(real_series, len(ch.series)) if wf is None else 0
+    if (
+        sers and nser
+    ):  # `hl=<series name>`: the whole series takes the emphasis color (a line gets a thicker stroke)
+        for plot in chart.plots:
+            for si, ser in enumerate(plot.series):
+                if si >= nser or str(ch.series[si].name).strip().casefold() not in sers:
+                    continue
+                try:
+                    if kind in ("line", "radar"):
+                        ser.format.line.color.rgb = color
+                        ser.format.line.width = Pt(rt.chart_hl_line + rt.chart_line_width)
+                        ser.marker.format.fill.solid()
+                        ser.marker.format.fill.fore_color.rgb = color
+                        ser.marker.format.line.color.rgb = color
+                    elif kind in _BAR_LIKE or kind == "area":
+                        ser.format.fill.solid()
+                        ser.format.fill.fore_color.rgb = color
+                except (IndexError, AttributeError, ValueError):
+                    continue
+    named = [ch.series[i].name for i in range(nser) if str(ch.series[i].name).strip().casefold() in sers]
+    if not idx:
+        return named
+
     for plot in chart.plots:
         for si, ser in enumerate(plot.series):
             for i in idx:
@@ -63,7 +86,7 @@ def apply_hl(
                             pt.format.line.width = Pt(rt.chart_hl_line)
                 except (IndexError, KeyError, AttributeError, ValueError):
                     continue
-    return [cats[i] for i in idx]
+    return [*named, *(cats[i] for i in idx)]
 
 
 def pin_plot(chart, frac: tuple[float, float, float, float]) -> None:

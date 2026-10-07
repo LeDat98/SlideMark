@@ -21,6 +21,7 @@ from ..ir import (
     Paragraph,
     Placed,
     Raw,
+    Run,
     Shape,
     Slide,
     Style,
@@ -517,8 +518,10 @@ def _cover_explicit(ctx: _Ctx, *els) -> bool:
     for el in els:
         if el is None:
             continue
-        if _explicit_size(ctx, el) or (ctx.css.active and ctx.css.own(el) != fast_style()):
+        if _explicit_size(ctx, el):
             return True
+        if ctx.css.active and any(v is not None for k, v in ctx.css.own(el).__dict__.items() if k != "color"):
+            return True  # (a rule that only sets the color, like the ink of `dark` / `bg=`, keeps the cover)
     return False
 
 
@@ -574,6 +577,8 @@ def _explicit_size(ctx: _Ctx, el) -> bool:
     """The author set the font size of ``el`` (CSS rule, ``{size=}``, element style): it never grows."""
     if getattr(getattr(el, "style", None), "font_size", None) is not None:
         return True
+    if ctx.theme.pinned and isinstance(el, Text) and _SIZE_KEY.get(el.role, "body") in ctx.theme.pinned:
+        return True  # `sizes: heading=20!`
     return bool(ctx.css.active and ctx.css.own(el).font_size is not None)
 
 
@@ -1282,37 +1287,75 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
             ctx.boxes[id(c)] = ids
 
 
-def _steps_parts(c: Container) -> tuple[list[Container], list[Container | None]]:
+def _cycle(theme: Theme | None, cls: str) -> list[str]:
+    """``style: steps-arrow.fill=primary,secondary``: the fills of class ``cls`` when it holds a list."""
+    fill = theme.classes[cls].fill if theme is not None and cls in theme.classes else None
+    parts = [x.strip() for x in fill.split(",")] if isinstance(fill, str) and "," in fill else []
+    return parts if len(parts) > 1 and all(parts) and "(" not in (fill or "") else []
+
+
+def _step_caption(theme: Theme | None, n: int, fmt: str | None, children: list) -> list:
+    """The card's children with the ``steps.caption`` line ("STEP {n}") first (no card text = a new Text)."""
+    if not fmt or theme is None:
+        return children
+    st = Style(
+        font_size=theme.steps_caption_size
+        or theme.sizes.get("body", DEFAULT_SIZES["body"]) * theme.layout.steps_caption_ratio,
+        bold=True,
+        align="center",
+        color=theme.steps_caption_color or "muted",
+    )
+    para = Paragraph(runs=[Run(text=fmt.replace("{n}", str(n)))], style=st)
+    if children and isinstance(children[0], Text) and children[0].role == "body":
+        first = children[0].model_copy(update={"paragraphs": [para, *children[0].paragraphs]})
+        return [first, *children[1:]]
+    return [Text(role="body", paragraphs=[para]), *children]
+
+
+def _steps_parts(
+    c: Container, theme: Theme | None = None, caption: str | None = None
+) -> tuple[list[Container], list[Container | None]]:
     """The arrow (heading only) and the card (the rest) of every ``##`` step of an ``@steps`` group.
 
-    Both keep the step's classes and CSS identity (``_css_src``); a step without content has no card."""
+    Both keep the step's classes and CSS identity (``_css_src``); a step without content has no card.
+    ``steps-arrow.fill=a,b`` / ``steps-card.fill=a,b`` cycle their colors over the steps; ``caption`` is the
+    first line of every card ("STEP {n}")."""
     arrows: list[Container] = []
     cards: list[Container | None] = []
+    cyc_a, cyc_c = _cycle(theme, "steps-arrow"), _cycle(theme, "steps-card")
     for i, b in enumerate(b for b in c.children if isinstance(b, Container) and b.title is not None):
         src = b.attrs.get("_css_src", id(b))
         keep = {k: v for k, v in b.attrs.items() if k == "icon"}
+        a_style = None
+        if cyc_a and theme is not None:
+            fill = cyc_a[i % len(cyc_a)]
+            a_style = Style(fill=fill, color=theme.ink_on(fill, theme.title_band_color or "bg"))
         arrows.append(
             Container(
                 title=b.title,
                 id=b.id,
                 line=b.line,
+                style=a_style,
                 classes=[*(k for k in b.classes if k not in ("kpi", "plain", "card")), "steps-arrow"],
                 attrs={**keep, "_css_src": src, "shape_name": f"Step {i + 1} arrow"},
             )
         )
         if b.children:
+            c_style = b.style
+            if cyc_c:
+                c_style = (b.style or Style()).merged(Style(fill=cyc_c[i % len(cyc_c)]))
             cards.append(
                 Container(
                     line=b.line,
                     grid=b.grid,
                     gap=b.gap,
                     links=b.links,
-                    style=b.style,
-                    children=b.children,
+                    style=c_style,
+                    children=_step_caption(theme, i + 1, caption, b.children),
                     classes=[*b.classes, "steps-card"],
                     attrs={
                         **{k: v for k, v in b.attrs.items() if k != "icon"},
-                        "_css_src": src,
+                        "_css_src": ("steps-card", src),
                         "shape_name": f"Step {i + 1} card",
                     },
                 )
@@ -1328,7 +1371,8 @@ def _place_steps(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> bool:
     The cards start ``steps_gap`` under the arrows and are as tall as their content here; the slide's
     growth passes then enlarge their text and ``fill_steps`` stretches them to the conclusion bar /
     footnote. ``False`` = not a steps group (fewer than two headed boxes): placed like any other box."""
-    arrows, cards = _steps_parts(c)
+    caption = ctx.theme.steps_caption or ("STEP {n}" if "num" in ctx.slide.classes else None)
+    arrows, cards = _steps_parts(c, ctx.theme, caption)
     n = len(arrows)
     if n < 2 or n != len(c.children):  # other blocks in the group: a plain row of boxes
         return False
@@ -3388,6 +3432,41 @@ def _search(first: _Ctx, solve, theme: Theme, body: Rect) -> tuple[_Ctx, str | N
     return first, None
 
 
+def html_footer_items(slide: Slide, deck: Deck, theme: Theme, index: int, W: int, H: int) -> list[Placed]:
+    """The deck footer and slide number of an ``@html`` slide (``layout.html_footer=on``)."""
+    ctx = _Ctx(deck, theme, slide, index, W, H)
+    Mx = to_emu(theme.margin_x)
+    inner_w = W - 2 * Mx
+    fh = round(0.26 * EMU_PER_INCH)
+    fy = H - fh - round(0.1 * EMU_PER_INCH)
+    cst = _role_style(ctx, "caption")
+    out: list[Placed] = []
+    if deck.footer:
+        out.append(
+            Placed(
+                element=_text_el("caption", deck.footer, {"field": "footer"}),
+                x=Mx,
+                y=fy,
+                w=round(inner_w * 0.7),
+                h=fh,
+                style=cst.merged(fast_style(valign="middle")),
+            )
+        )
+    if deck.slide_number:
+        nw = round(0.9 * EMU_PER_INCH)
+        out.append(
+            Placed(
+                element=_text_el("caption", str(index + 1), {"field": "slide_number"}),
+                x=W - Mx - nw,
+                y=fy,
+                w=nw,
+                h=fh,
+                style=cst.merged(fast_style(align="right", valign="middle")),
+            )
+        )
+    return out
+
+
 def layout_slide(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     """Return every visible item of ``slide`` (title included) in z-order, with final boxes and merged styles.
 
@@ -3411,6 +3490,111 @@ def layout_slide(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Pla
             )
         )
         return []
+
+
+def _rows_list(ctx: _Ctx, slide: Slide, kind: str) -> Text | None:
+    """The ordered list that ``@rows`` (or ``layout.rows``) draws as numbered bars, else ``None``.
+
+    Only a content slide whose body is one ordered (``1.``) list, nothing nested: a lead, conclusion and
+    footnotes may surround it. ``@rows`` on a slide that does not fit gets the info line ``rows-skipped``."""
+    asked = "rows" in slide.classes
+    if not (asked or ctx.lt.rows) or kind != "content":
+        return None
+    els = slide.elements
+    el = els[0] if len(els) == 1 else None
+    if (
+        isinstance(el, Text)
+        and el.role == "body"
+        and "callout" not in el.classes
+        and el.box is None
+        and not slide.links
+        and el.paragraphs
+        and all(p.marker == "number" and p.level == 0 for p in el.paragraphs)
+    ):
+        return el
+    if asked:
+        ctx.diag(
+            "rows-skipped",
+            "@rows needs one ordered list (1. 2. 3.) alone on the slide",
+            "put the numbered items directly under the title, with no other block or nested list",
+            level="info",
+        )
+    return None
+
+
+def _layout_rows(ctx: _Ctx, el: Text, body: Rect, sg: int) -> _Ctx | None:
+    """``@rows``: every item of an ordered list is a bar with a number badge on its left (a native rect
+    with the text, and a rect with the number). Looks: classes ``rows`` (bar), ``rows-num`` (badge; `fill=a,b`
+    cycles), ``layout.rows_*`` (height, gap, text size). ``None`` = the items do not fit even at the least
+    size: the list is laid out as plain text instead."""
+    th, lt = ctx.theme, ctx.lt
+    paras = el.paragraphs
+    n = len(paras)
+    gap = _emu(lt.rows_gap)
+    h = min(_emu(lt.rows_h), (body.h - gap * (n - 1)) // n)
+    if h < _emu(lt.rows_min_h):
+        return None
+    bar_st = fast_style().merged(*_class_styles(ctx, Shape(classes=["rows"])), ctx.css.own(el))
+    num_cls = th.classes.get("rows-num") or fast_style()
+    st0 = _styled(ctx, el, _role_style(ctx, "body"))
+    explicit = _explicit_size(ctx, el)
+    pad = _emu(lt.rows_pad)
+    size = st0.font_size or 18
+    if not explicit:
+        size = min(max(size, h / EMU_PER_PT * lt.rows_text_ratio), max(lt.rows_text_max_pt, size))
+    text_w = body.w - h - 2 * pad
+    plain = [p.model_copy(update={"marker": None, "level": 0}) for p in paras]
+    st_txt = st0.merged(
+        fast_style(
+            font_size=size,
+            align="left",
+            valign="middle",
+            padding_left=str(round((h + pad) / EMU_PER_PT, 2)) + "pt",
+        )
+    )
+    # the widest item decides one size for all rows: it must fit its bar on at most the lines the bar holds
+    while size > th.min_font_size:
+        probe = st_txt.merged(fast_style(font_size=size))
+        worst = max(_text_need(ctx, Text(role="body", paragraphs=[p]), probe, text_w, 1.0) for p in plain)
+        if worst <= h * 0.92:
+            break
+        size = max(size - 0.5, th.min_font_size)
+    st_txt = st_txt.merged(fast_style(font_size=size))
+    cyc = _cycle(th, "rows-num")
+    y = body.y
+    for i, p in enumerate(plain):
+        base = fast_style().merged(bar_st, st_txt)
+        ctx.emit(
+            Shape(shape="rect", paragraphs=[p], attrs={"shape_name": f"Row {i + 1}"}, classes=["rows"]),
+            Rect(body.x, y, body.w, h),
+            base.merged(
+                fast_style(padding_top="0pt", padding_bottom="0pt", padding_right=f"{pad / EMU_PER_PT:g}pt")
+            ),
+        )
+        fill = cyc[i % len(cyc)] if cyc else (num_cls.fill or "primary")
+        badge = Paragraph(runs=[Run(text=str(i + 1), bold=True)], style=None)
+        ctx.emit(
+            Shape(
+                shape="rect",
+                paragraphs=[badge],
+                attrs={"shape_name": f"Row {i + 1} num"},
+                classes=["rows-num"],
+            ),
+            Rect(body.x, y, h, h),
+            fast_style(
+                font=st0.font,
+                font_ea=st0.font_ea,
+                font_size=size,
+                fill=fill,
+                color=th.ink_on(fill, num_cls.color or "bg"),
+                bold=True,
+                align="center",
+                valign="middle",
+                padding="0pt",
+            ),
+        )
+        y += h + gap
+    return ctx
 
 
 def _layout_free(ctx: _Ctx, elements: list, body: Rect, slide: Slide, theme: Theme, sg: int) -> _Ctx:
@@ -3519,14 +3703,18 @@ def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, f
     ``cover.rule`` along that edge and the deck footer as a quiet caption at the bottom (``cover.footer``)."""
     W, H, Mx, My, sg, inner_w = dims
     theme, deck = ctx.theme, ctx.deck
+    band = theme.title_band if theme.cover_band else None  # `cover.band=none`: no band (a `bg=` shows)
+    bar_w = _emu(theme.cover_bar_w) if theme.cover_bar else 0  # `cover.bar=<color>`: a bar left of the title
+    off = bar_w + _emu(theme.cover_gap) if bar_w else 0
+    tx, tw = Mx + off, inner_w - off
     bh = round(H * theme.cover_band_h)
     rh = _emu(theme.cover_rule_h) if theme.cover_rule else 0
-    if theme.title_band:
+    if band:
         put(
             head,
             Shape(shape="rect", id="band"),
             Rect(0, 0, W, bh),
-            fast_style(fill=theme.title_band, line=None),
+            fast_style(fill=band, line=None),
         )
     bottom = bh - _emu(theme.cover_pad)
     air = _emu(theme.cover_gap)
@@ -3534,27 +3722,35 @@ def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, f
     sh = 0
     if sub:
         s_st = _role_style(ctx, "subtitle", cover=True)
-        if theme.title_band:
+        if band:
             s_st = s_st.merged(fast_style(color=theme.title_band_color))
         s_st = _styled(ctx, sub, s_st.merged(fast_style(valign="top")), classes=False)
-        s_fs = fit_text(sub, Rect(Mx, 0, inner_w, round(bh * 0.25)), s_st)
-        sh = round(_text_need(ctx, sub, s_st, inner_w, s_fs))
-        s_r = Rect(Mx, bottom - sh, inner_w, sh)
+        s_fs = fit_text(sub, Rect(tx, 0, tw, round(bh * 0.25)), s_st)
+        sh = round(_text_need(ctx, sub, s_st, tw, s_fs))
+        s_r = Rect(tx, bottom - sh, tw, sh)
     if slide.title:
         t_st = _role_style(ctx, "title", cover=True).merged(fast_style(valign="bottom"))
-        if theme.title_band:
+        if band:
             t_st = t_st.merged(fast_style(color=theme.title_band_color))
         t_st = _styled(ctx, slide.title, t_st, classes=False)
         room = max(bottom - sh - (air if sh else 0) - My, 1)
-        t_r = Rect(Mx, bottom - sh - (air if sh else 0) - room, inner_w, room)
+        t_r = Rect(tx, bottom - sh - (air if sh else 0) - room, tw, room)
         t_fs = fit_text(slide.title, t_r, t_st)
         t_fs = _grow_cover_title(ctx, slide.title, t_st, t_r, t_fs)
-        th = round(_text_need(ctx, slide.title, t_st, inner_w, t_fs))
-        put(head, slide.title, Rect(Mx, t_r.bottom - th, inner_w, th), t_st, t_fs)
+        th = round(_text_need(ctx, slide.title, t_st, tw, t_fs))
+        put(head, slide.title, Rect(tx, t_r.bottom - th, tw, th), t_st, t_fs)
+        if bar_w:
+            top = t_r.bottom - th
+            put(
+                head,
+                Shape(shape="rect", id="rule"),
+                Rect(Mx, top, bar_w, bottom - top),
+                fast_style(fill=theme.cover_bar, line=None),
+            )
     if s_r is not None:
         put(head, sub, s_r, s_st, s_fs)
     if rh:
-        full = theme.title_band is not None
+        full = band is not None or slide.background is not None
         put(
             head,
             Shape(shape="rect", id="rule"),
@@ -3568,7 +3764,7 @@ def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, f
             tail,
             _text_el("caption", deck.footer, {"field": "footer"}),
             Rect(Mx, foot_y, round(inner_w * 0.7), foot_h),
-            _role_style(ctx, "caption").merged(fast_style(valign="middle")),
+            _role_style(ctx, "caption").merged(ctx.css.virtual(["caption"]), fast_style(valign="middle")),
         )
     if not slide.elements:
         return None
@@ -3663,6 +3859,21 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
 
     head: list[Placed] = []
     tail: list[Placed] = []
+    rules: list[tuple[Shape, Rect, Style]] = []  # slide chrome strips (top / bottom bar, title rule)
+    if kind != "cover":
+        for color, h_tok, y_edge in (
+            (theme.top_bar, theme.top_bar_h, False),
+            (theme.bottom_bar, theme.bottom_bar_h, True),
+        ):
+            if color:
+                bh = max(_emu(h_tok), 1)
+                rules.append(
+                    (
+                        Shape(shape="rect", id="rule"),
+                        Rect(0, H - bh if y_edge else 0, W, bh),
+                        fast_style(fill=color, line=None),
+                    )
+                )
     reserved: tuple[Style, int] | None = None  # style and height of the empty lead slot kept for the body y
 
     def put(dst: list[Placed], el, rect: Rect, style: Style, fs: float = 1.0):
@@ -3770,6 +3981,18 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 r = _apply_box(ctx, slide.title, Rect(0, 0, W, H), True)  # an explicit title box wins
             st = _styled(ctx, slide.title, st, classes=False)
             put(head, slide.title, r, st, fit_text(slide.title, r, st))
+            if (
+                theme.title_rule and kind != "free"
+            ):  # `title.rule=<color>`: a rule on the bottom edge of the title
+                rule_h = max(_emu(theme.title_rule_h), 1)
+                full = theme.title_band is not None
+                rules.append(
+                    (
+                        Shape(shape="rect", id="rule"),
+                        Rect(0 if full else Mx, r.bottom - rule_h, W if full else inner_w, rule_h),
+                        fast_style(fill=theme.title_rule, line=None),
+                    )
+                )
         for role, el in (("subtitle", slide.subtitle), ("lead", slide.lead)):
             if kind == "blank" or el is None or not el.paragraphs:
                 continue
@@ -3806,7 +4029,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     if show_row:
         fh = round(0.26 * EMU_PER_INCH)
         fy = H - fh - round(0.1 * EMU_PER_INCH)
-        cst = _role_style(ctx, "caption")
+        cst = _role_style(ctx, "caption").merged(ctx.css.virtual(["caption"]))
         if deck.footer:
             put(
                 tail,
@@ -3888,7 +4111,22 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     # ---- body with global autofit
     elements = list(slide.elements)
     final_ctx: _Ctx | None = None
-    if kind == "free" and body is not None and elements and body.h > 0:
+    rows_el = _rows_list(ctx, slide, kind) if body is not None and body.h > 0 else None
+    if (
+        rows_el is not None
+        and (
+            rctx := _layout_rows(
+                _Ctx(deck, theme, slide, index, W, H, dense_k=ctx.dense_k, tight=ctx.tight, css=ctx.css),
+                rows_el,
+                body,
+                sg,
+            )
+        )
+        is not None
+    ):
+        final_ctx = rctx
+        kind = "rows"  # the passes of content slides (growth, centring, bars) do not apply
+    elif kind == "free" and body is not None and elements and body.h > 0:
         final_ctx = _layout_free(ctx, elements, body, slide, theme, sg)
         ctx.diags += final_ctx.diags
         for lab in dict.fromkeys(final_ctx.over):
@@ -4157,4 +4395,5 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         final_ctx.out = expand_pills(
             final_ctx.out, theme, lambda pl, cell: _pill_style(ctx, pl, cell), ctx.lt.pill_h
         )
-    return head + (final_ctx.out if final_ctx else []) + tail
+    chrome = [Placed(element=el, x=r.x, y=r.y, w=max(r.w, 0), h=max(r.h, 0), style=st) for el, r, st in rules]
+    return head + chrome + (final_ctx.out if final_ctx else []) + tail

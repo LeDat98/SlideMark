@@ -347,6 +347,17 @@ def _is_code(it: Item) -> bool:
 _STEP = re.compile(r"Step (\d+) (arrow|card)")
 
 
+def _is_step_caption(p: ParaT, n: int) -> bool:
+    """The first line of a step card is the generated caption ("STEP 2", "手順2"): bold, unlisted, ends in the
+    step number."""
+    return (
+        not p.marker
+        and bool(p.runs)
+        and all(r.bold for r in p.runs if r.text.strip())
+        and re.fullmatch(rf"\D{{0,12}}\s*{n}\D{{0,2}}", p.plain.strip()) is not None
+    )
+
+
 def fold_steps(pool: list[Item]) -> list[Item]:
     """``@steps`` arrows (shape names ``Step N arrow``) take the text of their ``Step N card`` as content.
 
@@ -372,12 +383,53 @@ def fold_steps(pool: list[Item]) -> list[Item]:
                 and card.x - 2 <= i.cx <= card.x + card.w + 2
                 and card.y - 2 <= i.cy <= card.y + card.h + 2
             ]
-            for i in sorted(inside, key=lambda i: (i.y, i.x)):
-                paras += i.paras
+            for k, i in enumerate(sorted(inside, key=lambda i: (i.y, i.x))):
+                ps = list(i.paras)
+                if k == 0 and ps and _is_step_caption(ps[0], n):  # `steps.caption` is a token, not content
+                    ps = ps[1:]
+                paras += ps
                 drop.add(i.uid)
             drop.add(card.uid)
         new[arrow.uid] = replace(arrow, paras=paras, steps=True)
     return [new.get(i.uid, i) for i in pool if i.uid not in drop]
+
+
+_ROW = re.compile(r"Row (\d+)( num)?")
+
+
+def fold_rows(pool: list[Item]) -> tuple[list[Item], bool]:
+    """``@rows`` bars (shape names ``Row N`` / ``Row N num``) become one ordered list; True = it happened."""
+    rows = sorted(
+        (int(m.group(1)), it)
+        for it in pool
+        if (m := _ROW.fullmatch(it.name or "")) and not m.group(2) and it.paras
+    )
+    if not rows:
+        return pool, False
+    first = rows[0][1]
+    paras = [
+        ParaT(runs=list(p.runs), marker="number", size=p.size)
+        for _n, it in rows
+        for p in it.paras[:1]
+        if p.plain.strip()
+    ]
+    x0, y0 = min(it.x for _n, it in rows), min(it.y for _n, it in rows)
+    merged = replace(
+        first,
+        kind="text",
+        name="Rows",
+        fill=None,
+        line=False,
+        paras=paras,
+        x=x0,
+        y=y0,
+        w=max(it.x + it.w for _n, it in rows) - x0,
+        h=max(it.y + it.h for _n, it in rows) - y0,
+    )
+    drop = {it.uid for it in pool if _ROW.fullmatch(it.name or "")}
+    return [
+        merged if i.uid == first.uid else i for i in pool if i.uid not in drop or i.uid == first.uid
+    ], True
 
 
 def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = None) -> list[Block]:
@@ -1104,6 +1156,7 @@ def build_slide(
     fold_into_tables(data)
     title, pool = classify(data, deck)
     pool = fold_steps(pool)
+    pool, rows_slide = fold_rows(pool)
     by_role = {r: [i for i in data.items if i.role == r] for r in ("lead", "conclusion", "footnote")}
     icons = [i for i in data.items if i.role == "icon"]
     blocks = make_blocks(pool, deck, icons)
@@ -1171,6 +1224,8 @@ def build_slide(
         tokens = group_tokens[0]
     else:
         tokens, grid, extras = plan_grid(blocks, deck.width, deck.height, gdiag, deck.margin_x, deck.gap)
+    if rows_slide:
+        tokens = ["rows"]
     for g in gdiag:
         diags.append(
             Diagnostic(level="info", message=g, slide=n, rule="import-layout", hint="check the arrangement")
