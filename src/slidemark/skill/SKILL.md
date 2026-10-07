@@ -210,6 +210,13 @@ styles one list line; a chart frame takes `{fill= radius= pad=}`.
 
 ## Composition forms (one `@word` line under the title; secondary attributes on the same line; looks via `word.*` tokens)
 
+- `@timeline dir=h|v marks=on|off|num` + `## date` boxes (heading = date, body = text, `{.accent}` = now).
+- `@vs` + two `##` cards and an optional `## 結論` verdict bar (`{.hero}` = the winner).
+- `@matrix x="低←容易性→高" y="低←効果→高"` + exactly four `##` boxes in reading order (`fill=a,b,c,d` per quadrant).
+- `@funnel` / `@pyramid dir=up|down` + `##` boxes (heading inside the stage, body right; `funnel.fill=a,b,c` `.taper`).
+- `@cycle dir=cw|ccw` + 3–6 `##` boxes in loop order (heading in the node, body outside; `cycle.fill` `.arrow`).
+- `@agenda` + one `1.` list alone, `{.accent}` on the current item (`agenda.num.size` `.num.text="第{n}章"` `.rule=none`).
+- `@statement align= valign=` + `**+18%**` then one caption line (one huge number or sentence; `statement.size`).
 - `@iconlist cols=2` + `- icon=bolt **Title** text` items (icon, bold title, text in 1–3 columns; `iconlist.icon.size/.color`).
 - `@quote align=center` + `> "text"` then `> — Name` (large quotation with mark and attribution; `quote.size` `quote.mark.color`).
 - `@split side=right ratio=2:3 bleed=on` + `![alt](x.png)` (or a `fill=` block) + any text/boxes (picture beside content).
