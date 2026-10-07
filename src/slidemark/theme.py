@@ -437,6 +437,11 @@ class LayoutTokens(BaseModel):
     rows_pad: Length = "0.2in"  # air between the badge and the text, and at the right end
     rows_text_ratio: float = 0.34  # text size = this x the bar height (pt), at least the body size ...
     rows_text_max_pt: float = 28  # ... at most this size (pt)
+    rows_stripe_w: Length = "0.14in"  # `rows.stripe`: width of the left stripe of a bar
+    rows_glyph_ratio: float = 0.7  # `@rows plain` glyph size = this x the bar text size
+    num_badge_ratio: float = 1.9  # `@num` badge diameter / its digit size (the digit is the heading size x
+    # `num_digit_ratio` unless `box.num.size` is set)
+    num_digit_ratio: float = 1.0
     steps_caption_ratio: float = 0.65  # the "STEP n" caption line is this x the body text size
     steps_stretch: bool = True  # the cards grow down to the conclusion bar / footnote (items spread inside)
     steps_stretch_min: float = 0.4  # hollow at full height: cards are tried shorter, down to this share ...
@@ -714,6 +719,9 @@ def _base_classes() -> dict[str, Style]:
         # `@rows`: the bar of every ordered-list item and its number badge (`rows-num.fill=a,b` cycles)
         "rows": Style(fill="surface", line="border", line_width=0.75),
         "rows-num": Style(fill="primary", color="bg"),
+        # an item card: a bullet of a box under `@items` (or a `### x {.item}` sub-box);
+        # `item.border-left=` is its stripe
+        "item": Style(fill="bg", valign="middle"),
         # `note=` of a chart: native callout inside the chart frame, pointing at the `hl=` point
         "chart-note": Style(
             fill="surface", line="accent", line_width=1, radius=3, padding="5pt", bold=True, valign="middle"
@@ -751,8 +759,12 @@ class Theme(BaseModel):
     cover_rule: str | None = None  # color of a thin rule along the band edge (None = no rule)
     cover_rule_h: Length = "0.05in"  # ... its thickness
     cover_footer: bool = True  # the deck footer (organisation) shows on the cover as a quiet caption
-    cover_bar: str | None = None  # color of a vertical bar left of the cover title block (None = none)
+    cover_bar: str | None = None  # color of a vertical bar left of the cover title block (None = none);
+    # `accent@edge`: a bar on the slide's left edge over the full height instead
     cover_bar_w: Length = "0.12in"  # ... its width (the title block moves right by width + `cover_gap`)
+    cover_rule_w: Length | None = None  # a short cover rule of this width at the title (not full width)
+    cover_rule_pos: str = "below"  # ... `above` the title, or `below` it (between title and subtitle)
+    cover_stripes: str | None = None  # `color@x,color@x`: vertical stripes from x to the right edge
     cover_band: bool = True  # False: the cover band is not drawn although `title.band` is set (bg= shows)
     # slide chrome (design wave 3): edge strips, the rule under the title, a KPI stripe
     top_bar: str | None = None  # color of a strip along the top edge of every slide but the cover
@@ -761,6 +773,18 @@ class Theme(BaseModel):
     bottom_bar_h: Length = "0.1in"
     title_rule: str | None = None  # color of a rule under the slide title (None = none)
     title_rule_h: Length = "2pt"
+    title_rule2: str | None = None  # color of a second, short segment on the left end of the title rule
+    title_rule2_w: Length = "1.6in"  # ... its width (its thickness is `title_rule_h`)
+    heading_rule: str | None = None  # color of a rule under every `##` box heading or band (not `###`)
+    heading_rule_h: Length = "2pt"
+    box_items: str = "bullets"  # `cards`: the bullets of every box are item cards (`@items`: one slide)
+    box_num_fill: str | None = None  # `@num`: the numbered badge on a box heading: fill (None = primary) ...
+    box_num_color: str | None = None  # ... digit color (None = readable on the fill)
+    box_num_size: float | None = None  # ... digit size in pt (None = the box heading size)
+    rows_glyph: str | None = None  # `@rows plain`: the glyph before every bar text (None = `bullet=`)
+    rows_glyph_color: str | None = None  # ... its color (None = `bullet.color`, else the text color)
+    rows_stripe: str | None = None  # a left stripe on every `@rows` bar: a color or a list `a,b` (cycled)
+    table_num_pad: Length | None = None  # right inset of right-aligned (numeric) table cells
     kpi_stripe: str | None = None  # color of a stripe on the top edge of every `.kpi` card
     kpi_stripe_h: Length = "6pt"
     bullet: str | None = None  # glyph of bullet lists (None = the built-in "•" / "–")
@@ -1407,6 +1431,7 @@ _PT_PATHS = {
     "render.connector_width",
     "render.chart_line_width",
     "render.chart_pie_line_width",
+    "box_num_size",
 }
 _THEME_COLOR_SUFFIX = ("_fill", "_color", "_band", "_border", "_bar", "_rule", "_stripe")
 _OPTIONAL_COLORS = {
@@ -1424,6 +1449,10 @@ _OPTIONAL_COLORS = {
     "kpi_stripe",
     "bullet_color",
     "steps_caption_color",
+    "heading_rule",
+    "rows_glyph_color",
+    "box_num_fill",
+    "box_num_color",
 }
 _MEDIUM_PT = 2.25  # CSS `medium` border width (3px)
 
@@ -1570,6 +1599,74 @@ def _fill_value(path: str, raw: str, names: set[str] | None) -> list[tuple[str, 
     return [(path, _color_value(v, names, _HINT_FILL))]
 
 
+_DL2_PATHS = {
+    "cover_bar",
+    "cover_stripes",
+    "cover_rule_pos",
+    "title_rule2",
+    "rows_stripe",
+    "box_items",
+    "render.chevron_shape",
+}
+_CHEVRON_SHAPES = ("chevron", "pentagon", "homeplate")
+
+
+def _opt_color(raw: str, names: set[str] | None) -> str | None:
+    return None if _unquote(raw).lower() in ("none", "null", "off") else _color_value(raw, names)
+
+
+def _dl2_value(path: str, raw: str, names: set[str] | None) -> list[tuple[str, Any]]:
+    """Tokens whose value is more than one color or a word of a short list (DL2: edge bar, stripes, lists)."""
+    v = _unquote(raw)
+    if path == "cover_bar":  # `accent` | `accent@edge`
+        col, at, where = v.partition("@")
+        if at and where.strip().lower() != "edge":
+            raise TokenValueError(f"'@{where}' is not a cover bar position", "write cover.bar=accent@edge")
+        got = _opt_color(col, names)
+        return [(path, None if got is None else got + ("@edge" if at else ""))]
+    if path == "cover_stripes":  # `#1C3A68@8.9in,secondary@10.2in`
+        if v.lower() in ("none", "null", "off"):
+            return [(path, None)]
+        out = []
+        for item in (s.strip() for s in v.split(",")):
+            col, at, pos = item.rpartition("@")
+            if not at or not col or not pos:
+                raise TokenValueError(
+                    f"'{item}' is not <color>@<x>",
+                    "write cover.stripes=#1C3A68@8.9in,secondary@10.2in (a color and where it starts)",
+                )
+            try:
+                _length_value(pos)
+            except TokenValueError:
+                raise TokenValueError(f"'{pos}' is not a length", _HINT_LEN) from None
+            out.append(f"{_color_value(col, names)}@{pos}")
+        return [(path, ",".join(out))]
+    if path == "cover_rule_pos":
+        if v.lower() not in ("above", "below"):
+            raise TokenValueError("cover.rule_pos is above or below", "write cover.rule_pos=above (or below)")
+        return [(path, v.lower())]
+    if path == "title_rule2":
+        return [(path, _opt_color(raw, names))]
+    if path == "rows_stripe":  # one color, or a list that cycles over the bars
+        if v.lower() in ("none", "null", "off"):
+            return [(path, None)]
+        items = [p.strip() for p in v.split(",") if p.strip()]
+        if not items:
+            raise TokenValueError("rows.stripe needs a color", "write rows.stripe=primary,secondary")
+        return [(path, ",".join(_color_value(p, names) for p in items))]
+    if path == "box_items":
+        if v.lower() not in ("cards", "bullets"):
+            raise TokenValueError("box.items is cards or bullets", "write box.items=cards (or bullets)")
+        return [(path, v.lower())]
+    items = [p.strip().lower() for p in v.split(",") if p.strip()]  # render.chevron_shape
+    if not items or any(i not in _CHEVRON_SHAPES for i in items):
+        raise TokenValueError(
+            f"'{v}' is not a chevron shape",
+            "write render.chevron_shape=pentagon or pentagon,chevron (first arrow, then the rest)",
+        )
+    return [(path, ",".join(items))]
+
+
 def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[str, Any]]:
     """Validate a raw token value by its field type and map CSS-like shorthands.
 
@@ -1611,6 +1708,8 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
         raise TokenValueError("ink.auto is on or off", "write 'style: ink.auto=off' (or on)")
     if path == "cover_band":  # `cover.band=none` / `off` = no band; anything else = on
         return [(path, _unquote(raw).lower() not in ("none", "off", "no", "false", "0"))]
+    if path in _DL2_PATHS:
+        return _dl2_value(path, raw, names)
     if path == "palette":
         items = [p.strip() for p in _unquote(raw).split(",") if p.strip()]
         return [(path, [_color_value(p, names) for p in items])]

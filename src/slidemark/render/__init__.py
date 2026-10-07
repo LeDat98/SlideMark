@@ -155,6 +155,11 @@ def _render_slide(rc: RenderCtx, prs, slide: Slide, items: list[Placed]):
     else:
         s = prs.slides.add_slide(prs.slide_layouts[5 if has_title else 6])
     _background(rc, prs, s, slide)
+    arrows = sorted(
+        (pl for pl in items if isinstance(pl.element, Shape) and pl.element.shape == "chevron"),
+        key=lambda pl: (round(pl.y / 91440), pl.x),  # reading order, rows of 0.1 in
+    )
+    rc.chev_rank = {id(pl): k for k, pl in enumerate(arrows)}
     counters: dict[str, int] = {}
     used_title = False
     shape_ids: list[list[int]] = []  # per Placed index: ids of the shapes it produced (for animations)
@@ -615,7 +620,7 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
                 line=el.line,
             )
             kind = MSO_SHAPE.RECTANGLE
-        if el.shape == "chevron" and str(rc.theme.render.chevron_shape).lower() in ("pentagon", "homeplate"):
+        if el.shape == "chevron" and _flat_tail(rc, pl):
             kind = MSO_SHAPE.PENTAGON  # `render.chevron_shape=pentagon`: a flat tail, a pointed head
         shp = _autoshape(rc, s, pl, kind, name)
         if el.paragraphs:
@@ -675,6 +680,16 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             "info",
             line=el.line,
         )
+
+
+def _flat_tail(rc: RenderCtx, pl: Placed) -> bool:
+    """``render.chevron_shape`` names the shape of the arrows in reading order (``pentagon,chevron``: the
+    first arrow is a pentagon, the rest chevrons; one word = every arrow; the last word repeats)."""
+    names = [w.strip().lower() for w in str(rc.theme.render.chevron_shape).split(",") if w.strip()]
+    if not names:
+        return False
+    word = names[min(rc.chev_rank.get(id(pl), 0), len(names) - 1)]
+    return word in ("pentagon", "homeplate")
 
 
 def _accent_bar(rc: RenderCtx, slide, pl: Placed, name: str) -> None:

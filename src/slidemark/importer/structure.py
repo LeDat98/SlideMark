@@ -62,6 +62,8 @@ class Block:
     icon: str | None = None
     lines: list[str] = field(default_factory=list)  # kind "fence": the fence lines (a recovered diagram)
     links: list[str] = field(default_factory=list)  # box: link tokens between its children
+    card: bool = False  # box: an ``Item N`` card (a bullet drawn as a card by ``@items``)
+    items: bool = False  # box: its bullets were item cards (the slide gets the ``items`` word)
 
 
 # --------------------------------------------------------------------------- classification
@@ -183,6 +185,7 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
             or it.has_slidenum
             or nm.startswith("band")
             or nm == "rule"
+            or _NUM_BADGE.fullmatch(nm)  # `@num`: the numbered circle of a box heading
             or nm == "background"
             or nm.endswith(" accent")
             or (it.kind == "text" and it.y >= 0.85 * H and _norm(it.text) in deck.footers)
@@ -238,8 +241,8 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
         title.role = "title"
     # callouts: a filled text shape with a thin filled bar on its left edge
     for it in live:
-        if it.role or it.kind != "text" or not it.fill:
-            continue
+        if it.role or it.kind != "text" or not it.fill or _ROW.fullmatch(it.name or ""):
+            continue  # (an `@rows` bar with a `rows.stripe` is no callout)
         for bar in items:
             if (
                 bar is not it
@@ -394,21 +397,26 @@ def fold_steps(pool: list[Item]) -> list[Item]:
     return [new.get(i.uid, i) for i in pool if i.uid not in drop]
 
 
-_ROW = re.compile(r"Row (\d+)( num)?")
+_ROW = re.compile(r"Row (\d+)( num| stripe| glyph)?")
+_NUM_BADGE = re.compile(r"num \d+")
+_ITEM_CARD = re.compile(r"Item \d+")
 
 
-def fold_rows(pool: list[Item]) -> tuple[list[Item], bool]:
-    """``@rows`` bars (shape names ``Row N`` / ``Row N num``) become one ordered list; True = it happened."""
+def fold_rows(pool: list[Item]) -> tuple[list[Item], str | None]:
+    """``@rows`` bars (shape names ``Row N`` / ``Row N num`` / ``stripe`` / ``glyph``) become one list:
+    ``"rows"`` = ordered (numbered bars), ``"plain"`` = bullets (no badges: ``@rows plain``), ``None`` = no
+    bars."""
     rows = sorted(
         (int(m.group(1)), it)
         for it in pool
         if (m := _ROW.fullmatch(it.name or "")) and not m.group(2) and it.paras
     )
     if not rows:
-        return pool, False
+        return pool, None
+    plain = not any((m := _ROW.fullmatch(it.name or "")) and m.group(2) == " num" for it in pool)
     first = rows[0][1]
     paras = [
-        ParaT(runs=list(p.runs), marker="number", size=p.size)
+        ParaT(runs=list(p.runs), marker="bullet" if plain else "number", size=p.size)
         for _n, it in rows
         for p in it.paras[:1]
         if p.plain.strip()
@@ -427,9 +435,9 @@ def fold_rows(pool: list[Item]) -> tuple[list[Item], bool]:
         h=max(it.y + it.h for _n, it in rows) - y0,
     )
     drop = {it.uid for it in pool if _ROW.fullmatch(it.name or "")}
-    return [
-        merged if i.uid == first.uid else i for i in pool if i.uid not in drop or i.uid == first.uid
-    ], True
+    return [merged if i.uid == first.uid else i for i in pool if i.uid not in drop or i.uid == first.uid], (
+        "plain" if plain else "rows"
+    )
 
 
 def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = None) -> list[Block]:
@@ -549,7 +557,32 @@ def make_blocks(pool: list[Item], deck: DeckInfo, icons: list[Item] | None = Non
             return blocks
         if extra:
             blocks.insert(0, Block("text", it.x, it.y, it.w, it.h, paras=extra))
-        return [Block("box", it.x, it.y, it.w, it.h, item=it, heading=head, children=blocks, sub=nested)]
+        card = bool(_ITEM_CARD.fullmatch(it.name or ""))
+        if (  # a box whose children are all `Item N` cards: the cards are its bullets (`@items`)
+            not nested
+            and blocks
+            and all(b.kind == "box" and b.card and not b.children and not b.paras for b in blocks)
+        ):
+            paras = [
+                ParaT(runs=list(p.runs), marker="bullet", size=p.size)
+                for b in blocks
+                for p in (b.heading or [])
+            ]
+            x0, y0 = min(b.x for b in blocks), min(b.y for b in blocks)
+            text = Block(
+                "text",
+                x0,
+                y0,
+                max(b.x + b.w for b in blocks) - x0,
+                max(b.y + b.h for b in blocks) - y0,
+                paras=paras,
+            )
+            return [Block("box", it.x, it.y, it.w, it.h, item=it, heading=head, children=[text], items=True)]
+        return [
+            Block(
+                "box", it.x, it.y, it.w, it.h, item=it, heading=head, children=blocks, sub=nested, card=card
+            )
+        ]
 
     out: list[Block] = []
     for it in pool:
@@ -1158,7 +1191,8 @@ def build_slide(
     fold_into_tables(data)
     title, pool = classify(data, deck)
     pool = fold_steps(pool)
-    pool, rows_slide = fold_rows(pool)
+    pool, rows_mode = fold_rows(pool)
+    rows_slide = rows_mode is not None
     by_role = {r: [i for i in data.items if i.role == r] for r in ("lead", "conclusion", "footnote")}
     icons = [i for i in data.items if i.role == "icon"]
     blocks = make_blocks(pool, deck, icons)
@@ -1300,6 +1334,15 @@ def build_slide(
             extra.append("section")
         elif n > 1 and deck.sections and n not in starts:
             extra.append("cover")
+    if any(_NUM_BADGE.fullmatch((i.name or "").lower().strip()) for i in data.items):
+        extra.append("num")  # `@4 num`: the badges are decor, the slide word draws them again
+    boxes = [b for b in seq if b.kind == "box"]
+    if any(b.items for b in boxes) and not any(
+        not b.items and any(p.marker for c in b.children if c.kind == "text" for p in c.paras) for b in boxes
+    ):
+        extra.append("items")  # `@4 items`: the item cards are the boxes' bullets
+    if rows_mode == "plain":
+        extra.append("plain")  # `@rows plain`: bars without number badges
     if data.transition:
         extra.append("t=" + data.transition)
     if data.build:

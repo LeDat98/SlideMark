@@ -15,14 +15,16 @@ every build 0 warnings and `agent_accept` accepted. N = token or attribute, C = 
 
 | Deck | Decisions | N | C | M | Statable (N+C) | Native only | deck.md tokens vs build.py | Content-only deck |
 |---|---|---|---|---|---|---|---|---|
-| t1, 5 slides | 44 | 29 | 3 | 12 | 73% | 66% | 912 / 3,187 = 28.6% | 460 = 14% |
-| t2, 15 slides | 64 | 59 | 1 | 4 | 94% | 92% | 2,283 / 5,263 = 43% (port made before wave 3; not re-ported) | 1,271 = 24% |
-| t3, 25 slides | 62 | 41 | 2 | 19 | 69% | 66% | 2,755 / 8,188 = 33.6% | 2,000 = 24% |
+| t1, 5 slides | 44 | 42 | 0 | 2 | 95% | 95% | 890 / 3,187 = 27.9% | 460 = 14% |
+| t2, 15 slides | 64 | 60 | 0 | 4 | 94% | 94% | 1,577 / 5,263 = 30.0% (DL2 part 1) | 1,261 = 24% |
+| t3, 25 slides | 62 | 56 | 1 | 5 | 92% | 90% | 2,889 / 8,188 = 35.3% | 2,000 = 24% |
 
-DL2 (>= 95% statable, <= 30% of the tokens) holds on none of the three. The t2 deck uses a plain look that the syntax
-covers; t1 and t3 use more bespoke chrome (cover stripes, KPI bands, item cards, number circles, label styling) and
-each has 12-19 missing decisions. Token share is within the gate only on t1; the frame header is 385 / 475 tokens, a
-fixed cost, while t3 pays for 25 slides of per-slide choices (+755 tokens over its content-only deck).
+After DL2 lane F (box, row, cover and chrome decisions; t1 and t3 re-ported with the chart forms of lane E too) the 5-slide
+deck meets DL2 (>= 95% statable, <= 30% of the tokens); the 25-slide deck is at 92% statable and 35% of the tokens. The 7
+missing decisions are lane C's (KPI header band and divider, KPI unit size, exact table row heights, per-point chart
+label positions) and the pie side panel with slice-coloured stripes. Token share on t3: the header is 559 tokens (a fixed
+cost: 385 on t1), the 25 slides pay 2,330 for content (2,000) and per-slide choices; `@items` / `@rows plain` / chart
+forms replaced a css fence and 14 deviations but add header tokens (`item.*`, `rows.stripe`, `cover.stripes`, ...).
 
 ## Slide frame
 
@@ -164,42 +166,48 @@ not already hold. Ported in `bench/lengthbench/t1|t3/slidemark-ported/deck.md`. 
 | Message bar: light fill, padding | L95 / L115 | `style: lead.background=surface lead.padding="5pt 12pt"` | covered |
 | Message bar: accent stripe at its left | L96 / L116 | `style: lead.border-left="7pt solid accent"` | covered |
 | Footer hairline above the footer text | n/a / L120 | `style: footer.border-top="1pt solid border"` | covered |
-| Cards white with a border (KPI and boxes) | L140 / L163 | `style: card.fill=bg card.line=border` (`kpi.fill=` is accepted and ignored: the KPI box takes `card.*`) | covered |
+| Cards white with a border (KPI and boxes) | L140 / L163 | `style: card.fill=bg card.line=border`; `kpi.fill=` / `kpi.line=` are aliases for `.kpi` cards only | covered / new (the alias was silently ignored) |
 | No footer on the cover | n/a / L130 | `style: cover.footer=off` | covered |
-| Second rule segment (orange, 1.6 in) on the title rule | n/a / L112 | none | missing |
-| Cover bar on the slide's left edge, full height | L110 | `cover.bar` draws beside the title block only | missing |
-| Cover rule short (6 / 1.6 in), above or under the title | L111 / L136 | `cover.rule` is full width at the band edge | missing |
-| Cover stripes on the right (two colours, fixed x) | n/a / L134-135 | none | missing |
+| Second rule segment (orange, 1.6 in) on the title rule | n/a / L112 | `style: title.rule2=accent title.rule2_w=1.6in` | new |
+| Cover bar on the slide's left edge, full height | L110 | `style: cover.bar=accent@edge cover.bar_w=0.35in` | new |
+| Cover rule short (6 / 1.6 in), above or under the title | L111 / L136 | `style: cover.rule=accent cover.rule_w=6in cover.rule_pos=below|above` | new |
+| Cover stripes on the right (two colours, fixed x) | n/a / L134-135 | `style: cover.stripes=#1C3A68@8.9in,secondary@10.2in` | new |
 | KPI header band (navy, white label) | L141-142 | none: `heading.band` skips `.kpi` | missing |
 | KPI unit (億円, 名) smaller than the number | n/a / L166-169 | none: one run size per card | missing |
 | KPI value size by cards per row (42 for 4, 60 for 3) | n/a / L160 | slide css `.kpi { font-size: 60pt }` (`{size=}` on the card is ignored) | CSS only |
-| Accent stripe on top of a box card | L201 | css `.strat { border-top: 6pt solid #D9821E }` on a class | CSS only |
-| Number circle on a box heading | L202-203 | none | missing |
-| Rule under a box heading, or under the band | L205 / L192 | `heading.border-bottom` hits every heading including `###` | missing |
-| Items as cards inside a box (fill, left stripe, regular text) | L208-210 / L195-197 | `###` sub-boxes: with `heading.band` each item becomes a band; item text is heading-sized bold (`item.font_size` has no effect); left stripe by css; bullets are the fallback | missing |
-| First arrow a pentagon, the rest chevrons | L221 / L215 | `render.chevron_shape` is all or none | missing |
-| Step card stripe (top or left, accent) | L225 / L221 | css `.steps-card { border-top: 5pt solid #E07B18 }` | CSS only |
-| Numeric table column inset 0.6 in at the right | n/a / L272 | `layout.cell_pad_x` is global | missing |
-| Unnumbered bar rows with a glyph and alternating stripe | n/a / L308-310 | `@rows` draws numbered badges; `bullet=` does not apply to rows | missing |
-| Chart data labels bold | L173 / L368 | none | missing |
-| Series overlap (-5, 100) | L165 / L364 | none (a stacked kind sets 100 itself) | missing |
-| Value axis major unit | L180 | none (auto) | missing |
-| Tick size apart from label and legend size | L181, L186 / L350, L358 | `size=` is one value | missing |
-| Pie label = category name + value, newline separator | n/a / L373-381 | `labels=` has no name option | missing |
-| Pie slice outline (white) | n/a / L388 | none | missing |
+| Accent stripe on top of a box card | L201 | `style: strat.border-top="6pt solid accent"` with `{.strat}` (a class token; the css fence was never needed) | covered |
+| Number circle on a box heading | L202-203 | `@4 num`, `style: box.num.fill=primary box.num.color=bg box.num.size=20` | new |
+| Rule under a box heading, or under the band | L205 / L192 | `style: heading.rule=secondary heading.rule_h=0.03in` (not on `###`) | new |
+| Items as cards inside a box (fill, left stripe, regular text) | L208-210 / L195-197 | `@4 items` (or `box.items=cards`): `style: item.fill=surface item.border-left="7pt solid secondary" item.size=14 item.bold=off`; `### x {.item}` takes the same tokens | new |
+| First arrow a pentagon, the rest chevrons | L221 / L215 | `style: render.chevron_shape=pentagon,chevron` | new |
+| Step card stripe (top or left, accent) | L225 / L221 | `style: steps-card.border-left="5pt solid accent"` (or `border-top`) | covered |
+| Numeric table column inset 0.6 in at the right | n/a / L272 | `style: table.num_pad=0.6in` (right-aligned cells, header included) | new |
+| Unnumbered bar rows with a glyph and alternating stripe | n/a / L308-310 | `@rows plain` + `style: rows.glyph=■ rows.glyph.color=accent rows.stripe=primary,secondary` (`bullet=■` is the glyph too) | new |
+| Chart data labels bold | L173 / L368 | `labels.bold=on` | new (lane E) |
+| Series overlap (-5, 100) | L165 / L364 | `overlap=-5` (a stacked kind sets 100 itself) | new (lane E) |
+| Value axis major unit | L180 | `step=200` | new (lane E) |
+| Tick size apart from label and legend size | L181, L186 / L350, L358 | `size=14,12` | new (lane E) |
+| Pie label = category name + value, newline separator | n/a / L373-381 | `labels=outside+name` | new (lane E) |
+| Pie slice outline (white) | n/a / L388 | `slice.line=bg` | new (lane E) |
 | Pie with a side panel of rows with slice-coloured stripes | n/a / L477-487 | `@3:2` + `###` `.kpi` sub-boxes: label 13 pt, no slice stripe | missing |
-| Stacked column without totals | n/a / L363-368 | `totals=off` is in the chart option table but the parser rejects it (`bad-chart-option`) | missing |
+| Stacked column without totals | n/a / L363-368 | `totals=off` (was documented but rejected) | new (lane E) |
 
 ### Summary, t1 and t3
 
-28 new rows: **covered 5**, **CSS only 3**, **missing 20**. With the t2 rows above the whole table is 92 rows:
-covered or new 65 (4 after a routing fix, as before), CSS only 3 (+ the 2 mixed rows of t2), missing 24. Per deck the
-DL2 counts are in the table at the top of this file.
+28 rows: **covered 7** (two were listed as CSS only and already worked as class tokens: `strat.border-top`,
+`steps-card.border-left`; one gained the `kpi.fill` alias), **new 17** (10 from lane F: second title rule, cover bar on
+the edge, short cover rule, cover stripes, number circle, heading rule, item cards, pentagon list, numeric inset, plain
+rows with glyph and stripe; 7 from lane E: chart labels, overlap, step, tick size, pie name, pie outline, `totals=off`),
+**CSS only 1** (the KPI value size per row, slide css), **missing 3** (KPI header band and KPI unit size: lane C; the pie
+side panel with slice-coloured stripes). With the t2 rows above the whole table is 98 rows: covered 45, new 45, CSS
+only 1, missing 7 (distinct decisions: KPI header band, KPI divider, KPI unit size, exact table row heights, a colour
+per bar, per-point label positions, the pie side panel). Per deck the DL2 counts are in the table at the top of this file.
 
 Silent failures found while porting (they look statable and do nothing):
 
-- `kpi.fill=bg kpi.line=border`: accepted, the KPI card keeps `card.fill` (use `card.fill=bg`).
-- `item.font_size=14 item.bold=off item.valign=middle` on a `### {.item}` sub-box: accepted, no effect.
+- `kpi.fill=bg kpi.line=border`: accepted, the KPI card kept `card.fill` (fixed: aliases of the card look for `.kpi`).
+- `item.font_size=14 item.bold=off item.valign=middle` on a `### {.item}` sub-box: accepted, no effect (fixed: the sub-box is an item card).
 - `{.kpi size=60}` on a KPI heading: accepted, no effect (slide css works).
-- `totals=off` on a chart: documented in `docs/SYNTAX.md`, rejected by the parser.
-- `kpi.stripe_h=0.7in` with a white label: a `contrast` warning, because the lint reads the label against the card fill.
+- `totals=off` on a chart: documented in `docs/SYNTAX.md`, rejected by the parser (fixed by lane E).
+- `kpi.stripe_h=0.7in` with a white label: a `contrast` warning, because the lint read the label against the card fill (fixed: judged against the stripe when the label overlaps it; the stripe still is not a header band, see lane C's `kpi.band`).
+- Four `cover.* has no effect here` warnings on decks with `kpi.label.*` or `heading.bold=on` (the cover test read `.kpi h2` and `h2 {}` as cover rules; fixed in `honour.py`).

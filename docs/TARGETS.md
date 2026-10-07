@@ -60,7 +60,7 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       with tokens or attributes (no `css` fence, no `@html` needed), deck ≤ 30% of `build.py` tokens (now 60/64 = 94%
       incl. 9 CSS-only, 2,283 tokens = 43%; the 4 missing: KPI divider rule, exact row height, a colour per bar, a
       manual per-point label position). DL2 part 1 (2026-10-07): CSS-only rows 0, the port uses no css fence and no
-      `@html`: 1,577 tokens = 29.96%, accepted, 0 warnings. Open: the 4 missing rows, the 5- and 25-slide decks.
+      `@html`: 1,577 tokens = 29.96%, accepted, 0 warnings. Lane F (2026-10-07): t1 (5 slides) 42/44 = 95%, 890 tokens = 27.9%, meets DL2; t3 (25 slides) 56 N + 1 CSS of 62 = 92%, 2,889 tokens = 35.3%. Open: KPI header band / divider / unit size, exact table row heights, a colour per bar, per-point label positions, the pie side panel (lane C).
 - [ ] DL3 Every element kind (title, lead, box, KPI, list item, table cell, chart point/series, image, step, row, cover)
       accepts `{x y w h size color fill border align valign bold rotate shape z}` on its own line, with pinned values
       never grown or moved by a layout pass; per-cell `{fill color}` on a table cell, per-point `{color label}` on a

@@ -31,7 +31,7 @@ from ..layout.css import border_spec, cell_insets
 from ..layout.tablehl import hl_cell, hl_cols, hl_names, hl_rows, join_names
 from ..layout.tables import column_widths, compact_header, table_grid
 from ..theme import Theme
-from ..units import EMU_PER_PT
+from ..units import EMU_PER_PT, to_emu
 from . import waterfall as wfall
 from .axis import (
     axis_shown,
@@ -293,6 +293,12 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
             for cc in range(c, c + cs):
                 _cell_borders(rc, tbl.cell(rr, cc)._tc.get_or_add_tcPr(), ct.style)
         cl, ctp, cr, cb = cell_insets(ct.style, *measure.cell_pad())
+        if (  # `table.num_pad=0.6in`: right-aligned (numeric) cells keep this inset on the right
+            theme.table_num_pad is not None
+            and (st.align == "right" or (ct.style and ct.style.align == "right"))
+            and not (ct.style and (ct.style.padding is not None or ct.style.padding_right is not None))
+        ):
+            cr = min(max(to_emu(theme.table_num_pad), 0), max(sum(cw[c : c + cs]) // 2, 0))
         fill_text(
             rc,
             cell.text_frame,

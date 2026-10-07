@@ -277,6 +277,7 @@ def audit(slide: Slide, theme: Any, index: int = 0) -> list[tuple[Any, str, str,
                     and isinstance(el, Container)
                     and not _has_text(el)
                     and "kpi" not in el.classes
+                    and "item" not in el.classes  # an item card: `size=` sizes its text
                 ):
                     hint = "size= sizes the box text, not its heading: sizes: heading=NN or h2.size=NN"
                     out.append((el, kind, attr, hint))
@@ -342,13 +343,47 @@ class _Facts:
             if getattr(el.style, "font_size", None) is not None or el.role in pinned:
                 return True
         names = ["h1", "slide", r"\.cover", r"\.title"]
-        names += [r"\.subtitle", "h2"] if cover.subtitle is not None else [r"\.lead"] if cover.lead else []
-        pattern = re.compile(r"(^|[\s>,])(" + "|".join(names) + r")\b")
+        # (the cover subtitle is a `p.subtitle` node: `h2 { }` styles box headings, not the subtitle)
+        names += [r"\.subtitle"] if cover.subtitle is not None else [r"\.lead"] if cover.lead else []
+        pattern = re.compile(r"(" + "|".join(names) + r")\b")
+
+        def reaches_cover(selector: str) -> bool:
+            """The rule's subject (its last compound) is a cover element and nothing narrows it to another
+            ancestor: ``.kpi h2`` styles the KPI labels, not the cover subtitle."""
+            parts = re.split(r"\s*[>\s]\s*", selector.strip())
+            return bool(pattern.match(parts[-1])) and all(
+                re.match(r"(slide|\.cover)\b", a) for a in parts[:-1]
+            )
+
         return any(
-            pattern.search(r.selector)
+            reaches_cover(r.selector)
             and any(v is not None for k, v in r.style.__dict__.items() if k != "color")
             for r in [*self.deck.css, *cover.css]
         )
+
+    def items(self) -> bool:
+        """`@items` / `box.items=cards` on a deck with boxes, or a `### x {.item}` sub-box."""
+        return (
+            (self.theme.box_items == "cards" and self.boxes())
+            or any("items" in s.classes for s in self.deck.slides)
+            or self.any(lambda e: isinstance(e, Container) and "item" in e.classes)
+        )
+
+    def num(self) -> bool:
+        """`@num` on a slide of boxes (on `@steps` it is the caption flag, `@rows` has its own badges)."""
+
+        def steps(s: Slide) -> bool:  # `@steps` is expanded into a group at parse time
+            return bool({"steps", "chevron", "rows"} & set(s.classes)) or any(
+                isinstance(e, Container) and "steps" in e.classes for e in s.elements
+            )
+
+        return any("num" in s.classes and not steps(s) for s in self.deck.slides)
+
+    def plain_rows(self) -> bool:
+        return any({"rows", "plain"} <= set(s.classes) for s in self.deck.slides)
+
+    def cover_rule(self) -> bool:
+        return bool(self.theme.cover_rule)
 
     def footer(self) -> bool:
         return bool(self.deck.footer or self.deck.slide_number)
@@ -375,6 +410,11 @@ STYLE_NEEDS: list[tuple[re.Pattern[str], Callable[[_Facts], bool], str]] = [
         "`chevron.*` styles nothing: arrows follow primary (compact) or steps-arrow.fill=<c> (@steps)",
     ),
     (
+        re.compile(r"^cover\.rule_(w|pos)$"),
+        _Facts.cover_rule,
+        "needs a rule to shorten: cover.rule=<color> (cover.rule_w / rule_pos place it)",
+    ),
+    (
         re.compile(r"^cover\.band_h$"),
         _Facts.cover,
         "no cover slide: slide 1 with only a title (+ subtitle) or @cover",
@@ -395,6 +435,11 @@ STYLE_NEEDS: list[tuple[re.Pattern[str], Callable[[_Facts], bool], str]] = [
         "no @steps slide in the deck: write `@4 steps` before the boxes",
     ),
     (
+        re.compile(r"^rows\.glyph"),
+        _Facts.plain_rows,
+        "no `@rows plain` slide in the deck: the glyph marks the bars of unnumbered rows",
+    ),
+    (
         re.compile(r"^(rows?[.-]|layout\.rows)"),
         _Facts.rows,
         "no @rows slide in the deck: write `@rows` before a 1. list",
@@ -402,6 +447,21 @@ STYLE_NEEDS: list[tuple[re.Pattern[str], Callable[[_Facts], bool], str]] = [
     (re.compile(r"^(table\.|layout\.table)"), _Facts.table, "no table in the deck"),
     (re.compile(r"^(palette|render\.chart_)"), _Facts.chart, "no chart in the deck"),
     (re.compile(r"^bullet"), _Facts.bullets, "no bullet list in the deck"),
+    (
+        re.compile(r"^box\.num\."),
+        _Facts.num,
+        "no `@num` slide in the deck: write `@4 num` before the boxes (not on @steps)",
+    ),
+    (
+        re.compile(r"^item\."),
+        _Facts.items,
+        "no item cards in the deck: `@4 items` before the boxes, box.items=cards, or `### x {.item}`",
+    ),
+    (
+        re.compile(r"^render\.chevron_shape$"),
+        _Facts.steps,
+        "no @steps / @chevron slide in the deck: the shape is the arrows' own",
+    ),
     (re.compile(r"^(heading\.|card\.|box\.)"), _Facts.boxes, "no ## box in the deck"),
     (re.compile(r"^(footer|num)\."), _Facts.footer, "no footer: set `footer:` or `num: on`"),
     (re.compile(r"^lead\."), _Facts.lead, "no `>` lead line under a title"),
