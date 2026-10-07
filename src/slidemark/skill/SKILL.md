@@ -83,7 +83,7 @@ Enterprise,1.1%,0.8%
 > Keep the success team on enterprise accounts
 
 # Q4 plan
-@steps
+@steps num
 ## Oct {.accent}
 - Hire 4 AEs
 ## Nov
@@ -116,7 +116,7 @@ lang: ja
 colors: primary=#0B3D91 accent=#C8102E
 fonts: ea="Yu Gothic"
 sizes: body=11 table=10 footnote=9
-style: title.band=primary heading.band=primary table.header.fill=primary
+style: title.band=primary heading.band=primary table.header.fill=primary top.bar=accent kpi.stripe=primary
 footer: ACME株式会社
 num: on
 
@@ -185,8 +185,8 @@ goes full width below. Each table/chart/image/code outside a box is its own bloc
 
 **`@` line** (only if the automatic layout is wrong; one per slide, tokens space separated):
 `@3` columns · `@2x2` grid · `@1:2` ratios · `@aab/aac` areas (letters = blocks in order, `.` empty) ·
-`chevron` steps (heading + 1–2 short bullets) · `steps` arrows, bullets in a card below · `flow` cards with
-arrows · `a>b` arrow, `a-b` line between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition ·
+`chevron` steps (heading + 1–2 short bullets) · `steps` arrows, bullets in a card below (`steps num` adds a
+"STEP n" caption) · `rows` a `1.` list alone as numbered bars · `flow` cards with arrows · `a>b` arrow, `a-b` line between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition ·
 `@bg=#0B1020` or `@bg="linear-gradient(135deg,#1A0B2E,#7A1FA2)"` background (dark flips text light; `@dark`
 `@light` force it) · `@free` no automatic layout: blocks sit at their own `{x y w h}`.
 
@@ -221,7 +221,9 @@ matches. Merge: a lone `<` joins the cell to the left, `^` the cell above. Numbe
 Chart fence kinds: `column bar line area pie doughnut scatter radar stacked-column stacked-bar waterfall` (waterfall: one row, `=` cell = total). CSV body:
 first row = categories (first cell empty), then one row per series (name first). Options: `title="..."`
 `labels=on|percent|off` `legend=bottom|right|top|none` `fmt="0.0"|"#,##0"|"0%"` `min=` `max=`
-`colors=primary,accent,#888888` `axis=off`; takeaway: `hl=Metro note="Metro: 40% of visits"`. Numbers may be
+`colors=primary,accent,#888888` (names from `colors:` work) `gap=80` `marker=9` `size=14` (exact)
+`labels=outside|inside|above|below` `axis=off`; takeaway: `hl=Metro note="Metro: 40% of visits"` (`hl=` names a
+category or a series). Numbers may be
 `1,240`, `12%`, `▲3`; a decimal comma needs quotes (`"1,6"`). One value axis.
 
 ## Design tokens (header lines)
@@ -229,12 +231,15 @@ first row = categories (first cell empty), then one row per series (name first).
 - `colors:` `bg fg primary accent surface border muted danger success` or any new name (`brand=#FF5A1F`).
   `primary` colours KPI numbers, badges, bars, charts and the title band.
 - `fonts:` `heading body mono ea` (ea = Japanese/Chinese text).
-- `sizes:` pt per role: `title heading body lead caption footnote table code cover-title`.
+- `sizes:` pt per role: `title heading body lead conclusion caption footnote table code cover-title`; a trailing
+  `!` (`heading=20!`) pins the size against automatic growth.
 - `style:` `radius=14` `gap=12pt` `padding=12pt` `shadow="0 6 18 #00000055"` `card.fill=#141A2E` (`none` =
   no card; a `linear-gradient(...)` works) `title.band=primary|none` `title.band.color=#FFFFFF`
   `heading.band=primary` `table.header.fill=primary` `table.header.color=#FFFFFF`
   `palette=primary,accent,#FF5A1F` (chart series) `h1.letter-spacing=2pt` (any `selector.css-property`)
-  `hero.fill=#FF5A1F` (your own class, used as `## X {.hero}`).
+  `hero.fill=#FF5A1F` (your own class, used as `## X {.hero}`). Chrome: `top.bar=primary` `title.rule=secondary` `kpi.stripe=secondary` `kpi.label.size=20` `kpi.note.color=teal` `bullet=■`
+  `bullet.color=teal` `lead.bold=on` `heading.align=center` `footer.color=muted` `steps-arrow.fill=a,b`
+  `rows-num.fill=a,b` `cover.bar=teal` `cover.band=none` `render.chart_grid=border`.
 - A ` ```css ` fence (header = whole deck, in a slide = that slide) styles `slide h1 h2 p li .lead
   .conclusion .footnote .box .kpi table th td tr code img .chart` and your `{.class}`: colours, gradients,
   borders, radius, shadows, fonts, spacing, `text-transform`, `transform: rotate()`.
