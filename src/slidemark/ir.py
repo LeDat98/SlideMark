@@ -150,6 +150,8 @@ class Run(Model):
     highlight: str | None = None
     link: str | None = None  # URL, or "#<slide-id>" / "#3" for an internal jump
     size: float | None = None  # pt of this run alone (None = the paragraph's); set by `kpi.unit.size`
+    # True = `[x]{size=28}`: the author pinned `size` exactly; no pass grows, shrinks or clamps it
+    exact: bool = False
 
 
 class Paragraph(Model):

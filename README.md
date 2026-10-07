@@ -88,7 +88,7 @@ Toàn bộ thiết kế mà agent python-pptx tự viết (64 quyết định) n
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-07 · commit `696f532` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-07 · commit `a28012e` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -321,6 +321,18 @@ Nguồn: [`examples/24-vocabulary-2.md`](examples/24-vocabulary-2.md)
 ![24-vocabulary-2 slide 7](docs/gallery/24-vocabulary-2/slide-07.png)
 ![24-vocabulary-2 slide 8](docs/gallery/24-vocabulary-2/slide-08.png)
 ![24-vocabulary-2 slide 9](docs/gallery/24-vocabulary-2/slide-09.png)
+
+### 25-roundtrip-forms
+
+Nguồn: [`examples/25-roundtrip-forms.md`](examples/25-roundtrip-forms.md)
+
+![25-roundtrip-forms slide 1](docs/gallery/25-roundtrip-forms/slide-01.png)
+![25-roundtrip-forms slide 2](docs/gallery/25-roundtrip-forms/slide-02.png)
+![25-roundtrip-forms slide 3](docs/gallery/25-roundtrip-forms/slide-03.png)
+![25-roundtrip-forms slide 4](docs/gallery/25-roundtrip-forms/slide-04.png)
+![25-roundtrip-forms slide 5](docs/gallery/25-roundtrip-forms/slide-05.png)
+![25-roundtrip-forms slide 6](docs/gallery/25-roundtrip-forms/slide-06.png)
+![25-roundtrip-forms slide 7](docs/gallery/25-roundtrip-forms/slide-07.png)
 <!-- gallery:end -->
 
 ## Tài liệu

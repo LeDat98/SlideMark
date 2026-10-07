@@ -194,6 +194,13 @@ NEEDS: dict[tuple[str, str], tuple[str, ...]] = {
 }
 
 
+STRIPE_KINDS = (
+    "box",
+    "item",
+    "kpi",
+)  # `{stripe=teal}`: the stripe on a card edge (not in ATTRS: a card look)
+
+
 def honoured(kind: str, attr: str) -> bool:
     return attr in HONOURED[kind].split()
 
@@ -334,6 +341,15 @@ def audit(slide: Slide, theme: Any, index: int = 0) -> list[tuple[Any, str, str,
                     out.append((el, kind, attr, None))
             else:
                 out.append((el, kind, attr, IGNORED[kind][attr]))
+        if "stripe" in getattr(el, "attrs", {}) and kind not in STRIPE_KINDS:
+            out.append(
+                (
+                    el,
+                    kind,
+                    "stripe",
+                    "stripe=<color> draws on a card edge: put it on a ## box, an item card or a KPI card",
+                )
+            )
     return out
 
 
@@ -426,7 +442,11 @@ class _Facts:
                 isinstance(e, Container) and "steps" in e.classes for e in s.elements
             )
 
-        return any("num" in s.classes and not steps(s) for s in self.deck.slides)
+        return any("num" in s.classes and not steps(s) for s in self.deck.slides) or self.any(
+            lambda e: (
+                isinstance(e, Container) and "num" in e.classes
+            )  # `## 01 {.num}`: the heading is the number
+        )
 
     def has_form(self, name: str) -> bool:
         """A slide with the composition form ``@name`` (``@timeline`` ...)."""
@@ -466,6 +486,11 @@ STYLE_NEEDS: list[tuple[re.Pattern[str], Callable[[_Facts], bool], str]] = [
         re.compile(r"^cover\.rule_(w|pos)$"),
         _Facts.cover_rule,
         "needs a rule to shorten: cover.rule=<color> (cover.rule_w / rule_pos place it)",
+    ),
+    (
+        re.compile(r"^cover\.bottom\."),
+        _Facts.cover,
+        "no cover slide: slide 1 with only a title (+ subtitle) or @cover",
     ),
     (
         re.compile(r"^cover\.band_h$"),

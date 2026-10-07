@@ -27,7 +27,7 @@ def split_unit(p: Paragraph, size: float, color: str | None = None) -> Paragraph
 def _split(p: Paragraph, size: float, color: str | None) -> Paragraph:
     plain = p.plain
     m = _TAIL.search(plain)
-    if m is None or not size or size <= 0:
+    if m is None or not size or size <= 0 or any(r.exact for r in p.runs):  # exact spans: the author's
         return p
     cut = m.start(1)  # characters before `cut` stay in the number's runs
     runs: list[Run] = []
@@ -59,6 +59,11 @@ def value_em(p: Paragraph, size: float, unit_pt: float | None = None) -> float:
     plain = p.plain
     if size <= 0:
         return measure.text_em(plain, bold=True)
+    if any(r.exact and r.size for r in p.runs):  # `[x]{size=28}` spans are fixed in pt, like the unit
+        return sum(
+            measure.text_em(r.text, bold=True) * (r.size / size if r.exact and r.size else 1.0)
+            for r in p.runs
+        )
     tail = [r for r in p.runs if r.size]
     if tail:
         unit_pt = unit_pt or tail[0].size

@@ -510,7 +510,11 @@ def test_panel_beside_chart_gets_spans_tiles_do_not(tmp_path):
     _filler(prs2, 1)
     _chart_slide(prs2, panel=False, tiles=True)
     _filler(prs2, 3)
-    assert "size=30" not in _slide_md(_import(prs2, tmp_path), 2)
+    tiles = _slide_md(_import(prs2, tmp_path), 2)
+    # tiles are no panel (no `@2:1` split, one card per tile); each tile heading states its own mixed sizes
+    # through the shared span writer (lane A), exactly once
+    assert not re.search(r"^@2:1", tiles, re.M) and tiles.count("## ") == 3, tiles
+    assert "[[" not in tiles and "]{size=20 color=#222B36} [9%]{size=30" in tiles, tiles
 
 
 def test_recognition_is_off_for_a_deck_with_its_own_design(tmp_path):

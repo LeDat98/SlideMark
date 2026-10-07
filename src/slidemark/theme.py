@@ -450,6 +450,9 @@ class LayoutTokens(BaseModel):
     num_badge_ratio: float = 1.9  # `@num` badge diameter / its digit size (the digit is the heading size x
     # `num_digit_ratio` unless `box.num.size` is set)
     num_digit_ratio: float = 1.0
+    num_text_ratio: float = (
+        1.7  # `@num=text` / `{.num}`: the number text / the heading size (unless `box.num.size`)
+    )
     steps_caption_ratio: float = 0.65  # the "STEP n" caption line is this x the body text size
     steps_stretch: bool = True  # the cards grow down to the conclusion bar / footnote (items spread inside)
     steps_stretch_min: float = 0.4  # hollow at full height: cards are tried shorter, down to this share ...
@@ -825,6 +828,15 @@ class Theme(Forms2Tokens):  # Forms2Tokens: the DL3b part 2 tokens (iconlist.*, 
     box_num_fill: str | None = None  # `@num`: the numbered badge on a box heading: fill (None = primary) ...
     box_num_color: str | None = None  # ... digit color (None = readable on the fill)
     box_num_size: float | None = None  # ... digit size in pt (None = the box heading size)
+    box_num_text: str = "{nn}"  # `@4 num=text`: the number text ("{n}" = 1, "{nn}" = 01, "第{n}章") ...
+    # (box_num_fill / box_num_color / box_num_size above: with `num=text` or `{.num}` the colour of the number
+    # text, a list cycles over the boxes; size in pt, None = `layout.num_text_ratio` x the heading size)
+    box_stripe: str | None = None  # a stripe on every `##` card: a color or a list `a,b,c` (cycled in order)
+    box_stripe_h: Length = "6pt"  # ... its thickness
+    box_stripe_side: str = "top"  # ... on the `top`, `left`, `right` or `bottom` edge
+    item_stripe: str | None = None  # the same for item cards (`@items`, `### x {.item}`)
+    item_stripe_h: Length = "6pt"
+    item_stripe_side: str = "left"
     rows_glyph: str | None = None  # `@rows plain`: the glyph before every bar text (None = `bullet=`)
     rows_glyph_color: str | None = None  # ... its color (None = `bullet.color`, else the text color)
     rows_stripe: str | None = None  # a left stripe on every `@rows` bar: a color or a list `a,b` (cycled)
@@ -877,6 +889,9 @@ class Theme(Forms2Tokens):  # Forms2Tokens: the DL3b part 2 tokens (iconlist.*, 
     table_num_pad: Length | None = None  # right inset of right-aligned (numeric) table cells
     kpi_stripe: str | None = None  # color of a stripe on the top edge of every `.kpi` card
     kpi_stripe_h: Length = "6pt"
+    kpi_stripe_side: str = (
+        "top"  # `top`, `left`, `right` or `bottom` (kpi.stripe may be a list `a,b,c`: cycled)
+    )
     kpi_rule: str | None = None  # color of a divider rule between the number and its caption in `.kpi` cards
     kpi_rule_h: Length = "1pt"
     kpi_rule_w: Length = "100%"  # ... its width (a share of the card's text width, or a length), centred
@@ -1757,12 +1772,23 @@ def _fill_value(path: str, raw: str, names: set[str] | None) -> list[tuple[str, 
     return [(path, _color_value(v, names, _HINT_FILL))]
 
 
+_COLOR_LISTS = {
+    "rows_stripe",
+    "box_stripe",
+    "item_stripe",
+    "kpi_stripe",
+    "box_num_fill",
+    "box_num_color",
+}  # one colour, or a list that cycles over the cards
+_SIDE_PATHS = {"box_stripe_side", "item_stripe_side", "kpi_stripe_side"}
 _DL2_PATHS = {
+    *_COLOR_LISTS,
+    *_SIDE_PATHS,
+    "box_num_text",
     "cover_bar",
     "cover_stripes",
     "cover_rule_pos",
     "title_rule2",
-    "rows_stripe",
     "box_items",
     "render.chevron_shape",
     *_VOCAB_LISTS,
@@ -1806,7 +1832,18 @@ def _dl2_value(path: str, raw: str, names: set[str] | None) -> list[tuple[str, A
         return [(path, v.lower())]
     if path == "title_rule2":
         return [(path, _opt_color(raw, names))]
-    if path == "rows_stripe" or path in _VOCAB_LISTS:  # one color, or a list that cycles
+    if path in _SIDE_PATHS:
+        key = path.replace("_", ".", 1).replace("_", ".")
+        if v.lower() not in ("top", "left", "right", "bottom"):
+            raise TokenValueError(f"{key} is top, left, right or bottom", f"write {key}=left (or top)")
+        return [(path, v.lower())]
+    if path == "box_num_text":
+        if "{n}" not in v and "{nn}" not in v:
+            raise TokenValueError(
+                "box.num.text needs {n} or {nn}", 'write box.num.text="{nn}" (01) or "{n}" (1)'
+            )
+        return [(path, v)]
+    if path in _COLOR_LISTS or path in _VOCAB_LISTS:  # one color, or a list that cycles
         if v.lower() in ("none", "null", "off"):
             return [(path, None)]
         items = [p.strip() for p in v.split(",") if p.strip()]

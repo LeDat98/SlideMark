@@ -1,10 +1,13 @@
 colors: primary=#142B4D secondary=#1F5FA8 muted=#59626E
 fonts: body="Yu Gothic" heading="Yu Gothic"
 style: table_header_fill=#142B4D table_header_color=#FFFFFF radius=0
+style: cover.band=none cover.pad=0.44in cover.band_h=61% cover.rule=#E09F1F cover.rule_h=0.06in cover.bar=#2A9D8F cover.bar_w=0.12in top.bar=#142B4D top.bar_h=0.12in title.height=0.65in title.rule=#1F5FA8 title.rule_h=0.03in render.chevron_shape=pentagon
 lang: ja
 footer: 青葉フーズ株式会社
+num: on
 
 # 2027年度 事業計画
+@bg=primary dark
 青葉フーズ株式会社 経営企画部 2027年3月
 
 # 2027年度の経営目標
@@ -25,37 +28,35 @@ footer: 青葉フーズ株式会社
 **9.0%**
 
 **+0.8pt**
-^ 2
 
 # 売上高と営業利益の推移（億円）
 > **5年間で売上高は1.25倍に**
-```column {labels=on fmt=#,##0}
+```column {labels=on fmt=#,##0 colors=secondary,#E09F1F size=14 gap=80}
 ,2023,2024,2025,2026,2027計画
 売上高,1020,1085,1130,1185,1280
 営業利益,61,70,78,86,96
 ```
-^ 3
 
 # 4つの重点戦略
+@4
 ## 既存事業の収益改善
-■ 主力3ブランドの価格改定
+[■]{size=18 color=#2A9D8F} [主力3ブランドの価格改定]{size=22}
 
-■ 不採算SKUを15%削減
+[■]{size=18 color=#2A9D8F} [不採算SKUを15%削減]{size=22}
 ## 海外展開の加速
-■ タイ工場の増設
+[■]{size=18 color=#2A9D8F} [タイ工場の増設]{size=22}
 
-■ 北米で冷凍食品を発売
+[■]{size=18 color=#2A9D8F} [北米で冷凍食品を発売]{size=22}
 ## DXの推進
-■ 需要予測のAI化
+[■]{size=18 color=#2A9D8F} [需要予測のAI化]{size=22}
 
-■ 受発注の完全電子化
+[■]{size=18 color=#2A9D8F} [受発注の完全電子化]{size=22}
 ## 人的資本への投資
-■ 賃上げ率4.5%
+[■]{size=18 color=#2A9D8F} [賃上げ率4.5%]{size=22}
 
-■ デジタル人材を50名採用
+[■]{size=18 color=#2A9D8F} [デジタル人材を50名採用]{size=22}
 @end
 &#8251; 各戦略のKPIは個別資料を参照
-^ 4
 
 # 年間スケジュール
 @4x3
@@ -75,39 +76,33 @@ footer: 青葉フーズ株式会社
 **STEP 3**
 {}
 **STEP 4**
-^ 5
 ??? 価格改定は主要取引先への説明を3月中に終えます。
 
 # 事業別の売上計画（億円）
-{align=llll rowh=0.8in widths=3:2:2:2}
+style: table.zebra.fill=#EEF2F7
+{.zebra align=llll size=20 rowh=0.8in widths=3:2:2:2}
 | 事業 | 2026実績 | 2027計画 | 前年比 |
 |-|-|-|-|
 | **冷凍食品** | 420 | 465 | +11% |
 | **調味料** | 310 | 325 | +5% |
 | **飲料** | 255 | 270 | +6% |
 | **海外** | 200 | 220 | +10% |
-^ 6
 > 冷凍食品と海外が成長をけん引
 
 # 2027年度 売上構成（%）
-```pie {legend=right labels=on fmt='0"%"'}
+```pie {legend=right labels=on fmt='0"%"' colors=secondary,#E09F1F,#2A9D8F,#8A5AA8 size=22}
 ,冷凍食品,調味料,飲料,海外
 構成比,36,25,21,18
 ```
-^ 7
 
 # 価格改定の方針
 > **原材料高を価格に反映し、販売数量を維持する**
-@1
-## 1
-主力3ブランドを平均6%改定
-## 2
-改定は2027年5月出荷分から
-## 3
-容量変更は行わない
-## 4
-販促費を前年比10%削減
-^ 8
+style: rows-num.fill=#142B4D,#1F5FA8,#142B4D,#1F5FA8 rows.fill=#EEF2F7 rows.size=26
+@rows
+1. 主力3ブランドを平均6%改定
+1. 改定は2027年5月出荷分から
+1. 容量変更は行わない
+1. 販促費を前年比10%削減
 
 # 冷凍食品事業の目標
 ## 売上高
@@ -122,41 +117,38 @@ footer: 青葉フーズ株式会社
 **88%**
 
 **+5pt**
-^ 9
 
 # 海外展開の重点地域
 ## タイ
-■ 工場の生産能力を1.5倍に
+[■]{size=20 color=#2A9D8F} [工場の生産能力を1.5倍に]{size=24}
 
-■ ASEAN向け輸出拠点
+[■]{size=20 color=#2A9D8F} [ASEAN向け輸出拠点]{size=24}
 ## 北米
-■ 冷凍餃子を発売
+[■]{size=20 color=#2A9D8F} [冷凍餃子を発売]{size=24}
 
-■ 大手スーパー3社で展開
+[■]{size=20 color=#2A9D8F} [大手スーパー3社で展開]{size=24}
 ## 台湾
-■ 調味料の現地生産
+[■]{size=20 color=#2A9D8F} [調味料の現地生産]{size=24}
 
-■ コンビニ向けPB
-^ 10
+[■]{size=20 color=#2A9D8F} [コンビニ向けPB]{size=24}
 
 # 海外売上高の推移（億円）
-```line {labels=on fmt=#,##0}
+```line {labels=on fmt=#,##0 colors=secondary,#E09F1F,#2A9D8F size=14}
 ,2024,2025,2026,2027計画
 タイ,70,82,95,105
 北米,20,30,45,60
 台湾,40,50,60,55
 ```
-^ 11
 
 # DX施策の一覧
-{rowh=1.05in widths=3:2:2:2}
+style: table.zebra.fill=#EEF2F7
+{.zebra size=20 rowh=1.05in}
 | 施策 | 対象 | 効果 | 時期 |
 |-|-|-|-|
 | **需要予測AI** | 全工場 | 在庫 -15% | 2027年6月 |
 | **受発注の電子化** | 主要取引先 | 工数 -30% | 2027年9月 |
 | **設備の予知保全** | 3工場 | 停止時間 -20% | 2027年12月 |
 | **経費精算の自動化** | 全社 | 処理時間 -50% | 2027年4月 |
-^ 12
 
 # DX推進のロードマップ
 @4x3
@@ -176,7 +168,6 @@ footer: 青葉フーズ株式会社
 **STEP 3**
 {}
 **STEP 4**
-^ 13
 
 # 人的資本の目標
 ## 賃上げ率
@@ -195,13 +186,11 @@ footer: 青葉フーズ株式会社
 **3.8**
 
 **+0.2**
-^ 14
 
 # 設備投資の配分（億円）
 > **設備投資は総額100億円**
-```bar {labels=on fmt=#,##0 axis=on}
+```bar {labels=on fmt=#,##0 axis=on colors=secondary size=14}
 ,タイ工場,国内工場更新,DX,研究開発
 投資額,45,30,15,10
 ```
-^ 15
 ??? タイ工場は2028年4月の稼働を予定しています。

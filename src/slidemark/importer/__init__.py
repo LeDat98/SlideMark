@@ -12,7 +12,7 @@ from pathlib import Path
 from ..ir import Diagnostic
 from ..render.design_part import read_design_part
 from ..theme import DEFAULT, JP_BUSINESS, MIDNIGHT, Theme
-from . import recognise2
+from . import emit, recognise2
 from .design import (
     claim_fences,
     css_fence,
@@ -269,6 +269,7 @@ def _import_with(
     )
     if deck.foreign:
         deck.ink = recognise2.deck_ink(datas, colors.get("bg", "FFFFFF"), H)
+    emit.set_palette(colors)
     rules = design_rules(design)
     deck.implied = {r: implied_style(rules, r, colors) for r in ("lead", "conclusion", "footnote")}
     deck.css_heading = heading_sized(rules)

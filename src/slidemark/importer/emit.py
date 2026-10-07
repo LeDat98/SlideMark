@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import replace
 
+from . import runs as spans
 from .read import CellT, ChartT, ParaT, RunT
 from .runs import span_has, wrap_span
 
@@ -37,16 +38,45 @@ def esc_line_start(line: str) -> str:
     return "\\" + line
 
 
-def _fmt_key(r: RunT) -> tuple:
-    return (r.bold, r.italic, r.strike, r.sup, r.sub, r.code, r.color, r.badge, r.link, r.span)
+_NAMES: dict[str, str] = {}  # RRGGBB -> deck colour name, for the colours a span writes (`set_palette`)
+_FG: str | None = None  # the deck text colour: a span never writes it
 
 
-def _merge(runs: list[RunT]) -> list[RunT]:
+def set_palette(colors: dict[str, str]) -> None:
+    """The deck's named colours (name -> RRGGBB), set once per import: spans write ``color=primary``."""
+    global _FG
+    first = ("primary", "secondary", "accent", "muted", "success", "danger")
+    names: dict[str, str] = {}
+    for name in [*first, *(k for k in colors if k not in first and k not in ("fg", "bg"))]:
+        if name in colors:
+            names.setdefault(colors[name].lstrip("#").upper(), name)
+    _NAMES.clear()
+    _NAMES.update(names)
+    _FG = colors["fg"].lstrip("#").upper() if colors.get("fg") else None
+
+
+def _fmt_key(r: RunT, pin: bool = False) -> tuple:
+    return (
+        r.bold,
+        r.italic,
+        r.strike,
+        r.sup,
+        r.sub,
+        r.code,
+        r.color,
+        r.badge,
+        r.link,
+        r.span,
+        r.size if pin else None,
+    )
+
+
+def _merge(runs: list[RunT], pin: bool = False) -> list[RunT]:
     out: list[RunT] = []
     for r in runs:
         if r.text == "\n" or (out and out[-1].text == "\n"):
             out.append(r)
-        elif out and _fmt_key(out[-1]) == _fmt_key(r):
+        elif out and _fmt_key(out[-1], pin) == _fmt_key(r, pin):
             out[-1] = RunT(**{**out[-1].__dict__, "text": out[-1].text + r.text})
         else:
             out.append(RunT(**r.__dict__))
@@ -65,28 +95,48 @@ def inline(
     plain_bold: bool = False,
     cell: bool = False,
     implied=None,
+    names: dict[str, str] | None = None,
+    fg: str | None = None,
+    spans_on: bool = True,
+    pin: bool | None = None,
+    tint: bool | None = None,
 ) -> str:
     """Runs -> inline Markdown. ``plain_bold`` drops bold that the theme adds anyway (titles, headings).
 
     ``implied`` (a Style: color, bold, italic) is what a css rule already gives this text: no markup for it.
+    A paragraph whose runs differ in size or colour is written with spans (``importer/runs.py``): ``names``
+    maps ``RRGGBB`` to colour names, ``fg`` is the deck text colour (not written).
     """
     imp_color = getattr(implied, "color", None)
     imp_bold = bool(getattr(implied, "bold", None))
     imp_italic = bool(getattr(implied, "italic", None))
-    shades = (accent or "").split("|")
-    runs = [  # a colour the markup cannot say must not split a run (`**a****b**`)
+    accents = (accent or "").split("|")
+    # a recogniser that set spans on this paragraph owns them (`runs.put_span`): no automatic ones on top
+    auto = spans_on and not any(r.span for r in runs)
+    pin = auto and (
+        spans.mixed_sizes(runs) if pin is None else pin
+    )  # (a KPI value keeps its unit run: `kpi.unit.size` says it)
+    tint = auto and (spans.mixed_colors(runs) if tint is None else tint)
+    runs = [  # a colour the markup cannot say must not split a run (`**a****b**`); a span can say it
         replace(r, color=None)
         if r.color
+        and not tint
         and not r.span
         and r.color != imp_color
-        and r.color not in shades
+        and r.color not in accents
         and (classes or {}).get(r.color) not in ("success", "danger")
         else r
         for r in runs
     ]
     parts: list[str] = []
     all_bold = bool(runs) and all(r.bold for r in runs if r.text.strip())
-    for r in _merge(runs):
+    shade_names = dict(
+        names if names is not None else _NAMES
+    )  # every legible shade of the accent is `accent`
+    for shade in accents:
+        if shade.strip():
+            shade_names.setdefault(shade.strip().lstrip("#").upper(), "accent")
+    for r in _merge(runs, pin):
         if r.text == "\n":
             parts.append("<br>" if cell else "\\\n")
             continue
@@ -112,7 +162,20 @@ def inline(
                 body = f"~{body}~"
             if r.strike:
                 body = f"~~{body}~~"
-            if r.italic and not imp_italic:
+            if (pin or tint) and not (imp_color and r.color == imp_color):
+                if pin or not (
+                    (accent and r.color in accent.split("|"))
+                    or (classes or {}).get(r.color or "") in ("success", "danger")
+                ):  # the paragraph mixes sizes / colours: the run states its own (runs.py, one writer)
+                    r = spans.with_span(
+                        r,
+                        pin=pin,
+                        tint=tint,
+                        names=shade_names,
+                        fg=fg or imp_color or _FG,
+                        bold=r.bold and not imp_bold and not (plain_bold and all_bold),
+                    )
+            if r.italic and not imp_italic and not span_has(r, "italic"):
                 body = f"*{body}*"
             if (
                 r.bold
@@ -130,7 +193,7 @@ def inline(
                 body = f"=={body}=="
             elif r.color and not r.badge and (cname := (classes or {}).get(r.color)) in ("success", "danger"):
                 body = f"[{body}]{{.{cname}}}"
-            body = wrap_span(body, r)  # runs.py: one `[text]{size=26 color=#E08A1E}` for both recognisers
+            body = wrap_span(body, r)  # runs.py: the only place that writes `[text]{size=26 color=#E08A1E}`
         if r.badge:
             cls = _badge_class(r.badge, classes or {})
             body = f"[{body}]{{.badge{(' .' + cls) if cls else ''}}}"
@@ -143,13 +206,27 @@ def inline(
 # --------------------------------------------------------------------------- text blocks
 
 
-def text_lines(paras: list[ParaT], *, accent=None, classes=None, plain_bold=False) -> list[str]:
+def text_lines(
+    paras: list[ParaT], *, accent=None, classes=None, plain_bold=False, block_spans: bool = False
+) -> list[str]:
     """Paragraphs -> Markdown lines (lists with two-space nesting, blank lines where Markdown needs them)."""
     out: list[str] = []
     stack: list[str] = []  # marker per level of the current list
     prev_list = False
+    # `block_spans` (the body of a box): lines of different sizes each state their size, lines of different
+    # colours say all but the dominant one (a price over a note on a dark panel)
+    block_pin = (spans.mixed_block(paras) or None) if block_spans else None
+    block_tint, block_fg = spans.block_colors(paras, _FG) if block_spans else (None, None)
     for p in paras:
-        body = inline(p.runs, accent=accent, classes=classes, plain_bold=plain_bold)
+        body = inline(
+            p.runs,
+            accent=accent,
+            classes=classes,
+            plain_bold=plain_bold,
+            pin=block_pin,
+            tint=block_tint,
+            fg=block_fg,
+        )
         if not body:
             continue
         if p.marker:

@@ -91,7 +91,7 @@ style: top.bar=primary top.bar_h=0.12in title.rule=secondary kpi.stripe=secondar
 | `title.rule=<color>` `title.rule_h=2pt` | a rule on the bottom edge of the slide title |
 | `title.rule2=<color>` `title.rule2_w=1.6in` | a second, short segment of the title rule's height on its left end (an accent over the rule) |
 | `heading.rule=<color>` `heading.rule_h=2pt` | a rule under every `##` box heading (on the lower edge of the band with `heading.band`); not on `###`, KPI cards or item cards |
-| `kpi.stripe=<color>` `kpi.stripe_h=6pt` | a stripe on the top edge of every `.kpi` card (a tall stripe is a header band: a label on it is judged against the stripe colour) |
+| `kpi.stripe=<color>` `kpi.stripe_h=6pt` `kpi.stripe.side=top` | a stripe on the top edge of every `.kpi` card (a tall stripe is a header band: a label on it is judged against the stripe colour); a list `kpi.stripe=a,b,c` cycles over the cards in order, `kpi.stripe.side=left\|right\|bottom` moves it, `{stripe=teal}` on one card wins ("Card stripes" below) |
 | `kpi.rule=<color>` `kpi.rule_h=1pt` `kpi.rule_w=100%` | a divider rule between the number and its caption in every `.kpi` card (off by default). The caption becomes its own text box under the rule; `layout.kpi_rule_gap_em` is the air around it |
 | `kpi.band=<color>` `kpi.band.color=<c>` `kpi.band.size=20` | a header band on every `.kpi` card, flush on its top edge, holding the label in the band's ink (white, or what reads on the fill; like `heading.band` on boxes); `kpi.band.size` also pins the label size; an `icon=` sits under the band; `layout.kpi_band_pad` is the air around the label |
 | `kpi.unit.size=22` `kpi.unit.color=<c>` | the unit of a KPI value (the trailing non-digit run of the value line: `億円` in `1,280億円`, `名`, `%`) in its own size, smaller than the digits (never larger than the number); a value without digits or without a tail is left alone; per slide: `style: kpi.unit.size=32` inside the slide |
@@ -135,6 +135,7 @@ A declared color name beats the CSS color of the same name (`colors: teal=#2A9D8
   (title to subtitle), `cover.rule=accent` + `cover.rule_h=0.06in` (rule on the band edge, `none` = off),
   `cover.footer=off` (the deck `footer:` shows on the cover as a bottom caption), `cover.bar=teal` + `cover.bar_w=0.12in` (a vertical bar left of the title block), `cover.band=none` (no band although `title.band` is set, so a slide `bg=` shows; the rule is full width over a `bg=`). `cover.top_bar=<color>` / `cover.bottom_bar=<color>` (+ `cover.top_bar_h` / `cover.bottom_bar_h`, default 0.1in) draw a full-width strip on the cover's top / bottom edge (`top.bar` / `bottom.bar` skip the cover). `{size=}` or CSS (other than `color`) on the cover keeps the old look. A full-bleed cover with a rule and a bar: `style: cover.band_h=61% cover.rule=accent cover.bar=teal cover.band=none` + `@cover bg=primary dark`.
   More decoration, all inside the composed cover (`cover.band_h` above 0), all working over a slide `bg=` and `dark`: `cover.bar=accent@edge` (the bar sits on the slide's left edge over the full height, width `cover.bar_w`), `cover.rule_w=6in` (the rule is short and sits at the title, left aligned: `cover.rule_pos=above` over the title, `below` (default) between title and subtitle) and `cover.stripes=#1C3A68@8.9in,secondary@10.2in` (vertical stripes, each from its x to the right edge, drawn behind the text; the title keeps left of the first). `cover.rule_w` shortens the `cover.rule=<color>` you set. Decor shapes are named `rule` and the importer skips them.
+  A band on the cover's bottom edge: `cover.bottom.bar=<color>` + `cover.bottom.bar_h=0.3in` (works on any cover; the deck `footer:` caption sits above it, `cover.footer=off` hides it). Slide 1 of a navy cover with an amber bar and a blue foot: `style: cover.band_h=70% cover.band=none cover.bar=accent cover.bottom.bar=secondary` + `@cover bg=primary dark`.
 - **Dark slides pick their own ink.** A slide `bg=` (color, token name or `linear-gradient(...)`, every stop
   judged) that gives the theme `fg` less than 4.5:1 turns the text on the slide (title, lead, subtitle, footnote,
   loose paragraphs) to `render.ink_light` or `render.ink_dark`, whichever contrasts more; lead, subtitle and
@@ -297,6 +298,39 @@ style: heading.band=primary heading.rule=accent heading.rule_h=0.06in item.borde
 - 不採算SKUを15%削減
 ```
 
+**Card stripes.** A stripe on one edge of every card, in a colour per card: `style: box.stripe=primary,secondary,accent` (a list is applied in reading order and cycles, like `steps-arrow.fill=a,b`), `box.stripe_h=6pt` (thickness), `box.stripe.side=top|left|right|bottom` (default `top`). The same three tokens exist for item cards (`item.stripe` `item.stripe_h` `item.stripe.side`, side default `left`), KPI cards (`kpi.stripe` `kpi.stripe_h` `kpi.stripe.side`) and `@rows` bars (`rows.stripe=a,b`, always on the left, width `layout.rows_stripe_w`). `## 現状 {stripe=teal}` colours that one card and still takes its place in the cycle. A stripe is drawn from the final card rectangle (a card a pass stretched keeps it), named `Stripe` (a KPI stripe `rule`), and the importer drops the shape and keeps the tokens. Only cards with a fill or border get one (`{.plain}` boxes do not).
+
+```markdown
+style: box.stripe=primary,secondary,accent box.stripe.side=left
+@3
+## 現状 {stripe=danger}
+- 手作業が多い
+## 課題
+- 解約率が上昇
+```
+
+**Number as heading text.** `@4 num=text` writes `01` `02` ... as big coloured text above every `##` heading instead of a badge (`@4 num` = the circle, `num=badge` is the same word); `## 01 {.num}` / `## 2.1兆円 {.num}` draws the heading text itself as the number. Look: `style: box.num.size=36 box.num.color=primary,secondary,accent box.num.text="{nn}"` (`{nn}` = 01, `{n}` = 1, `"第{n}章"`; size defaults to `layout.num_text_ratio` 1.7 x the heading size; the colour list cycles over the boxes, default = the card's own stripe colour, else `primary`; `box.num.fill` / `box.num.color` also cycle the badges of `@num`). Shapes: the heading is named `Number text` / `Number heading`, the importer folds both back.
+
+```markdown
+style: box.stripe=primary,secondary,accent box.num.size=34
+@3 num=text
+## 3年で売上を2倍
+営業利益率を 20% へ
+```
+
+**Number tiles.** `@kpi tile` (or `## 2.1兆円 {.kpi .tile}` on one card) makes a card whose heading is the number and whose body is the description: the heading becomes the value line (in the card's stripe colour), the body the caption, text left-aligned unless `{align=center}`. With `kpi.stripe=teal,teal,accent,muted kpi.stripe.side=left` this is the "four number tiles" slide. The text shape is named `Tile` and the importer folds the card back to `{.kpi .tile}`.
+
+```markdown
+style: kpi.stripe=primary,secondary,accent,muted kpi.stripe.side=left kpi.stripe_h=0.08in
+@2x2 kpi tile
+## 2.1兆円
+国内の中小企業向けSaaS市場は2029年に2.1兆円へ
+## 38%
+クラウド会計の導入率
+```
+
+**Dark panel.** A box with its own `fill` picks a readable ink for its heading and text (no `color=` needed), so a statement panel beside a list is one box: `@1:2` then `## スタンダードプラン {fill=primary valign=middle}` with `[9,800円]{size=32 bold=true}` / `▼` / `[10,800円]{size=32 bold=true color=accent}` lines (spans of different sizes, "Inline text").
+
 ## Composition forms
 
 One `@word` line turns the blocks under it into a diagram, with secondary keys on the same line. Every form takes
@@ -445,6 +479,8 @@ Keys:
 | Image | `fit=contain` (default), `cover`, `stretch`; `size=60` is the share of its cell the picture fills (5-100), `pad` insets it, `align` / `valign` anchor it in the cell, `fill` shows behind a transparent picture |
 | Classes | theme colors (`.primary`, `.accent`, `.danger`, `.success`, `.muted`), `.plain` (box without card), `.kpi` (big number box) |
 
+`stripe=teal` (outside the table: it is a card look, see "Card stripes") colours the stripe on one `##` box, item card or KPI card; any other kind reports `attr-ignored`.
+
 Every element kind takes the whole set (title, cover, box, item card, KPI card, step, chevron, text, callout, image,
 table, chart, code, `@rows` list), and a pinned `x y w h` is never grown, shrunk or moved by a layout pass
 (`Placed.pin`, `engine._restore_pins`): the explicit wins. Where a key means something specific the kind says so
@@ -573,6 +609,14 @@ to slide 5. Additions:
 
 - `==text==` emphasizes in the theme accent color (for the key number).
 - `[text]{.danger}` colors text.
+- **Mixed sizes and colours in one line.** A span takes `size=` (pt, **exact**: no pass grows, shrinks or clamps it),
+  `bold=` `italic=` and `color=` (a colour name or `#RRGGBB`; `.muted` / `.primary` ... are the class form):
+  `[売上高]{size=14 bold=true} [420億円]{size=28 bold=true color=primary} [（2026年度 210億円）]{size=12 .muted}`.
+  It works in paragraphs, list items (`@rows` bars too), table cells (`<br>` is a line break in a cell), `##` box
+  headings and KPI value lines. A line is as tall as its largest pinned span, and a text with a
+  pinned span is not grown by the sparse-slide passes (the unpinned rest still follows autofit shrinking).
+  A bad `size=` (not a number, outside 1-400) is ignored. The importer writes spans back for a paragraph whose runs
+  differ in size or colour (`importer/runs.py`).
 - `H~2~O` is subscript and `x^2^` is superscript.
 
 Lists use `-` and `1.`, nested with two spaces.
@@ -605,6 +649,8 @@ to merge it into the cell above.
 | 売上 | 10 | 12 |
 | 合計 | 22 | < |
 ```
+
+A cell may hold `<br>` (a line break inside the cell, no warning) and spans of different sizes (`[月額]{size=10 .muted}<br>[9,800円]{size=20 bold=true color=primary}`: a small label over a big value).
 
 A ` ```table ` fence takes CSV instead. Its first row is the header.
 

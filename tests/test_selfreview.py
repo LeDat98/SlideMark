@@ -211,11 +211,14 @@ def test_loop_swaps_a_failing_declared_color():
     assert res.text.count("\n") == src.count("\n")  # no other line changed
 
 
-def test_loop_gives_light_ink_on_a_dark_declared_fill():
+def test_a_dark_declared_fill_needs_no_ink_fix_any_more():
+    # the layout derives a readable ink (heading and text) from the box's own fill (DL3d), so the loop has
+    # nothing to repair; it used to add `color=#FFFFFF` to the box
     src = "# T\n> m\n## A {fill=#111111}\n- default text color\n- b\n## B\n- ok\n## C\n- ok\n> concl\n"
+    assert "contrast" not in rules(src)
     res = self_review(src)
-    assert any(f.rule == "contrast-color" for f in res.fixed)
-    assert "color=#FFFFFF" in res.text
+    assert not any(f.rule == "contrast-color" for f in res.fixed)
+    assert "color=#FFFFFF" not in res.text
 
 
 def test_loop_never_touches_an_undeclared_color():

@@ -232,6 +232,8 @@ def fill_text(
         para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
         pst = style.merged(p.style)
         size = (pst.font_size or 18) * scale
+        if measure.has_exact(p):  # `[x]{size=28}` spans: the line is as tall as the biggest of them
+            size = measure.exact_ref(p, size)
         para.alignment = _ALIGN.get(pst.align or "left", PP_ALIGN.LEFT)
         if pst.line_spacing:
             para.line_spacing = pst.line_spacing
@@ -240,7 +242,7 @@ def fill_text(
         _set_bullet(para, p, size, rc)
         sq = 0.0
         cuts: dict[int, list[int]] = {}
-        if box_w is not None and not field:
+        if box_w is not None and not field and not measure.has_exact(p):  # exact spans: no uniform-size model
             wpt = (box_w - pl - pr - (measure.list_indent(size, p.level)[0] if p.marker else 0)) / EMU_PER_PT
             sq = measure.paragraph_squeeze(p, pst, wpt, size) if squeeze else 0.0
             if plan := jbreak.plan_breaks(p, pst, wpt, size, sq):
@@ -249,7 +251,7 @@ def fill_text(
         prev = ""
         prev_r = None
         bound = [r.text for r in p.runs] if field else measure.bound_texts(p.runs)
-        if box_w is not None and not field:  # a binding never forces a mid-word break
+        if box_w is not None and not field and not measure.has_exact(p):  # a binding never forces a break
             bound = measure.loosen_wide_bindings([r.text for r in p.runs], bound, wpt, size, pst.font)
         for ri, (run, run_text) in enumerate(zip(p.runs, bound, strict=True)):
             segs = run_text.replace("\r", "").replace("\v", "\n").split("\n")
@@ -278,8 +280,12 @@ def fill_text(
                     r = para.add_run()
                     r.text = f"{pad}{_join_ranges(seg[a:b])}{pad}"
                     rsize = (
-                        min(run.size * scale, size) if run.size else size
-                    )  # `kpi.unit.size`: never above the number
+                        run.size  # `[x]{size=28}`: exact, whatever the layout grew or shrank
+                        if run.exact and run.size
+                        else min(run.size * scale, size)  # `kpi.unit.size`: never above the number
+                        if run.size
+                        else size
+                    )
                     _format_run(rc, r, run, pst, rsize, seg[a:b], scale, sq, mono)
                 prev = seg
                 prev_r = None if run.highlight else r  # a badge carries its own padding
