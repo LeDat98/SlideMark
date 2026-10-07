@@ -33,7 +33,7 @@ from ..ir import (
 from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
-from . import cardlook, css, forms2, kpirow, measure, stepspin, vocab
+from . import boxpin, cardlook, css, forms2, kpirow, measure, stepspin, vocab
 from .chartnote import expand_notes, scale_warning
 from .diagram import fill_tree
 from .gantt import expand_gantt
@@ -5181,7 +5181,11 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         final_ctx.out = _restore_pins(
             final_ctx.out
         )  # the explicit wins: no pass moved what the author pinned
-        final_ctx.out = stepspin.pin_steps(final_ctx.out, theme)  # `steps-arrow.h` `steps-card.h` `steps.gap`
+        final_ctx.out = stepspin.pin_steps(
+            final_ctx.out, theme, fit_body.y if fit_body is not None else None
+        )  # `steps-arrow.h` `steps-card.h` `steps.gap` `steps-arrow.point`
+        if boxpin.wanted(theme) and kind == "content":  # `box.h` `box.anchor`: exact cards, row at an edge
+            final_ctx.out = boxpin.pin_boxes(final_ctx.out, theme, fit_body or body)
         if (
             theme.steps_card_h
         ):  # a pinned card row is a block: the conclusion bar follows it, one gutter below

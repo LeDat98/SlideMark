@@ -556,6 +556,11 @@ STYLE_NEEDS: list[tuple[re.Pattern[str], Callable[[_Facts], bool], str]] = [
         )
         for name in forms.FORMS
     ),
+    (
+        re.compile(r"^box\.(h|anchor)$"),
+        _Facts.boxes,
+        "no ## box in the deck: box.h and box.anchor size and place `##` box cards (KPI cards: kpi.h)",
+    ),
     (re.compile(r"^(heading\.|card\.|box\.)"), _Facts.boxes, "no ## box in the deck"),
     (re.compile(r"^(footer|num)\."), _Facts.footer, "no footer: set `footer:` or `num: on`"),
     (re.compile(r"^lead\."), _Facts.lead, "no `>` lead line under a title"),

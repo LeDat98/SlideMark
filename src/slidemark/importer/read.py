@@ -113,6 +113,7 @@ class Item:
     heatmap: str = (
         ""  # table: `lo;hi;colors;text` of an `@heatmap` (the renderer appends it to the shape name)
     )
+    adj: float | None = None  # first ``a:avLst`` guide of the preset geometry / 100000 (chevron point depth)
     rec: str = ""  # set by recognise.py: the form this foreign shape was read as (kpi, numcard, quote, ...)
     rec_attrs: str = ""  # attributes recognise.py adds to the `##` line of the box this item is
 
@@ -812,6 +813,17 @@ def _new(ctx: ReadCtx, kind: str, box, sid: int = 0, **kw) -> Item:
     return Item(kind=kind, x=box[0], y=box[1], w=box[2], h=box[3], uid=ctx.next_uid, sid=sid, **kw)
 
 
+def _adj(geom) -> float | None:
+    """The first ``adj`` guide of a preset geometry as a share (``val 50000`` = 0.5); None when absent."""
+    if geom is None:
+        return None
+    for gd in geom.iter(qn("a:gd")):
+        m = (gd.get("fmla") or "").split()
+        if gd.get("name") in ("adj", "adj1") and len(m) == 2 and m[0] == "val" and m[1].lstrip("-").isdigit():
+            return int(m[1]) / 100000
+    return None
+
+
 def _radius(geom, box) -> float | None:
     """Corner radius (pt) from the ``adj`` guide of a ``roundRect``; None when the guide is absent."""
     for gd in geom.iter(qn("a:gd")):
@@ -990,6 +1002,7 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
             line_color=line_color,
             prst=prst,
             radius=radius,
+            adj=_adj(geom) if prst in ("chevron", "homePlate", "pentagon") else None,
             paras=paras,
             has_slidenum=num,
             rot=_rot_of(el),

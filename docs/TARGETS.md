@@ -103,6 +103,9 @@ Levels are cumulative; cost gates AC7–AC9 below apply to every DL from DL2 on.
       `slidemark import` shortens a foreign deck, `--no-slim` keeps the raw text. Next lever: glyph-bullet lines
       (`[■]{size=18 color=#2A9D8F} [text]{size=22}` is 24% of t2) as a `bullet=` list, and `box.stripe` instead
       of `sN.border-top` classes (about -75 tokens on t4): both are recognition changes.
+      Part 2 lane I (2026-10-07, geometry leftovers): `box.h` + `box.anchor`, deck `margin=` / `layout.top_gap=` from the
+      content, `steps-arrow.point`, plain-table `rowh=` after `widths=`; round trip t4 23.2 -> 17.3, t2 19.0 -> 13.4 (lane
+      E / F state before it); still open: header band height, lead / card text offsets, shadows (LibreOffice artifact).
 - [ ] DL4 `shape=` on any box / step / row names any of the ≥ 150 PowerPoint preset shapes; connectors with
       arrowheads, dash and curve; freeform paths from inline SVG as native geometry; images with crop, radius, mask and
       opacity; text outline / shadow / glow; per-shape gradient, pattern and line dash. Gate: a shape-gallery example

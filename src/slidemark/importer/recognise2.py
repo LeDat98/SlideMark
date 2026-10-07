@@ -61,6 +61,17 @@ class Thresholds:
     panel_dy: float = 0.5  # a panel overlaps its chart on this share of the card height
     panel_h: float = 0.7  # ... and is at least this share of the chart height (smaller cards are tiles)
     gap_tol: int = 2  # a chart gap within this of the build default is not stated
+    margin_tol: float = 0.015  # side margins within this many inches are one margin
+    margin_min: float = 0.2  # a margin is between these (inches) ...
+    margin_max: float = 1.2
+    margin_diff: float = 0.03  # ... and is stated when it differs from the theme's by more than this (inches)
+    margin_share: float = 0.5  # the margin must show on this share of the slides, on both sides
+    top_diff: float = 0.04  # a body top (inches) within this of the build default is not stated
+    top_share: float = 0.5  # the commonest body top must hold on this share of the slides that have one
+    top_slides: int = 3  # ... and at least this many
+    lead_h: float = 0.65  # a text this high (inches) right under the title is a lead line, not the body
+    point_default: float = 0.3  # the build's point depth (layout.chevron_adj): a deck at this states nothing
+    point_share: float = 0.6  # a point depth is a deck token when this share of the arrows has it
 
 
 T = Thresholds()
@@ -355,6 +366,7 @@ def deck_tokens(datas: list[SlideData], deck) -> dict[str, str]:
                     out["title.rule2"] = "#" + short[0].fill.upper()
                     out["title.rule2_w"] = _length(short[0].w)
                     out.setdefault("title.rule_h", _length(short[0].h))
+        out.update(_page_geometry(body, deck, out, bool(bands) if body else False))
         shapes = {
             it.prst
             for sd in datas
@@ -363,9 +375,133 @@ def deck_tokens(datas: list[SlideData], deck) -> dict[str, str]:
         }
         if shapes and shapes <= {"homePlate", "pentagon"}:
             out["render.chevron_shape"] = "pentagon"
+        if point := _deck_point(datas):
+            out["steps-arrow.point"] = point
+            deck.arrow_point = float(point)
     except Exception:
         return {}
     return out
+
+
+def _arrow_adj(it: Item) -> float:
+    """Point depth of a chevron / pentagon as a share of its shorter side (the preset default is 0.5)."""
+    return 0.5 if it.adj is None else it.adj
+
+
+def _deck_point(datas: list[SlideData]) -> str | None:
+    """``steps-arrow.point`` when most arrows of the deck share one depth that is not the build's own."""
+    adjs = [
+        round(_arrow_adj(it), 3)
+        for sd in datas
+        for it in sd.items
+        if it.prst in CHEVRON_PRST and it.paras and _is_hex(it.fill) and _foreign_name(it)
+    ]
+    if len(adjs) < 2:
+        return None
+    best, n = max(((a, adjs.count(a)) for a in set(adjs)), key=lambda t: t[1])
+    if n < T.point_share * len(adjs) or abs(best - T.point_default) <= 0.01 or not 0.05 <= best <= 1.0:
+        return None
+    return f"{best:g}"
+
+
+def _emu_of(v: str) -> int:
+    from ..units import to_emu
+
+    return to_emu(v)
+
+
+def _page_geometry(body: list[SlideData], deck, out: dict[str, str], band: bool) -> dict[str, str]:
+    """Deck-wide side margin (``margin``) and body top (``layout.top_gap``) from where the content sits.
+
+    A foreign deck puts its content at its own margins (0.6in on both sides, the first card 0.45in under the
+    title) while the build's defaults are 0.5in and 0.25in: every body item then sits a little off. The
+    margin is the left edge that also shows as a right edge on half of the slides; the body top is the
+    commonest distance from the bottom of the title area to the first content item (slides whose first item is
+    a lead line are left out: the lead is placed by the layout). Also sets ``deck.margin_x`` /
+    ``deck.body_top`` so the rest of the import reads the deck with them. Never raises (``{}``)."""
+    got: dict[str, str] = {}
+    try:
+        W, IN = deck.width, 914400
+        if len(body) < 2:
+            return got
+        tol = T.margin_tol * IN
+        lefts: list[list[float]] = []
+        rights: list[list[float]] = []
+        for sd in body:
+            live = [
+                it
+                for it in sd.items
+                if it.w < T.strip_w * W and it.w > 0.02 * W and _foreign_name(it) and not it.ph
+            ]
+            lefts.append([it.x for it in live if T.margin_min * IN <= it.x <= T.margin_max * IN])
+            rights.append(
+                [W - it.x - it.w for it in live if T.margin_min * IN <= W - it.x - it.w <= T.margin_max * IN]
+            )
+        best, hits = 0.0, 0
+        for c in {round(x / (0.01 * IN)) * 0.01 * IN for ls in lefts for x in ls}:
+            n = sum(
+                any(abs(x - c) <= tol for x in ls) and any(abs(r - c) <= tol for r in rs)
+                for ls, rs in zip(lefts, rights, strict=True)
+            )
+            if n > hits or (n == hits and abs(c - 0.6 * IN) < abs(best - 0.6 * IN) and n):
+                best, hits = c, n
+        if hits >= max(2, T.margin_share * len(body)):
+            if abs(best - (deck.margin_x or 0.5 * IN)) > T.margin_diff * IN:
+                got["margin"] = _length(best)
+                deck.margin_x = round(best)
+        # body top: distance from the bottom of the title area to the first content item
+        th = _emu_of(out.get("title.height", "0.9in"))
+        my = deck.margin_y or round(0.4 * IN)
+        title_bottom = th + my // 2 if band else my + th
+        gaps: list[float] = []
+        for sd in body:
+            below = sorted(
+                (
+                    it
+                    for it in sd.items
+                    if title_bottom - 0.05 * IN <= it.y <= 0.5 * deck.height
+                    and it.w < T.strip_w * W
+                    and _foreign_name(it)
+                    and not it.ph
+                    and it.h > 0.04 * IN
+                ),
+                key=lambda it: it.y,
+            )
+            if not below:
+                continue
+            first = below[0]
+            if (
+                first.kind == "text"
+                and not first.fill
+                and len(first.paras) == 1
+                and first.h <= T.lead_h * IN
+                and first.y - title_bottom <= 0.35 * IN
+                and len(below) > 1
+            ):
+                continue  # a lead line: the layout places it, the body follows it
+            gaps.append(first.y - title_bottom)
+        if len(gaps) >= T.top_slides:
+            unit = 0.05 * IN
+            cnt: dict[int, int] = {}
+            for g in gaps:
+                cnt[round(g / unit)] = cnt.get(round(g / unit), 0) + 1
+            k, n = max(cnt.items(), key=lambda t: (t[1], -abs(t[0] * unit - 0.25 * IN)))
+            if n >= T.top_share * len(gaps) and n >= T.top_slides:
+                near = [g for g in gaps if round(g / unit) == k]
+                gap = sum(near) / len(near)
+                if abs(gap - 0.25 * IN) > T.top_diff * IN and gap > 0:
+                    got["layout.top_gap"] = _length(gap)
+                    deck.body_top = round(title_bottom + gap)
+                else:
+                    deck.body_top = round(title_bottom + 0.25 * IN)
+        if not deck.body_top:
+            deck.body_top = round(title_bottom + 0.25 * IN)
+        deck.body_bottom = deck.height - round(
+            0.74 * IN
+        )  # footer row (0.36in) + margins: where the body ends
+    except Exception:
+        return {}
+    return got
 
 
 # --------------------------------------------------------------------------- 1. chevron sequence
@@ -445,6 +581,9 @@ def _chevron_steps(data: SlideData, deck, n: int, found: Found) -> None:
     if len(fills) == 1 and _dist(next(iter(fills)), surf) > T.same_fill:
         found.style["steps-card.fill"] = name_or_hex(deck, next(iter(fills)))
     # exact geometry (DL3d part 2): the layout chooses these itself, the original states them
+    point = _modal([round(_arrow_adj(a), 3) for a in row])
+    if point and abs(point - (deck.arrow_point or T.point_default)) > 0.01 and 0.05 <= point <= 1.0:
+        found.style["steps-arrow.point"] = f"{point:g}"  # (a deck-wide point is the header's)
     found.style["steps-arrow.h"] = _length(_modal([float(c.h) for c in row]) or row[0].h)
     found.style["steps-card.h"] = _length(_modal([float(c.h) for c in cards]) or cards[0].h)
     gaps = [float(k.y - (a.y + a.h)) for a, k in zip(row, cards, strict=True)]
