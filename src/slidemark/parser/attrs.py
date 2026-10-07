@@ -243,6 +243,8 @@ KNOWN_WORDS = (
     "rows",
     "num",
     "items",
+    "noemph",
+    "defaults",
 )
 TRANSITIONS = ("fade", "push", "wipe", "split", "cover", "zoom", "morph")
 _N = re.compile(r"^\d+$")

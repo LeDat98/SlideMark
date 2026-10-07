@@ -235,7 +235,11 @@ def test_header_css_fence_with_theme_none(tmp_path):
     md = "theme: none\n\n```css\n.box {border: 2px solid #FF8800}\n```\n\n" + BOXES
     deck = build(md, tmp_path / "o.pptx")
     assert deck.theme == "none"
-    assert not [d for d in deck.diagnostics if d.level in ("warning", "error")]
+    assert not [
+        d
+        for d in deck.diagnostics
+        if d.level in ("warning", "error") and not (d.rule or "").startswith("design-")
+    ]
     prs = Presentation(str(tmp_path / "o.pptx"))
     sp = next(s for s in prs.slides[0].shapes if s.name.startswith("Card"))
     assert sp._element.spPr.xpath("./a:ln/a:solidFill/a:srgbClr")[0].get("val") == "FF8800"

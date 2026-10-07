@@ -16,6 +16,9 @@ def rules(text: str) -> set[str]:
     return {d.rule for d in parse(text).diagnostics}
 
 
+DESIGN_HEAD = "colors: primary=#2B6CB0\nfonts: heading=Georgia\nsizes: title=30\nstyle: radius=8\n"
+
+
 def test_missing_end_before_table():
     src = "# T\n@2\n## A\n- a\n## B\n- b\n\n| x | y |\n|---|---|\n| 1 | 2 |\n"
     new, fixed = fix(src)
@@ -179,7 +182,7 @@ def test_cli_fix_json_has_fixed(tmp_path, capsys):
 
 def test_cli_fix_nothing_to_fix_keeps_file(tmp_path, capsys):
     f = tmp_path / "a.md"
-    f.write_text("colors: primary=#2B6CB0\n\n# T\n@dense\n- a\n", encoding="utf-8")
+    f.write_text(DESIGN_HEAD + "\n# T\n@1 noemph dense\n- a\n", encoding="utf-8")
     before = f.stat().st_mtime_ns
     assert main(["check", "--fix", str(f)]) == 0
     assert f.stat().st_mtime_ns == before and capsys.readouterr().out.startswith("ok")

@@ -2,10 +2,14 @@ theme: jp-business
 lang: ja
 footer: ACME株式会社　社外秘
 num: on
+colors: primary=#1E3A5F
+fonts: heading="Yu Gothic" body="Yu Gothic"
+sizes: title=24 body=11
 style: palette=#9FB3C8,primary,#D5DDE6
 
 # 国内クラウド会計市場の動向
 > 市場は年率12%で拡大、中堅企業セグメントが成長を牽引
+@defaults
 ```column {title="市場規模推移（億円）" labels=on}
 ,2022,2023,2024,2025,2026
 大企業,820,880,930,990,1040
@@ -24,6 +28,7 @@ style: palette=#9FB3C8,primary,#D5DDE6
 ※ 2026年は見込み値
 
 # 競合比較
+@defaults
 {hl=AI仕訳,導入期間 hcol=1}
 | 項目 | 当社 | A社 | B社 | C社 |
 |-|-|-|-|-|

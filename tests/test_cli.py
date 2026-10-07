@@ -7,6 +7,8 @@ from slidemark import __version__
 from slidemark.cli import main
 
 CORPUS = Path(__file__).parent.parent / "bench" / "corpus"
+# the four header lines the design feedback asks for (a deck that must build with no warning states them)
+DESIGN_HEAD = "colors: primary=#2B6CB0\nfonts: heading=Georgia\nsizes: title=30\nstyle: radius=8\n"
 
 
 def test_version(capsys):
@@ -16,7 +18,7 @@ def test_version(capsys):
 
 def test_check_ok(tmp_path, capsys):
     f = tmp_path / "a.md"
-    f.write_text("colors: primary=#2B6CB0\n\n# A\n@dense\n- x\n", encoding="utf-8")
+    f.write_text(DESIGN_HEAD + "\n# A\n@1 noemph dense\n- x\n", encoding="utf-8")
     assert main(["check", str(f)]) == 0
     assert capsys.readouterr().out.startswith("ok")
 

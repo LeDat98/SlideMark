@@ -3,6 +3,7 @@ lang: ja
 num: on
 colors: bg=#0A0F1F fg=#E8ECF8 primary=#38BDF8 secondary=#A78BFA accent=#F472B6 surface=#121A33 border=#26324F muted=#94A3C4
 fonts: heading="Noto Sans JP" body="Noto Sans JP" ea="Noto Sans JP"
+sizes: title=32 body=18
 style: radius=16 title.band=none card.shadow="0 6 18 #00000066"
 ```css
 slide { background: linear-gradient(160deg, #0A0F1F, #111A3A) }
@@ -17,7 +18,7 @@ td { border-color: #26324F }
 ```
 
 # 現場の点検を、AIで10分に
-@html
+@html noemph defaults
 ```html
 <div style="height:100%;display:flex;flex-direction:column;justify-content:center;padding:0 96px;background:radial-gradient(circle at 80% 20%,#38BDF855,transparent 45%),radial-gradient(circle at 10% 90%,#A78BFA44,transparent 40%),#0A0F1F;color:#E8ECF8">
   <div style="font-size:18px;letter-spacing:6px;color:#38BDF8">SERIES A ・ 2026</div>
@@ -28,6 +29,7 @@ td { border-color: #26324F }
 
 # 課題：点検は人手に依存し続けている
 > 国内の橋梁・トンネルの点検は年 7.2万件、技術者は10年で 3割減る
+@noemph
 ## 人手不足 {icon=users}
 - 点検技術者の平均年齢 54歳
 - 若手の採用は年 ▲8%
@@ -50,7 +52,7 @@ td { border-color: #26324F }
 99%
 自治体の年間契約
 @end
-```column {title="導入自治体数" labels=on colors=primary}
+```column {title="導入自治体数" labels=on colors=primary hl=2026}
 ,2023,2024,2025,2026
 導入数,8,31,74,120
 ```

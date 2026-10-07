@@ -2,6 +2,7 @@ theme: default
 colors: bg=#FFFFFF fg=#1B2333 primary=#243B6B accent=#F2A33A surface=#F5F7FB border=#D5DBE7 muted=#5B6475
 fonts: heading="Montserrat" body="Inter"
 style: radius=6 title.band=none heading.band=primary h1.letter-spacing=0.5pt render.waterfall_down=success render.waterfall_up=danger
+sizes: title=32 body=18
 footer: Northwind Health · Launch Office · Confidential
 num: on
 
@@ -34,7 +35,7 @@ FY2027 rollout of 24 partner clinics · Board review, October 2026
 
 # Four launch waves
 > Each wave reuses the playbook of the previous one and adds one new region
-@4 chevron
+@4 chevron noemph defaults
 ## Wave 1
 Q1 · North
 ## Wave 2
@@ -53,7 +54,7 @@ Q4 · Metro
 
 # Demand by city
 > Metro and Coast carry 58% of the expected visits
-@1:1
+@1:1 defaults
 ```bar {title="Expected visits per year (k)" labels=on hl=Metro note="Metro alone: 40% of visits"}
 ,North,Coast,Valley,Metro
 Visits,64,108,72,166
@@ -68,7 +69,7 @@ Visits,64,108,72,166
 
 # Unit economics
 > Visit cost falls below $120 once the lab hub and shared triage are live
-@3
+@3 noemph
 ## Visit cost {.kpi icon=money}
 $118
 Q4 FY2027, from $142
@@ -97,7 +98,7 @@ Cost,142,-11,-8,-6,1,=
 
 # Decisions for today
 > We ask the board to approve wave 1 and the lab hub
-@2
+@2 noemph defaults
 ## Decisions
 1. Approve the four-wave plan and $18M capex envelope
 2. Release $3.1M for wave 1 (North)

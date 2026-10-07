@@ -1,5 +1,7 @@
 colors: primary=#0E7490 accent=#EA580C
 fonts: heading=Arial body=Arial
+sizes: title=32 body=18
+style: radius=6
 # Q3 Business Review
 Sales & Growth
 ??? Chào mọi người, hôm nay mình review kết quả Q3.

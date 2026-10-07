@@ -2,9 +2,12 @@ theme: default
 lang: en
 num: on
 colors: primary=#1F3A60 accent=#E08A00
+fonts: heading=Calibri body=Calibri
+sizes: title=32 body=18
 style: radius=8
 
 # HTML, SVG and math, all editable
+@noemph
 ```html {render=native}
 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;font-family:sans-serif">
  <div style="background:#eef3fb;border:1px solid #1f3a60;border-radius:8px;padding:12px">
@@ -17,6 +20,7 @@ style: radius=8
 ```
 
 # Vector logo and an equation
+@noemph
 ![SlideMark logo](assets/logo.svg)
 {size=28}
 ```math

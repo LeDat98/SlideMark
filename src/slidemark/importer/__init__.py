@@ -382,6 +382,8 @@ def _import_with(
                 lines = _shorten(lines, info, sd, deck, classes, _trial_head(header, css_head))
                 lines = _table_widths(lines, sd, _trial_head(header, css_head))
                 lines = insert_fences(_drop_section(lines) if won else lines, won, len(notes_lines(sd.notes)))
+                if ent and ent.get("dec"):
+                    lines = _add_decisions(lines, info, ent["dec"])
             if ent and ent.get("css"):
                 k = len(lines) - len(notes_lines(sd.notes))
                 lines = [*lines[:k], *css_fence(ent["css"]), *lines[k:]]
@@ -614,6 +616,18 @@ def _add_dense(lines: list[str], info: dict) -> list[str]:
     info["extra"] = [*extra, "dense"]
     info["at"] = at
     return out
+
+
+def _add_decisions(lines: list[str], info: dict, words: list[str]) -> list[str]:
+    """``@noemph`` / ``@defaults`` (stored in the design part: they leave no trace in the shapes) on the
+    slide's ``@`` line, a new one right under the heading when there is none."""
+    pos = info.get("pos", 1)
+    words = [w for w in words if w in ("noemph", "defaults")]
+    if not words or pos > len(lines):
+        return lines
+    if pos < len(lines) and lines[pos].startswith("@") and not lines[pos].startswith("@end"):
+        return [*lines[:pos], " ".join([lines[pos], *words]), *lines[pos + 1 :]]
+    return [*lines[:pos], "@" + " ".join(words), *lines[pos:]]
 
 
 def _dense_decision(lines, info, sd, deck, header, theme) -> tuple[bool, bool]:

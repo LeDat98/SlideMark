@@ -2,10 +2,11 @@ theme: none
 lang: en
 colors: bg=#0F172A fg=#E0E7FF primary=#818CF8 secondary=#34D399 accent=#F472B6 muted=#94A3B8 surface=#1E293B border=#334155
 fonts: heading="Inter" body="Inter"
+sizes: title=32 body=18
 style: radius=12 card.shadow="0 6 18 #00000066"
 
 # Lumen Labs
-@html
+@html noemph defaults
 ```html
 <div style="position:absolute;inset:0;background:radial-gradient(circle at 25% 30%,#4338CA,#0F172A 70%)"></div>
 <div style="position:absolute;left:96px;top:250px;font-size:20px;letter-spacing:6px;color:var(--secondary)">RESEARCH UPDATE · 2026</div>
@@ -17,6 +18,7 @@ style: radius=12 card.shadow="0 6 18 #00000066"
 
 # Three research areas
 > Each area has a lab lead and a 2027 milestone
+@defaults
 ## Photonic chips
 - ==40×== lower energy per inference
 - Tape-out Q2 2027

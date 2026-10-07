@@ -3,10 +3,13 @@ lang: ja
 footer: ACME株式会社　社外秘
 num: on
 colors: primary=#1E3A5F accent=#C00000
+fonts: heading="Yu Gothic" body="Yu Gothic"
 sizes: body=11 footnote=9
+style: radius=0
 
 # 新規事業の検討状況と今後の方針
 > 3つの課題を解決し、2027年度の黒字化を目指す
+@defaults
 ## 現状
 - 売上：12.4億円（前年比 +8%）
 - 顧客数：1,240社（うち大企業 18%）
@@ -27,7 +30,7 @@ sizes: body=11 footnote=9
 ※ 売上は税抜、連結ベース
 
 # 実行計画
-@chevron
+@chevron noemph defaults
 ## Phase 1 準備
 - 要件定義
 - 体制構築

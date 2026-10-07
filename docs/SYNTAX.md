@@ -223,6 +223,7 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `a>b` `a-b` | **connector** from block `a` to block `b` (arrow / plain line). Letters count blocks in source order (`a` = 1st), digits work too (`1>3`). With `flow`, the links replace the flow arrows (info `flow-links`) | `@3 a>b a>c` |
 | `hidden` | hide the slide in the show | |
 | `build` | bullets and blocks appear one by one on click (`{.build}` on one block does it for that block only) | `@build` |
+| `noemph` `defaults` | decisions, no visual effect: `noemph` = this slide has no focal figure, `defaults` = the deck frame already serves this slide's values (they satisfy `design-slide`, see "Diagnostics: design feedback") | `@2 noemph defaults` |
 | any other word | class applied to the slide (`dense`, `dark`, ...) | `@3 dense` |
 
 Inside a box, an `@` line lays out that box's `###` sub-boxes in the same way. An `@` line after the last box of a slide
@@ -624,25 +625,38 @@ from `<style>`), is laid out by Chromium as a whole-slide HTML slide. `data-rend
 ## Diagnostics: design feedback
 
 `build` and `check` print two deck-level warnings (no slide number, never fixed by `--fix`, never fail a build) that
-tell an agent whether it made design decisions (`docs/DESIGN_REQUIRED.md`):
+tell an agent whether it made design decisions (`docs/DESIGN_REQUIRED.md`, "Tightened rules"):
 
 | Rule | Fires when | Message -> hint |
 |---|---|---|
-| `design-none` | the header has none of `colors:` `fonts:` `sizes:` `style:` and there is no deck-level ` ```css ` fence (`theme: <preset>` alone does not count; `theme: ./brand.yaml` or `template.pptx` does) | `no design stated` -> `state your design: colors: fonts: sizes: style: (or a css fence)` |
-| `design-slide` | slides on which no element carries a choice, listed in one line | `slides 3, 7, 8 carry no design choice` -> `choose the form (list/cards/@steps/@cols/table/chart/@html), one emphasis ({.hero} hl= ==x==) or an override (size= fill= color= align= x y w h) per slide` |
+| `design-none` | the header lacks some of `colors:` `fonts:` `sizes:` `style:`; one warning names every missing line. A deck ` ```css ` fence or a theme file (`theme: ./brand.yaml`, `template.pptx`) stands in for `style:`; `theme: <preset>` alone never counts | `design: fonts: sizes: not stated` -> `add fonts: sizes: to the header` (when `style:` is missing the hint adds `(a css fence or theme file also counts for style:)`) |
+| `design-slide` | a content slide is short of one of the three groups below; one warning per deck lists the slides | `slides 4 (values), 8 (form, emphasis) are short of a decision` -> `per slide state form (@N @steps table chart), one emphasis (.hero hl= ==x==) or @noemph, a value (size= color= fill= x y w h) or @defaults` |
 
-A **choice** is anything written beyond the content and its block kind: `{attrs}` (class, `key=value`) on a heading,
-image or block; an option on a table or chart (`widths=` `align=` `hl=` `.zebra` `legend=` `colors=` ...); an `@`
-directive (`@steps` `@chevron` `@3` / `@2x2` / `@1:2` grids, `@free` `@center` `@blank` `@html` `@bg=` `@dark` `@light`
-`@dense`, `a>b` connectors); a slide ` ```css ` fence; inline emphasis (`==x==`, `[x]{.class}`, badges). Not choices:
-`@build`, `@t=`, `@hidden`, a chart `title=`, plain bold/italic/links, callouts and mermaid diagrams (the block kind).
-Cover and section slides, and slides with nothing but a title (and speaker notes), are exempt.
+The three groups a content slide states (cover, section and slides with nothing but a title and notes are exempt):
+
+1. **form**: a layout directive (`@3` `@2x2` `@1:2` `@aab/aac`, `@steps` `@chevron` `@flow` `@rows` `@items` `@kpi`
+   `@free` `@blank` `@center` `@html` `@timeline` ..., `a>b` connectors) or a block that is not the default list:
+   table, chart, image, code, boxes with headings, KPI cards, mermaid diagram, callout.
+2. **emphasis**: exactly one: `.hero`, `{.accent}` / `{.danger}` / `{.success}` on one element, `hl=` / `hlcol=` /
+   `note=` on a table or chart (`hl=` + `note=` on one chart is one takeaway), `==x==`, `[x]{.class}`, a badge (a column of
+   badges in one table is one), or the directive `@noemph` (no focal figure on this slide). Counted per element, so
+   two emphasised elements are reported as `slide 5 (emphasis: 2 stated, keep one)`.
+3. **values**: at least one chosen value: `size=` `color=` `fill=` `line=` `x y w h` on an element, chart `colors=`
+   `size=` `labels=<pos>` `legend=` `fmt=` ..., table `widths=` `rowh=` `align=`, `.zebra`, `icon=`, `@bg=` `@gap=`
+   `@dark` `@light` `@dense`, a slide-scoped `sizes:` / `style:` line or ` ```css ` fence, or the directive `@defaults`
+   (the deck frame already serves this slide).
+
+Not decisions: `{.kpi}`, `labels=on`, a chart `title=`, plain bold/italic/links, `@build`, `@t=`, `@hidden`, and what the
+parser derives itself. `@noemph` and `@defaults` are ordinary slide directives (`@2 noemph defaults`): they draw nothing,
+and the importer keeps them (they ride in the design part). Colour-coding boxes is a value, not an emphasis:
+`{line=success}`, not `{.success}`.
 
 `build` also prints the stated keys before the `look:` line, one line, no colour:
-`design: colors fonts style footer; 12/15 slides carry choices` (`design: none; 0/15 slides carry choices` when
-nothing is stated). The slide count leaves out the exempt slides, so `n == total` means no `design-slide` warning.
-Keys: `colors fonts sizes style css theme-file footer num`. `slidemark check --format json` carries both warnings
-with their `rule` names (`design-none`, `design-slide`; `slide` is `null`).
+`design: colors fonts sizes style footer; 9/14 slides decided form+emphasis+values`, with `; short: 4 (values), 8 (form,
+emphasis)` appended when some slides are short (`design: none; 0/15 ...` when nothing is stated). The count leaves out
+the exempt slides and counts slides with all three groups, so `n == total` means no `design-slide` warning. Keys:
+`colors fonts sizes style css theme-file footer num`. `slidemark check --format json` carries both warnings with their
+`rule` names (`design-none`, `design-slide`; `slide` is `null`).
 
 ## Build output: fit lines and ignored attributes
 

@@ -4,6 +4,8 @@ footer: ACME株式会社　経営企画部　社外秘
 num: on
 density: dense
 colors: primary=#1E3A5F danger=#C00000 success=#2E7D32
+fonts: heading="Yu Gothic" body="Yu Gothic"
+sizes: title=24 body=11
 style: palette=primary,#7FA3C7,danger,#BFC7D1
 
 # 物流DX推進計画
@@ -12,7 +14,7 @@ style: palette=primary,#7FA3C7,danger,#BFC7D1
 # エグゼクティブサマリー
 > 配送コストを3年で18%削減し、営業利益率を2.4pt改善する
 @3
-## 現状の課題 {.danger icon=warning}
+## 現状の課題 {line=danger icon=warning}
 - 配送コストが売上の11.2%（業界平均 8.5%）
 - 配車計画が属人化（ベテラン3名に依存）
 - 倉庫の在庫精度 96.1%（目標 99.5%）
@@ -20,7 +22,7 @@ style: palette=primary,#7FA3C7,danger,#BFC7D1
 1. AI配車で積載率を68%→82%へ
 2. WMS刷新とハンディ端末の全拠点導入
 3. 協力会社との共同配送（関東・中部）
-## 期待効果 {.success icon=chart}
+## 期待効果 {line=success icon=chart}
 - 配送コスト ==▲18%==（年 21億円）
 - 欠品率 2.3% → 0.8%
 - 残業時間 ▲30%
@@ -34,7 +36,7 @@ style: palette=primary,#7FA3C7,danger,#BFC7D1
 
 # 現状分析：コスト構造
 > 配送費の4割を占める「積載ロス」と「再配達」が最大の改善余地
-@1:1
+@1:1 defaults
 ```stacked-bar {title="配送コストの内訳（億円）" labels=on}
 ,2024,2025,2026
 幹線輸送,38,40,43
@@ -52,7 +54,7 @@ style: palette=primary,#7FA3C7,danger,#BFC7D1
 
 # 施策の全体像
 > 3つの施策を「基盤→最適化→連携」の順に展開する
-@3 chevron
+@3 chevron noemph defaults
 ## Step 1 基盤整備
 WMS刷新・データ統合
 ## Step 2 最適化
@@ -83,7 +85,7 @@ NPV 34億円
 ▲12%
 2025年度比
 @end
-```column {title="効果額の推移（億円）" labels=on}
+```column {title="効果額の推移（億円）" labels=on hl=2029}
 ,2027,2028,2029
 効果額,4,12,21
 ```
@@ -91,7 +93,7 @@ NPV 34億円
 
 # 推進体制
 > CEO直轄のDX推進委員会のもと、4つの分科会で推進する
-@a>b b>c b>d b>e
+@a>b b>c b>d b>e noemph defaults
 ## DX推進委員会
 委員長：代表取締役社長　月1回開催
 ## PMO（DX推進室）
@@ -106,7 +108,7 @@ DX推進室　6名
 
 # 実行ロードマップ
 > 2027年度にPoC、2028年度に全国展開、2029年度に効果を確定する
-@4
+@4 defaults
 ## 2027年度 上期
 - WMS要件定義
 - PoC（関東2拠点）
@@ -129,7 +131,7 @@ DX推進室　6名
 
 # リスクと対応策
 > 4つのリスクを特定し、すべてに対応策と責任部署を設定した
-@2x2
+@2x2 defaults
 ## 現場の定着 {.danger}
 - 影響：大／発生可能性：高
 - 対応：先行2拠点で成功事例を作り横展開
@@ -148,7 +150,7 @@ DX推進室　6名
 
 # 本日のご決議事項
 > 第1期投資 8.0億円（2027年度）のご承認をお願いしたい
-@2
+@2 noemph
 ## ご決議事項 {.primary}
 1. 物流DX推進計画（2027–2029年度）の基本方針
 2. 第1期投資 8.0億円（WMS刷新・AI配車PoC）

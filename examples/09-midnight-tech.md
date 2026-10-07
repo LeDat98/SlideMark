@@ -3,6 +3,7 @@ lang: en
 num: on
 colors: primary=#38BDF8 secondary=#2DD4BF accent=#FBBF24 surface=#16213A
 fonts: heading="Inter" body="Inter"
+sizes: title=32 body=18
 style: radius=10
 
 # Shipping LedgerAI
@@ -20,12 +21,13 @@ $52k
 1.8%
 target < 2%
 @end
-```column {title="MRR (k USD)" labels=on legend=none}
+```column {title="MRR (k USD)" labels=on legend=none hl=Q4}
 ,Q1,Q2,Q3,Q4
 MRR,10,18,31,52
 ```
 
 # How a receipt becomes a ledger entry
+@defaults
 ```mermaid
 graph LR
 A[Upload receipt] --> B[OCR]
@@ -37,6 +39,7 @@ E --> D
 > [!tip] ==92%== of receipts post without a human
 
 # Pricing model
+@defaults
 ```math
 \text{LTV} = \frac{\text{ARPA} \times m}{c}
 ```
@@ -47,6 +50,7 @@ E --> D
 - LTV ≈ ==$1,890==
 
 # API in one call
+@noemph
 {size=18}
 ```python
 from ledgerai import Client
@@ -59,6 +63,7 @@ print(entry.account, entry.amount)
 - Webhooks for review results
 
 # Product demo
+@defaults
 ![Receipt upload to posted entry in 20 seconds](assets/demo.mp4)
 - Upload a photo, get a posted entry
 - Review queue for low-confidence cases

@@ -2,6 +2,7 @@ theme: none
 colors: bg=#FBF8F3 fg=#1F2A30 primary=#0F5257 accent=#E4572E surface=#FFFFFF border=#D9D2C5 muted=#5E6B70
 fonts: heading="Montserrat" body="Inter"
 style: radius=10 title.band=none heading.band=primary card.fill=#FFFFFF
+sizes: title=32 body=18
 lang: vi
 footer: Công ty CP Logistics Sao Mai · Nội bộ
 num: on
@@ -11,7 +12,7 @@ num: on
 
 # Lộ trình ba bước
 > Kết nối dữ liệu trước, tối ưu sau, mở rộng hệ sinh thái cuối cùng
-@chevron
+@chevron noemph defaults
 ## Bước 1 Kết nối
 - Số hóa 100% đơn hàng
 ## Bước 2 Tối ưu
@@ -22,7 +23,7 @@ num: on
 
 # Cơ cấu điều hành
 > Ban chỉ đạo do Tổng giám đốc trực tiếp phụ trách
-@.a./bcd a>b a>c a>d
+@.a./bcd a>b a>c a>d noemph defaults
 ## Ban chỉ đạo chuyển đổi số
 - Trưởng ban: Tổng giám đốc
 ## Kho vận
@@ -45,6 +46,7 @@ num: on
 
 # Đề xuất phê duyệt
 > Đề nghị Hội đồng quản trị phê duyệt ngân sách giai đoạn 1: 120 tỷ đồng
+@noemph
 ## Nội dung phê duyệt {.primary}
 1. Chiến lược chuyển đổi số 2027–2029
 2. Ngân sách giai đoạn 1: 120 tỷ đồng

@@ -90,7 +90,7 @@ def test_svg_file_icon_native_geometry(tmp_path):
         '<circle cx="5" cy="5" r="2" fill="#fff"/></svg>'
     )
     prs, deck = _build(HEAD + "\n# T\n## a {icon=s.svg}\n- x\n", tmp_path)
-    assert not [d for d in deck.diagnostics if d.level != "info"]
+    assert not [d for d in deck.diagnostics if d.level != "info" and not (d.rule or "").startswith("design-")]
     icon = next(s for s in prs.slides[0].shapes if s.name.startswith("icon s.svg"))
     assert icon._element.spPr.find(qn("a:custGeom")) is not None
 

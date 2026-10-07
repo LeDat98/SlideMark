@@ -17,6 +17,7 @@ Series A update · October 2026
 
 # Why now
 > Teams drown in dashboards but still decide on gut feeling
+@defaults
 ## Signal {.hero}
 - One weekly brief instead of 40 dashboards
 - Written by an agent, checked by a human
@@ -24,9 +25,10 @@ Series A update · October 2026
 - Questions answered in **minutes**, not sprints
 ## Trust
 - Every number links to its query
-- ==98.7%== answer accuracy in pilots
+- 98.7% answer accuracy in pilots
 
 # Traction
+@noemph
 ## ARR {.kpi}
 $3.1M
 +212% YoY

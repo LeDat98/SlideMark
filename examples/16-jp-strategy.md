@@ -3,7 +3,9 @@ lang: ja
 footer: 東和精機株式会社　経営企画室　Confidential
 num: on
 density: dense
+colors: primary=#1E3A5F accent=#C00000
 fonts: heading=Meiryo body=Meiryo ea=Meiryo
+sizes: title=24 body=11
 style: palette=#BFC7D1,#7FA3C7,primary
 
 # 中期経営計画 2027–2029
@@ -16,7 +18,7 @@ style: palette=#BFC7D1,#7FA3C7,primary
 - 国内工作機械市場は年▲1.5%で縮小
 - 予知保全の需要は年+14%で拡大
 - 顧客の7割が「停止時間の短縮」を最重視
-## 当社の課題 {.danger icon=warning}
+## 当社の課題 {line=danger icon=warning}
 - 売上の82%が機械販売（景気連動）
 - 保守は受注型で粗利率18%
 - IoT接続率は出荷台数の23%
@@ -24,7 +26,7 @@ style: palette=#BFC7D1,#7FA3C7,primary
 1. 稼働保証型サービスの投入
 2. 全出荷機のIoT標準化
 3. 代理店網の再編（42社→25社）
-## 目標（2029年度） {.success icon=chart}
+## 目標（2029年度） {line=success icon=chart}
 - 売上高 ==1,250億円==（+19%）
 - サービス比率 18% → 35%
 - 営業利益率 6.8% → ==12.0%==
@@ -56,6 +58,7 @@ style: palette=#BFC7D1,#7FA3C7,primary
 
 # 競合比較
 > サービス体制とデータ基盤の両方で優位に立てる余地がある
+@defaults
 | 評価軸 | 当社 | A社（国内大手） | B社（欧州） | C社（新興） |
 |-|-|-|-|-|
 | 設置台数（国内） | 4.2万台 [首位]{.badge .success} | 3.8万台 | 1.1万台 | 0.2万台 |
@@ -68,7 +71,7 @@ style: palette=#BFC7D1,#7FA3C7,primary
 
 # 課題の構造
 > 利益率低迷の根本原因は「データがない」ことにある
-@aaa/bcd a>b a>c a>d
+@aaa/bcd a>b a>c a>d defaults
 ## 営業利益率が業界平均（9.5%）を下回る {.danger}
 売上の82%が景気連動の機械販売
 ## 保守が受注型
@@ -84,7 +87,7 @@ style: palette=#BFC7D1,#7FA3C7,primary
 
 # 施策の全体像
 > 4つの施策を「つなぐ→見える→守る→売る」の順に展開する
-@4 chevron
+@4 chevron noemph defaults
 ## Step 1 つなぐ
 全出荷機のIoT標準化
 ## Step 2 見える
@@ -117,7 +120,7 @@ style: palette=#BFC7D1,#7FA3C7,primary
 2.1年
 IRR 38%
 @end
-```stacked-column {title="営業利益の構成（億円）" labels=on}
+```stacked-column {title="営業利益の構成（億円）" labels=on hl=2029年度}
 ,2026年度,2029年度
 機械販売,58,64
 保守・稼働保証,13,68
@@ -132,7 +135,7 @@ IRR 38%
 **影響：大 / 可能性：中**
 - 3年の移行期間を設定
 - 保守委託で収益を補償
-## 稼働保証の損失 {.danger}
+## 稼働保証の損失 {line=danger}
 **影響：大 / 可能性：低**
 - 対象を接続済み機に限定
 - 保証上限を契約額の50%に
@@ -160,7 +163,7 @@ IRR 38%
 
 # 本日のご決議事項
 > 中期経営計画（2027–2029）と第1期投資 18億円のご承認をお願いしたい
-@3:2
+@3:2 noemph
 ## ご決議事項 {.primary}
 1. 中期経営計画 2027–2029 の基本方針
 2. 第1期投資 18億円（IoT標準化・データ基盤）

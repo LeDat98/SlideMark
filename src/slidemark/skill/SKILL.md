@@ -33,17 +33,17 @@ the .pptx or run another command. Worst case: read, build, one look, hand back =
 Settle these in your reasoning, then write them into the deck (`build` echoes them in `design:`):
 
 1. **Deck frame:** colours, fonts, type scale, chrome (title band, cards, rules), `footer:` / `num:`, a `css`
-   fence for what tokens cannot say. A `theme:` preset alone is a starting point, not a decision.
+   fence for what tokens cannot say. A `theme:` preset alone does not count.
 2. **Each slide:** its form (list, cards, `@steps`, grid, table, chart kind, KPI row, `@html`), its one
-   emphasis (`.hero` `hl=` `==x==` `{.accent}`), an override wherever the default would not serve its message
+   emphasis (`.hero` `hl=` `==x==` `{.accent}`), an override where the default fails its message
    (`size=` `fill=` `color=` `align=` `x y w h`).
 3. **Each chart and table:** series colours, labels, legend, the takeaway (`hl=` + `note=`), `widths=` `align=`
    `.zebra`.
 4. **Expected fit:** per slide, what its fit line should say (form, size, how full); a line that differs is
    the cue to change one thing.
 
-`design-none` (no `colors:` `fonts:` `sizes:` `style:`, no deck `css`) and `design-slide` (no element carries a
-choice) are advisory: state the choice the hint names.
+`design-none` names the missing header lines (`colors:` `fonts:` `sizes:` `style:`); `design-slide` the slides
+short of a form, one emphasis (or `@noemph`), values (or `@defaults`). Advisory.
 
 ## Pattern 1: English deck, every slide decided
 
@@ -62,6 +62,7 @@ num: on
 
 # Revenue grew 18% on one segment
 > Enterprise carried the quarter
+@defaults
 ## Revenue {.kpi .hero}
 $4.2M
 +18% QoQ
@@ -71,7 +72,7 @@ $4.2M
 ## NPS {.kpi}
 61
 @end
-- ==14 enterprise logos== signed, 3 in the last week
+- 14 enterprise logos signed, 3 in the last week
 
 # Enterprise drove the growth
 ```column {title="Revenue by segment ($M)" colors=#B8B8AA,primary labels=on legend=bottom hl=Enterprise note="Enterprise: 62% of growth"}
@@ -90,7 +91,7 @@ Enterprise,1.1%,0.8%
 > Keep the success team on enterprise accounts
 
 # Q4 plan
-@steps num
+@steps num defaults
 ## Oct {.accent}
 - Hire 4 AEs
 ## Nov
@@ -99,14 +100,14 @@ Enterprise,1.1%,0.8%
 - Renewal push
 
 # Two asks
-@free
+@free noemph
 {x=6% y=25% w=40% h=45% size=28 fill=primary color=#FFFFFF align=center valign=middle}
 +$300k for partner marketing
 {x=54% y=25% w=40% h=45% size=28 fill=accent color=#FFFFFF align=center valign=middle}
 4 account executives
 
 # Thank you
-@html
+@html noemph defaults
 ```html
 <div style="height:100%;background:var(--primary);color:#fff;padding:96px">
   <h1 style="font-size:72px;margin:0">Next review: January</h1>
@@ -131,7 +132,8 @@ num: on
 
 # 主要指標
 > 商談化率が目標を上回った
-## 商談数 {.kpi .hero}
+@defaults
+## 商談数 {.kpi}
 420件
 前月比 +12%
 ## 商談化率 {.kpi}
