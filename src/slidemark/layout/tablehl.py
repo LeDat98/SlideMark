@@ -1,4 +1,4 @@
-"""Emphasised table rows (``hl=`` on a table): which body rows a list of first-cell values selects.
+"""Emphasised table rows and columns (``hl=`` / ``hlcol=`` on a table): which body cells they select.
 
 Parser (validation), layout (bold measuring), CSS (``tr.hl``), renderer, lint and importer share these.
 """
@@ -65,3 +65,39 @@ def hl_rows(t: Table) -> frozenset[int]:
         return frozenset()
     keys = {norm_key(n) for n in names}
     return frozenset(r for r, text in first_cells(t) if text and norm_key(text) in keys)
+
+
+def header_texts(t: Table) -> dict[int, str]:
+    """``column -> header text`` (the last header row that has a cell there; rows may be merged)."""
+    from .tables import table_grid
+
+    _n, _m, anchors = table_grid(t)
+    out: dict[int, str] = {}
+    for r, c, cell in anchors:
+        if r < t.header_rows:
+            text = "".join(p.plain for p in cell.paragraphs).strip()
+            for cc in range(c, c + max(cell.colspan, 1)):
+                if text:
+                    out[cc] = text
+    return out
+
+
+def hl_cols(t: Table) -> frozenset[int]:
+    """0-based columns that ``t.attrs['hlcol']`` (1-based numbers, validated by the parser) emphasises."""
+    raw = t.attrs.get("hlcol")
+    if not raw:
+        return frozenset()
+    items = raw if isinstance(raw, (list, tuple)) else re.split(r"[,;\s]+", str(raw))
+    out = set()
+    for x in items:
+        try:
+            out.add(int(x) - 1)
+        except (TypeError, ValueError):
+            continue
+    return frozenset(c for c in out if c >= 0)
+
+
+def hl_cell(t: Table):
+    """``(row, col) -> bool``: a body cell in an ``hl=`` row or an ``hlcol=`` column."""
+    rows, cols, hdr = hl_rows(t), hl_cols(t), t.header_rows
+    return lambda r, c: r in rows or (c in cols and r >= hdr)

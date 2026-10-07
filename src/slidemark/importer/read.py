@@ -95,6 +95,7 @@ class Item:
     row_h: list[int] = field(default_factory=list)  # table: row heights (EMU)
     steps: bool = False  # chevron: an ``@steps`` arrow with the text of its card folded in
     hl: str = ""  # table: the `hl=` first-cell values (the renderer appends them to the shape name)
+    hlcol: str = ""  # table: the `hlcol=` column numbers (1-based, comma list; the same shape-name suffix)
     gantt: bool = False  # table: bars (filled shapes over body cells) were folded into it (`{.gantt}`)
     cropped: bool = False  # image: a:srcRect crop (``fit=cover``)
     latex: str | None = None  # math: the equation as LaTeX (``` math fence)
@@ -678,6 +679,7 @@ def read_sections(prs) -> list[tuple[str, list[int]]]:
 
 
 CHART_NOTE = "ChartNote"  # shape names the renderer gives a `note=` callout and its pointer
+_HLCOL = re.compile(r" hlcol=([\d,]+)$")  # ... and the `hlcol=` column numbers to a table's
 _HL = re.compile(r" hl=(.+)$")  # the renderer appends the `hl=` categories to a chart's shape name
 
 
@@ -933,7 +935,10 @@ def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
                     )
                 rows.append(row)
             tit = _new(ctx, "table", box, sid=sh.shape_id, name=name, rows=rows)
-            if m := _HL.search(name):
+            mc = _HLCOL.search(name)
+            if mc:
+                tit.hlcol = mc.group(1)
+            if m := _HL.search(name[: mc.start()] if mc else name):
                 tit.hl = m.group(1)
             try:
                 sx = box[2] / (sum(c.width for c in sh.table.columns) or 1)

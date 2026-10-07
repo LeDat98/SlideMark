@@ -389,13 +389,50 @@ def _apply_table_hl(t: Table, value: str, ctx: Ctx, line: int | None) -> None:
         t.attrs["hl"] = good
 
 
+def _apply_table_hlcol(t: Table, value: str, ctx: Ctx, line: int | None) -> None:
+    """``hlcol=2027計画,3``: body columns named by a header cell or a 1-based number are emphasised."""
+    from ..layout.tablehl import header_texts, norm_key, split_names
+
+    n = max((len(r) for r in t.rows), default=0)
+    heads = header_texts(t)
+    by_key = {norm_key(h): c for c, h in sorted(heads.items(), reverse=True)}
+    names = (
+        [value.strip().strip("\"'")] if norm_key(value.strip().strip("\"'")) in by_key else split_names(value)
+    )
+    good: list[int] = []
+    for name in names:
+        col = by_key.get(norm_key(name))
+        if col is None and re.fullmatch(r"\d+", name.strip()) and 1 <= int(name) <= n:
+            col = int(name) - 1
+        if col is None:
+            near = closest(norm_key(name), list(by_key), 0.5)
+            hint = (
+                f"did you mean '{heads[by_key[near]]}'?"
+                if near
+                else f"columns are 1..{n}" + (": " + ", ".join(list(heads.values())[:8]) if heads else "")
+            )
+            ctx.warn(f"hlcol '{name}' is not a header cell or column number", line, "table-hl", hint)
+        elif col + 1 not in good:
+            good.append(col + 1)
+    if not names:
+        ctx.warn(
+            f"bad table option hlcol='{value}'",
+            line,
+            "table-hl",
+            "hlcol is header texts or column numbers to emphasise, e.g. hlcol=2027計画 or hlcol=3",
+        )
+    if good:
+        t.attrs["hlcol"] = sorted(good)
+
+
 def apply_table_kv(t: Table, kv: dict[str, str], ctx: Ctx, line: int | None) -> dict[str, str]:
     """Consume widths/align/header/hcol/hl from ``kv``; returns the remaining keys."""
     rest: dict[str, str] = {}
     n = max((len(r) for r in t.rows), default=0)
     hl = kv.get("hl")  # last: header= decides which rows are body rows
+    hlcol = kv.get("hlcol")
     for k, v in kv.items():
-        if k == "hl":
+        if k in ("hl", "hlcol"):
             continue
         if k == "widths":
             try:
@@ -467,4 +504,6 @@ def apply_table_kv(t: Table, kv: dict[str, str], ctx: Ctx, line: int | None) -> 
             rest[k] = v
     if hl is not None:
         _apply_table_hl(t, hl, ctx, line)
+    if hlcol is not None:
+        _apply_table_hlcol(t, hlcol, ctx, line)
     return rest

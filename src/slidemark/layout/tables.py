@@ -7,7 +7,7 @@ import re
 from ..ir import Cell, Style, Table, fast_style
 from ..units import EMU_PER_PT, to_emu
 from . import css, measure
-from .tablehl import hl_rows
+from .tablehl import hl_cell
 
 
 def table_grid(t: Table) -> tuple[int, int, list[tuple[int, int, Cell]]]:
@@ -95,11 +95,13 @@ def _measured_em(
     """(longest-text width, minimum sensible width) per column, in em, cell padding included."""
     weights = [3.0] * ncols
     mins = [2.0] * ncols
-    hl = hl_rows(t)  # emphasised rows are bold (measured so even with `table.hl.bold=off`: a little headroom)
+    hl = hl_cell(
+        t
+    )  # emphasised rows and columns are bold (measured so even with `table.hl.bold=off`: a little headroom)
     for r, c, cell in anchors:
         if cell.colspan != 1:
             continue
-        bold = r < t.header_rows or c < t.header_cols or r in hl
+        bold = r < t.header_rows or c < t.header_cols or hl(r, c)
         tf = cell.style.text_transform if cell.style else None
         ems = [_para_em(p, bold, tf) for p in cell.paragraphs]
         weights[c] = max(weights[c], min(max((e[0] for e in ems), default=0.0), 30.0))
@@ -273,7 +275,7 @@ def row_heights(
     nrows = len(t.rows)
     size = (base.font_size or 14) * scale
     heights = [round((size * measure.tokens().line_latin * 12700) * 1.0 + 2 * measure.cell_pad()[1])] * nrows
-    hl = hl_rows(t)
+    hl = hl_cell(t)
     for r, c, cell in anchors:
         if cell.rowspan > 1:
             continue
@@ -281,7 +283,7 @@ def row_heights(
         cl, ct, cr, cb = css.cell_insets(cell.style, px, py)
         w = sum(widths[c : c + max(cell.colspan, 1)]) - cl - cr
         st = base.merged(cell.style)
-        if r < t.header_rows or c < t.header_cols or r in hl:
+        if r < t.header_rows or c < t.header_cols or hl(r, c):
             st = st.merged(fast_style(bold=True))
         need = measure.paragraphs_height(cell.paragraphs, w, st, scale) + ct + cb
         heights[r] = max(heights[r], round(need))

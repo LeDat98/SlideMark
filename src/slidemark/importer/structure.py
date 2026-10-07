@@ -1058,6 +1058,7 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
             classes=cls,
             header_rows=hdr,
             hl_rows=hl_row_set(b.item.rows, hl, hdr) if hl else set(),
+            hl_cols={int(x) - 1 for x in b.item.hlcol.split(",") if x.isdigit()},
         )
         if lost:
             out.diags.append(
@@ -1075,6 +1076,7 @@ def emit_block(b: Block, out: Out) -> list[tuple[str, list[str]]]:
             + ([f"header={hdr}"] if hdr > 1 else [])
             + ([f"align={align}"] if align else [])
             + ([_attr("hl", hl)] if hl else [])
+            + ([f"hlcol={b.item.hlcol}"] if b.item.hlcol else [])
         )
         if attrs and lines:
             lines = ["{" + " ".join(attrs) + "}", *lines]

@@ -145,7 +145,7 @@ SLIDE_CHOICES: tuple[Callable[[Slide], bool], ...] = (
     lambda s: any(k not in IGNORED_SLIDE_ATTRS for k in s.attrs),  # @gap= and unknown keys
     lambda s: s.background is not None,  # @bg=
     lambda s: s.html is not None,  # @html
-    lambda s: bool(s.css),  # a ```css fence in the slide
+    lambda s: bool(s.css) or bool(s.tokens),  # a ```css fence or a `sizes:` / `style:` line in the slide
     lambda s: bool(s.links),  # @ a>b connectors
 )
 

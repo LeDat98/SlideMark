@@ -1,10 +1,10 @@
-# Porting the python-pptx deck's design decisions to SlideMark (lengthbench t2, design wave 3 lane 4)
+# Porting the python-pptx deck's design decisions to SlideMark (lengthbench t2, design wave 3 lane 4; DL2 part 1 update at the end of section 1)
 
 Source: `../python-pptx/build.py` (the agent's 15-slide deck, render `../python-pptx/sheet.png`).
 Port: `deck.md` (render `sheet.png`). Baseline for comparison: `../slidemark-wave2/deck.md`.
 Everything uses syntax documented in `docs/SYNTAX.md`; no source or doc outside this folder changed.
 
-## Build line (verbatim)
+## Build line of the first port (verbatim; the current one is in section 1)
 
 ```
 $ slidemark build deck.md -o /tmp/ported.pptx --png sheet.png
@@ -24,11 +24,33 @@ The `chart-scale` info is the brief's data (1280 vs 96 on one axis); the python-
 |---|---|---|
 | `python-pptx/build.py` | 5,263 | 100% |
 | `slidemark-wave2/deck.md` (defaults, content only) | 1,261 | 24% |
-| `slidemark-ported/deck.md` (all design stated) | **2,283** | **43%** |
+| `slidemark-ported/deck.md` before DL2 part 1 (css fence + 2 `@html` slides) | 2,283 | 43% |
+| `slidemark-ported/deck.md` after DL2 part 1 (**no css fence, no `@html`**) | **1,577** | **29.96%** |
 
-Where the 2,283 go: deck header (colors/fonts/sizes/style + 1 css fence) 359; cover as `@html` 218; slide 8 as
-`@html` 434; the other 13 slides (content + per-slide forms + chart options) 1,272. The two `@html` slides cost 652
-(29% of the deck for 2 of 15 slides).
+DL2 part 1 (this update): the cover `@html` (218 tokens) became `@cover bg=primary dark` + 3 `cover.*` tokens + one
+`style:` line for the light subtitle; the slide 8 `@html` (434) became `@rows`; the css fence (7 rules) and the two
+per-slide css fences became header tokens and per-slide `sizes:` lines. Where the 1,577 go: deck header lines
+(`colors` 46, `fonts` 8, `sizes` 38, `style` about 150) about 250; the 15 slides (content, per-slide forms, chart
+options) about 1,320. Build line now:
+
+```
+$ slidemark build deck.md -o /tmp/ported.pptx --png sheet.png
+info slide 3 chart-scale: series '営業利益' (max 96) is under 10% of '売上高' (max 1280): it is drawn as a sliver -> ...
+design: colors fonts sizes style footer num; 14/14 slides carry choices
+look: theme none, bg #FFFFFF, text #222B36, primary #142B4D, accent #E09F1F; fonts Yu Gothic (headings, body), Yu Gothic (ea); title band off; accent on 3 charts
+wrote /tmp/ported.pptx: 15 slides 16:9, 4 charts, 2 tables, notes on 2 slides, 0 warnings (checked: fit, overlap, contrast, text size, word breaks)
+$ python bench/agent_accept.py bench/lengthbench/t2/accept.json /tmp/ported.pptx
+accepted
+```
+
+`slidemark review`: 99/100 (infos only: no key message on 4 slides, 31% empty bottom on slide 10, as in python-pptx).
+
+Native forms added for it (`docs/SYNTAX.md`, `tests/test_design_native.py`): slide-scoped `sizes:` / `style:` lines,
+the text shorthand (`kpi.label="20 bold primary"`, `steps-card="24 bold center"`, `heading=center`), `fonts: font=`,
+`@kpi`, `kpi.h=4.4in`, table `hlcol=`. Known deviations from python-pptx kept to reach 0 warnings: `teal` is `#217B70`
+(text contrast; the pie and line series use it too, python-pptx has `#2A9D8F`), KPI numbers shrink to the card width
+(27 pt on 4 cards, 47 on 3; python-pptx 34 / 54), `top.bar` 0.10 in (python-pptx 0.12), cards start at 2.22 in (2.0).
+Not stated: KPI divider rule, exact table row height (section 4).
 
 ## 2. Decisions stated in native syntax or tokens
 
@@ -56,49 +78,41 @@ Where the 2,283 go: deck header (colors/fonts/sizes/style + 1 css fence) 359; co
 | Process row, chevron head + card, alternating navy/blue | `@4 steps`, `## 7–9月 {.secondary}` on every second step |
 | Tall KPI cards (4.4 in) | `layout.kpi_lone_h=0.9 layout.kpi_lone_min_h=0.85` (token) |
 
-## 3. Decisions that needed CSS or `@html`
+## 3. Decisions that needed CSS or `@html` (all native now)
 
-| Decision | What I wrote | Proposed shortest syntax |
+| Decision | First port (css / `@html`) | Native form in the current deck |
 |---|---|---|
-| Rule under the title | css `h1 { border-bottom: 2px solid #1F5FA8 }` | `title.rule=secondary` |
-| KPI card top stripe | css `.kpi { border-top: 6pt solid #1F5FA8 }` | `kpi.stripe=secondary` |
-| KPI label 20 bold navy / value 34 / note 20 bold teal | 3 css rules | `kpi.label.size=20 kpi.label.bold=on kpi.note.color=teal kpi.size=34` |
-| Pin box heading 20 / text 22 (auto-growth gives 27/26) | css `.box > h2`, `.box li` font-size | `sizes: heading=20!` ("exact, no growth") or `grow=off` |
-| Box heading centred bold | css `.box > h2 { text-align: center; font-weight: bold }` | `heading.align=center heading.bold=on` |
-| Slide 10 heading 26 / text 24 | per-slide css fence | `{size=24}` on the `@3` line applying to the row |
-| Conclusion 24 bold | css `.conclusion { font-size: 24pt; font-weight: bold }` | `sizes: conclusion=24`, `conclusion.bold=on` |
-| Numbered rows (slide 8) | `@html` (434 tokens) | `@rows`: numbered bars from an ordered list, `rows.num.fill`, `rows.fill` |
-| Cover: full navy, amber rule at 61%, teal bar, light-blue subtitle | `@html` (218 tokens); native `@cover bg=primary dark` + `cover.*` gave a plain navy slide | `cover.rule` working with `bg=`, `cover.bar=teal`, `cover.band=none` independent of `title.band` |
-| Footer + number on an `@html` slide | typed by hand into the html | `footer:` / `num:` drawn on `@html` slides |
+| Rule under the title | css `h1 { border-bottom }` | `title.rule=secondary` |
+| KPI card top stripe | css `.kpi { border-top }` | `kpi.stripe=secondary` |
+| KPI label 20 bold navy / note 20 bold teal | 2 css rules | `kpi.label="20 bold primary" kpi.note="20 bold teal"` |
+| KPI card height 4.4 in | row tokens | `kpi.h=4.4in` |
+| KPI rows | `{.kpi}` on every box | `@kpi` under the title |
+| Pin box heading 20 / text 22 (auto-growth gives 27/26) | css font-size rules | `sizes: heading=20! body=22!` |
+| Box heading centred bold | css `.box > h2` | `heading=center` (bold is the default) |
+| Slide 9 KPI value 54 / slide 10 heading 26 text 24 | per-slide css fences | `sizes: kpi=54` / `sizes: heading=26! body=24!` inside the slide |
+| Conclusion 24 bold | css `.conclusion` | `conclusion="24 bold"` |
+| Numbered rows (slide 8) | `@html` (434 tokens) | `@rows` (+ 4 `N.` lines) |
+| Cover: full navy, amber rule at 61%, teal bar, light-blue subtitle | `@html` (218 tokens) | `cover.band_h=61% cover.rule=accent cover.bar=teal` + `@cover bg=primary dark` + `style: subtitle.color=#D6E2F0` in the slide |
+| Footer + number on an `@html` slide | typed by hand | `footer:` / `num:` (no `@html` slide left); `layout.html_footer=on` otherwise |
 
-## 4. Decisions I could NOT state
+## 4. Decisions I could NOT state (first port) and where they stand now
 
-| Decision | Tried | Proposed syntax |
-|---|---|---|
-| Navy strip across the top of every slide | css `slide { border-top }` -> `css-unsupported` x15 | `style: top.bar=primary top.bar_h=0.12in` |
-| Divider between KPI value and note | none | `kpi.rule=border` |
-| Teal "■" bullet glyph | none (`li::marker` not a selector) | `bullet=■ bullet.color=teal` |
-| 22 pt spacing between box items | not tried (`layout.para_gap` is a ratio) | `para.gap=22pt` |
-| "STEP 1..4" teal caption under each card | none | `@4 steps num` |
-| Step card text bold, centred, 24 pt | css `.steps-card`: no effect, no diagnostic | `steps-card.align=center steps-card.bold=on steps-card.size=24` |
-| Alternate chevron colours without touching the card | `{.secondary}` recolours arrow and outlines card; `nth-child` css ignored; `{fill=}` recolours card (2.2:1) | `steps-arrow.fill=primary,secondary` (cycling list) |
-| Chart text 14 / axis 13 (SlideMark gives 20-24) | none per chart | chart option `size=14` |
-| Column gap 80 per chart | `render.chart_gap` is deck-wide | chart option `gap=80` |
-| Line markers filled 9 pt | none | chart option `marker=9` |
-| Gridline colour, no value-axis line | none | `render.chart_grid=border`, `axis=grid` |
-| Exact KPI card height 4.4 in | only body-share tokens | `{h=4.4in}` honoured on KPI rows |
-| Custom colour name in `colors=` of a chart | warns `bad-chart-option` (only 10 preset names or hex) | accept names declared in `colors:` |
-
-Count: 32 decisions listed -> 21 covered natively or by tokens, 9 CSS or `@html` workarounds, 13 not statable (a few
-appear in two sections because they are partly native, partly CSS). Deviations kept to reach 0 warnings: teal note text
-`#2A9D8F` -> `#217B70` (3.0:1 on `#EEF2F7`), KPI numbers shrink to fit (28 vs 34 pt, 49 vs 54 pt), alternate step cards
-carry a blue outline, slide 8 rows start at 1.92 in instead of 2.0.
+| Decision | Status now |
+|---|---|
+| Navy strip across the top of every slide | `top.bar=primary` (design wave 3) |
+| Teal "■" bullet glyph | `bullet=■ bullet.color=teal` |
+| "STEP 1..4" teal caption, step card text bold centred 24, alternating arrow colours, pentagon heads | `@steps num`, `steps.caption_color=teal`, `steps-card="24 bold center"`, `steps-arrow.fill=primary,secondary`, `render.chevron_shape=pentagon` |
+| Chart text 14, gap 80, markers 9, gridline colour, custom colour names in `colors=` | chart options `size=14 gap=80 marker=9`, `render.chart_grid`, names accepted |
+| Exact KPI card height 4.4 in | `kpi.h=4.4in` |
+| 22 pt spacing between box items | `layout.para_gap` is a ratio (em); an absolute pt value is not stated |
+| Divider between KPI value and note | **still missing** (the note sits in the number's text frame) |
+| Exact table row height (0.8 / 1.05 in) | **still missing** (rows grow with the free height) |
 
 ## 5. Defaults overridden vs kept
 
 Overridden: theme (`none`), every colour and the palette, font family, the type scale, `title.band=none`,
 `heading.band=primary`, `card.radius=0`, KPI class (colour, size, stripe, label), table header/zebra/widths/align,
-conclusion fill and size, chart line width, per-chart series colours, KPI card height, two whole slides (`@html`).
+conclusion fill and size, chart line width, per-chart series colours, KPI card height, (no whole slide in `@html` any more).
 
 Kept: grid, gaps, margins and card padding; title/footer/footnote/conclusion placement; `lang: ja` line breaking, CJK
 squeeze, orphan control, U+2060 joiners; chart internals (plot placement, axis rules: bar with `labels=on` and 4
@@ -108,11 +122,6 @@ contrast safety net (it changed one of the agent's colours).
 
 ## 6. What this proves
 
-SlideMark states most of the agent's deck frame and per-slide choices in 43% of the tokens (2,283 vs 5,263), and the
-chart and table decisions in one fence line each. The remaining cost is chrome with no syntax yet: top strip, KPI
-stripe/label styling, bullet glyph, step labels, numbered rows, styled cover. Closing the top five (`top.bar` /
-`title.rule`, `kpi.*` tokens, `@rows`, `steps num` + cyclic arrow colours, chart `size= gap= marker=`) would bring the
-port to about 1,500 tokens (29%) with no `@html` and no css fence (estimate, not measured).
-
-Two silent failures worth a diagnostic: the css selectors `.steps-card` and `.steps-arrow:nth-child(even)` are
-accepted with no effect and no warning.
+SlideMark states the agent's deck frame and per-slide choices in 29.96% of the python-pptx tokens (1,577 vs 5,263)
+with no css fence and no `@html`. What remains outside the native vocabulary is in section 4: the KPI divider rule
+and an exact table row height (and a colour per bar / a manual per-point label position, which this deck does not use).

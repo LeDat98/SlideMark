@@ -203,6 +203,99 @@ def style_css_rules(deck: Deck, ctx: Ctx) -> list[CssRule]:
     return rules
 
 
+# `kpi.label="20 bold primary"`: one token for the text look of an element or class (like CSS `font`).
+# Words: a number = size (pt), bold / italic / underline, left|center|right|justify = alignment, else a color.
+_SHORT_HEADS = (
+    (_CSS_ELEMENTS - {"slide", "table", "code", "img"})
+    | _CSS_CLASSES
+    | {"title", "heading", "body", "text", "footer", "num", "steps-card", "steps-arrow", "rows", "rows-num"}
+)
+_SHORT_FLAGS = ("bold", "italic", "underline")
+_SHORT_ALIGN = ("left", "center", "right", "justify")
+
+
+def _short_head(key: str) -> bool:
+    head, dot, rest = key.strip().lower().partition(".")
+    if dot:
+        return head == "kpi" and rest in _KPI_PARTS
+    return head in _SHORT_HEADS
+
+
+def _shorthand(deck: Deck, key: str, value: str, ctx: Ctx, line: int) -> bool:
+    """``style: kpi.label="20 bold primary"`` -> ``kpi.label.size=20 .bold=on .color=primary`` (long keys).
+
+    Only a bare element or class name (a key that is otherwise an unknown token) takes the shorthand, so
+    ``radius=14`` and ``card.fill=...`` keep their meaning. A word it cannot place gets a ``bad-token``
+    hint."""
+    from ..theme import canonical_token
+
+    if not _short_head(key) or canonical_token("style", key)[0] is not None:
+        return False
+    k = key.strip().lower()
+    pairs: list[tuple[str, str]] = []
+    for w in value.split():
+        lw = w.lower()
+        if re.fullmatch(r"\d+(\.\d+)?(pt)?", lw):
+            pairs.append(("size", lw.removesuffix("pt")))
+        elif lw in _SHORT_FLAGS:
+            pairs.append((lw, "on"))
+        elif lw in _SHORT_ALIGN:
+            pairs.append(("align", lw))
+        elif re.fullmatch(r"#[0-9a-f]{3,8}|[a-z][\w-]*", lw):
+            pairs.append(("color", w))
+        else:
+            ctx.warn(
+                f"token {key}={value}: cannot read '{w}'"[:140],
+                line,
+                "bad-token",
+                f"{key} takes words: a size (24), bold, italic, underline, left|center|right|justify, color",
+            )
+            return True
+    if not pairs:
+        ctx.warn(
+            f"token {key} has no value",
+            line,
+            "bad-token",
+            f'write {key}="24 bold primary" (size, bold, color...)',
+        )
+        return True
+    for field, val in pairs:
+        set_token(deck, "style", f"{k}.{field}", val, ctx, line)
+    return True
+
+
+SLIDE_TOKEN_RE = re.compile(r"^(sizes|style)[ \t]*:[ \t]*(\S.*?)[ \t]*$")
+
+
+def take_slide_tokens(
+    lines: list[str], inside: list[bool], start: int, end: int
+) -> list[tuple[int, str, str]]:
+    """``sizes:`` / ``style:`` lines inside a slide body: ``(line index, group, text)``, blanked in ``lines``.
+
+    Only a line whose every word is ``key=value`` counts, so prose such as ``style: modern`` stays text."""
+    out: list[tuple[int, str, str]] = []
+    for i in range(start, min(end, len(lines))):
+        m = None if inside[i] else SLIDE_TOKEN_RE.match(lines[i])
+        if m and all("=" in w for w in split_pairs(m.group(2))):
+            out.append((i, m.group(1), m.group(2)))
+            lines[i] = ""
+    return out
+
+
+def slide_tokens(
+    deck: Deck, found: list[tuple[int, str, str]], ctx: Ctx
+) -> tuple[dict[str, str], list[CssRule]]:
+    """Tokens of one slide: (canonical path -> raw value, element-CSS rules). Same parsing as the header."""
+    scratch = Deck()
+    scratch.tokens = {k: v for k, v in deck.tokens.items() if k.startswith("colors.")}
+    own = set(scratch.tokens)
+    for i, group, text in found:
+        parse_token_line(scratch, group, text, ctx, i + 1)
+    rules = style_css_rules(scratch, ctx)
+    finish_tokens(scratch, ctx)
+    return {k: v for k, v in scratch.tokens.items() if k not in own}, rules
+
+
 def note_stated(deck: Deck, key: str) -> None:
     """Record that the header stated ``key`` (colors/fonts/sizes/style/css): the design feedback reads it."""
     stated = deck.attrs.setdefault("design_stated", [])
@@ -213,6 +306,14 @@ def note_stated(deck: Deck, key: str) -> None:
 def set_token(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int) -> None:
     from ..theme import TokenValueError, canonical_token, normalize_token
 
+    if group == "style" and _shorthand(deck, key, value, ctx, line):
+        return
+    if (
+        group == "fonts" and key.strip().lower() == "font"
+    ):  # `fonts: font="Yu Gothic"`: text roles, one family
+        for role in ("heading", "body", "ea"):
+            set_token(deck, group, role, value, ctx, line)
+        return
     if _style_css(deck, group, key, value, ctx, line):
         note_stated(deck, group)
         return

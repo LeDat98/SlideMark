@@ -229,7 +229,19 @@ def apply_attrs(
 LAYOUT_WORDS = ("cover", "section", "blank", "center", "free")
 FLAGS = ("flow", "chevron", "steps")
 AT_KEYS = ("bg", "t", "id", "gap")
-KNOWN_WORDS = (*LAYOUT_WORDS, *FLAGS, "html", "hidden", "build", "dense", "dark", "light", "plain")
+KNOWN_WORDS = (
+    *LAYOUT_WORDS,
+    *FLAGS,
+    "html",
+    "hidden",
+    "build",
+    "dense",
+    "dark",
+    "light",
+    "plain",
+    "kpi",
+    "rows",
+)
 TRANSITIONS = ("fade", "push", "wipe", "split", "cover", "zoom", "morph")
 _N = re.compile(r"^\d+$")
 _CXR = re.compile(r"^\d+x\d+$")

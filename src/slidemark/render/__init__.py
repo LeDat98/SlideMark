@@ -34,7 +34,7 @@ from ..ir import (
 from ..layout import measure
 from ..layout.css import has_side_borders, side_borders, slide_style
 from ..template import clone_footer, open_template, pick_layout
-from ..theme import DEFAULT_SIZES, Theme
+from ..theme import DEFAULT_SIZES, Theme, slide_theme
 from ..units import slide_size, to_emu
 from .anim import build_timing
 from .design_part import write_design_part
@@ -117,6 +117,7 @@ def render(deck: Deck, placed: list[list[Placed]], theme: Theme, out: str | Path
             prs.slide_width, prs.slide_height = (Emu(v) for v in slide_size("16:9"))
     for i, slide in enumerate(deck.slides):
         rc.slide_index = i
+        rc.theme = slide_theme(theme, slide)  # `sizes:` / `style:` lines inside the slide
         items = placed[i] if i < len(placed) else []
         try:
             rc.slides.append(_render_slide(rc, prs, slide, items))
@@ -130,6 +131,7 @@ def render(deck: Deck, placed: list[list[Placed]], theme: Theme, out: str | Path
                 "simplify this slide or report a bug",
                 "error",
             )
+    rc.theme = theme
     close_html(rc)
     _resolve_links(rc)
     _sections(rc, prs)
