@@ -195,12 +195,15 @@ goes full width below. Each table/chart/image/code outside a box is its own bloc
 `items` bullets of each box as item cards (`item.fill` `item.border-left="5pt solid secondary"` `item.size`) · `num` a
 numbered circle on each box heading (`box.num.fill`) · `flow` cards with arrows · `a>b` arrow, `a-b` line between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition ·
 `@bg=#0B1020` or `@bg="linear-gradient(135deg,#1A0B2E,#7A1FA2)"` background (dark flips text light; `@dark`
-`@light` force it) · `@free` no automatic layout: blocks sit at their own `{x y w h}`.
+`@light` force it) · `@free` no automatic layout: blocks sit at their own `{x y w h}` (`@free grid`: 12×12 cells, `x=3c w=4c`).
 
-**Attributes** `{.class key=value}` at the end of a heading or image, or alone on the line before a
-block: `x y w h` (`%` `in` `cm` `pt`), `size`, `color`, `fill`, `align`, `valign`, `bold`, `icon=name`.
+**Attributes** `{.class key=value}` at the end of a heading, image, title or list line, or alone on the line
+before a block; every element takes `x y w h` (`%` `in` `cm` `pt`; never moved by the layout once set), `size`,
+`color`, `fill`, `line`, `radius`, `shadow=on`, `align`, `valign`, `bold`, `italic`, `font`, `opacity`, `pad`,
+`rotate=-4`, `shape=pill|hexagon|chevron|parallelogram|ellipse|…` (59 names), `z=1..9` (stacking), `icon=name`.
 Classes: `.primary .accent .danger .success .muted` (colours), `.plain` (no card), `.kpi`, `.zebra` (table
-rows), `.badge` (inline pill). On a heading, `size` `fill` `color` style the whole box.
+rows), `.badge` (inline pill). On a heading, `size` `fill` `color` style the whole box; `- 要確認 {color=danger}`
+styles one list line; a chart frame takes `{fill= radius= pad=}`.
 
 **Inline:** `**b**` `*i*` `~~s~~` `` `code` `` `==accent==` `[text]{.danger}` `[済]{.badge .success}`
 `[link](url)`. Lists: `-` / `1.`, nest with two spaces; `- [ ] todo`.
