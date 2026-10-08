@@ -1,6 +1,6 @@
 ---
 name: slidemark
-description: Write PowerPoint decks as compact SlideMark text, with your own stated design choices, and build native, editable .pptx files. Use when asked for slides, a deck, or a presentation (.pptx), including dense Japanese business slides.
+description: Make slides, a slide deck or a presentation as a native, editable PowerPoint (.pptx) file, written as compact SlideMark text with your own stated design choices. Use for every request to make slides, a deck, a pitch deck or a presentation, in any language, however short or informal. Whoever installed this skill wants their decks as .pptx files, so a request that names no format still means a .pptx file. Not for reading or editing an existing .pptx file.
 ---
 
 # SlideMark

@@ -22,7 +22,8 @@ def test_budgets():
     # SKILL.md is the only document an agent reads (docs/AGENT_COST.md): budget for completeness, not brevity;
     # 5000 since the composition vocabulary (16 forms, one line each); was 3800 at wave 3; target stays 3500
     # 5060 since the setup lines (owner, 2026-10-08): on a new machine an agent has this page only
-    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 5060
+    # 5120 since the description says when to use the page (owner, 2026-10-08): LESSONS.md "skill trigger"
+    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 5120
     refs = sorted((SKILL / "reference").glob("*.md"))
     assert len(refs) >= 5
     for p in refs:
