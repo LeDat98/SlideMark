@@ -58,8 +58,9 @@ short of a form, one emphasis (or `@noemph`), values (or `@defaults`). Advisory.
   (`accent`: the key number, the current step, the verdict). Never split the weight evenly.
 - Light/dark contrast: dark cover and closing slide, light content between ("sandwich": `@cover bg=primary dark`
   on the first and last slide), or dark throughout for a premium feel (`@bg=` on every slide or `theme: midnight`).
-- One repeating visual motif, carried by every content slide: an icon on each card heading (`icon=`), numbered
-  discs (`@rows`, `num`), one chart style, one card style. Bars and stripes are not a motif.
+- One repeating visual motif, carried by every content slide: an icon disc on each card heading (`icon=` +
+  `style: icon.disc=secondary`), numbered discs (`@rows`, `num`), one chart style, one card style. Bars and
+  stripes are not a motif.
 - Starting points (write your own hexes when the brand or topic suggests them; do not default to blue):
   navy + teal + amber `colors: primary=#0B2A3C secondary=#1B8A8F accent=#F2A33A surface=#EEF4F6` ·
   forest + moss + cream `primary=#1E3A2F secondary=#6B8F71 accent=#D9A441 bg=#FBF8F1` ·
@@ -86,7 +87,8 @@ equivalent fallback). Japanese: Meiryo or Yu Gothic.
 
 **Never**: a rule under the slide title (`title.rule`, `heading.rule`) and decorative bars or stripes
 (`top.bar`, `bottom.bar`, `box.stripe`, `kpi.stripe`, `item.border-left`, a vertical band beside the content).
-Both read as machine-made. To lift a card use a tinted `fill`, `shadow=on` or an icon.
+Both read as machine-made. To lift a card use a tinted `fill`, a shadow (`style: card.elevation=2`: a soft
+shadow and no border line; `1` lighter, `3` deeper, or `card.shadow="0 3 12 #00000030"`) or an icon disc.
 **Avoid**: the same form on consecutive slides; a full stop at the end of a title; titles that move, change
 font or size between slides of one kind; centred paragraphs (centre titles only); titles under 36pt or body
 under 14pt (pin floors: `sizes: title=36! body=14!`, then cut text, widen the block or split the slide
@@ -295,7 +297,11 @@ styles one list line; a chart frame takes `{fill= radius= pad=}`.
   wider with a bigger number. Up to 4 in a row; `@end` + a list or table below them.
 - **Callout:** `> [!note] text` (`tip` `warn` `caution`), at slide level or inside a box.
 - **Icons:** `icon=` on a box heading: `check warning info user chart money yen target rocket gear clock
-  globe shield flag` or `icon=logo.svg`.
+  globe shield flag refresh tag` or `icon=logo.svg`. **Icon discs** (the icon inside a coloured circle, the
+  usual card motif): `style: icon.disc=secondary` deck-wide (`icon.disc.shape=circle|rounded|square`,
+  `icon.disc.size=0.8in`, `icon.color=` for the glyph; default a readable ink on the disc), `{icon=gear disc=accent}`
+  on one heading or `- icon=bolt disc=accent **T** text` in `@iconlist`, `disc=none` removes it.
+  `conclusion.icon=refresh` puts an icon at the left of the conclusion bar.
 - **Flowchart, org chart:** ` ```mermaid ` with `graph TD` / `graph LR`, `A[申請] --> B{承認?}`, `B -->|yes| C`.
 - **Math:** ` ```math ` LaTeX → native equation. **Images:** `![what it shows](a.png)` (alt text required);
   `![alt](demo.mp4)` video/audio; ` ```svg ` inline SVG. Other fences are code.
