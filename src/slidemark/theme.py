@@ -602,7 +602,7 @@ class LayoutTokens(BaseModel):
     iconlist_fill_air: float = 2.6  # `iconlist.fill=on`: a row is at most this x its tallest item
     cover_art_nodes: int = 11  # `cover.art=network`: dots (8..12) joined by thin lines
     cover_art_node_ratio: float = (
-        0.045  # ... a dot is this x the art's shorter side wide (the accent one 1.6x)
+        0.07  # ... a dot is this x the art's shorter side wide (the accent one 1.7x)
     )
     cover_art_line_pt: float = 1.25  # ... the lines' thickness (pt)
     cover_art_margin: float = 0.06  # ... air between the motif and the slide edges, in slide widths
@@ -1004,7 +1004,7 @@ class Theme(Forms4Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
         "none"  # decorative motif on the cover's right half
     )
     cover_art_color: str | None = None  # ... its colour (None = `secondary`); one node is `accent`
-    cover_art_opacity: float = Field(0.55, ge=0.05, le=1.0)  # ... how opaque it is
+    cover_art_opacity: float = Field(0.65, ge=0.05, le=1.0)  # ... how opaque it is
     cover_art_seed: int = 7  # ... the same seed draws the same motif
     cover_art_split: float = Field(
         0.6, ge=0.3, le=0.9

@@ -39,6 +39,7 @@ from ..template import clone_footer, open_template, pick_layout
 from ..theme import DEFAULT_SIZES, Theme, slide_theme
 from ..units import slide_size, to_emu
 from .anim import build_timing
+from .coverart import set_line_alpha
 from .design_part import write_design_part
 from .effects import apply_fill, apply_shadow, cover_crop, set_picture
 from .htmlimg import add_html_image, add_html_native, close_html
@@ -733,6 +734,8 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
         if el.shape == "chevron" and _flat_tail(rc, pl):
             kind = MSO_SHAPE.PENTAGON  # `render.chevron_shape=pentagon`: a flat tail, a pointed head
         shp = _autoshape(rc, s, pl, kind, name)
+        if "line_alpha" in el.attrs:  # `cover.art=rings`: an outline that is only partly opaque
+            set_line_alpha(shp.line, el.attrs["line_alpha"])
         if el.paragraphs:
             chev = el.shape == "chevron"
             pill = bool(el.attrs.get("pill"))
@@ -850,6 +853,8 @@ def _connector(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     st = pl.style
     cx.line.color.rgb = rgb(rc.theme, st.line or "primary")
     cx.line.width = Pt(st.line_width if st.line_width is not None else rc.theme.render.connector_width)
+    if "line_alpha" in el.attrs:  # `cover.art`: a thin line that is only partly opaque
+        set_line_alpha(cx.line, el.attrs["line_alpha"])
     if el.attrs.get("head") == "arrow":
         ln = cx.line._get_or_add_ln()
         tail = etree.SubElement(ln, qn("a:tailEnd"))

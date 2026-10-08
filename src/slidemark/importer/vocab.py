@@ -33,6 +33,7 @@ _NAMES = {
     "stairs": re.compile(r"Stairs (\d+)"),
     "nested": re.compile(r"Nested (\d+)(?: text| list| icon)?"),
     "flowdisc": re.compile(r"Flow (\d+) (?:disc|line|text|icon)"),
+    "coverart": re.compile(r"Cover art (\d+)"),
 }
 _TEXT = {
     "timeline": re.compile(r"Timeline (\d+)( now)?"),
@@ -127,6 +128,7 @@ def extract(data: SlideData) -> FormFold | None:
         "stairs": _stairs,
         "nested": _nested,
         "flowdisc": _flowdisc,
+        "coverart": _coverart,
         "vs": _vs,
         "matrix": _matrix,
     }[form]
@@ -134,6 +136,30 @@ def extract(data: SlideData) -> FormFold | None:
 
 
 # --------------------------------------------------------------------------- one fold per form
+
+
+def _coverart(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:
+    """``cover.art`` motifs are decoration: ``extract`` already marked every ``Cover art N`` shape as decor,
+    so the slide is imported as the plain cover it is (the token comes back via ``cover_art_tokens``)."""
+    return None
+
+
+def cover_art_tokens(data: SlideData) -> dict[str, str]:
+    """The deck ``style:`` tokens that redraw the ``Cover art N`` shapes of this slide (``{}`` without them).
+
+    ``network`` = joined by lines (call it before ``extract``); ``rings`` = outline-only circles;
+    ``dots`` = many filled discs. The colour is not read: the layout default (``secondary``) stays."""
+    art = [it for it in data.items if _NAMES["coverart"].fullmatch(_name(it))]
+    if not art:
+        return {}
+    discs = [it for it in art if it.kind != "line"]
+    if data.connectors or data.conns:  # (the lines are connectors, not items; `extract` clears the counts)
+        kind = "network"
+    elif discs and all(it.fill in (None, "x") for it in discs[:3]):
+        kind = "rings"
+    else:
+        kind = "dots"
+    return {"cover.art": kind}
 
 
 def _timeline(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:

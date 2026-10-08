@@ -501,6 +501,11 @@ STYLE_NEEDS: list[tuple[re.Pattern[str], Callable[[_Facts], bool], str]] = [
         "no cover slide: slide 1 with only a title (+ subtitle) or @cover",
     ),
     (
+        re.compile(r"^cover\.art"),  # wave 2026-10-08 lane D: the motif needs a cover, not the anchored one
+        _Facts.cover,
+        "no cover slide: slide 1 with only a title (+ subtitle) or @cover",
+    ),
+    (
         re.compile(r"^cover\.band_h$"),
         _Facts.cover,
         "no cover slide: slide 1 with only a title (+ subtitle) or @cover",

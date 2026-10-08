@@ -33,7 +33,7 @@ from ..ir import (
 from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
-from . import boxpin, cardlook, css, forms2, icondisc, kpirow, measure, stepspin, vocab
+from . import boxpin, cardlook, coverart, css, forms2, icondisc, kpirow, measure, stepspin, vocab
 from .chartnote import expand_notes, scale_warning
 from .diagram import fill_tree
 from .gantt import expand_gantt
@@ -4298,7 +4298,17 @@ def _cover_stripes(theme: Theme, W: int) -> list[tuple[str, int]]:
     return sorted(out, key=lambda t: t[1])
 
 
-def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, fit_text, dims) -> Rect | None:
+def _cover_art(ctx: _Ctx, head: list, put, W: int, H: int, art_x: int | None) -> None:
+    """``cover.art``: the motif's shapes (``Cover art N``), behind the title block, right of ``art_x``."""
+    if art_x is None:
+        return
+    for shape, rect, st in coverart.art(ctx.theme, ctx.lt, W, H, art_x):
+        put(head, shape, rect, st)
+
+
+def _anchored_cover(
+    ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, fit_text, dims, art_x: int | None = None
+) -> Rect | None:
     """Cover composed from tokens: a band (``cover.band_h`` of the height, filled when ``title.band`` is set)
     anchored to the top, the title (+ subtitle) bottom-aligned in it ``cover.pad`` above its edge, a thin
     ``cover.rule`` along that edge and the deck footer as a quiet caption at the bottom (``cover.footer``).
@@ -4319,6 +4329,8 @@ def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, f
     air = _emu(theme.cover_gap)
     if stripes:  # the text keeps clear of the first stripe
         tw = max(min(tw, stripes[0][1] - tx - air), inner_w // 4)
+    if art_x is not None:  # `cover.art`: the title block keeps the left share, the motif the rest
+        tw = max(min(tw, art_x - tx - air), inner_w // 4)
     bh = round(H * theme.cover_band_h)
     rh = _emu(theme.cover_rule_h) if theme.cover_rule else 0
     short = bool(rh and theme.cover_rule_w is not None)  # a short rule at the title, not on the band edge
@@ -4333,6 +4345,7 @@ def _anchored_cover(ctx: _Ctx, slide: Slide, sub, head: list, tail: list, put, f
         )
     for col, x in stripes:
         put(head, Shape(shape="rect", id="rule"), Rect(x, 0, W - x, H), fast_style(fill=col, line=None))
+    _cover_art(ctx, head, put, W, H, art_x)
     for col, h_tok, at_bottom in (  # `cover.top_bar` / `cover.bottom_bar`: a strip on the cover's edge
         (theme.cover_top_bar, theme.cover_top_bar_h, False),
         (theme.cover_bottom_bar, theme.cover_bottom_bar_h, True),
@@ -4728,10 +4741,18 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
     body: Rect | None
     if kind in ("cover", "section"):
         sub = slide.subtitle or slide.lead
+        art_x = (  # `cover.art`: on a cover and on a closing title slide; the title keeps `cover.art.split`
+            round(W * theme.cover_art_split)
+            if coverart.wanted(theme) and (kind == "cover" or index == len(deck.slides) - 1)
+            else None
+        )
         if kind == "cover" and theme.cover_band_h > 0 and not _cover_explicit(ctx, slide.title, sub):
-            body = _anchored_cover(ctx, slide, sub, head, tail, put, fit_text, (W, H, Mx, My, sg, inner_w))
+            body = _anchored_cover(
+                ctx, slide, sub, head, tail, put, fit_text, (W, H, Mx, My, sg, inner_w), art_x
+            )
             y_top = 0
         else:
+            text_w = inner_w if art_x is None else max(min(inner_w, art_x - Mx - sg), inner_w // 4)
             band_h = round(H * 0.34)
             by = round(H * 0.24)
             composed = (
@@ -4748,6 +4769,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     Rect(0, by, W, band_h),
                     fast_style(fill=theme.title_band, line=None),
                 )
+            _cover_art(ctx, head, put, W, H, art_x)
             t_st = s_st = None
             t_r = s_r = None
             t_fs = s_fs = 1.0
@@ -4756,7 +4778,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 t_st = t_st.merged(fast_style(valign="bottom"))
                 if theme.title_band:
                     t_st = t_st.merged(fast_style(color=theme.title_band_color))
-                t_r = _pin_rect(ctx, slide.title, Rect(Mx, by, inner_w, round(band_h * 0.65)), W, H)
+                t_r = _pin_rect(ctx, slide.title, Rect(Mx, by, text_w, round(band_h * 0.65)), W, H)
                 t_st = _styled(ctx, slide.title, t_st, classes=False)
                 t_fs = fit_text(slide.title, t_r, t_st)
                 if composed:
@@ -4766,7 +4788,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 if theme.title_band:
                     s_st = s_st.merged(fast_style(color=theme.title_band_color))
                 s_r = _pin_rect(
-                    ctx, sub, Rect(Mx, by + round(band_h * 0.68), inner_w, round(band_h * 0.3)), W, H
+                    ctx, sub, Rect(Mx, by + round(band_h * 0.68), text_w, round(band_h * 0.3)), W, H
                 )
                 s_st = _styled(ctx, sub, s_st.merged(fast_style(valign="top")), classes=False)
                 s_fs = fit_text(sub, s_r, s_st)
@@ -4775,9 +4797,9 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 sh = round(_text_need(ctx, sub, s_st, s_r.w, s_fs)) if s_r is not None else 0
                 sp = sg if sh else 0
                 top = round(H * ctx.lt.cover_title_y) - (th + sp + sh) // 2
-                t_r = Rect(Mx, top, inner_w, th)
+                t_r = Rect(Mx, top, text_w, th)
                 if s_r is not None:
-                    s_r = Rect(Mx, top + th + sp, inner_w, sh)
+                    s_r = Rect(Mx, top + th + sp, text_w, sh)
             if t_r is not None:
                 put(head, slide.title, t_r, t_st, t_fs)
             if s_r is not None:
