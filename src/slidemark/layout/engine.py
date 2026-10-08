@@ -33,7 +33,7 @@ from ..ir import (
 from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
-from . import boxpin, cardlook, coverart, css, forms2, icondisc, kpirow, measure, stepspin, vocab
+from . import boxpin, cardlook, coverart, css, forms2, headfit, icondisc, kpirow, measure, stepspin, vocab
 from .chartnote import expand_notes, scale_warning
 from .diagram import fill_tree
 from .gantt import expand_gantt
@@ -164,6 +164,10 @@ class _Ctx:
     band_h: dict[tuple[int, int], int] = field(
         default_factory=dict
     )  # (box id, box width) -> heading height shared by the boxes of one row
+    heading_probe: bool = False  # `_equalize_heads` is testing the row at the plain size (no recursion)
+    head_k: dict[tuple[int, int], float] = field(
+        default_factory=dict
+    )  # (box id, box width) -> shrink of the heading of a row whose heading would wrap (`heading.wrap=off`)
     gaps: dict[int, float] = field(default_factory=dict)  # text id -> paragraph gap (em) of a roomy card
     text_out: dict[int, int] = field(default_factory=dict)  # text id -> index of its Placed in ``out``
     boxes: dict[int, list[int]] = field(default_factory=dict)  # box id -> ids of its spreadable texts
@@ -1395,17 +1399,27 @@ def _box_body_pt(ctx: _Ctx, c: Container) -> float:
 
 
 def _head_metrics(
-    ctx: _Ctx, c: Container, rect_w: int, pad: int, kpi: bool, row: bool = True, hpad: int | None = None
+    ctx: _Ctx,
+    c: Container,
+    rect_w: int,
+    pad: int,
+    kpi: bool,
+    row: bool = True,
+    hpad: int | None = None,
+    k: float | None = None,
 ):
     """(parts, icon side, text shift, heading height) of a box ``rect_w`` wide, or ``None`` without heading.
 
     The height is the heading band (or the plain heading text); with ``row`` it is raised to the tallest
-    heading among the boxes of the same row (``ctx.band_h``) so that bands and bodies line up.
+    heading among the boxes of the same row (``ctx.band_h``) so that bands and bodies line up. ``k`` scales
+    the heading size (default: the row's one-line shrink, ``ctx.head_k``).
     """
     parts = _heading_parts(ctx, c, pad, kpi)
     if parts is None:
         return None
     h_el, hst, eff, band = parts
+    eff *= ctx.head_k.get((id(c), rect_w), 1.0) if k is None else k
+    parts = (h_el, hst, eff, band)
     icon = _icon_name(c)
     disc = _icon_disc(ctx, c) if icon else None
     above = _above(c, kpi)
@@ -1434,8 +1448,74 @@ def _head_metrics(
     return parts, isz, shift, hh
 
 
+def _head_wraps(ctx: _Ctx, c: Container, rect_w: int, k: float) -> bool | None:
+    """Would the heading of box ``c`` (``rect_w`` wide, scaled by ``k``) take more than one line?
+    ``None`` = not a heading to fit (no heading, several paragraphs)."""
+    if c.title is None or len(c.title.paragraphs) != 1:
+        return None
+    _st, pad, (pl, _pt, pr, _pb) = _cpads(ctx, c)
+    m = _head_metrics(ctx, c, rect_w, pad, False, row=False, hpad=pl + pr, k=k)
+    if m is None:
+        return None
+    (h_el, hst, eff, band), _isz, shift, _hh = m
+    w = rect_w - shift - (0 if band else pl + pr)
+    one = h_el.model_copy(update={"paragraphs": [Paragraph(runs=[Run(text="Ag")])]})
+    line = (hst.font_size or 18) * eff * EMU_PER_PT
+    return _text_need(ctx, h_el, hst, w, eff) > _text_need(ctx, one, hst, w, eff) + 0.5 * line
+
+
+def _fit_heads(ctx: _Ctx, row: list[tuple[Container, int]]) -> bool:
+    """``heading.wrap=off`` (the default): in a row or grid of cards no ``##`` heading wraps while the room
+    allows.
+
+    The headings of the whole group shrink together (one size, down to the card body size) until the
+    longest fits one line; when even the body size wraps one of them, every heading keeps its size and
+    wraps, and the result is ``False``. A heading with a size of its own (CSS, ``sizes: heading=20!``,
+    a ``[x]{size=}`` span) pins the row."""
+    if ctx.theme.heading_wrap or len(row) < 2:
+        return True
+    for c, w in row:
+        ctx.head_k.pop((id(c), w), None)
+    live = [(c, w) for c, w in row if c.title is not None and "kpi" not in c.classes]
+    if len(live) < 2 or any(_head_wraps(ctx, c, w, 1.0) is None for c, w in live):
+        return True
+    if not any(_head_wraps(ctx, c, w, 1.0) for c, w in live):
+        return True
+    floor = 0.0
+    for c, _w in live:  # the floor is the body text of the row (the biggest of the cards)
+        floor = max(floor, _box_body_pt(ctx, c))
+    floor = floor or ctx.theme.sizes.get("body", DEFAULT_SIZES["body"]) * ctx.dense_k
+    sizes = []
+    for c, _w in live:
+        parts = _heading_parts(ctx, c, _cpads(ctx, c)[1], False)
+        if parts is None:
+            return True
+        h_el, hst, eff, _band = parts
+        if _explicit_size(ctx, h_el) or _explicit_size(ctx, c.title):
+            return True  # a pinned heading: the row keeps its sizes
+        sizes.append((hst.font_size or 18) * eff)
+    k_lo = max(floor / max(sizes), 0.0) if sizes else 1.0
+    k = 1.0
+    while k > k_lo + 1e-9:
+        k = max(round(k - 0.02, 4), k_lo)
+        if not any(_head_wraps(ctx, c, w, k) for c, w in live):
+            for c, w in live:
+                ctx.head_k[(id(c), w)] = k
+            return True
+    return False  # even the body size wraps: every heading of the row keeps its size and wraps
+
+
 def _equalize_heads(ctx: _Ctx, boxes: list[tuple[Container, int, int]]) -> None:
     """Boxes of one row share the tallest heading height: ``boxes`` are (box, width, row key)."""
+    grid = [(c, w) for c, w, _key in boxes if isinstance(c, Container)]
+    if grid and not _fit_heads(ctx, grid) and ctx.grow > 1.0 and not ctx.heading_probe:
+        ctx.heading_probe = True  # a heading wraps at this growth: refuse it when the plain size fits
+        grown, ctx.grow = ctx.grow, 1.0
+        try:
+            if _fit_heads(ctx, grid):
+                ctx.over.append("a card heading (the text would grow until it wraps)")
+        finally:
+            ctx.grow, ctx.heading_probe = grown, False
     rows: dict[int, list[tuple[Container, int, int]]] = {}
     for c, w, key in boxes:
         if isinstance(c, Container) and "kpi" not in c.classes and c.title is not None:
@@ -1898,8 +1978,12 @@ def _place_steps(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> bool:
     The cards start ``steps_gap`` under the arrows and are as tall as their content here; the slide's
     growth passes then enlarge their text and ``fill_steps`` stretches them to the conclusion bar /
     footnote. ``False`` = not a steps group (fewer than two headed boxes): placed like any other box."""
-    caption = ctx.theme.steps_caption or ("STEP {n}" if "num" in ctx.slide.classes else None)
     head_card = str(ctx.slide.attrs.get("head") or ctx.theme.steps_head).lower() != "arrow"
+    # One label per step: the card look's arrow already shows the number, so `num` adds the `STEP n` caption
+    # only for `head=arrow` (the arrow holds the heading); `steps.caption=` states it for either look.
+    caption = ctx.theme.steps_caption or (
+        "STEP {n}" if "num" in ctx.slide.classes and not head_card else None
+    )
     arrows, cards = _steps_parts(c, ctx.theme, caption, head_card)
     n = len(arrows)
     if n < 2 or n != len(c.children):  # other blocks in the group: a plain row of boxes
@@ -1928,6 +2012,7 @@ def _place_steps(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> bool:
         h = area.h
         if gs is not None and gs.cols:
             cells = cell_rects(gs, len(present), area, gap, ctx.theme.columns)
+            _equalize_heads(ctx, [(k, r.w, 0) for k, r in zip(present, cells, strict=True)])
             nat = [_box_nat(ctx, k, r.w, inherit) for k, r in zip(present, cells, strict=True)]
             if all(v is not None for v in nat):
                 h = min(h, max(nat))  # type: ignore[type-var]
@@ -4724,6 +4809,7 @@ def _clone_ctx(c: _Ctx) -> _Ctx:
         c,
         alts=list(c.alts),
         band_h=dict(c.band_h),
+        head_k=dict(c.head_k),
         gaps=dict(c.gaps),
         text_out=dict(c.text_out),
         boxes={k: list(v) for k, v in c.boxes.items()},
@@ -5395,6 +5481,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         final_ctx.out = _restore_pins(
             final_ctx.out
         )  # the explicit wins: no pass moved what the author pinned
+        final_ctx.out = headfit.fit_headings(final_ctx.out, theme, ctx.lt)  # `heading.wrap=off`
         final_ctx.out = stepspin.pin_steps(
             final_ctx.out, theme, fit_body.y if fit_body is not None else None
         )  # `steps-arrow.h` `steps-card.h` `steps.gap` `steps-arrow.point`

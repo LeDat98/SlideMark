@@ -1623,7 +1623,7 @@ def build_slide(
         extra.append("bg=" + slide_bg[0])
         if slide_bg[1]:
             extra.append("dark")
-    if any(i.steps and i.caption for i in pool):
+    if any(i.steps and i.caption for i in pool) and "head=arrow" in data.words:
         extra.append("num")  # `@4 steps num`: the `STEP n` caption of every card, folded away above
     extra.extend(found.words)  # `bg=primary dark` of a cover drawn over a slide-filling rectangle
     if data.transition:

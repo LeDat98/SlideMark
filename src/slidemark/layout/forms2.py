@@ -1045,8 +1045,8 @@ def _proscons(ctx, slide: Slide, body: Rect, sg: int) -> bool:
         )
     boxes = boxes[:2]
     base = _base(ctx)
-    plus_col = _paint(ctx, th.proscons_plus_color, "success", "proscons.plus.color")
-    minus_col = _paint(ctx, th.proscons_minus_color, "danger", "proscons.minus.color")
+    plus_col = _paint(ctx, th.proscons_plus_color, "secondary", "proscons.plus.color")
+    minus_col = _paint(ctx, th.proscons_minus_color, "accent", "proscons.minus.color")
     glyphs = {True: (th.proscons_plus or "+")[:2], False: (th.proscons_minus or "\u2212")[:2]}
     card = _card(ctx)
     fill = _paint(ctx, slide.attrs.get("fill"), card.fill, "fill")

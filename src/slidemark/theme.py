@@ -1036,6 +1036,9 @@ class Theme(Forms4Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
     iconlist_icon_pos: Literal["auto", "left", "top"] = (
         "auto"  # `iconlist.icon.pos`: icon beside the text, or above it (auto: top for a row of 3+ columns)
     )
+    # --- wave 2026-10-08 lane F
+    # `heading.wrap=on`: a card heading may wrap; off (the default) = one line preferred in a row of cards
+    heading_wrap: bool = False
 
     def color(self, value: str | None) -> str | None:
         """Resolve a theme color name ("primary") or pass a hex value through."""
@@ -2131,6 +2134,8 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
         got := _lane_d_value(path, raw, names)
     ) is not None:  # wave 2026-10-08 lane D: steps.head cover.art ...
         return got
+    if path == "heading_wrap":  # wave 2026-10-08 lane F
+        return _lane_f_value(path, raw)
     parts = path.split(".")
     leaf = parts[-1]
     in_class = len(parts) == 3 and parts[0] == "classes"
@@ -2326,3 +2331,14 @@ def apply_slide_ink(deck: Any, theme: Theme) -> None:
             slide.css = [*rules, *slide.css]
     except Exception:  # never raise on user input: the slide keeps the theme colors
         return
+
+
+# --- wave 2026-10-08 lane F: heading.wrap
+def _lane_f_value(path: str, raw: str) -> list[tuple[str, Any]]:
+    """``heading.wrap=on|off``: on lets a card heading wrap; off (the default) keeps one line in a row."""
+    low = _unquote(raw).lower()
+    if low in _ON:
+        return [(path, True)]
+    if low in _OFF:
+        return [(path, False)]
+    raise TokenValueError("heading.wrap is on or off", "write heading.wrap=on (headings may wrap) or off")

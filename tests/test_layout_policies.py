@@ -510,6 +510,7 @@ def test_unknown_font_heading_wraps_before_the_body_is_placed():
         theme.fonts.body = font
         theme.layout.balance_air = 0.0  # no lone-row growth: headings would wrap in both fonts
         theme.layout.sparse_left_max = 0.0  # ... nor sparse completion
+        theme.heading_wrap = True  # (`heading.wrap=off` would shrink the heading to one line instead)
         s = Slide(
             title=T("t", "title"),
             grid="3",
