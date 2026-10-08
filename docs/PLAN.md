@@ -801,3 +801,19 @@ difference is the card border line that stays under the shadow and the small `sh
   first, pptxgenjs 3.5 second** ("G makes one decision per role and repeats it; T shrinks type to fit cards, boxes
   almost everything"). Still named on G: the `cols=1` icon list leaves the right half empty (slide 5), duplicate step
   numbers (slide 7, lane F), takeaway bars as dark as the titles, slide 14 cards floating.
+- **Wave 3 status (2026-10-08):** lanes E and F merged (3,426+ tests). Fresh-agent run (`bench/lengthbench/t5/
+  slidemark-wave3-1`): **6 calls**, 3 builds, 2 looks, 77 s, cost above start 120k (baseline 160k), accepted.
+  Blind judge round 12 (equal scale): **wave 3 3.5 ranked first, pptxgenjs 3.5 second, wave 2 3.0 third** ("P has the
+  cleaner hierarchy, consistent repeated parts and no redundant diagrams; N has the richer visual detail, but its
+  text is tiny and its takeaway bars are styled inconsistently"). Two rounds in a row rank SlideMark first at equal
+  scale. Still named on P: thin takeaway bars with tiny text (the agent set `sizes: conclusion=18`; SKILL.md now says
+  keep it ≥ body), `Bước n` captions over numbered arrows (the agent set `steps.caption`; SKILL.md no longer suggests
+  it), slide 14 cards with empty lower halves and no flow between stages, slide 3 ring labels repeating the list.
+  Judge's closing line for all three: "no deck gives the key message on each slide real visual weight".
+- **Leftovers for the next run:** (1) `@N num` / box rows with 2 short bullets still leave 37% of the body (lane E's
+  `fill_box_cards` did not fire: check its 70% rule against the fit line's `sparse: 37% free`); (2) a key-message
+  treatment with weight: `conclusion.style=bar|rule|statement` (statement = large bold line, no bar) as a token with
+  the judge's "pull line" look; (3) `@nested` list beside the rings repeats the ring headings (`nested.list.title=off`
+  as default when the ring holds the heading); (4) `@steps` card heading growth without a wrap check (lane F note);
+  (5) importer: stacked icon-list cards; (6) t4 token gate (diet round 2); (7) the gallery regression list in
+  "Session stop" above is superseded by the wave-3 goldens, re-check 05 / 11 / 16 / 19 by eye.

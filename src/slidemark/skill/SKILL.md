@@ -25,7 +25,8 @@ the form used, text size asked->reached (grown or shrunk to fill unless pinned: 
 free space, attributes `took` / `ignored` (`attr-ignored` names what works).
 
 **0 warnings, the counts your brief asks for, fit lines that match what you decided, and one look at
-`sheet.png` that finds none of the defects in "Check before handing back" = done: reply.**
+`sheet.png` that finds none of the defects in "Check before handing back" = done: reply.** The takeaway bar is the
+slide's message: keep `sizes: conclusion=` at or above `body` (default: it follows the body text).
 Else edit `deck.md` once and run `slidemark build deck.md -o deck.pptx --png sheet.png`. The only look is
 `sheet.png` (written by that same build) with ONE Read per build; never render, re-open the .pptx or run
 another command. Usual path: read, build + look, hand back = 3 calls; one fix round = 4. (No heredoc? Write
@@ -257,8 +258,8 @@ goes full width below. Each table/chart/image/code outside a box is its own bloc
 **`@` line** (only if the automatic layout is wrong; one per slide, tokens space separated):
 `@3` columns · `@2x2` grid · `@1:2` ratios · `@aab/aac` areas (letters = blocks in order, `.` empty) ·
 `chevron` steps (heading + 1–2 short bullets) · `steps` numbered arrows over cards, each card: icon disc, bold
-heading, text, top-anchored; one label per step (`steps.caption="Bước {n}"` adds a caption; `steps head=arrow`
-puts the headings in the arrows, then `num` captions the number) · `rows` a `1.` list alone as numbered bars (`rows plain` = unnumbered, `rows.glyph=■ rows.stripe=a,b`) ·
+heading, text, top-anchored; the arrow's number is the only step label (no caption: a `steps.caption=` would
+number twice; `steps head=arrow` puts the headings in the arrows, then `num` captions the number) · `rows` a `1.` list alone as numbered bars (`rows plain` = unnumbered, `rows.glyph=■ rows.stripe=a,b`) ·
 `items` bullets of each box as item cards (`item.fill` `item.border-left="5pt solid secondary"` `item.size`) · `num` a
 numbered circle on each box heading (`box.num.fill`) · `flow` cards with arrows · `a>b` arrow, `a-b` line between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition ·
 `@bg=#0B1020` or `@bg="linear-gradient(135deg,#1A0B2E,#7A1FA2)"` background (dark flips text light; `@dark`

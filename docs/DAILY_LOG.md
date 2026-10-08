@@ -167,4 +167,6 @@ Run goal (owner: look like the pptxgenjs deck; cost and time may rise to 50%):
 - [x] SKILL.md "Design guide" + the new forms (7.1k tokens); t5 open brief (`bench/lengthbench/t5`), 3 fresh-agent runs, 2 blind-judge rounds
 - Metrics: tests 3,368 (3,098 at start); judge on t5: pptxgenjs 4.0, SlideMark 2.5 → 3.5 (two rounds agree on 3.5 for the latest arm); runs 7 calls / 3 builds / 74–93 s, cost above start 160k → 138k → 130k, all accepted; round trip 117/126; q3 155 tokens (unchanged).
 - Problems: GitHub Actions 500 after the switch to public (release done from the owner's machine); two lanes spawned before a merge lacked wave 1 and merged `main` themselves; `pytest -n 4` needed in the venv; the t4 token gate stays red.
-- Next: wave 3 (text sizes in sparse forms, takeaway text floor, no double step label, 4-up heading wrap, proscons palette), then re-judge; t4 diet round 2; the gallery regression list in "Session stop".
+- [x] Wave 3 E: takeaway bar wraps before it shrinks, iconlist / card growth caps; F: one step label, headings never wrap in a row, proscons palette; judge round 12 at equal scale: SlideMark wave 3 3.5 ranked first, pptxgenjs 3.5, wave 2 3.0; run 6 calls / 77 s / cost above start 120k
+- Found: the judge sheets were not at one scale (pptxgenjs 640 px tiles vs ours 420): rebuilt, lesson recorded; at equal scale SlideMark ranks first in rounds 11 and 12.
+- Next: key-message weight (`conclusion.style`), card rows with two bullets still 37% empty, nested list repeating ring headings, steps heading wrap check, t4 diet round 2.
