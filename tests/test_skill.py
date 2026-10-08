@@ -23,7 +23,9 @@ def test_budgets():
     # 5000 since the composition vocabulary (16 forms, one line each); was 3800 at wave 3; target stays 3500
     # 5060 since the setup lines (owner, 2026-10-08): on a new machine an agent has this page only
     # 5120 since the description says when to use the page (owner, 2026-10-08): LESSONS.md "skill trigger"
-    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 5120
+    # 6600 since the design guide (owner, 2026-10-08): palette + motif, a visual on every slide, type scale,
+    # the never / avoid lists and the three-step check, after the pptxgenjs comparison (docs/PLAN.md)
+    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 6600
     refs = sorted((SKILL / "reference").glob("*.md"))
     assert len(refs) >= 5
     for p in refs:

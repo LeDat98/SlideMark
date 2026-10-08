@@ -24,10 +24,11 @@ sit": `slide 2: lead + 4 kpi cards 46% of body, value 48->40pt (shrunk to fit), 
 the form used, text size asked->reached (grown or shrunk to fill unless pinned: `size=`, `sizes: body=14!`),
 free space, attributes `took` / `ignored` (`attr-ignored` names what works).
 
-**0 warnings, the counts your brief asks for and fit lines that match what you decided = done: reply now.**
-Else edit `deck.md` once and run `slidemark build deck.md -o deck.pptx --png sheet.png`. The only look allowed
-is `sheet.png` (written by that same build) with ONE Read, when a fit line surprises you; never render, re-open
-the .pptx or run another command. Worst case: read, build, one look, hand back = 4 calls. (No heredoc? Write
+**0 warnings, the counts your brief asks for, fit lines that match what you decided, and one look at
+`sheet.png` that finds none of the defects in "Check before handing back" = done: reply.**
+Else edit `deck.md` once and run `slidemark build deck.md -o deck.pptx --png sheet.png`. The only look is
+`sheet.png` (written by that same build) with ONE Read per build; never render, re-open the .pptx or run
+another command. Usual path: read, build + look, hand back = 3 calls; one fix round = 4. (No heredoc? Write
 `deck.md`, build in the same turn.)
 
 ## Decide first (the choices are yours, none is the right one)
@@ -48,6 +49,64 @@ Settle these in your reasoning, then write them into the deck (`build` echoes th
 
 `design-none` names the missing header lines (`colors:` `fonts:` `sizes:` `style:`); `design-slide` the slides
 short of a form, one emphasis (or `@noemph`), values (or `@defaults`). Advisory.
+
+## Design guide (what separates a deck people keep from one they close)
+
+**Before the first slide: palette and motif, chosen for THIS topic.**
+- A palette that would fit any other deck is not specific enough. One colour carries 60–70% of the visual
+  weight (`primary`), one or two support it (`secondary`, `surface`), one accent is rare and means something
+  (`accent`: the key number, the current step, the verdict). Never split the weight evenly.
+- Light/dark contrast: dark cover and closing slide, light content between ("sandwich": `@cover bg=primary dark`
+  on the first and last slide), or dark throughout for a premium feel (`@bg=` on every slide or `theme: midnight`).
+- One repeating visual motif, carried by every content slide: an icon on each card heading (`icon=`), numbered
+  discs (`@rows`, `num`), one chart style, one card style. Bars and stripes are not a motif.
+- Starting points (write your own hexes when the brand or topic suggests them; do not default to blue):
+  navy + teal + amber `colors: primary=#0B2A3C secondary=#1B8A8F accent=#F2A33A surface=#EEF4F6` ·
+  forest + moss + cream `primary=#1E3A2F secondary=#6B8F71 accent=#D9A441 bg=#FBF8F1` ·
+  charcoal + coral `primary=#2B2D42 secondary=#8D99AE accent=#EF6F4C surface=#F4F5F7` ·
+  plum + rose `primary=#4A1D3F secondary=#9A5B82 accent=#E8B44A surface=#F7F1F4` ·
+  slate + lime `primary=#1F2A37 secondary=#5B6B7F accent=#A4D65E surface=#F1F4F7`.
+
+**Every slide carries a visual element**: a chart, a table, icons, a diagram or shaped blocks. A slide of only
+text is a defect, not a style. Forms that give a slide its shape (see "Composition forms"):
+- Two columns, text beside a figure: a box + chart/table/image, or `@split`.
+- Icon rows: `@iconlist cols=2` (icon, bold title, text), or `## Title {icon=bolt}` cards.
+- Grids: `@2x2` / `@3` cards with icons; `@kpi` for numbers; `@matrix` for two axes.
+- A picture bleeding over half the slide with content on top: `@split bleed=on`.
+- Numbers: `@statement` (one 60–72pt figure + a small label) or `{.kpi .hero}`; before/after and pros/cons
+  as `@vs` / `@proscons`; a sequence as `@timeline`, `@steps num` or `@cycle` with arrows.
+- Finish: an icon beside each heading, the one key figure or claim in the accent (`==x==`, `hl=`, `{.hero}`).
+
+**Type and spacing** (set once in `sizes:` and `style:`, then leave them):
+slide title 36–44pt bold · box headings 20–24pt bold · body 14–16pt · captions 10–12pt in `muted` · slide
+margin ≥ 0.5in (`margin=0.6in`) · one gap between blocks, kept throughout. Safe fonts that render at the
+measured width everywhere: Arial, Calibri, Cambria, Georgia, Times New Roman, Courier New; pair a serif heading
+with a sans body (`fonts: heading="Cambria" body="Calibri"`) for contrast. Not Aptos (older Office has no
+equivalent fallback). Japanese: Meiryo or Yu Gothic.
+
+**Never**: a rule under the slide title (`title.rule`, `heading.rule`) and decorative bars or stripes
+(`top.bar`, `bottom.bar`, `box.stripe`, `kpi.stripe`, `item.border-left`, a vertical band beside the content).
+Both read as machine-made. To lift a card use a tinted `fill`, `shadow=on` or an icon.
+**Avoid**: the same form on consecutive slides; a full stop at the end of a title; titles that move, change
+font or size between slides of one kind; centred paragraphs (centre titles only); titles under 36pt or body
+under 14pt (pin floors: `sizes: title=36! body=14!`, then cut text, widen the block or split the slide
+instead of letting text shrink); low contrast of text or icons on their fill; blue or cream/beige by default
+when nothing asks for them (white or the brand colour); text spilling out of its block; one decorated slide
+and the rest plain.
+
+**Check before handing back** (the visual pass catches the most):
+1. Content: every fact of the brief is on a slide, no typos, the order follows the argument.
+2. File: `build` reports 0 warnings (its lint covers overflow, overlap, contrast, missing alt text).
+3. Visual: read `sheet.png` once, slide by slide, with fresh eyes. Look for text cut at a block or slide
+   edge, overlapping blocks, uneven gaps or margins under 0.5in, a title that sits elsewhere than on its
+   siblings, low contrast, a number split from its unit, template text left over, a slide that is only text.
+   Fix what you find in `deck.md` and rebuild once.
+
+**Structure of the deck file** (so one change applies everywhere and the .pptx stays editable): declare the
+palette and the two fonts in the header, never a hex on a slide; group slides with `@section` dividers;
+footer and page number in the header (`footer:` `num: on`), not on slides; one form per slide kind (cover,
+section, agenda, content, chart + takeaway, table, closing) reused with the same `sizes:`; each slide's own
+cards, icons, numbers and pictures sit on that frame.
 
 ## Pattern 1: English deck, every slide decided
 

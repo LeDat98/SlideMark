@@ -726,3 +726,29 @@ Goal: run-8 leftovers (L3) then a same-prompt re-score; finish by 16:30 UTC; AC4
       rebuild and turn it into a build-line fact, a lint rule or an auto-fix. (b) Measure a 2-call path where SKILL.md
       is already in the agent's starting context (installed skill or prompt), so call 1 writes + builds and call 2
       hands back; report the saving and the cost of carrying SKILL.md when no deck is made.
+
+## Leftovers from the pptxgenjs comparison (owner, 2026-10-08)
+The owner had a local agent build the same 15-slide "AI overview" deck twice: with SlideMark (written once, not
+revised) and with the pptxgenjs skill (its design guide + a visual pass). The pptxgenjs deck won on looks. Most of
+the gap is guidance and the missing visual pass (SKILL.md now has a "Design guide" and the recipe includes one look
+at `sheet.png`); the rest is capability. A 5-slide probe built with today's forms showed what is missing:
+- [ ] **Icon discs:** the deck's motif is an icon inside a coloured circle on every card / row / step; `icon=` draws
+      a bare glyph. Add `icon.disc=<color>` (+ `icon.disc.size`, `icon.color`) on box headings, `@iconlist`,
+      `@steps` cards and `@cycle` nodes; the importer folds `ellipse + picture` back to it.
+- [ ] **`@cycle`:** nodes are tiny (text 17pt in a 0.6in disc); support `icon=` in the node (now `attr-ignored`),
+      a centre label (`cycle.center="Vòng lặp agent"`), node size that follows the body, text beside the node.
+- [ ] **`@steps` cards shrink while space is free:** probe slide 4: card text 16 -> 10pt with 23% free below; the
+      cards should take the free height first. Also an icon disc + caption + title + text card (the "Bước n" card).
+- [ ] **Nested circles:** three concentric discs with labels (AI > ML > DL) beside a list; a `@nested` /
+      `@onion` form (3–4 `##` boxes, heading in the ring, body in the side list).
+- [ ] **Staircase:** `@4 box.anchor=bottom` + `{h=}` per box works but the cards stay small; a `@stairs` form
+      (heights grow left to right, text sizes equal, fills from a list) is one line instead of four `h=`.
+- [ ] **Icon-node flow:** a row of icon discs joined by lines with the label under each disc and a side node above
+      (the RAG flow); `@flow` draws cards, not discs. Add `flow nodes=disc` or `@cycle`-style nodes on `@flow`.
+- [ ] **Conclusion bar with an icon:** `conclusion.icon=refresh` (the pptxgenjs bar had a disc + text).
+- [ ] **Cover art:** a decorative motif on the dark cover (network of dots and lines, right half) without
+      ` ```svg `: `cover.art=network|dots|rings` drawn as native shapes in `secondary` / `accent`.
+- [ ] **Masters (DL6):** the pptxgenjs deck keeps title, footer and page number on two layouts (DARK, CONTENT);
+      SlideMark draws them per slide. DL6 covers it.
+- [ ] Re-run the blind judge on the same brief after the icon discs and the steps fix, SlideMark arm with the new
+      SKILL.md (expect more calls: the visual pass is now part of "done").

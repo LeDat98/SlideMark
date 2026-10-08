@@ -149,3 +149,13 @@ Run goal:
 - Problems: smoke run first "rejected" by invisible U+2060 joiners (acceptance now strips them; Ctrl+F issue open); a relayed
   owner-decision message from another session was not applied (permission check) → owner to confirm.
 - Next (wave 6 added gantt bar pills, 1917 tests): callout clearance, dense table row height/headers, small-delta waterfalls, U+2060 → phrase packing.
+
+## 2026-10-08 (owner session: release 0.1.0 / 0.1.1, pptxgenjs comparison)
+- [x] Importer diet: `conclusion.size` is a measured token (`NEEDS_BUILD`); the committed t2 / t4 decks are fixed points again
+- [x] Packaging: PyPI publish workflow (trusted publisher), sdist without bench (10.8 -> 1.1 MB), 0.1.0 then 0.1.1 on PyPI
+- [x] SKILL.md "Design guide" (palette + motif, a visual on every slide, type scale, never / avoid, three-step check);
+      the recipe now includes one look at `sheet.png`; budget 5,120 -> 6,600 tokens
+- [ ] Open: t4 token gate (41% vs 40%: importer recognition work, see "Session stop"), gallery regression, the pptxgenjs
+      leftovers in PLAN.md (icon discs, `@cycle` nodes, `@steps` shrink, nested circles, stairs, icon-node flow)
+- Problems: GitHub Actions on the repo returned 500 for every re-run / dispatch after the switch to public (minutes were
+  exhausted while private); the release was published from the owner's machine with a token instead.
