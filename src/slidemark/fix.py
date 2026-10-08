@@ -15,6 +15,7 @@ from pathlib import Path
 from . import icons
 from .ir import Diagnostic
 from .parser.attrs import AT_KEYS, KNOWN_CLASSES, KNOWN_WORDS, STANDALONE, VALID_KEYS
+from .parser.blocks import CALLOUT_KINDS
 from .parser.core import FENCE_RE, H1_RE, HEADER_KEYS, HR_RE, fence_map, split_lines
 from .parser.ctx import unique_near
 
@@ -156,6 +157,8 @@ def _unknown_callout(src: _Src, d: Diagnostic) -> list[Edit]:
     near = _quoted(d.hint or "")
     i = (d.line or 0) - 1
     if not m or not near or not 0 <= i < len(src.lines):
+        return []
+    if not _safe(m.group(1), near.strip("[!]"), list(CALLOUT_KINDS)):
         return []
     new, n = re.subn(re.escape(m.group(0)), near, src.lines[i], count=1, flags=re.I)
     if not n:

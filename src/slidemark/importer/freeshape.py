@@ -44,8 +44,8 @@ def free_shapes(pool: list[Item], foreign: bool) -> list[Item]:
         own = bool(_OWN.fullmatch(name))
         if not own and not (foreign and not _GENERATED.match(name)):
             continue
-        if not own and (it.prst in _PLAIN or "rrow" in it.prst):
-            continue
+        if "rrow" in it.prst or (not own and it.prst in _PLAIN):
+            continue  # (the arrows between cards are `@flow`'s: the build names them `Shape N` too)
         if shapes.name_of_prst(it.prst) is None:
             continue
         if any(

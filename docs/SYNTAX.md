@@ -227,7 +227,7 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `flow disc` | `@flow` with the second word `disc`: every `##` box is an icon disc joined to the next by an arrow line, heading and text under it (below) | `@flow disc` |
 | `iconlist` `quote` `split` `proscons` `progress` `harvey` `heatmap` `pins` | composition forms with secondary attributes ("Composition forms, part 2" below) | `@iconlist cols=2` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
-| `free` | absolute positioning: every block with `{x= y= w= h=}` (% of the area under the title, or lengths) sits exactly there, with no growth, balance or search; unplaced blocks stack on top (info `free-unplaced`) | `{x=10% y=30% w=40% h=20%}` |
+| `free` | absolute positioning: every block with `{x= y= w= h=}` sits exactly there, with no growth, balance or search; unplaced blocks stack on top (info `free-unplaced`). `%` is a share of the body under the title (not the slide): the fit line prints it once (`free area 0.5,1.4 12.3x5.5in`, x,y then width x height). A `{x= y= w= h= shape= fill=}` line with nothing after it draws a shape (below) | `{x=10% y=30% w=40% h=20%}` |
 | `grid` | with `@free`: `x y w h` snap to a 12-column x 12-row grid over the body, and `3c` is a grid unit: `x=3c` / `y=2c` = the left / top edge of column / row 3 (counting from 1), `w=4c` / `h=3c` = four columns / three rows wide (a percentage snaps to the nearest twelfth). A title or subtitle pin counts over the whole slide. `3c` without `@free grid` warns `bad-length` | `@free grid` then `## a {x=1c y=2c w=6c h=5c}` |
 | `key=value` | `bg=` color or image, `t=` transition (`fade`, `push`, `wipe`, `split`, `cover`, `zoom`, `morph`; `t=fade:0.5` sets seconds), `id=`, `gap=` | `@bg=#0F172A t=fade` |
 | `a>b` `a-b` | **connector** from block `a` to block `b` (arrow / plain line). Letters count blocks in source order (`a` = 1st), digits work too (`1>3`). With `flow`, the links replace the flow arrows (info `flow-links`) | `@3 a>b a>c` |
@@ -527,6 +527,16 @@ room, `bold` / `italic` style its labels); a table's `pad` pads every cell; a KP
 number and `align` / `valign` place its text; `font` on a code block replaces the mono font; `align valign radius` on an
 `@rows` list act on the bars. A list item takes its own text style on its line: `- 要確認 {color=danger bold=true}` (also
 `{.danger}`; size color font bold italic align, plus fill line on a row of `@rows`).
+
+**Shape block.** An attribute line with a position (any of `x y w h`) and a look (`shape` `fill` `line`) and no content
+after it draws a native shape named `Shape N`, on any slide (an arrow between cards, a badge, a plate):
+`{x=24.4% y=36% w=2.4% h=8% shape=chevron fill=accent}`. `shape=` is the preset (default `rect`; `radius=` rounds a
+rectangle), with `fill line line.w=2pt radius rotate opacity shadow z`. `shape=line` is a straight connector from the
+top-left to the bottom-right corner of the box (`h=0` horizontal, `w=0` vertical; needs `line=`; `head=arrow` adds
+an arrowhead): `{x=10% y=50% w=30% h=0 shape=line line=accent line.w=2pt}`. A line followed by content is that
+block's attributes, as before. Fit line: `free 8 blocks, 8 pinned, 3 shapes`. The importer turns a text-less preset
+shape (not a rectangle or an arrow) of a foreign deck into such a block and the slide into `@free`, positions as
+inches from the body's top-left corner.
 
 **`shape=`** draws a box, card, text block (with a fill or border), code block, image or chart frame with a preset
 geometry instead of a rectangle (`shape=pill` is a rounded rectangle with half-round ends, `radius=` still sets a

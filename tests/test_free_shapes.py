@@ -7,6 +7,8 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE
 
@@ -156,3 +158,37 @@ def test_odd_shape_blocks_never_raise(line, tmp_path):
     deck = parse(md)
     assert deck is not None
     build(md, tmp_path / "o.pptx")
+
+
+_KEYS = ["x", "y", "w", "h", "shape", "fill", "line", "line.w", "head", "radius", "rotate", "opacity", "z"]
+_VALS = [
+    "",
+    "0",
+    "-1",
+    "10%",
+    "1in",
+    "chevron",
+    "line",
+    "accent",
+    "#zz",
+    "1e999",
+    "nan",
+    "2pt",
+    "arrow",
+    "999",
+]
+
+
+@settings(max_examples=60, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@given(
+    st.lists(
+        st.lists(st.tuples(st.sampled_from(_KEYS), st.sampled_from(_VALS)), min_size=0, max_size=7),
+        min_size=1,
+        max_size=5,
+    )
+)
+def test_shape_block_soup_never_raises(tmp_path, blocks):
+    lines = ["{" + " ".join(f"{k}={v}" for k, v in b) + "}" for b in blocks]
+    md = "# T\n@free\n" + "\n".join(lines) + "\n"
+    assert parse(md) is not None
+    build(md, tmp_path / "soup.pptx")
