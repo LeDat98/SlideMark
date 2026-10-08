@@ -277,9 +277,24 @@ def _step_cards(placed):
     return [p for p in placed if isinstance(p.element, Container) and "steps-card" in p.element.classes]
 
 
+def test_sparse_card_look_steps_fill_the_body_top_anchored():
+    placed, _, _ = lay("", 1, src=STEPS)  # the default look: the heading sits in the card
+    cs = _step_cards(placed)
+    assert len(cs) == 3 and len({(c.y, c.h) for c in cs}) == 1
+    assert cs[0].y + cs[0].h > 0.8 * H and cs[0].y + cs[0].h <= H  # the cards take the free height
+    assert cs[0].h <= 2.0 * cs[0].w + 1  # ... not as towers (steps_to_body_aspect)
+    for c in cs:
+        inner = [p for p in placed if c.x <= p.x < c.x + c.w and c.y < p.y < c.y + c.h]
+        assert min(p.y for p in inner) - c.y < 0.3 * c.h  # the content starts at the top of the card
+        assert all(p.y + p.h <= c.y + c.h + 2 for p in inner)
+
+
 def test_sparse_steps_fill_the_body_without_a_bar():
-    placed, _, _ = lay("", 1, src=STEPS)
-    off, _, _ = lay("", 1, src=STEPS, steps_to_body=False)
+    src = STEPS.replace(
+        "@steps", "@steps head=arrow"
+    )  # (the token acts on the old look's sparse composition)
+    placed, _, _ = lay("", 1, src=src)
+    off, _, _ = lay("", 1, src=src, steps_to_body=False)
     cs, cs0 = _step_cards(placed), _step_cards(off)
     assert len(cs) == 3
     assert cs[0].y + cs[0].h > cs0[0].y + cs0[0].h + 0.05 * H
@@ -289,7 +304,9 @@ def test_sparse_steps_fill_the_body_without_a_bar():
         (t,) = [p for p in _bodies(placed) if c.x <= p.x < c.x + c.w]
         assert c.y <= t.y and t.y + t.h <= c.y + c.h + 2
     chev, _, _ = lay("", 1, src=STEPS.replace("@steps", "@chevron"))
-    assert [(p.x, p.y, p.h) for p in _step_cards(chev)] == [(p.x, p.y, p.h) for p in cs]  # same either way
+    arrow, _, _ = lay("", 1, src=STEPS.replace("@steps", "@steps head=arrow"))
+    # `@chevron` keeps the heading in the arrow: the same cards as `@steps head=arrow`
+    assert [(p.x, p.y, p.h) for p in _step_cards(chev)] == [(p.x, p.y, p.h) for p in _step_cards(arrow)]
 
 
 def test_steps_with_a_bar_still_stretch_to_the_bar():

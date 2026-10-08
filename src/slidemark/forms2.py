@@ -57,7 +57,10 @@ KEYS_BY_WORD: dict[str, tuple[str, ...]] = {
     "heatmap": ("min", "max", "colors", "text", *GENERIC),
     "pins": ("legend", *GENERIC),
 }
-KEYS: tuple[str, ...] = tuple(dict.fromkeys(k for ks in KEYS_BY_WORD.values() for k in ks))
+STEPS_KEYS = (
+    "head",
+)  # `@4 steps head=card|arrow` (wave 2026-10-08 lane D): `@steps` is not a composition word
+KEYS: tuple[str, ...] = tuple(dict.fromkeys([*(k for ks in KEYS_BY_WORD.values() for k in ks), *STEPS_KEYS]))
 
 # what a key may hold, for the bad-value hint
 VALUES: dict[str, str] = {
@@ -72,6 +75,7 @@ VALUES: dict[str, str] = {
     "colors": "two or more colors, e.g. #F3F6FA,primary",
     "text": "auto, on or off",
     "legend": "right, bottom or off",
+    "head": "card (the heading sits in the card, the arrow shows the number) or arrow",
     "size": "a font size in pt, e.g. 24",
     "fill": "a color, e.g. primary or #E8EEF7",
 }
@@ -93,6 +97,10 @@ def check_at(classes: list[str], attrs: dict[str, str], warn: Callable[[str, str
     for k in attrs:
         if k not in KEYS:
             continue  # unknown keys are the parser's own diagnostic
+        if k in STEPS_KEYS and "steps" in classes:
+            if str(attrs[k]).lower() not in ("card", "arrow"):
+                warn(f"bad head '{attrs[k]}'", "bad-attr", f"head= takes {VALUES['head']}")
+            continue
         if word is None:
             warn(
                 f"'{k}=' on the @ line has no form to act on",

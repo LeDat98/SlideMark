@@ -33,6 +33,7 @@ _NAMES = {
     "stairs": re.compile(r"Stairs (\d+)"),
     "nested": re.compile(r"Nested (\d+)(?: text| list| icon)?"),
     "flowdisc": re.compile(r"Flow (\d+) (?:disc|line|text|icon)"),
+    "coverart": re.compile(r"Cover art (\d+)"),
 }
 _TEXT = {
     "timeline": re.compile(r"Timeline (\d+)( now)?"),
@@ -107,8 +108,61 @@ def _stack(its: list[Item]) -> list[Item]:
     return sorted(its, key=lambda i: i.y)
 
 
+_STEP = re.compile(r"Step (\d+) (arrow|card)")
+
+
+def _steps_head(data: SlideData) -> None:
+    """``@steps`` drawn by SlideMark (shapes ``Step N arrow`` / ``Step N card``) in either look.
+
+    ``head=arrow``: the arrows hold the headings; the slide gets the word ``head=arrow`` (the build's default
+    is the other look). ``head=card`` (the default): every arrow shows its own number and the heading is the
+    first paragraph of the card's first text (after the ``steps.caption`` line): it goes back into the arrow,
+    where ``structure.fold_steps`` reads the step's heading."""
+    named = {(m.group(2), int(m.group(1))): it for it in data.items if (m := _STEP.fullmatch(_name(it)))}
+    ns = sorted(n for kind, n in named if kind == "arrow")
+    if len(ns) < 2 or any(not named[("arrow", n)].paras for n in ns):
+        return
+    if not all(re.fullmatch(rf"\s*{n}\s*", named[("arrow", n)].text) for n in ns):
+        if "head=arrow" not in data.words:
+            data.words.append("head=arrow")
+        return
+    from .structure import _is_step_caption
+
+    for n in ns:
+        arrow, card = named[("arrow", n)], named.get(("card", n))
+        if card is None:
+            continue
+        inside = sorted(
+            (
+                i
+                for i in data.items
+                if i is not card
+                and i is not arrow
+                and i.kind == "text"
+                and card.x - 2 <= i.cx <= card.x + card.w + 2
+                and card.y - 2 <= i.cy <= card.y + card.h + 2
+            ),
+            key=lambda i: (i.y, i.x),
+        )
+        for (
+            ic
+        ) in data.items:  # the icon (disc) at the top of the card belongs to the step: back into its arrow
+            if (ic.name or "").strip().startswith("icon ") and card.x <= ic.cx <= card.x + card.w:
+                if card.y <= ic.cy <= card.y + card.h:
+                    ic.x, ic.y = arrow.x + (arrow.w - ic.w) // 2, arrow.y + (arrow.h - ic.h) // 2
+        if not inside:
+            continue
+        paras = list(inside[0].paras)
+        cap = 1 if paras and _is_step_caption(paras[0], n) else 0
+        if len(paras) <= cap:
+            continue
+        arrow.paras = [paras[cap]]
+        inside[0].paras = paras[:cap] + paras[cap + 1 :]
+
+
 def extract(data: SlideData) -> FormFold | None:
     """Fold the named shapes of a form slide; marks them ``decor``. ``None`` when the slide holds no form."""
+    _steps_head(data)
     form = detect(data)
     if form is None:
         return None
@@ -127,6 +181,7 @@ def extract(data: SlideData) -> FormFold | None:
         "stairs": _stairs,
         "nested": _nested,
         "flowdisc": _flowdisc,
+        "coverart": _coverart,
         "vs": _vs,
         "matrix": _matrix,
     }[form]
@@ -134,6 +189,30 @@ def extract(data: SlideData) -> FormFold | None:
 
 
 # --------------------------------------------------------------------------- one fold per form
+
+
+def _coverart(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:
+    """``cover.art`` motifs are decoration: ``extract`` already marked every ``Cover art N`` shape as decor,
+    so the slide is imported as the plain cover it is (the token comes back via ``cover_art_tokens``)."""
+    return None
+
+
+def cover_art_tokens(data: SlideData) -> dict[str, str]:
+    """The deck ``style:`` tokens that redraw the ``Cover art N`` shapes of this slide (``{}`` without them).
+
+    ``network`` = joined by lines (call it before ``extract``); ``rings`` = outline-only circles;
+    ``dots`` = many filled discs. The colour is not read: the layout default (``secondary``) stays."""
+    art = [it for it in data.items if _NAMES["coverart"].fullmatch(_name(it))]
+    if not art:
+        return {}
+    discs = [it for it in art if it.kind != "line"]
+    if data.connectors or data.conns:  # (the lines are connectors, not items; `extract` clears the counts)
+        kind = "network"
+    elif discs and all(it.fill in (None, "x") for it in discs[:3]):
+        kind = "rings"
+    else:
+        kind = "dots"
+    return {"cover.art": kind}
 
 
 def _timeline(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:

@@ -196,6 +196,19 @@ def _set_bullet(para, p: Paragraph, size_pt: float, rc: RenderCtx | None = None)
         etree.SubElement(pPr, qn("a:buNone"))
 
 
+INSCRIBED = {
+    "ellipse": 0.7071
+}  # preset -> text rectangle width / shape width (the ellipse's inscribed square)
+
+
+def text_width(shape: str | None, w: int) -> int:
+    """The width (EMU) PowerPoint and LibreOffice wrap a shape's text at, before the frame margins.
+
+    An ellipse sets its text in the inscribed square (``a:rect`` of the preset: 0.707 of the width), so the
+    phrase breaks and the CJK squeeze must be planned on that, not on the full width of the shape."""
+    return max(round(w * INSCRIBED.get(shape or "", 1.0)), 1)
+
+
 def fill_text(
     rc: RenderCtx,
     tf,

@@ -59,7 +59,7 @@ sizes: heading=20! body=22!
 &#8251; 各戦略のKPIは個別資料を参照
 
 # 年間スケジュール
-@4 steps num
+@4 steps num head=arrow
 ## 4–6月
 **価格改定**
 ## 7–9月
@@ -144,7 +144,7 @@ sizes: heading=26! body=24!
 | **経費精算の自動化** | 全社 | 処理時間 -50% | 2027年4月 |
 
 # DX推進のロードマップ
-@4 steps num
+@4 steps num head=arrow
 ## 2027年4月
 **経費精算**
 ## 6月

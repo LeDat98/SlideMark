@@ -201,8 +201,8 @@ def test_steps_caption_cycle_and_card_selectors(tmp_path):
     c = [s for s in arrows if s.name.endswith("card")]
     assert [fill_hex(s) for s in a] == ["142B4D", "1F5FA8", "142B4D", "1F5FA8"]
     assert [fill_hex(s) for s in c] == ["EEF2F7", "FFDDEE", "EEF2F7", "FFDDEE"]
-    texts = [s.text_frame.text for s in shapes(prs, 0, "Text")]
-    assert any(t.startswith("STEP 1") for t in texts) or any("STEP 1" in s.text_frame.text for s in c)
+    texts = [s.text_frame.text for s in shapes(prs, 0, "Heading")]  # (the card look: caption + heading)
+    assert any(t.startswith("STEP 1") for t in texts)
     text, _ = import_pptx(tmp_path / "d.pptx")  # the caption is a token: it is not imported as content
     assert "STEP 1" not in text and "@4 steps" in text
 

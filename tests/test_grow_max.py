@@ -17,7 +17,9 @@ from slidemark.theme import LayoutTokens
 from .test_layout_l3_fill import lay
 from .test_sparse_wave2 import CARDS, CHEV_PLAIN, HEAD, LIST, TABLE
 
-STEPS = HEAD + "# 年間計画\n@3 steps\n## 4月\n- 価格改定\n## 7月\n- 工場着工\n## 10月\n- 北米発売\n"
+STEPS = (
+    HEAD + "# 年間計画\n@3 steps head=arrow\n## 4月\n- 価格改定\n## 7月\n- 工場着工\n## 10月\n- 北米発売\n"
+)
 KPI = (
     HEAD
     + "# 主要指標\n## 売上高 {.kpi}\n1,280億円\n前年比 +8%\n## 営業利益 {.kpi}\n96億円\n前年比 +12%\n"

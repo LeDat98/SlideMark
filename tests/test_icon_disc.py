@@ -276,7 +276,7 @@ def test_iconlist_items_get_discs(tmp_path):
 def test_steps_arrow_and_chevron_icons_with_discs(tmp_path):
     md = (
         HEAD
-        + "style: icon.disc=secondary\n\n# T\n@steps\n## One {icon=database}\nA\n## Two {icon=cpu}\nB\n## Three {icon=rocket}\nC\n\n# C\n@chevron\n## P {icon=bolt}\n## Q {icon=star}\n## R {icon=heart}\n"
+        + "style: icon.disc=secondary\n\n# T\n@steps head=arrow\n## One {icon=database}\nA\n## Two {icon=cpu}\nB\n## Three {icon=rocket}\nC\n\n# C\n@chevron\n## P {icon=bolt}\n## Q {icon=star}\n## R {icon=heart}\n"
     )
     _d, prs = make(tmp_path, md)
     for n in (0, 1):
