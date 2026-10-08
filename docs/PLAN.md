@@ -752,3 +752,22 @@ at `sheet.png`); the rest is capability. A 5-slide probe built with today's form
       SlideMark draws them per slide. DL6 covers it.
 - [ ] Re-run the blind judge on the same brief after the icon discs and the steps fix, SlideMark arm with the new
       SKILL.md (expect more calls: the visual pass is now part of "done").
+
+## Run 2026-10-08 (owner direction: match the pptxgenjs deck; cost and time may rise to 50% of python-pptx)
+Goal: the capability gaps above, as tokens and forms (design freedom), so a fresh agent with SKILL.md alone can
+build the owner's 15-slide "AI overview" deck at the pptxgenjs look. Owner note: SlideMark shadows read shallower
+than pptxgenjs's; the XML is equivalent (`0 2 8 #0000001F` = blurRad 101600, dist 25400, alpha 12%), so the
+difference is the card border line that stays under the shadow and the small `shadow=on` default.
+- **Wave 1 lane A: look** (`theme.py` tokens, `render/`, `icons/`, the icon helpers of `layout/engine.py` and
+  `layout/cardlook.py`, `layout/forms2.py` iconlist, `importer/`): icon discs (`icon.disc=` `icon.disc.size=`
+  `icon.disc.shape=` `icon.color=`, per element `{icon=bolt disc=accent}`) on box headings, KPI cards, iconlist
+  items, steps cards, chevrons; `conclusion.icon=`; shadows: `shadow=on` default deeper (`0 3 12 #00000030`), a
+  shadowed card drops its border unless `line` is set, every card kind (box, kpi, item, steps-card, iconlist
+  `fill=`) follows `card.shadow`; importer folds `ellipse + icon` back to `icon.disc`.
+- **Wave 1 lane B: forms** (`layout/vocab.py`, `layout/l3fill.py`, `layout/stepspin.py`, `forms*.py`, parser form
+  list, `honour.py`, `fit.py`, `design.py`, `importer/vocab.py`, `docs/SYNTAX.md` form rows, `examples/26-ai-overview.md`):
+  `@cycle` nodes sized to the ring with `icon=` inside and `center="..."`; `@steps` cards take the free height
+  before any text shrink; `@stairs` (rising cards, `stairs.fill=a,b,c,d`); `@nested` (concentric rings beside a
+  list); `@flow disc` (icon discs joined by lines, label under each).
+- **Orchestrator:** SKILL.md lines for the new tokens / forms, goldens + gallery, bench, a fresh-agent run on the
+  owner's brief with the new SKILL.md and the blind judge (`bench/design_review_prompt.md`).
