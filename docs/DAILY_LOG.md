@@ -159,3 +159,12 @@ Run goal:
       leftovers in PLAN.md (icon discs, `@cycle` nodes, `@steps` shrink, nested circles, stairs, icon-node flow)
 - Problems: GitHub Actions on the repo returned 500 for every re-run / dispatch after the switch to public (minutes were
   exhausted while private); the release was published from the owner's machine with a token instead.
+
+## 2026-10-08 (run: match the pptxgenjs deck, 09:00–12:30 UTC, orchestrator + 2 lanes per wave)
+Run goal (owner: look like the pptxgenjs deck; cost and time may rise to 50%):
+- [x] Wave 1 A: icon discs, soft shadows without a border line, `card.elevation`, `conclusion.icon`; B: `@cycle` icons + centre, `@stairs`, `@nested`, `@flow disc`, `@steps` growth; `examples/26-ai-overview.md`
+- [x] Wave 2 C: shape blocks on `@free`, safe did-you-mean, 6 icons, example 26 round trip; D: `@steps` card look, `@iconlist` fill, `cover.art`, ellipse text width
+- [x] SKILL.md "Design guide" + the new forms (7.1k tokens); t5 open brief (`bench/lengthbench/t5`), 3 fresh-agent runs, 2 blind-judge rounds
+- Metrics: tests 3,368 (3,098 at start); judge on t5: pptxgenjs 4.0, SlideMark 2.5 → 3.5 (two rounds agree on 3.5 for the latest arm); runs 7 calls / 3 builds / 74–93 s, cost above start 160k → 138k → 130k, all accepted; round trip 117/126; q3 155 tokens (unchanged).
+- Problems: GitHub Actions 500 after the switch to public (release done from the owner's machine); two lanes spawned before a merge lacked wave 1 and merged `main` themselves; `pytest -n 4` needed in the venv; the t4 token gate stays red.
+- Next: wave 3 (text sizes in sparse forms, takeaway text floor, no double step label, 4-up heading wrap, proscons palette), then re-judge; t4 diet round 2; the gallery regression list in "Session stop".

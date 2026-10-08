@@ -783,3 +783,16 @@ difference is the card border line that stays under the shadow and the small `sh
   cover and closing undesigned (flat dark field) → `cover.art`; `STEP n` labels tiny and card text sinking in tall
   empty cards (slide 7) → steps card look; the icon list fills only the left half (slide 5) → iconlist fill; an
   unexplained table row highlight (agent choice; SKILL.md: highlight only what the takeaway names).
+- **Wave 2 status (2026-10-08):** lanes C and D merged (3,368 tests; round trip 117/126). Fresh-agent run
+  (`bench/lengthbench/t5/slidemark-wave2-1`): 7 calls, 3 builds, 2 looks, 74 s, cost above start 130k (wave 1: 138k,
+  baseline 160k), accepted. Blind judge round 10: pptxgenjs 4.0, wave 2 **3.5**, wave 1 3.0 (3.5 in round 9: ±0.5
+  judge noise; within the round wave 2 > wave 1, ranked K > B > R). Judge's asks now: body text small inside large
+  areas (icon list 5, 2x2 cards 8) and takeaway bar text small; steps labelled twice (arrow number + `STEP n` tag);
+  a card heading wrapping in a 4-up row (`Chuẩn hóa`); pure green / red `@proscons` headers off the palette.
+- **Wave 3 (2026-10-08, afternoon):** lane E (`layout/forms2.py` iconlist, `layout/sparsefill.py`, `layout/vfill.py`,
+  `layout/l3fill.py` boxes): sparse forms fill like pptxgenjs cards (icon list and 2x2 / 3-up cards grow icon, heading
+  and text with the free height up to `grow_max`, cards to the body), conclusion bar text never under the body size;
+  lane F (`layout/engine.py` steps and heading fit, `layout/vocab.py` agenda, `forms2.py` proscons tokens): no double
+  step label (caption off when the arrow shows the number unless `steps.caption` is set), a 4-up card heading never
+  wraps (shrink to one line down to the body size, else widen), `@proscons` default colours as palette tints
+  (`secondary` / `accent`) with `success` / `danger` only when asked.
