@@ -2,6 +2,18 @@
 
 All notable changes. Versions follow semver once 0.1.0 is published.
 
+## 0.1.1 (2026-10-08)
+
+The agent skill only; the library code is the same as 0.1.0.
+
+### Agent skill
+- The page states its own setup: `pip install -U "slidemark[preview]"`, LibreOffice for `--png`,
+  `slidemark[html]` and `playwright install chromium` for `@html`. On a new machine an agent has this page only.
+- New `description:`: what the result is, when to use the page (deck requests that name no format too), what
+  it is not for. It no longer names Japanese business slides, which biased agents toward that style.
+- The page installs alone: `skills/slidemark/SKILL.md` for `npx skills add LeDat98/SlideMark`, and a Claude
+  Code marketplace entry (`.claude-plugin/marketplace.json`).
+
 ## 0.1.0 (2026-10-07)
 
 ### Design freedom
