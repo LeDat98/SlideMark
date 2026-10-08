@@ -295,6 +295,9 @@ def _import_with(
     disc_shape: str | None = None
     for sd in datas:
         icondisc.fold(sd)  # (before the deck-wide disc is read; ``build_slide`` folds again on its copies)
+    from . import vocab as _vocab  # (needs Block from structure)
+
+    cover_art = _vocab.cover_art_tokens(datas[0]) if datas else {}  # before ``extract`` clears the connectors
     if deck.foreign:
         deck.ink = recognise2.deck_ink(datas, colors.get("bg", "FFFFFF"), H)
         deck.card_shadow = card_shadow(datas, W, H)
@@ -379,6 +382,8 @@ def _import_with(
             if disc_shape and disc_shape != "circle":
                 disc_tokens["icon_disc_shape"] = disc_shape
             header.extend(token_lines(_keep_valid(disc_tokens)))
+    if cover_art and not any("cover.art=" in ln or "cover_art=" in ln for ln in header):
+        header.append(f"style: cover.art={cover_art['cover.art']}")  # the motif was dropped: say it once
     size = _size_token(W, H)
     if size:
         header.append(f"size: {size}")

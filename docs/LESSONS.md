@@ -323,3 +323,7 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [import] The build names the arrows between cards `Shape N` too, so the importer keeps arrows and `@flow` shapes out of shape blocks.
 - [design] The ink CSS rules that `dark` / `light` derive must not be stored in the design part, or they come back as a css fence on import.
 - [worktree] A worktree is based on the commit it was created at: a lane spawned before a wave merged lacks that wave (lane C had to merge `main` itself); spawn after the merge or say so in the prompt.
+- [layout] `steps.head=card` is the default now: a deck that wants headings in the arrows says `steps head=arrow`; `@chevron` rows turned into steps keep that look and the importer writes it.
+- [layout] The sparse and chevron growth passes stretch the arrow row after placement, so the steps card pass closes the arrow-to-card gap itself and caps number-only arrows.
+- [render] An ellipse wraps text in its inscribed 0.707 square: phrase bindings are planned on that width (closes the open ellipse line above).
+- [test] Dict-by-name lookups of shapes lose repeated names such as `Icon disc`: collect lists.

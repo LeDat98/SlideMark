@@ -27,7 +27,8 @@ def test_budgets():
     # the never / avoid lists and the three-step check, after the pptxgenjs comparison (docs/PLAN.md)
     # 6900 since icon discs / card.elevation / conclusion.icon (wave 2026-10-08; lane B's forms come next)
     # 7100 since @stairs / @nested / @flow disc / @cycle icons (wave 2026-10-08 lane B)
-    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 7100
+    # 7300 since cover.art, the steps card look and shape blocks (wave 2)
+    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 7300
     refs = sorted((SKILL / "reference").glob("*.md"))
     assert len(refs) >= 5
     for p in refs:

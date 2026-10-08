@@ -203,6 +203,11 @@ def test_importer_drops_the_motif_and_reads_the_kind(tmp_path):
     text, _diags = import_pptx(tmp_path / "d.pptx")
     assert "Cover art" not in text and "AI: từ nền tảng đến ứng dụng" in text
     assert "Giới thiệu cho người mới bắt đầu" in text  # the subtitle survives the dropped shapes
+    import re
+
+    # the token comes back once, in the header (from the design part as `cover_art=`, else re-read from the
+    # motif as `cover.art=`); both spellings parse to the same token
+    assert len(re.findall(r"cover[._]art=network", text)) == 1
     for kind in ("network", "rings", "dots"):
         _, prs = make(tmp_path, f"cover.art={kind}", name=kind)
         first = read_slide(prs.slides[0], ReadCtx(accent="F2A33A"))

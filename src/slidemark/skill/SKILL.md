@@ -58,6 +58,8 @@ short of a form, one emphasis (or `@noemph`), values (or `@defaults`). Advisory.
   (`accent`: the key number, the current step, the verdict). Never split the weight evenly.
 - Light/dark contrast: dark cover and closing slide, light content between ("sandwich": `@cover bg=primary dark`
   on the first and last slide), or dark throughout for a premium feel (`@bg=` on every slide or `theme: midnight`).
+  A cover needs one visual: `style: cover.art=network` (`dots`, `rings`; native shapes in `secondary` with one accent
+  node on the right 40%), a picture, or a large type scale.
 - One repeating visual motif, carried by every content slide: an icon disc on each card heading (`icon=` +
   `style: icon.disc=secondary`), numbered discs (`@rows`, `num`), one chart style, one card style. Bars and
   stripes are not a motif.
@@ -254,8 +256,9 @@ goes full width below. Each table/chart/image/code outside a box is its own bloc
 
 **`@` line** (only if the automatic layout is wrong; one per slide, tokens space separated):
 `@3` columns · `@2x2` grid · `@1:2` ratios · `@aab/aac` areas (letters = blocks in order, `.` empty) ·
-`chevron` steps (heading + 1–2 short bullets) · `steps` arrows, bullets in a card below (`steps num` adds a
-"STEP n" caption) · `rows` a `1.` list alone as numbered bars (`rows plain` = unnumbered, `rows.glyph=■ rows.stripe=a,b`) ·
+`chevron` steps (heading + 1–2 short bullets) · `steps` numbered arrows over cards, each card: icon disc, caption
+(`steps num`, text from `steps.caption="Bước {n}"`), bold heading, text, top-anchored (`steps head=arrow` puts the
+headings in the arrows instead) · `rows` a `1.` list alone as numbered bars (`rows plain` = unnumbered, `rows.glyph=■ rows.stripe=a,b`) ·
 `items` bullets of each box as item cards (`item.fill` `item.border-left="5pt solid secondary"` `item.size`) · `num` a
 numbered circle on each box heading (`box.num.fill`) · `flow` cards with arrows · `a>b` arrow, `a-b` line between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition ·
 `@bg=#0B1020` or `@bg="linear-gradient(135deg,#1A0B2E,#7A1FA2)"` background (dark flips text light; `@dark`
@@ -288,7 +291,8 @@ styles one list line; a chart frame takes `{fill= radius= pad=}`.
   `## Kho tài liệu {.above icon=database}` as the first box = a side node above step 2 (`flow.disc.fill=a,b` `.size`).
 - `@agenda` + one `1.` list alone, `{.accent}` on the current item (`agenda.num.size` `.num.text="第{n}章"` `.rule=none`).
 - `@statement align= valign=` + `**+18%**` then one caption line (one huge number or sentence; `statement.size`).
-- `@iconlist cols=2` + `- icon=bolt **Title** text` items (icon, bold title, text in 1–3 columns; `iconlist.icon.size/.color`).
+- `@iconlist cols=2` + `- icon=bolt **Title** text` items (icon disc, bold title, text in 1–3 columns, spread over the
+  body; `iconlist.icon.size/.color`, `iconlist.fill=off` to keep them compact, `fill=surface` on the `@` line = cards).
 - `@quote align=center` + `> "text"` then `> — Name` (large quotation with mark and attribution; `quote.size` `quote.mark.color`).
 - `@split side=right ratio=2:3 bleed=on` + `![alt](x.png)` (or a `fill=` block) + any text/boxes (picture beside content).
 - `@proscons` + two `##` boxes (pros, cons) + optional last `> verdict` (+/− discs, verdict bar; `proscons.plus.color`).
