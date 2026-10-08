@@ -608,6 +608,19 @@ class LayoutTokens(BaseModel):
     )
     cover_art_line_pt: float = 1.25  # ... the lines' thickness (pt)
     cover_art_margin: float = 0.06  # ... air between the motif and the slide edges, in slide widths
+    # --- wave 2026-10-08 lane E
+    iconlist_fill_min: float = (
+        0.6  # a stacked `@iconlist` card (icon above text) is at most content / this tall
+    )
+    card_fill_max: float = (
+        0.7  # box cards: text is not grown once the content fills this share of the card ...
+    )
+    card_fill_min: float = 0.6  # ... and the cards are no taller than the content / this (not hollow)
+    card_heading_max_pt: float = (
+        30  # `card.heading.max`: a box card heading grows to at most this size (pt) ...
+    )
+    card_body_max_pt: float = 24  # `card.text.max`: ... its text to at most this (both under `grow.max`)
+    card_fill_step: float = 0.04  # ... box card growth steps by this factor
 
 
 class RenderTokens(BaseModel):
@@ -1012,6 +1025,18 @@ class Theme(Forms4Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
         0.6, ge=0.3, le=0.9
     )  # ... the title keeps this share of the width, the art the rest
 
+    # --- wave 2026-10-08 lane E
+    conclusion_floor: float = Field(
+        1.0, ge=0.0
+    )  # `conclusion.floor`: the bar text is never under this x the body text of its slide (it wraps first)
+    iconlist_title_max: float = 28  # `iconlist.title.max`: the item title grows to at most this size (pt) ...
+    iconlist_text_max: float = (
+        22  # `iconlist.text.max`: ... the item text to at most this (both under `grow.max`)
+    )
+    iconlist_icon_pos: Literal["auto", "left", "top"] = (
+        "auto"  # `iconlist.icon.pos`: icon beside the text, or above it (auto: top for a row of 3+ columns)
+    )
+
     def color(self, value: str | None) -> str | None:
         """Resolve a theme color name ("primary") or pass a hex value through."""
         if value is None:
@@ -1299,6 +1324,8 @@ STYLE_ALIASES = {
     "ink.auto": "render.ink_auto",
     "kpi.h": "layout.kpi_h",
     "grow.max": "layout.grow_max",
+    "card.heading.max": "layout.card_heading_max_pt",  # wave 2026-10-08 lane E
+    "card.text.max": "layout.card_body_max_pt",
 }
 _STYLE_FIELDS = tuple(Style.model_fields)
 _NUM = re.compile(r"^-?\d+(?:\.\d+)?$")

@@ -749,12 +749,18 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
     base = _base(ctx)
     fill = _paint(ctx, slide.attrs.get("fill"), None, "fill")
     card = _card(ctx)
-    pad = _pt(base.font_size * 0.6) if fill else 0
+    stack = th.iconlist_icon_pos == "top" or (th.iconlist_icon_pos == "auto" and rows == 1 and cols >= 3)
+    pad = _pt(base.font_size * (0.9 if stack else 0.6)) if fill else 0  # (a stacked card breathes more)
     radius = card.radius if fill else None
     icon_col = _paint(ctx, th.iconlist_icon_color, "primary", "iconlist.icon.color")
     discs = [icondisc.disc_color(th, {"disc": it["disc"]} if it["disc"] else None, ctx.diag) for it in items]
     pinned = _attr_size(ctx, slide)
-    cap = pinned or _grow_cap(ctx, base.font_size or 18)
+    cap = pinned or min(  # `iconlist.title.max` / `iconlist.text.max` under `layout.grow_max`
+        _grow_cap(ctx, base.font_size or 18),
+        th.iconlist_title_max,
+        th.iconlist_text_max / max(th.iconlist_text_ratio, 0.1),
+    )
+    cap = max(cap, base.font_size or 18)  # (a cap under the role size never shrinks the text)
     rg = sg
 
     def paras_of(it, S: float) -> list[Paragraph]:
@@ -776,11 +782,14 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
         ):  # a disc takes the icon slot: `icon.disc.size`, else the slot x `layout.icon_disc_list`
             icon = icondisc.diameter(th, ctx.lt, icon, ctx.lt.icon_disc_list)
         gi = _length(ctx, th.iconlist_gap, body.w, round(th.iconlist_gap_ratio * icon))
-        tw = cw - icon - gi - 2 * pad
+        tw = cw - 2 * pad if stack else cw - icon - gi - 2 * pad
         if tw < _pt(S * 4):
             return None
         st = base.merged(fast_style(font_size=S, padding="0pt"))
-        hs = [max(icon, round(_need(paras_of(it, S), st, tw))) + 2 * pad for it in items]
+        if stack:  # the icon sits above the text: its height and the gap are part of the card
+            hs = [icon + gi + round(_need(paras_of(it, S), st, tw)) + 2 * pad for it in items]
+        else:
+            hs = [max(icon, round(_need(paras_of(it, S), st, tw))) + 2 * pad for it in items]
         row_h = [max(hs[r * cols : (r + 1) * cols]) for r in range(rows)]
         return icon, gi, tw, row_h
 
@@ -801,6 +810,8 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
     )  # `iconlist.fill=on`: the rows share the body evenly, the icons grow into the room
     top = th.iconlist_valign == "top"
     air = ctx.lt.iconlist_fill_air if even else th.iconlist_row_air
+    if stack and even:  # a stacked card is never hollow: at most its content / `layout.iconlist_fill_min`
+        air = min(air, 1.0 / max(ctx.lt.iconlist_fill_min, 0.2))
     slot = min(max((body.h + rg) // rows, tall), round(tall * air))
     if even and th.iconlist_icon_size is None and th.icon_disc_size is None and sum(row_h) < body.h:
         k = (
@@ -808,7 +819,11 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
         )  # the text is at its ceiling: the icon takes what is left, up to `layout.grow_max`
         while k > 1.0 + 1e-6:
             big = geom(S, k)
-            if big and max(big[3]) <= slot - rg and big[0] <= (slot - rg - 2 * pad) * 0.86:
+            if (
+                big
+                and max(big[3]) <= slot - rg
+                and (big[0] <= cw * 0.4 if stack else big[0] <= (slot - rg - 2 * pad) * 0.86)
+            ):
                 icon, gi, tw, row_h = big
                 break
             k -= 0.05
@@ -823,16 +838,18 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
         st = base.merged(
             fast_style(
                 font_size=S,
-                valign="top" if top and even else "middle",
+                valign="top" if (top and even) or stack else "middle",
                 align="left",
                 fill=fill,
                 radius=radius,
                 shadow=(card.shadow or None)
                 if fill
                 else None,  # `card.shadow` / `card.elevation` reach the cards
-                padding_left=f"{(pad + icon + gi) / EMU_PER_PT:.2f}pt",
+                padding_left=f"{(pad if stack else pad + icon + gi) / EMU_PER_PT:.2f}pt",
                 padding_right=f"{pad / EMU_PER_PT:.2f}pt",
-                padding_top=f"{pad / EMU_PER_PT:.2f}pt" if top and even else "0pt",
+                padding_top=f"{(pad + icon + gi) / EMU_PER_PT:.2f}pt"
+                if stack
+                else (f"{pad / EMU_PER_PT:.2f}pt" if top and even else "0pt"),
                 padding_bottom="0pt",
             )
         )
@@ -843,7 +860,7 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
                 update={"classes": ["iconlist-icon"]}
             )
             ink = icon_col if th.iconlist_icon_color else icondisc.ink(th, disc, "primary")
-            iy = y + pad if top and even else y + (h - icon) // 2
+            iy = y + pad if (top and even) or stack else y + (h - icon) // 2
             ctx.emit(shape, Rect(x + pad, iy, icon, icon), fast_style(fill=ink, line=None))
     return True
 

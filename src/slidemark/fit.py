@@ -433,6 +433,12 @@ def _slide_line(deck: Deck, slide, items: list[Placed], theme: Theme, i: int) ->
     if sparse is None and free and kind not in ("free",):
         facts.append(free)
     facts += _set_ignored(slide, theme, i)
+    if (
+        slide.conclusion is not None and slide.conclusion.paragraphs
+    ):  # the bar text size (never under the body)
+        bar = next((p for p in items if isinstance(p.element, Text) and p.element.role == "conclusion"), None)
+        if bar is not None and (bar_pt := _pt(bar)):
+            facts.append(f"bar {_size(bar_pt)}")
     if sparse is not None:  # the composition cue ends the line (it replaces the plain free-space fact)
         facts.append(f"sparse: {sparse}% free")
     return f"slide {n}: " + ", ".join([names, *facts]), sparse

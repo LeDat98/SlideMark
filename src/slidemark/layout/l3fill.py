@@ -839,7 +839,10 @@ def fill_cards_to_bar(
     a footnote when the block is already top-anchored (``anchored``). ``to_body`` (small-body themes): cards
     alone on a sparse slide stretch down the body without a bar (``_cards_to_body``)."""
     try:
-        return _cards_to_bar(out, body, lt, bar, anchored, foot, False, to_body)
+        stretched = _cards_to_bar(out, body, lt, bar, anchored, foot, False, to_body)
+        if stretched is None and not to_body:  # box cards with free height inside: heading, text, disc grow
+            return fill_box_cards(out, body, lt)
+        return stretched
     except Exception:  # never raise on bad input
         return None
 
@@ -2105,3 +2108,182 @@ def _center_band(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed
         return out
     ids = {id(p) for p in items}
     return [p.model_copy(update={"y": p.y + dy}) if id(p) in ids else p for p in out]
+
+
+# ------------------------------------------------------------------ box cards (wave 2026-10-08, lane E)
+
+
+def _sized(p: Placed) -> bool:
+    """The author fixed the size of this text (``{size=}``, a sized run), or the layout never grew it: a
+    pinned size (``sizes: heading=20!``), a CSS ``font-size`` and a slide that was already full keep
+    ``font_scale`` 1."""
+    el = p.element
+    return bool(
+        (getattr(el, "style", None) and el.style.font_size)
+        or p.font_scale <= 1.0 + 1e-6
+        or any(measure.has_exact(q) or (q.style is not None and q.style.font_size) for q in el.paragraphs)
+    )
+
+
+def _cjk(p: Placed) -> bool:
+    return any(measure.has_cjk(q.plain) for q in p.element.paragraphs)
+
+
+def _words_fit(p: Placed, s: float, lt: LayoutTokens) -> bool:
+    """No word of ``p`` drawn ``s`` x larger is wider than its text width (it would break mid-word)."""
+    pad = _text_pad(p)
+    width = (p.w - 2 * pad) * (1.0 - lt.l3_wrap_margin)
+    pt = (p.style.font_size or 18) * p.font_scale * s
+    for q in p.element.paragraphs:
+        indent = measure.list_indent(pt, q.level)[0] if q.marker else 0
+        for w in q.plain.split():
+            if measure.text_em(w, font=p.style.font) * pt * EMU_PER_PT > width - indent:
+                return False
+    return True
+
+
+def fill_box_cards(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed] | None:
+    """Box cards (``@2x2`` ``@3`` ``@4``: icon or number, heading, text) with free height inside: the heading
+    (``card.heading.max``) and the text (``card.text.max``) grow into it, the icon disc follows the heading.
+
+    Only a card whose content fills less than ``layout.card_fill_max`` of its height grows, and only until it
+    does; the cards keep their size and their top-anchored content. Growth stays under ``layout.grow_max``;
+    pinned sizes (``{size=}``, ``sizes: body=16!``), CSS sizes and dense slides keep theirs.
+    ``None`` = nothing changes. Never raises."""
+    try:
+        return _fill_box_cards(out, body, lt)
+    except Exception:  # never raise on bad input
+        return None
+
+
+def _fill_box_cards(out: list[Placed], body: Rect, lt: LayoutTokens) -> list[Placed] | None:
+    if not (lt.l3_fill and lt.grow and lt.card_fill_max > 0) or lt.body_valign == "top" or body.h <= 0:
+        return None
+    if measure.ceiling(lt) > max(lt.grow_max, 1.0) + 1e-6:
+        return None  # a dense slide: its sizes were chosen to fit
+    items = _body_items(out, body)
+    boxes = [p for p in items if isinstance(p.element, Container)]
+    cards = [p for p in boxes if not any(q is not p and _contains(q, p) for q in boxes)]
+    if not 2 <= len(cards) <= 8 or len(cards) != len(boxes):
+        return None
+    if any({"kpi", "steps-card"} & set(c.element.classes) or c.element.box is not None for c in cards):
+        return None
+    if any(not any(q is p or _contains(q, p) for q in cards) for p in items):
+        return None  # arrows, charts, loose text share the body
+    parts = [_head_card_parts(c, items) for c in cards]
+    if any(pt is None or not pt[2] for pt in parts):
+        return None
+    heads = [pt[1] for pt in parts]  # type: ignore[index]
+    if any(_sized(h) for h in heads):
+        return None
+    if any(_sized(b) or _is_note(b) or _explicit(b) for pt in parts for b in pt[2]):  # type: ignore[index]
+        return None
+    for icon, head, _bodies in parts:  # type: ignore[misc]
+        if icon is not None and not (  # the icon sits beside the heading (a stacked head keeps its look)
+            icon.x + icon.w <= head.x + 2 and icon.y < head.y + head.h and icon.y + icon.h > head.y
+        ):
+            return None
+
+    def need(p: Placed, s: float, width: int, tight: bool) -> int:
+        pad = _text_pad(p)
+        w = width - 2 * pad
+        if tight:
+            w = round(w * (1.0 - lt.l3_wrap_margin))
+        gap = measure.element_gap(p.element)
+        h = measure.paragraphs_height(p.element.paragraphs, w, p.style, p.font_scale * s, gap=gap)
+        return round(h) + 2 * pad
+
+    def head_box(pt, sh: float) -> tuple[int, int, int]:
+        """(icon side, heading x offset from the icon's left edge, heading width) at heading growth ``sh``."""
+        icon, head, _b = pt
+        if icon is None:
+            return 0, 0, head.w
+        side = round(icon.w * sh)
+        off = side + round((head.x - (icon.x + icon.w)) * sh)
+        return side, off, head.x + head.w - (icon.x + off)
+
+    def geometry(c: Placed, pt, sh: float, sb: float, tight: bool):
+        """({orig id: Placed}, content height below the card top) of one card at head / body growth."""
+        icon, head, bodies = pt
+        first = icon if icon is not None else head
+        top = first.y - c.y
+        side, off, hw = head_box(pt, sh)
+        hx = first.x + off if icon is not None else head.x
+        hh = need(head, sh, hw, tight) if sh != 1.0 else head.h
+        band = max(side, hh, round(head.h * sh)) if icon is not None else hh
+        y = c.y + top
+        res: dict[int, Placed] = {}
+        if icon is not None:
+            res[id(icon)] = icon.model_copy(
+                update={
+                    "y": y + (band - side) // 2,
+                    "w": side,
+                    "h": side,
+                    "font_scale": round(icon.font_scale * sh, 4),
+                }
+            )
+        res[id(head)] = head.model_copy(
+            update={"x": hx, "w": hw, "y": y, "h": band, "font_scale": round(head.font_scale * sh, 4)}
+        )
+        y += band
+        prev = max((icon.y + icon.h) if icon is not None else 0, head.y + head.h)
+        for b in bodies:
+            y += round(max(b.y - prev, 0) * sb)
+            h = b.h if sb == 1.0 and not tight else need(b, sb, b.w, tight)
+            res[id(b)] = b.model_copy(update={"y": y, "h": h, "font_scale": round(b.font_scale * sb, 4)})
+            y += h
+            prev = b.y + b.h
+        return res, y - c.y + top
+
+    def wraps_ok(pt, sh: float, sb: float) -> bool:
+        _icon, head, bodies = pt
+        if sh > 1.0:  # the heading never gets another line
+            hw = head_box(pt, sh)[2]
+            if need(head, sh, hw, True) > need(head, 1.0, head.w, False) * sh * 1.05 + 1:
+                return False
+        if sb > 1.0:
+            for b in bodies:
+                if _cjk(b):  # a new wrapped line / orphan in CJK text
+                    if need(b, sb, b.w, True) > need(b, 1.0, b.w, False) * sb * 1.015:
+                        return False
+                elif not _words_fit(b, sb, lt):
+                    return False
+        return True
+
+    def fits(sh: float, sb: float) -> bool:
+        return all(
+            wraps_ok(pt, sh, sb) and geometry(c, pt, sh, sb, True)[1] <= lt.card_fill_max * c.h
+            for c, pt in zip(cards, parts, strict=True)
+        )
+
+    if not fits(1.0, 1.0):
+        return None  # a card already fills its height: it keeps its text
+    sh_top = min(
+        measure.grow_cap(
+            lt, h.style.font_size, (h.style.font_size or 18) * h.font_scale, lt.card_heading_max_pt
+        )
+        for h in heads
+    )
+    sb_top = min(
+        measure.grow_cap(lt, b.style.font_size, (b.style.font_size or 18) * b.font_scale, lt.card_body_max_pt)
+        for pt in parts
+        for b in pt[2]  # type: ignore[index]
+    )
+    step = max(lt.card_fill_step, 0.01)
+    sh = sb = 1.0
+    while True:
+        moved = False
+        if sb + 1e-9 < sb_top and fits(sh, min(sb + step, sb_top)):
+            sb = min(sb + step, sb_top)
+            moved = True
+        if sh + 1e-9 < sh_top and fits(min(sh + step, sh_top), sb):
+            sh = min(sh + step, sh_top)
+            moved = True
+        if not moved:
+            break
+    if sh <= 1.0 + 1e-9 and sb <= 1.0 + 1e-9:
+        return None
+    res: dict[int, Placed] = {}
+    for c, pt in zip(cards, parts, strict=True):
+        res.update(geometry(c, pt, sh, sb, False)[0])
+    return _apply(out, res)

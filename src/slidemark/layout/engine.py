@@ -4356,16 +4356,27 @@ def _conclusion_style(ctx: _Ctx, slide: Slide, st: Style, index: int) -> Style:
     if not sizes:
         return _bar_shrink(st, base, em, room, base, lt)
     want = min(max(base, max(sizes) * lt.conclusion_min_ratio), max(lt.conclusion_max_pt, base))
-    return _bar_shrink(st, base, em, room, want, lt)
+    # the bar text never shrinks under the body text of its slide (`conclusion.floor`): it wraps instead
+    fl = ctx.theme.conclusion_floor
+    keep = min(want, max(sizes) * fl) if fl > 0 else 0.0
+    return _bar_shrink(st, base, em, room, want, lt, keep)
 
 
-def _bar_shrink(st: Style, base: float, em: float, room: float, want: float, lt: LayoutTokens) -> Style:
+def _bar_shrink(
+    st: Style, base: float, em: float, room: float, want: float, lt: LayoutTokens, keep: float = 0.0
+) -> Style:
     """The bar text (``want`` pt, at least ``base``) stays on one line: it shrinks step by step to the floor
     (``conclusion_min_scale`` x ``base``, never below 12pt) before the bar may wrap; a text that does not fit
-    even there wraps at the theme size."""
+    even there wraps at the theme size. ``keep`` (pt): the bar never shrinks under it (the body text of the
+    slide): the line wraps at ``keep`` first, so the bar grows to two lines before the text gets smaller than
+    the body text."""
     if em > 0 and em * want > room:
-        if room / em >= base:
+        if room / em >= max(base, keep):
             want = room / em  # grown text shrinks to the line
+        elif keep > base:  # a one-line fit would be smaller than the body text: two lines at that size
+            want = keep
+        elif room / em >= base:
+            want = room / em
         else:  # even the theme size wraps: step down to the floor, else wrap at the theme size
             floor = min(base, max(base * lt.conclusion_min_scale, 12.0))
             size = base
