@@ -259,7 +259,7 @@ goes full width below. Each table/chart/image/code outside a box is its own bloc
 `items` bullets of each box as item cards (`item.fill` `item.border-left="5pt solid secondary"` `item.size`) · `num` a
 numbered circle on each box heading (`box.num.fill`) · `flow` cards with arrows · `a>b` arrow, `a-b` line between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition ·
 `@bg=#0B1020` or `@bg="linear-gradient(135deg,#1A0B2E,#7A1FA2)"` background (dark flips text light; `@dark`
-`@light` force it) · `@free` no automatic layout: blocks sit at their own `{x y w h}` (`%` = share of the area under the title, not of the slide; `@free grid`: 12×12 cells, `x=3c w=4c`); a line of attributes with no text draws nothing yet.
+`@light` force it) · `@free` no automatic layout: blocks sit at their own `{x y w h}` (`%` = share of the area under the title, not of the slide; the fit line prints that area; `@free grid`: 12×12 cells, `x=3c w=4c`). A line of only `{x y w h shape=chevron fill=accent}` (no text) draws that shape; `shape=line head=arrow` a connector.
 
 **Attributes** `{.class key=value}` at the end of a heading, image, title or list line, or alone on the line
 before a block; every element takes `x y w h` (`%` `in` `cm` `pt`; never moved by the layout once set), `size`,
@@ -305,7 +305,8 @@ styles one list line; a chart frame takes `{fill= radius= pad=}`.
   wider with a bigger number. Up to 4 in a row; `@end` + a list or table below them.
 - **Callout:** `> [!note] text` (`tip` `warn` `caution`), at slide level or inside a box.
 - **Icons:** `icon=` on a box heading: `check warning info user chart money yen target rocket gear clock
-  globe shield flag refresh tag` or `icon=logo.svg`. **Icon discs** (the icon inside a coloured circle, the
+  globe shield flag refresh tag eye brain layers microphone list video database search code` or `icon=logo.svg` (an
+  unknown name warns with the closest names; the source is never rewritten to a far guess). **Icon discs** (the icon inside a coloured circle, the
   usual card motif): `style: icon.disc=secondary` deck-wide (`icon.disc.shape=circle|rounded|square`,
   `icon.disc.size=0.8in`, `icon.color=` for the glyph; default a readable ink on the disc), `{icon=gear disc=accent}`
   on one heading or `- icon=bolt disc=accent **T** text` in `@iconlist`, `disc=none` removes it.
@@ -319,7 +320,7 @@ styles one list line; a chart frame takes `{fill= radius= pad=}`.
 Table: ` ```table ` fence with CSV (first row = header; quote cells with commas: `"1,240"`), or a GFM table.
 Options on the fence or the line before: `{widths=3:1:1 align=lrr header=1 hcol=1 rowh=0.8in .zebra}` (one `align` letter
 per column); `.gantt` draws filled period cells as bars; `hl=Metro,Kyoto` emphasises the rows whose first cell
-matches, `hlcol=Q3` a column. Merge: a lone `<` joins the cell to the left, `^` the cell above.
+matches, `hlcol=Q3` a column (highlight only what the takeaway names; an unexplained highlight reads as arbitrary). Merge: a lone `<` joins the cell to the left, `^` the cell above.
 
 Chart fence kinds: `column bar line area pie doughnut scatter radar stacked-column stacked-bar waterfall` (waterfall: one row, `=` cell = total). CSV body:
 first row = categories (first cell empty), then one row per series (name first). Options: `title="..."`

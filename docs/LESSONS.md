@@ -318,3 +318,8 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [build] `build` auto-fixes an unknown icon name by edit distance and rewrites the source (`eye` -> `yen`, `refresh` -> `briefcase`): a far match must warn, not rewrite — open.
 - [import] `fold_steps` drops the `STEP n` caption without restoring `num`, so `examples/26` round-trips lossy (slide 7); the closing cover re-imports as a section — open.
 - [test] `pytest -n 4` (pytest-xdist) runs the full suite in about 7 minutes instead of 12; add it to the venv (`uv pip install pytest-xdist --python .venv`).
+- [parser] An attribute-only line directly before a `##` heading belongs to that box; a shape block inside a box needs `@end` after it.
+- [fix] A did-you-mean rewrite is safe only for the unique name within one letter (`chrt` is one letter from both `chart` and `chat`: warn, do not rewrite; `eye` -> `yen` was a far guess that silently rewrote the source).
+- [import] The build names the arrows between cards `Shape N` too, so the importer keeps arrows and `@flow` shapes out of shape blocks.
+- [design] The ink CSS rules that `dark` / `light` derive must not be stored in the design part, or they come back as a css fence on import.
+- [worktree] A worktree is based on the commit it was created at: a lane spawned before a wave merged lacks that wave (lane C had to merge `main` itself); spawn after the merge or say so in the prompt.
