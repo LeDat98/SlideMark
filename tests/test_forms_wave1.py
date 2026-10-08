@@ -943,3 +943,84 @@ def test_fuzz_a_form_slide_never_raises(word, heads, body, icon, tmp_path_factor
     for d in deck.diagnostics:
         if d.level in ("warning", "error"):
             assert d.hint or d.rule.startswith("design"), str(d)
+
+
+# --- wave 2 lane D: @iconlist fills its space
+
+ICONLIST6 = (
+    "\n# AI không chỉ đọc chữ\n@iconlist cols=2{attrs}\n"
+    "- icon=document **Văn bản** viết, tóm tắt, dịch và lập trình\n"
+    "- icon=camera **Hình ảnh** nhận diện, mô tả\n"
+    "- icon=headphones **Âm thanh** chép lời\n"
+    "- icon=play **Video** hiểu cảnh quay\n"
+    "- icon=code **Mã nguồn** gợi ý, sửa lỗi\n"
+    "- icon=chart **Bảng số liệu** đọc, so sánh\n"
+)
+DISC = "style: icon.disc=secondary\n"
+
+
+def _iconlist_extent(prs) -> tuple[float, float, float]:
+    """(top of the first item, bottom of the last item, disc diameter) in inches."""
+    items = shapes(prs, 0, r"Iconlist \d+")
+    discs = shapes(prs, 0, "Icon disc")
+    e = 914400
+    return (
+        min(s.top for s in items) / e,
+        max(s.top + s.height for s in items) / e,
+        max(d.width for d in discs) / e,
+    )
+
+
+def test_iconlist_fill_spaces_the_items_over_the_body_and_grows_the_discs(tmp_path):
+    on, prs_on = make(tmp_path, ICONLIST6.format(attrs=""), HEAD + DISC, "on")
+    off, prs_off = make(
+        tmp_path, ICONLIST6.format(attrs=""), HEAD + DISC + "style: iconlist.fill=off\n", "off"
+    )
+    top_on, bot_on, d_on = _iconlist_extent(prs_on)
+    top_off, bot_off, d_off = _iconlist_extent(prs_off)
+    assert (bot_on - top_on) > (bot_off - top_off) + 0.4  # the rows share the whole body
+    assert d_off < d_on <= d_off * 1.51  # the disc grew into the room, never beyond layout.grow_max
+    assert bot_on <= 7.3 and top_on >= 1.0  # inside the slide, under the title
+    assert not clean(on) and not clean(off)
+
+
+def test_iconlist_fill_cards_stretch_to_their_rows_without_overlap(tmp_path):
+    deck, prs = make(tmp_path, ICONLIST6.format(attrs=" fill=surface"), HEAD + DISC)
+    items = sorted(shapes(prs, 0, r"Iconlist \d+"), key=lambda s: (s.top, s.left))
+    assert len(items) == 6
+    rows = {s.top for s in items}
+    assert len(rows) == 3
+    for a, b in zip(items, items[1:], strict=False):
+        if a.top == b.top:
+            assert a.left + a.width <= b.left
+    ys = sorted(rows)
+    tall = {s.height for s in items}
+    assert len(tall) == 1 and all(y1 + next(iter(tall)) <= y2 for y1, y2 in zip(ys, ys[1:], strict=False))
+    assert not clean(deck)
+
+
+def test_iconlist_valign_top_starts_at_the_body_top(tmp_path):
+    _, mid = make(tmp_path, ICONLIST6.format(attrs=""), HEAD + DISC, "m")
+    _, top = make(tmp_path, ICONLIST6.format(attrs=""), HEAD + DISC + "style: iconlist.valign=top\n", "t")
+    t0 = shapes(top, 0, "Icon disc")[0]
+    m0 = shapes(mid, 0, "Icon disc")[0]
+    assert t0.top <= m0.top  # the disc sits at the top of its row, not centred in it
+
+
+def test_iconlist_tokens_are_checked(tmp_path):
+    deck, _ = make(
+        tmp_path, ICONLIST6.format(attrs=""), HEAD + "style: iconlist.valign=side iconlist.fill=maybe\n"
+    )
+    bad = [d for d in deck.diagnostics if d.rule == "bad-token"]
+    assert len(bad) == 2 and all(d.hint for d in bad)
+    assert normalize_token("iconlist_fill", "off", None) == [("iconlist_fill", False)]
+    assert normalize_token("iconlist_valign", "middle", None) == [("iconlist_valign", "center")]
+
+
+def test_iconlist_one_item_and_many_items_stay_inside(tmp_path):
+    one_item = "\n# T\n@iconlist\n- icon=bolt **Nhanh** xây trong vài giây\n"
+    many = "\n# T\n@iconlist\n" + "".join(f"- icon=bolt **Mục {i}** mô tả ngắn\n" for i in range(9))
+    for text in (one_item, many):
+        deck, prs = make(tmp_path, text, HEAD + DISC)
+        top, bottom, _ = _iconlist_extent(prs)
+        assert top >= 0.9 and bottom <= 7.5

@@ -765,11 +765,11 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
         out += [p.model_copy(update={"style": ts}) if ts else p for p in it["text"]]
         return out
 
-    def geom(S: float):
+    def geom(S: float, k: float = 1.0):
         icon = (
             max(_length(ctx, th.iconlist_icon_size, body.w, 0), 1)
             if th.iconlist_icon_size is not None
-            else _pt(th.iconlist_icon_ratio * S)
+            else _pt(th.iconlist_icon_ratio * S * k)
         )
         if any(
             discs
@@ -796,9 +796,25 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
     if sum(row_h) + rg * (rows - 1) > body.h * 1.01:
         ctx.over.append("icon list")
     tall = max(row_h)
-    slot = min(max((body.h + rg) // rows, tall), round(tall * th.iconlist_row_air))
+    even = (
+        th.iconlist_fill
+    )  # `iconlist.fill=on`: the rows share the body evenly, the icons grow into the room
+    top = th.iconlist_valign == "top"
+    air = ctx.lt.iconlist_fill_air if even else th.iconlist_row_air
+    slot = min(max((body.h + rg) // rows, tall), round(tall * air))
+    if even and th.iconlist_icon_size is None and th.icon_disc_size is None and sum(row_h) < body.h:
+        k = (
+            ctx.lt.grow_max
+        )  # the text is at its ceiling: the icon takes what is left, up to `layout.grow_max`
+        while k > 1.0 + 1e-6:
+            big = geom(S, k)
+            if big and max(big[3]) <= slot - rg and big[0] <= (slot - rg - 2 * pad) * 0.86:
+                icon, gi, tw, row_h = big
+                break
+            k -= 0.05
+        tall = max(row_h)
     used = rows * slot - rg
-    y0 = body.y + max((body.h - used) // 2, 0)
+    y0 = body.y if top and even else body.y + max((body.h - used) // 2, 0)
     for i, it in enumerate(items):
         r, c = divmod(i, cols)
         x = body.x + c * (cw + gutter)
@@ -807,7 +823,7 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
         st = base.merged(
             fast_style(
                 font_size=S,
-                valign="middle",
+                valign="top" if top and even else "middle",
                 align="left",
                 fill=fill,
                 radius=radius,
@@ -816,7 +832,7 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
                 else None,  # `card.shadow` / `card.elevation` reach the cards
                 padding_left=f"{(pad + icon + gi) / EMU_PER_PT:.2f}pt",
                 padding_right=f"{pad / EMU_PER_PT:.2f}pt",
-                padding_top="0pt",
+                padding_top=f"{pad / EMU_PER_PT:.2f}pt" if top and even else "0pt",
                 padding_bottom="0pt",
             )
         )
@@ -827,7 +843,8 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
                 update={"classes": ["iconlist-icon"]}
             )
             ink = icon_col if th.iconlist_icon_color else icondisc.ink(th, disc, "primary")
-            ctx.emit(shape, Rect(x + pad, y + (h - icon) // 2, icon, icon), fast_style(fill=ink, line=None))
+            iy = y + pad if top and even else y + (h - icon) // 2
+            ctx.emit(shape, Rect(x + pad, iy, icon, icon), fast_style(fill=ink, line=None))
     return True
 
 

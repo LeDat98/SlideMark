@@ -594,6 +594,18 @@ class LayoutTokens(BaseModel):
     conclusion_icon_ratio: float = 0.62  # `conclusion.icon`: glyph (or disc) side / bar height
     conclusion_icon_gap: float = 0.5  # ... the air after it, in icon sides
     conclusion_icon_h: Length = "0.55in"  # ... a bar with an icon is at least this tall (`conclusion.h` wins)
+    # --- wave 2026-10-08 lane D
+    steps_card_pad: Length = "0.2in"  # `@steps` card (head=card): air around its top-anchored content
+    steps_card_head_ratio: float = 1.3  # ... the card heading is this x the card body text
+    steps_card_gap: float = 0.5  # ... air between the card's disc / caption / heading / body, in body em
+    steps_card_fill_max: float = 0.92  # ... the card text grows until it fills this share of the card
+    iconlist_fill_air: float = 2.6  # `iconlist.fill=on`: a row is at most this x its tallest item
+    cover_art_nodes: int = 11  # `cover.art=network`: dots (8..12) joined by thin lines
+    cover_art_node_ratio: float = (
+        0.045  # ... a dot is this x the art's shorter side wide (the accent one 1.6x)
+    )
+    cover_art_line_pt: float = 1.25  # ... the lines' thickness (pt)
+    cover_art_margin: float = 0.06  # ... air between the motif and the slide edges, in slide widths
 
 
 class RenderTokens(BaseModel):
@@ -980,6 +992,23 @@ class Theme(Forms4Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
         False  # the deck states `card.line` / `card.border`: a shadowed card keeps its border
     )
     conclusion_icon: str | None = None  # `conclusion.icon=refresh`: an icon at the left of the conclusion bar
+
+    # --- wave 2026-10-08 lane D
+    # `@steps`: the heading is written in the card (the arrow shows the step number / icon) or in the `arrow`
+    steps_head: Literal["card", "arrow"] = "card"
+    iconlist_fill: bool = True  # `@iconlist` grows its icons and spaces the items evenly over the body
+    iconlist_valign: Literal["top", "center"] = (
+        "center"  # ... an item sits at the top / the middle of its row
+    )
+    cover_art: Literal["none", "network", "dots", "rings"] = (
+        "none"  # decorative motif on the cover's right half
+    )
+    cover_art_color: str | None = None  # ... its colour (None = `secondary`); one node is `accent`
+    cover_art_opacity: float = Field(0.55, ge=0.05, le=1.0)  # ... how opaque it is
+    cover_art_seed: int = 7  # ... the same seed draws the same motif
+    cover_art_split: float = Field(
+        0.6, ge=0.3, le=0.9
+    )  # ... the title keeps this share of the width, the art the rest
 
     def color(self, value: str | None) -> str | None:
         """Resolve a theme color name ("primary") or pass a hex value through."""
@@ -1984,6 +2013,72 @@ def _lane_a_value(path: str, raw: str, names: set[str] | None) -> list[tuple[str
     return None
 
 
+# --- wave 2026-10-08 lane D: steps.head, iconlist.fill / valign, cover.art*
+_ON = ("on", "true", "yes", "1")
+_OFF = ("off", "false", "no", "0", "none")
+
+
+def _lane_d_value(path: str, raw: str, names: set[str] | None) -> list[tuple[str, Any]] | None:
+    """``steps.head`` ``iconlist.fill`` ``iconlist.valign`` ``cover.art`` ``cover.art.color`` ``.opacity``
+    ``.seed`` ``.split``. ``None`` = not one of them (the generic rules apply)."""
+    if path not in (
+        "steps_head",
+        "iconlist_fill",
+        "iconlist_valign",
+        "cover_art",
+        "cover_art_color",
+        "cover_art_opacity",
+        "cover_art_seed",
+        "cover_art_split",
+    ):
+        return None
+    v = _unquote(raw)
+    low = v.lower()
+    key = path.replace("_", ".")
+
+    def pick(words: tuple[str, ...], hint: str) -> list[tuple[str, Any]]:
+        if low not in words:
+            near = difflib.get_close_matches(low, words, n=1, cutoff=0.5)
+            tip = f"did you mean '{near[0]}'? " if near else ""
+            raise TokenValueError(f"'{v}' is not a {key} value", f"{tip}{hint}")
+        return [(path, low)]
+
+    if path == "steps_head":
+        return pick(("card", "arrow"), "write steps.head=card (heading in the card) or steps.head=arrow")
+    if path == "iconlist_valign":
+        low = {"middle": "center", "centre": "center"}.get(low, low)
+        return pick(("top", "center"), "write iconlist.valign=top or center")
+    if path == "iconlist_fill":
+        if low in _ON:
+            return [(path, True)]
+        if low in _OFF:
+            return [(path, False)]
+        raise TokenValueError("iconlist.fill is on or off", "write iconlist.fill=off (or on)")
+    if path == "cover_art":
+        low = "none" if low in _OFF else low
+        return pick(("none", "network", "dots", "rings"), "write cover.art=network, dots, rings or none")
+    if path == "cover_art_color":
+        return [(path, None if low in ("none", "auto") else _color_value(raw, names))]
+    try:
+        if path == "cover_art_seed":
+            return [(path, int(float(low)))]
+        num = float(low[:-1]) / 100 if low.endswith("%") else float(low)
+        if path == "cover_art_opacity" and not 0.05 <= num <= 1.0:
+            raise ValueError
+        if path == "cover_art_split" and not 0.3 <= num <= 0.9:
+            raise ValueError
+        return [(path, num)]
+    except ValueError:
+        ranges = {
+            "cover_art_opacity": "0.05 to 1 (or 40%)",
+            "cover_art_split": "0.3 to 0.9 (the title's share of the width)",
+            "cover_art_seed": "a whole number",
+        }
+        raise TokenValueError(
+            f"'{v}' is not valid for {key}", f"write {key}= {ranges.get(path, 'a number')}"
+        ) from None
+
+
 def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[str, Any]]:
     """Validate a raw token value by its field type and map CSS-like shorthands.
 
@@ -2002,6 +2097,10 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
     if (got := _lane_a_value(path, raw, names)) is not None:  # icon.disc* icon.color card.elevation ...
         return got
     if (got := forms4_normalize(path, raw, names)) is not None:  # wave 2026-10-08 lane B: cycle.center ...
+        return got
+    if (
+        got := _lane_d_value(path, raw, names)
+    ) is not None:  # wave 2026-10-08 lane D: steps.head cover.art ...
         return got
     parts = path.split(".")
     leaf = parts[-1]
