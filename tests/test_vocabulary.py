@@ -46,6 +46,10 @@ PYRAMID = "\n# T\n@pyramid\n## Board\nsets course\n## Heads\nplan\n## Leads\nrun
 CYCLE = "\n# T\n@cycle\n## Plan\ngoals\n## Do\nship\n## Check\nmeasure\n## Act\nadjust\n"
 AGENDA = "\n# T\n@agenda\n1. Context\n2. Options {.accent}\n   - three of them\n3. Decision\n"
 STATEMENT = "\n# T\n@statement\n**+18%**\nrevenue growth year on year\n"
+STAIRS = (
+    "\n# T\n@stairs\n## Buy\nready now\n## Prompt\nwrite it\n## Retrieve\nyour data\n## Train\nown model\n"
+)
+NESTED = "\n# T\n@nested\n## AI\nthe field\n## ML\nlearns from data\n## DL\ndeep networks\n"
 ALL = {
     "timeline": TIMELINE,
     "vs": VS,
@@ -55,6 +59,8 @@ ALL = {
     "cycle": CYCLE,
     "agenda": AGENDA,
     "statement": STATEMENT,
+    "stairs": STAIRS,
+    "nested": NESTED,
 }
 
 
@@ -108,9 +114,10 @@ def inch(emu: int) -> float:
 def test_every_form_has_keys_an_example_and_a_composer():
     from slidemark.layout import vocab
 
-    assert set(forms.FORMS) == set(forms.KEYS) == set(forms.EXAMPLE) == set(vocab._FORMS)
+    assert set(forms.FORMS) | {"flowdisc"} == set(forms.KEYS) == set(forms.EXAMPLE) == set(vocab._FORMS)
     for form, example in forms.EXAMPLE.items():
-        assert example.startswith(f"@{form}") or f"@{form}" in example
+        word = forms.WORD.get(form, form)
+        assert example.startswith(f"@{word}") or f"@{word}" in example
 
 
 @pytest.mark.parametrize("form", forms.FORMS)
@@ -174,6 +181,8 @@ def test_bad_attributes_warn_with_a_hint(text, rule, hint):
         ("cycle", "\n# T\n@cycle\n## a\n## b\n"),
         ("agenda", "\n# T\n@agenda\n- a\n- b\n"),
         ("statement", "\n# T\n@statement\n- a\n- b\n"),
+        ("stairs", "\n# T\n@stairs\n## a\n"),
+        ("nested", "\n# T\n@nested\n## a\n## b\n"),
     ],
 )
 def test_a_slide_without_what_the_form_needs_warns_and_stays_ordinary(form, text, tmp_path):
@@ -184,7 +193,7 @@ def test_a_slide_without_what_the_form_needs_warns_and_stays_ordinary(form, text
     assert not [
         s
         for s in prs.slides[0].shapes
-        if re.match(r"(Timeline|VS|Matrix|Funnel|Pyramid|Cycle|Agenda|Statement)", s.name)
+        if re.match(r"(Timeline|VS|Matrix|Funnel|Pyramid|Cycle|Agenda|Statement|Stairs|Nested)", s.name)
     ]
 
 

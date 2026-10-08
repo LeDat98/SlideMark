@@ -1735,7 +1735,7 @@ def _step_caption(theme: Theme | None, n: int, fmt: str | None, children: list) 
         align="center",
         color=theme.steps_caption_color or "muted",
     )
-    para = Paragraph(runs=[Run(text=fmt.replace("{n}", str(n)))], style=st)
+    para = Paragraph(runs=[Run(text=fmt.replace("{n}", str(n)))], style=st, attrs={"_caption": True})
     if children and isinstance(children[0], Text) and children[0].role == "body":
         first = children[0].model_copy(update={"paragraphs": [para, *children[0].paragraphs]})
         return [first, *children[1:]]
@@ -1843,6 +1843,8 @@ def _place_steps(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> bool:
         if area.h <= 0:
             ctx.over.append(_label(c))
             return True
+        for k in present:  # the height the content asks for: a later stretch to the bar shows in the fit line
+            k.attrs["_nat_h"] = h
         _place_blocks(ctx, present, Rect(area.x, area.y, area.w, h), inherit, card_grid, [], gap, c)
     finally:
         ctx.depth, ctx.steps_row = saved
