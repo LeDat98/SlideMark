@@ -181,6 +181,17 @@ def _kpi(cards: list[Placed], items: list[Placed], body: list[int] | None, asked
     return name, facts
 
 
+def _body_pt(p: Placed) -> float | None:
+    """The size (pt) of the body text of a card: its last paragraph with text (a ``STEP 1`` caption comes
+    first and is smaller by design, so the first paragraph would report the caption)."""
+    paras = [q for q in (getattr(p.element, "paragraphs", None) or []) if q.plain.strip()]
+    if not paras:
+        return _pt(p)
+    q = paras[-1]
+    size = (q.style.font_size if q.style and q.style.font_size else None) or p.style.font_size
+    return float(size or 18) * p.font_scale
+
+
 def _steps(arrows: list[Placed], cards: list[Placed], items, body, theme, dense_k):
     name = f"steps {len(arrows)}"
     facts = []
@@ -189,7 +200,10 @@ def _steps(arrows: list[Placed], cards: list[Placed], items, body, theme, dense_
         facts.append(f"arrows + cards fill {_share((max(c.y + c.h for c in cards) - top) / body[3])}%")
     txt = _first_text(items, cards)
     if txt is not None:
-        facts.append("card text " + _size(_pt(txt), _asked(theme, "body", dense_k)))
+        facts.append("card text " + _size(_body_pt(txt), _asked(theme, "body", dense_k)))
+    nat = [c.element.attrs.get("_nat_h") for c in cards]
+    if cards and all(nat) and any(c.h > n * (1 + SIZE_TOL) for c, n in zip(cards, nat, strict=True)):
+        facts.append("cards grown to fill")
     return name, facts
 
 
@@ -258,7 +272,21 @@ def _vocab(v: dict, theme: Theme, dense_k: float):
             text,
         ]
     if form == "cycle":
-        return f"cycle {n} nodes ({v.get('dir')})", [f"node text {round(v.get('head') or 0)}pt", text]
+        facts = ([f"node text {round(v['head'])}pt"] if v.get("head") else []) + (
+            [f"{_n(v['icons'], 'icon')} in nodes"] if v.get("icons") else []
+        )
+        facts += ["numbered nodes, headings beside them"] if v.get("numbered") else []
+        facts += [f"centre label {round(v['center'])}pt"] if v.get("center") else []
+        return f"cycle {n} nodes ({v.get('dir')})", [*facts, text]
+    if form == "stairs":
+        return f"stairs {n} ({v.get('dir')})", [f"step {v.get('step')}pt", text]
+    if form == "nested":
+        return f"nested {n} rings ({v.get('side')})", [f"ring headings {round(v.get('head') or 0)}pt", text]
+    if form == "flowdisc":
+        return f"flow of {n} discs" + (", side node above" if v.get("above") else ""), [
+            f"disc {round(v.get('disc') or 0)}pt",
+            text,
+        ]
     if form == "agenda":
         return f"agenda {n} rows" + (", current marked" if v.get("now") else ""), [
             f"numbers {round(v.get('num') or 0)}pt",

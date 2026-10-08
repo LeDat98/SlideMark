@@ -26,7 +26,8 @@ def test_budgets():
     # 6600 since the design guide (owner, 2026-10-08): palette + motif, a visual on every slide, type scale,
     # the never / avoid lists and the three-step check, after the pptxgenjs comparison (docs/PLAN.md)
     # 6900 since icon discs / card.elevation / conclusion.icon (wave 2026-10-08; lane B's forms come next)
-    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 6900
+    # 7100 since @stairs / @nested / @flow disc / @cycle icons (wave 2026-10-08 lane B)
+    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 7100
     refs = sorted((SKILL / "reference").glob("*.md"))
     assert len(refs) >= 5
     for p in refs:

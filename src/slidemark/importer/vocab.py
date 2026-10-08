@@ -27,9 +27,12 @@ _NAMES = {
     "matrix": re.compile(r"Matrix [xy] (?:axis|label)"),
     "funnel": re.compile(r"Funnel (\d+)(?: (?:up|down))?(?: text)?"),
     "pyramid": re.compile(r"Pyramid (\d+)(?: (?:up|down))?(?: text)?"),
-    "cycle": re.compile(r"Cycle (\d+)(?: text| arrow(?: ccw)?)?"),
+    "cycle": re.compile(r"Cycle (?:center|(\d+)(?: text| icon| arrow(?: ccw)?)?)"),
     "agenda": re.compile(r"Agenda (\d+)(?: now)?(?: (?:num|rule|fill))?"),
     "statement": re.compile(r"Statement(?: caption)?"),
+    "stairs": re.compile(r"Stairs (\d+)"),
+    "nested": re.compile(r"Nested (\d+)(?: text| list| icon)?"),
+    "flowdisc": re.compile(r"Flow (\d+) (?:disc|line|text|icon)"),
 }
 _TEXT = {
     "timeline": re.compile(r"Timeline (\d+)( now)?"),
@@ -37,7 +40,15 @@ _TEXT = {
     "pyramid": re.compile(r"Pyramid (\d+)(?: (up|down))?( text)?"),
     "cycle": re.compile(r"Cycle (\d+)( text)?"),
     "agenda": re.compile(r"Agenda (\d+)( now)?"),
+    "stairs": re.compile(r"Stairs (\d+)"),
 }
+
+
+_WITH_DATA = (
+    "cycle",
+    "nested",
+    "flowdisc",
+)  # folds that also read the slide's other shapes (the icons drawn in the nodes)
 
 
 @dataclass
@@ -113,10 +124,13 @@ def extract(data: SlideData) -> FormFold | None:
         "cycle": _cycle,
         "agenda": _agenda,
         "statement": _statement,
+        "stairs": _stairs,
+        "nested": _nested,
+        "flowdisc": _flowdisc,
         "vs": _vs,
         "matrix": _matrix,
     }[form]
-    return fold(form, named, texts)
+    return fold(form, named, texts, data) if form in _WITH_DATA else fold(form, named, texts)
 
 
 # --------------------------------------------------------------------------- one fold per form
@@ -174,10 +188,23 @@ def _stage(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:
     return FormFold(form, tokens, boxes)
 
 
-def _cycle(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:
+def _icon_in(data: SlideData | None, it: Item) -> str | None:
+    """The ``icon <name>`` shape whose centre lies inside ``it`` (a glyph a form drew in a node), or None."""
+    for ic in data.items if data is not None else ():
+        if (
+            ic.kind == "shape"
+            and ic.name.lower().startswith("icon ")
+            and it.x <= ic.cx <= it.x + it.w
+            and it.y <= ic.cy <= it.y + it.h
+        ):
+            return ic.name.strip()[5:].strip() or None
+    return None
+
+
+def _cycle(form: str, named: list[Item], texts: list[Item], data: SlideData | None = None) -> FormFold | None:
     nodes: dict[int, Item] = {}
     bodies: dict[int, Item] = {}
-    for it in texts:
+    for it in named:  # (a node that holds an icon has no text: its ellipse is not a text shape)
         m = _TEXT[form].fullmatch(_name(it))
         if m:
             (bodies if m.group(2) else nodes)[int(m.group(1))] = it
@@ -186,10 +213,105 @@ def _cycle(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:
     ccw = any(_name(it).endswith("arrow ccw") for it in named)
     boxes = []
     for n in sorted(nodes):
+        icon = _icon_in(data, nodes[n])
         head = [p for p in nodes[n].paras if p.plain.strip()]
         rest = [p for p in (bodies[n].paras if n in bodies else []) if p.plain.strip()]
-        boxes.append(_box(nodes[n], head[:1], rest))
-    return FormFold("cycle", ["cycle"] + (["dir=ccw"] if ccw else []), boxes)
+        numbered = (  # a node that only holds its number: the bold first line beside it is the heading
+            bool(head)
+            and head[0].plain.strip() == str(n)
+            and bool(rest)
+            and all(r.bold for r in rest[0].runs if r.text.strip())
+        )
+        if (icon and not head and rest) or numbered:  # the heading moved out of the node
+            head, rest = rest[:1], rest[1:]
+        blk = _box(nodes[n], head[:1], rest)
+        blk.icon = icon
+        boxes.append(blk)
+    tokens = ["cycle"] + (["dir=ccw"] if ccw else [])
+    center = next((t for t in texts if _name(t) == "Cycle center"), None)
+    if center is None:
+        center = next((t for t in named if _name(t) == "Cycle center" and t.text), None)
+    if center is not None and center.text:
+        tokens.append(f"center={_quote(center.text.replace(chr(10), ' ').strip())}")
+    return FormFold("cycle", tokens, boxes)
+
+
+def _stairs(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:
+    cards = sorted(
+        ((int(m.group(1)), it) for it in texts if (m := _TEXT[form].fullmatch(_name(it)))), key=lambda t: t[0]
+    )
+    if len(cards) < 2:
+        return None
+    boxes = []
+    for _n, it in cards:
+        paras = [p for p in it.paras if p.plain.strip()]
+        boxes.append(_box(it, paras[:1], paras[1:]))
+    down = cards[0][1].h > cards[-1][1].h  # the first card is the tallest: the staircase falls
+    return FormFold("stairs", ["stairs"] + (["dir=down"] if down else []), boxes)
+
+
+def _icon_beside(data: SlideData | None, it: Item) -> str | None:
+    """The ``icon <name>`` shape on the row of ``it``: its centre inside the item's height, beside it."""
+    best: tuple[int, str] | None = None
+    for ic in data.items if data is not None else ():
+        if ic.kind == "shape" and ic.name.lower().startswith("icon ") and it.y <= ic.cy <= it.y + it.h:
+            dist = min(abs(ic.cx - it.x), abs(ic.cx - (it.x + it.w)))
+            if best is None or dist < best[0]:
+                best = (dist, ic.name.strip()[5:].strip())
+    return best[1] if best and best[1] else None
+
+
+def _nested(
+    form: str, named: list[Item], texts: list[Item], data: SlideData | None = None
+) -> FormFold | None:
+    rings: dict[int, Item] = {}
+    heads: dict[int, Item] = {}
+    lists: dict[int, Item] = {}
+    for it in named:
+        m = re.fullmatch(r"Nested (\d+)( text| list| icon)?", _name(it))
+        if not m or m.group(2) == " icon":
+            continue
+        {None: rings, " text": heads, " list": lists}[m.group(2)][int(m.group(1))] = it
+    if len(rings) < 3:
+        return None
+    boxes = []
+    for n in sorted(rings):
+        head = [p for p in (heads[n].paras if n in heads else []) if p.plain.strip()][:1]
+        rest = [p for p in (lists[n].paras if n in lists else []) if p.plain.strip()]
+        if head and rest and rest[0].plain.strip() == head[0].plain.strip():
+            rest = rest[1:]  # the list item starts with the ring heading (`nested.list.title`)
+        elif not head and rest:
+            head, rest = rest[:1], rest[1:]
+        blk = _box(lists.get(n, rings[n]), head, rest)  # (rows do not overlap: the rings do)
+        if n in lists:
+            blk.icon = _icon_beside(data, lists[n])
+        boxes.append(blk)
+    first = lists.get(min(lists)) if lists else None
+    right = first is not None and rings[min(rings)].cx > first.cx
+    return FormFold("nested", ["nested"] + (["side=right"] if right else []), boxes)
+
+
+def _flowdisc(
+    form: str, named: list[Item], texts: list[Item], data: SlideData | None = None
+) -> FormFold | None:
+    discs: dict[int, Item] = {}
+    bodies: dict[int, Item] = {}
+    for it in named:
+        m = re.fullmatch(r"Flow (\d+) (disc|text)", _name(it))
+        if m:
+            (discs if m.group(2) == "disc" else bodies)[int(m.group(1))] = it
+    if len(discs) < 2:
+        return None
+    ys = sorted(d.cy for d in discs.values())
+    row = ys[len(ys) // 2]  # the row's height: the median disc
+    boxes = []
+    for n in sorted(discs):
+        d = discs[n]
+        paras = [p for p in (bodies[n].paras if n in bodies else []) if p.plain.strip()]
+        blk = _box(bodies.get(n, d), paras[:1], paras[1:], "above" if d.cy < row - 0.5 * d.h else "")
+        blk.icon = _icon_in(data, d)
+        boxes.append(blk)
+    return FormFold("flowdisc", ["flow", "disc"], boxes)
 
 
 def _agenda(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:

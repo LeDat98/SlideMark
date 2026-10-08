@@ -142,12 +142,14 @@ def _paras(
 
 
 def _word_em(h: Text | None) -> float:
-    """Width (em, bold) of the longest word of a heading; a CJK run counts half its length (it may break)."""
+    """Width (em, bold) of the longest word of a heading; a CJK run counts half its length (it may break).
+    The orphan control (the last two words of a 3-word line share a no-break space) counts as one word."""
     if h is None:
         return 0.0
     best = 0.0
     for p in h.paragraphs:
-        for tok in p.plain.split():
+        text = "".join(measure.bound_texts(p.runs))
+        for tok in re.split(r"[ \t\n\v\r]+", text):
             em = (len(tok) + 1) / 2 if measure.has_cjk(tok) else measure.text_em(tok, bold=True)
             best = max(best, em)
     return best
@@ -828,43 +830,27 @@ def _pyramid(c, slide, body, sg, info) -> bool:
 
 def _cycle(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     th, lt = c.theme, c.lt
+    E = _eng()
     bx = forms.boxes(slide) or []
     n = len(bx)
     cw = forms.words(slide.attrs, "cycle", "dir") == "cw"
     parts = [_split_box(b) for b in bx]
+    icons_ = [
+        E._icon_name(b) for b in bx
+    ]  # `## Plan {icon=target}`: the glyph sits in the node, the heading beside it
     base, ratio, hi, lo, pinned = _sizes(c, slide)
     start = -90.0 if n % 2 else -90.0 + 180.0 / n
     step = 360.0 / n * (1 if cw else -1)
     angles = [start + i * step for i in range(n)]
     sin_max = max(abs(math.sin(math.radians(a))) for a in angles)
     base_pt = max(base, lo)
-    if th.cycle_node_size:
-        d = _emu(th.cycle_node_size)
-    else:  # the room decides, but a node is wide enough for the longest word of a heading at the body size
-        d = round(lt.cycle_node_ratio * body.h)
-        word = max((_word_em(h) for h, _b in parts), default=0.0)
-        d = max(d, round((word * base_pt + 2 * lt.cycle_node_pad) * EMU_PER_PT / lt.cycle_node_inner))
-    r = min((body.h - d) / (2 * sin_max), (body.w * (1 - lt.cycle_body_share) - d) / 2)
-    if not th.cycle_node_size:  # neighbours stay apart: the chord between two nodes holds both and an arrow
-        d = min(d, round(2 * r * math.sin(math.pi / n) / lt.cycle_chord_ratio))
-        r = min((body.h - d) / (2 * sin_max), (body.w * (1 - lt.cycle_body_share) - d) / 2)
-    r = max(r, d * 0.6)
-    ccx, ccy = body.x + body.w // 2, body.y + body.h // 2
-    aw = _emu(th.cycle_arrow_w)
-    ag = _emu(lt.cycle_arrow_gap)
-    fills = _colors(slide, th.cycle_fill)
-    pos = [(ccx + r * math.cos(math.radians(a)), ccy + r * math.sin(math.radians(a))) for a in angles]
-    side = ["r" if math.cos(math.radians(a)) > -0.05 else "l" for a in angles]
-    inner = round(d * lt.cycle_node_inner - 2 * lt.cycle_node_pad * EMU_PER_PT)  # the text square of a circle
-    bw = max(round(min(body.w / 2 - r - d / 2 - sg, body.w * 0.4)), 1)
-    # body text height: bounded by the vertical distance to the next node on the same side
-    ys = {s: sorted(p[1] for p, sd in zip(pos, side, strict=True) if sd == s) for s in ("r", "l")}
-    gaps = [b - a for v in ys.values() for a, b in zip(v, v[1:], strict=False)]
-    # bodies hang from the top of upper nodes and stand on the bottom of lower ones: two neighbours need
-    # bh_a + bh_b <= gap + d, so each gets half of it
-    bh = round(min(max((min(gaps, default=d * 2) + d) / 2 * 0.96, d), d * 2.2))
+    pad2 = 2 * lt.cycle_node_pad * EMU_PER_PT
+    text_nodes = [p for p, ic in zip(parts, icons_, strict=True) if not ic and p[0] is not None]
 
-    def head_ok(s: float) -> bool:
+    def inner_of(dia: int) -> int:  # the text square of a circle
+        return round(dia * lt.cycle_node_inner - pad2)
+
+    def head_fits(s: float, inner: int) -> bool:
         st = _text_style(c, s, bold=True)
         return all(
             _word_em(h) * s * EMU_PER_PT <= inner  # no word is cut in two
@@ -875,22 +861,75 @@ def _cycle(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
                 st,
             )
             <= inner
-            for h, _b in parts
-            if h is not None
+            for h, _b in text_nodes
         )
 
-    hsize, hfit = _largest(min(hi * ratio, d / EMU_PER_PT * 0.3) if not pinned else hi, lo, head_ok)
+    def ring_r(dia: int) -> float:
+        r_ = min((body.h - dia) / (2 * sin_max), (body.w * (1 - lt.cycle_body_share) - dia) / 2)
+        return max(r_, dia * 0.6)
+
+    def chord_ok(dia: int) -> bool:  # neighbours stay apart: the chord holds both nodes and an arrow
+        return 2 * ring_r(dia) * math.sin(math.pi / n) / lt.cycle_chord_ratio >= dia
+
+    d_room = d_cap = 0
+    if th.cycle_node_size:
+        d = _emu(th.cycle_node_size)
+    else:
+        d_room = round(lt.cycle_node_ratio * body.h)
+        unit = round(0.04 * 914400)
+        d_cap = d_room
+        while not chord_ok(d_cap) and d_cap > unit * 4:  # the room cannot hold the preferred node: shrink it
+            d_cap -= unit
+        while chord_ok(d_cap + unit) and d_cap < 0.5 * body.h:  # ... or it holds a larger one
+            d_cap += unit
+        d = min(d_room, d_cap)
+        if text_nodes:  # a node grows until its heading fits at the body size (the ring allows it)
+            while d < d_cap and not head_fits(base_pt, inner_of(d)):
+                d = min(d + unit, d_cap)
+    # a heading the largest node still cannot hold at the body size goes beside its node (as with an icon);
+    # the node then carries the step number
+    numbered = False
+    if text_nodes and not pinned and not th.cycle_node_size:
+        top0 = max(min(hi * ratio, d / EMU_PER_PT * 0.3), base_pt)
+        if _largest(top0, lo, lambda s_: head_fits(s_, inner_of(d)))[0] < base_pt - 1e-9:
+            numbered, d = True, min(d_room, d_cap)
+            text_nodes.clear()
+    outside = [bool(icons_[i]) or (numbered and parts[i][0] is not None) for i in range(n)]
+    r = ring_r(d)
+    ccx, ccy = body.x + body.w // 2, body.y + body.h // 2
+    aw = _emu(th.cycle_arrow_w)
+    ag = _emu(lt.cycle_arrow_gap)
+    fills = _colors(slide, th.cycle_fill)
+    pos = [(ccx + r * math.cos(math.radians(a)), ccy + r * math.sin(math.radians(a))) for a in angles]
+    side = ["r" if math.cos(math.radians(a)) > -0.05 else "l" for a in angles]
+    inner = inner_of(d)
+    bw = max(round(min(body.w / 2 - r - d / 2 - sg, body.w * 0.4)), 1)
+    # body text height: bounded by the vertical distance to the next node on the same side
+    ys = {s: sorted(p[1] for p, sd in zip(pos, side, strict=True) if sd == s) for s in ("r", "l")}
+    gaps = [b - a for v in ys.values() for a, b in zip(v, v[1:], strict=False)]
+    # bodies hang from the top of upper nodes and stand on the bottom of lower ones: two neighbours need
+    # bh_a + bh_b <= gap + d, so each gets half of it
+    bh = round(min(max((min(gaps, default=d * 2) + d) / 2 * 0.96, d), d * 2.2))
+    out_head = th.legible(th.cycle_head_color or "fg")
+
+    if text_nodes:
+        top_pt = max(min(hi * ratio, d / EMU_PER_PT * 0.3), base_pt) if not pinned else hi
+        hsize, hfit = _largest(top_pt, lo, lambda s: head_fits(s, inner))
+    else:
+        hsize, hfit = base_pt, True
+
+    def side_paras(i: int, s: float) -> list[Paragraph]:
+        h, bd = parts[i]
+        if outside[i]:  # the heading moved out of the node: it leads the text beside it
+            return _paras(h, bd, s, ratio, _own(bx[i], "color") or out_head)
+        return [p for t in bd for p in t.paragraphs]
 
     def body_ok(s: float) -> bool:
         st = _text_style(c, s)
-        return all(
-            _need(c, [p for t in bd for p in t.paragraphs], bw, st) <= bh * lt.vocab_fill
-            for _h, bd in parts
-            if bd
-        )
+        return all(_need(c, ps, bw, st) <= bh * lt.vocab_fill for i in range(n) if (ps := side_paras(i, s)))
 
-    has_body = any(bd for _h, bd in parts)
-    bsize, bfit = _largest(hi, lo, body_ok) if has_body else (hsize, True)
+    has_text = any(side_paras(i, base_pt) for i in range(n))
+    bsize, bfit = _largest(hi, lo, body_ok) if has_text else (hsize, True)
     # curved arrows first (behind the nodes): the arc of the ring between neighbours
     half = math.degrees(math.asin(min((d / 2 + ag) / r, 1.0)))
     arrow_col = th.cycle_arrow
@@ -921,15 +960,26 @@ def _cycle(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             Rect(round(ccx - r), round(ccy - r), round(2 * r), round(2 * r)),
             fast_style(fill=None, line=arrow_col, line_width=_pt(aw)),
         )
-    for i, ((h, bd), (px, py)) in enumerate(zip(parts, pos, strict=True)):
+    csize = _cycle_center(c, slide, (ccx, ccy), r, d, ag + aw, (hi * ratio, lo), info)
+    for i, ((h, _bd), (px, py)) in enumerate(zip(parts, pos, strict=True)):
         col = _own(bx[i], "fill") or _pick(fills, i, "primary") or "primary"
+        ink = _own(bx[i], "color") or th.cycle_color or th.ink_on(col, "bg")
         paras = (
             [
                 p.model_copy(update={"style": fast_style(font_size=hsize, bold=True).merged(p.style)})
                 for p in h.paragraphs
             ]
-            if h is not None
-            else []
+            if h is not None and not outside[i]
+            else (
+                [
+                    Paragraph(
+                        runs=[Run(text=str(i + 1), bold=True)],
+                        style=fast_style(font_size=min(hi * ratio, d / EMU_PER_PT * 0.4), bold=True),
+                    )
+                ]
+                if numbered and outside[i] and not icons_[i]
+                else []
+            )
         )
         c.emit(
             Shape(shape="ellipse", paragraphs=paras, attrs={"shape_name": f"Cycle {i + 1}"}),
@@ -941,18 +991,35 @@ def _cycle(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
                 font_ea=th.fonts.ea,
                 font_size=hsize,
                 bold=True,
-                color=_own(bx[i], "color") or th.cycle_color or th.ink_on(col, "bg"),
+                color=ink,
                 align="center",
                 valign="middle",
                 padding="2pt",
             ),
         )
-        if bd:
+        if icons_[i]:
+            isz = round(d * th.cycle_icon_ratio)
+            c.emit(
+                Shape(shape="icon", attrs={"icon": icons_[i], "shape_name": f"Cycle {i + 1} icon"}),
+                Rect(round(px - isz / 2), round(py - isz / 2), isz, isz),
+                fast_style(fill=th.cycle_icon_color or th.ink_on(col, "bg"), line=None),
+            )
+        ps = side_paras(i, bsize)
+        if ps:
             right = side[i] == "r"
             x = round(px + d / 2 + sg) if right else round(px - d / 2 - sg - bw)
             sin = math.sin(math.radians(angles[i]))
             if sin < -0.3:  # upper half: the text hangs from the top of its node
-                rect, va = Rect(x, round(py - d / 2), bw, bh), "top"
+                tw = bw
+                if sin < -0.9 and right:  # the top node: the arc leaving it runs under the text, so the text
+                    # starts where the arc has dropped below the text's last line
+                    need = min(_need(c, ps, bw, _text_style(c, bsize)), bh)
+                    drop = max(need - d / 2, 0) + 0.04 * 914400
+                    dx = math.sqrt(max(r * r - (r - drop) ** 2, 0.0)) if drop < r else r
+                    x2 = max(x, round(px + dx))
+                    if x2 + bw * 0.8 <= body.right:
+                        x, tw = x2, min(bw, body.right - x2)
+                rect, va = Rect(x, round(py - d / 2), tw, bh), "top"
             elif sin > 0.3:  # lower half: it stands on the bottom of its node
                 rect, va = Rect(x, round(py + d / 2 - bh), bw, bh), "bottom"
             else:
@@ -960,14 +1027,91 @@ def _cycle(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             _emit_text(
                 c,
                 f"Cycle {i + 1} text",
-                [p for t in bd for p in t.paragraphs],
+                ps,
                 rect,
                 _text_style(c, bsize, align="left" if right else "right", valign=va),
             )
-    info.update(n=n, dir="cw" if cw else "ccw", size=bsize, head=hsize, fit=hfit and bfit)
+    info.update(
+        n=n,
+        dir="cw" if cw else "ccw",
+        size=bsize,
+        head=hsize if text_nodes else None,
+        fit=hfit and bfit,
+        icons=sum(1 for ic in icons_ if ic),
+        center=csize,
+        numbered=numbered,
+    )
     if not (hfit and bfit):
         c.over.append("@cycle text")
     return True
+
+
+def _cycle_center(
+    c, slide: Slide, centre: tuple[int, int], r: float, d: int, clear: int, sizes: tuple[float, float], info
+) -> float | None:
+    """The label at the ring's centre (``center="..."`` on the ``@`` line, else ``cycle.center``): the largest
+    size the free disc holds. Returns its size in pt (``None`` = no label)."""
+    th, lt = c.theme, c.lt
+    text = str(slide.attrs.get("center") or th.cycle_center or "").strip()
+    if not text:
+        return None
+    free = round(2 * (r - d / 2 - clear))  # the disc between the arrows
+    if free < _emu("0.5in"):
+        c.diag(
+            "cycle-center",
+            "the ring is too small for a centre label",
+            "shorten the nodes' text, drop a node, or write cycle.node.size=0.8in",
+        )
+        return None
+    w = round(free * lt.cycle_node_inner * 1.1)
+    h = round(free * lt.cycle_node_inner)
+    top, lo = sizes
+    pin = th.cycle_center_size
+    para = Paragraph(runs=[Run(text=text, bold=True)])
+
+    def ok(s: float) -> bool:
+        st = _text_style(c, s, bold=True)
+        return _word_em(Text(role="body", paragraphs=[para])) * s * EMU_PER_PT <= w and (
+            _need(c, [para.model_copy(update={"style": fast_style(font_size=s, bold=True)})], w, st)
+            <= h * lt.vocab_fill
+        )
+
+    size, fit = (pin, True) if pin else _largest(min(top, h / EMU_PER_PT * 0.5), lo, ok)
+    if not fit:
+        c.over.append("@cycle centre label")
+    fill = th.cycle_center_fill
+    if th.cycle_center_color:
+        ink = th.cycle_center_color
+    else:
+        ink = th.ink_on(fill, "bg") if fill else th.legible("primary")
+    paras = [para.model_copy(update={"style": fast_style(font_size=size, bold=True)})]
+    cx, cy = centre
+    if fill:
+        c.emit(
+            Shape(shape="ellipse", paragraphs=paras, attrs={"shape_name": "Cycle center"}),
+            Rect(cx - free // 2, cy - free // 2, free, free),
+            fast_style(
+                fill=fill,
+                line=None,
+                font=th.fonts.heading,
+                font_ea=th.fonts.ea,
+                font_size=size,
+                bold=True,
+                color=ink,
+                align="center",
+                valign="middle",
+                padding="4pt",
+            ),
+        )
+    else:
+        _emit_text(
+            c,
+            "Cycle center",
+            paras,
+            Rect(cx - w // 2, cy - h // 2, w, h),
+            _text_style(c, size, bold=True, align="center", valign="middle", color=ink),
+        )
+    return size
 
 
 # --------------------------------------------------------------------------- @agenda
@@ -1169,3 +1313,8 @@ _FORMS: dict[str, Callable] = {
     "agenda": _agenda,
     "statement": _statement,
 }
+
+
+from . import vocab4  # noqa: E402  (wave 2026-10-08 lane B: @stairs @nested @flow disc)
+
+_FORMS.update(vocab4.FORMS)

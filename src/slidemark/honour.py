@@ -22,7 +22,7 @@ import re
 from collections.abc import Callable, Iterator
 from typing import Any
 
-from . import forms, forms2
+from . import forms, forms2, forms4
 from .ir import Chart, Code, Container, Deck, Diagnostic, Image, Media, Placed, Shape, Slide, Table, Text
 
 # The documented attribute keys (docs/SYNTAX.md "Attributes"): position, style, image, `icon` on boxes and the
@@ -246,7 +246,7 @@ def _walk(slide: Slide, theme: Any, index: int) -> Iterator[tuple[Any, str]]:
     form = forms.form_of(slide)
     if form and forms.fits(form, slide) is not None:
         form = None  # not composed: ordinary blocks
-    drawn = form in ("timeline", "funnel", "pyramid", "cycle")  # boxes become shapes of the form
+    drawn = form in ("timeline", "funnel", "pyramid", "cycle", "stairs", "nested", "flowdisc")
 
     def rec(el: Any, parent: Container | None) -> Iterator[tuple[Any, str]]:
         if isinstance(el, Container) and drawn and parent is None:
@@ -322,16 +322,21 @@ def _has_text(el: Any) -> bool:
     return any(isinstance(c, Text) and c.paragraphs for c in el.children)
 
 
+# forms whose `##` boxes take `icon=`: the glyph sits in the node (`@cycle`) or the list beside the rings
+ICON_FORMS = ("cycle", "nested", "flowdisc")
+
+
 def audit(slide: Slide, theme: Any, index: int = 0) -> list[tuple[Any, str, str, str | None]]:
     """``(element, kind, attr, hint)`` for every attribute written on the slide; hint ``None`` = honoured."""
     free = slide.layout == "free"
+    form = forms.form_of(slide)
     out = []
     for el, kind in _walk(slide, theme, index):
         authored = _authored(el)
         for attr in authored:
             if free and attr in GEOMETRY and kind not in ("row", "list item"):
                 out.append((el, kind, attr, None))
-            elif honoured(kind, attr):
+            elif honoured(kind, attr) or (kind == "stage" and attr == "icon" and form in ICON_FORMS):
                 needs = NEEDS.get((kind, attr))
                 if needs and not any(n in authored for n in needs):
                     hint = f"{attr}= shows with {' or '.join(f'{n}=<c>' for n in needs)}: write one beside it"
@@ -576,6 +581,7 @@ STYLE_NEEDS: list[tuple[re.Pattern[str], Callable[[_Facts], bool], str]] = [
 
 
 STYLE_NEEDS.extend(forms2.STYLE_NEEDS)  # DL3b part 2: iconlist.* quote.* split.* proscons.* progress.* ...
+STYLE_NEEDS.extend(forms4.STYLE_NEEDS)  # wave 2026-10-08 lane B: flow.disc.* flow.line
 
 
 def style_diagnostics(deck: Deck, theme: Any) -> list[Diagnostic]:

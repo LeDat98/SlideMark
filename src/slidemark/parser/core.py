@@ -1045,18 +1045,27 @@ def _check_form(slide: Slide, ctx: Ctx) -> None:
             "form-conflict",
             f"keep one: @{found[0]} is used",
         )
-    form = found[0] if found else None
+    form = found[0] if found else forms.form_of(slide)  # (`@flow disc` is the pseudo form `flowdisc`)
+    if "disc" in slide.classes and "flow" not in slide.classes:
+        ctx.add(
+            "warning",
+            "@disc is a word of @flow",
+            line,
+            "attr-ignored",
+            "write `@flow disc` (a row of icon discs joined by lines)",
+        )
     if form or not forms2.word_of(
         slide.classes
     ):  # an @quote / @split ... slide: ``forms2.check_at`` owns its keys
         for rule, msg, hint in forms.check_attrs(form, slide.attrs):
             ctx.add("warning", msg, line, rule, hint)
     if form and (why := forms.fits(form, slide)):
+        rule = "flow-skipped" if form == "flowdisc" else f"{form}-skipped"
         ctx.add(
             "warning",
             why,
             line,
-            f"{form}-skipped",
+            rule,
             "the slide is laid out as ordinary blocks; " + forms.EXAMPLE[form],
         )
 

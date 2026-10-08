@@ -439,15 +439,25 @@ def _fill_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: bool =
     if any(p.y >= min(c.y for c in cards) - 2 for p in rest):
         return out  # a table / chart under the cards shares the body: they keep their height
     dy = body.y - min(a.y for a in arrows)  # top-anchored, right under the lead
+    arrow_icons = _arrow_icons(
+        [p for p in out if isinstance(p.element, Shape) and p.element.shape == "icon"], arrows
+    )
     moved = {id(p): p.model_copy(update={"y": p.y + dy}) for p in items} if dy else {}
+    if dy:  # (an icon sits on its arrow and travels with it, even when it pokes out of the body rectangle)
+        moved.update({id(ic): ic.model_copy(update={"y": ic.y + dy}) for ic in arrow_icons.values()})
     out = [moved.get(id(p), p) for p in out]
     arrows = [moved.get(id(p), p) for p in arrows]
+    glyphs = {id(moved.get(id(ic), ic)) for ic in arrow_icons.values()}
     top = min(moved.get(id(c), c).y for c in cards)
     up = top - (
         max(a.y + a.h for a in arrows) + to_emu(lt.steps_gap)
     )  # the sparse passes may have spread them
     if up > 0:
-        shifted = {id(p): p.model_copy(update={"y": p.y - up}) for p in out if not _is_step_arrow(p)}
+        shifted = {
+            id(p): p.model_copy(update={"y": p.y - up})
+            for p in out
+            if not _is_step_arrow(p) and id(p) not in glyphs
+        }
         out = [shifted.get(id(p), p) for p in out]
         top -= up
     keep = [p for p in out if not _is_step_arrow(p)]
@@ -495,16 +505,22 @@ def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: boo
         texts = [p for p in items if p is not c and _contains(c, p) and not _is_rule(p)]
         if len(texts) != 1 or not isinstance(texts[0].element, Text) or texts[0].style.font_size is None:
             return out
-        if len(texts[0].element.paragraphs) > lt.steps_sparse_items or texts[0].element.box is not None:
+        n_items = sum(1 for q in texts[0].element.paragraphs if not q.attrs.get("_caption"))
+        if n_items > lt.steps_sparse_items or texts[0].element.box is not None:
             return out
         inner[id(c)] = texts[0]
+    icon_of = _arrow_icons(items, arrows)
     other = [
         p
         for p in items
-        if not _is_step_arrow(p) and not _is_rule(p) and p not in cards and p not in inner.values()
+        if not _is_step_arrow(p)
+        and not _is_rule(p)
+        and p not in cards
+        and p not in inner.values()
+        and all(p is not ic for ic in icon_of.values())
     ]
     if other:
-        return out  # something else (icons, a table under the cards) shares the body
+        return out  # something else (a table under the cards) shares the body
     top0 = min(a.y for a in arrows)
     bottom0 = max(c.y + c.h for c in cards)
     if (bottom0 - top0) >= (fill if to_body else lt.steps_sparse_below) * body.h:
@@ -536,7 +552,7 @@ def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: boo
     cap = lt.model_copy(
         update={"chevron_text_max_pt": arrow_pt, "chevron_text_fill": lt.steps_arrow_text_fill}
     )
-    ga = _grow_chevron_text(new_arrows, cap, strict=True)
+    ga = _grow_chevron_text(new_arrows, cap, strict=True, icons=True)
     if ga:
         new_arrows = ga
     # 3. card height: the share of the body the group should cover, not taller than its width allows
@@ -560,7 +576,10 @@ def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: boo
     top = body.y + round((body.h - group_h) * min(max(top_share, 0.0), 1.0))
     res: dict[int, Placed] = {}
     for a, na in zip(arrows, new_arrows, strict=True):
-        res[id(a)] = na.model_copy(update={"y": top})
+        placed = na.model_copy(update={"y": top})
+        if (ic := icon_of.get(id(a))) is not None:  # the icon follows its arrow (size, place)
+            placed, res[id(ic)] = _icon_arrow(placed, ic, lt)
+        res[id(a)] = placed
     ctop = top + h_arrow + gap
     for c in cards:
         m = inner[id(c)]
@@ -603,11 +622,48 @@ def _grow_step_arrows(out: list[Placed], arrows: list[Placed], lt: LayoutTokens)
     if want <= now * 1.02:
         return out
     cap = lt.model_copy(update={"chevron_text_max_pt": want, "chevron_text_fill": lt.steps_arrow_text_fill})
-    grown = _grow_chevron_text(arrows, cap, strict=True)
+    grown = _grow_chevron_text(arrows, cap, strict=True, icons=True)
     if not grown:
         return out
     swap = {id(c): g for c, g in zip(arrows, grown, strict=True)}
+    icon_of = _arrow_icons(
+        [p for p in out if isinstance(p.element, Shape) and p.element.shape == "icon"], arrows
+    )
+    for a, g in zip(arrows, grown, strict=True):
+        if (ic := icon_of.get(id(a))) is not None:
+            swap[id(a)], swap[id(ic)] = _icon_arrow(g, ic, lt)
     return [swap.get(id(p), p) for p in out]
+
+
+def _arrow_icons(items: list[Placed], arrows: list[Placed]) -> dict[int, Placed]:
+    """``id(arrow) -> its icon``: the glyph an ``icon=`` heading draws inside a step arrow."""
+    out: dict[int, Placed] = {}
+    for a in arrows:
+        for p in items:
+            if isinstance(p.element, Shape) and p.element.shape == "icon" and _contains(a, p):
+                out[id(a)] = p
+                break
+    return out
+
+
+def _icon_arrow(a: Placed, ic: Placed, lt: LayoutTokens) -> tuple[Placed, Placed]:
+    """The arrow ``a`` and its icon ``ic`` after the arrow's size or text size changed: the icon side follows
+    the label (``icon_head`` x its size, at most 40% of the height) and sits before the centred text block,
+    as the first layout placed it."""
+    from .engine import _chevron_text_w, _pad
+
+    size_pt = (a.style.font_size or 18) * a.font_scale
+    side = min(round(lt.icon_head * size_pt * EMU_PER_PT), round(0.4 * a.h))
+    attrs = {**a.element.attrs, "icon_side": side, "icon_inset": side + round(lt.icon_gap * side)}
+    a2 = a.model_copy(update={"element": a.element.model_copy(update={"attrs": attrs})})
+    adj = attrs.get("adj", lt.chevron_adj)
+    avail = _chevron_text_w(Rect(a2.x, a2.y, a2.w, a2.h), a2.style, a2.element, adj)
+    line = max(
+        (measure.text_em(q.plain, bold=True) * size_pt * EMU_PER_PT for q in a2.element.paragraphs), default=0
+    )
+    left = a2.x + round(adj * min(a2.w, a2.h)) + _pad(a2.style)
+    off = max(round((avail - min(line, avail)) / 2), 0)
+    return a2, ic.model_copy(update={"x": left + off, "y": a2.y + (a2.h - side) // 2, "w": side, "h": side})
 
 
 def fill_cards_to_bar(
@@ -1423,16 +1479,20 @@ def _grow_chevron_table(out: list[Placed], body: Rect, lt: LayoutTokens) -> list
 
 
 def _grow_chevron_text(
-    chevs: list[Placed], lt: LayoutTokens, fill: float | None = None, strict: bool = False
+    chevs: list[Placed],
+    lt: LayoutTokens,
+    fill: float | None = None,
+    strict: bool = False,
+    icons: bool = False,
 ) -> list[Placed] | None:
     """Text of a lone chevron row grows to fill the chevron: one factor for the whole row, capped by
     ``chevron_text_max_pt`` and ``chevron_text_fill`` of the height. A word never breaks (it fits one line
     ``chevron_word_slack`` narrower) and no paragraph wraps onto more lines than it did (in an area
-    ``chevron_cjk_slack`` / ``chevron_head_slack`` narrower). Rows with icons keep their size. ``None`` =
-    unchanged."""
+    ``chevron_cjk_slack`` / ``chevron_head_slack`` narrower). Rows with icons keep their size unless
+    ``icons`` (the caller then moves the icons: the icon's room grows with the text). ``None`` = unchanged."""
     from .engine import _chevron_text_w, _longest_word_em
 
-    if lt.chevron_text_max_pt <= 0 or any("icon_side" in c.element.attrs for c in chevs):
+    if lt.chevron_text_max_pt <= 0 or (not icons and any("icon_side" in c.element.attrs for c in chevs)):
         return None
     sizes = [(c.style.font_size or 18) * c.font_scale for c in chevs]
     s_top = min(
@@ -1446,7 +1506,12 @@ def _grow_chevron_text(
             paras = c.element.paragraphs
             rect = Rect(c.x, c.y, c.w, c.h)
             adj = c.element.attrs.get("adj")
-            avail = _chevron_text_w(rect, c.style, c.element, adj) / EMU_PER_PT
+            el = c.element
+            if icons and el.attrs.get("icon_inset"):  # the icon grows with the text: so does its room
+                el = el.model_copy(
+                    update={"attrs": {**el.attrs, "icon_inset": round(el.attrs["icon_inset"] * s)}}
+                )
+            avail = _chevron_text_w(rect, c.style, el, adj) / EMU_PER_PT
             if avail <= 0:
                 return False
             new_fs = c.font_scale * s

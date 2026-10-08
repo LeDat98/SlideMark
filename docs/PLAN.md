@@ -776,3 +776,10 @@ difference is the card border line that stays under the shadow and the small `sh
   silently: draw them as filled shapes (arrows, connectors, decoration) and name them `Shape N`; `%` in `@free`
   is a share of the body, which the agent read as the slide (SKILL.md now says so); `@iconlist cols=1` with three
   items leaves 34% of the body empty (icon list should grow its text / icons like cards do).
+- **Wave 1 status (2026-10-08):** lanes A and B merged (3,263 tests). Fresh-agent run on the owner's brief
+  (`bench/lengthbench/t5/slidemark-wave1-1`): 7 calls, 3 builds, 75 s, cost 167k (baseline before the wave 188k),
+  accepted, "nothing it could not express". Blind judge round 9 (Opus, contact sheets, `bench/design_review.jsonl`):
+  pptxgenjs 4.0, SlideMark before the wave 2.5, after wave 1 **3.5** (form 4, variety 4). Judge's asks for wave 2:
+  cover and closing undesigned (flat dark field) → `cover.art`; `STEP n` labels tiny and card text sinking in tall
+  empty cards (slide 7) → steps card look; the icon list fills only the left half (slide 5) → iconlist fill; an
+  unexplained table row highlight (agent choice; SKILL.md: highlight only what the takeaway names).

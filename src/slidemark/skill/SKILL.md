@@ -75,7 +75,8 @@ text is a defect, not a style. Forms that give a slide its shape (see "Compositi
 - Grids: `@2x2` / `@3` cards with icons; `@kpi` for numbers; `@matrix` for two axes.
 - A picture bleeding over half the slide with content on top: `@split bleed=on`.
 - Numbers: `@statement` (one 60–72pt figure + a small label) or `{.kpi .hero}`; before/after and pros/cons
-  as `@vs` / `@proscons`; a sequence as `@timeline`, `@steps num` or `@cycle` with arrows.
+  as `@vs` / `@proscons`; a sequence as `@timeline`, `@steps num`, `@flow disc` or `@cycle` with arrows; levels
+  as `@stairs`; layers as `@nested`.
 - Finish: an icon beside each heading, the one key figure or claim in the accent (`==x==`, `hl=`, `{.hero}`).
 
 **Type and spacing** (set once in `sizes:` and `style:`, then leave them):
@@ -277,7 +278,14 @@ styles one list line; a chart frame takes `{fill= radius= pad=}`.
 - `@vs` + two `##` cards and an optional `## 結論` verdict bar (`{.hero}` = the winner).
 - `@matrix x="低←容易性→高" y="低←効果→高"` + exactly four `##` boxes in reading order (`fill=a,b,c,d` per quadrant).
 - `@funnel` / `@pyramid dir=up|down` + `##` boxes (heading inside the stage, body right; `funnel.fill=a,b,c` `.taper`).
-- `@cycle dir=cw|ccw` + 3–6 `##` boxes in loop order (heading in the node, body outside; `cycle.fill` `.arrow`).
+- `@cycle dir=cw|ccw center="Vòng lặp"` + 3–6 `##` boxes in loop order (`## Quan sát {icon=search}` = glyph in
+  the node, heading beside it, body under; nodes sized by the ring; `cycle.fill=a,b` `.arrow` `.center.size`).
+- `@stairs dir=up|down` + 2–6 `##` boxes = cards rising left to right, bottoms aligned (complexity, maturity,
+  levels; `stairs.fill=a,b,c,d` light to dark, `stairs.low` `stairs.step`).
+- `@nested side=left|right` + 3–4 `##` boxes = concentric rings, first = outermost, headings in the rings, bodies
+  as an icon list beside them (`{icon=cpu}` on a heading; `nested.fill=a,b,c` `nested.core`).
+- `@flow disc` + 2–7 `##` boxes = icon discs joined by arrow lines, heading and text under each (a pipeline);
+  `## Kho tài liệu {.above icon=database}` as the first box = a side node above step 2 (`flow.disc.fill=a,b` `.size`).
 - `@agenda` + one `1.` list alone, `{.accent}` on the current item (`agenda.num.size` `.num.text="第{n}章"` `.rule=none`).
 - `@statement align= valign=` + `**+18%**` then one caption line (one huge number or sentence; `statement.size`).
 - `@iconlist cols=2` + `- icon=bolt **Title** text` items (icon, bold title, text in 1–3 columns; `iconlist.icon.size/.color`).
