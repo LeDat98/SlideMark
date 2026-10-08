@@ -256,7 +256,7 @@ goes full width below. Each table/chart/image/code outside a box is its own bloc
 `items` bullets of each box as item cards (`item.fill` `item.border-left="5pt solid secondary"` `item.size`) · `num` a
 numbered circle on each box heading (`box.num.fill`) · `flow` cards with arrows · `a>b` arrow, `a-b` line between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition ·
 `@bg=#0B1020` or `@bg="linear-gradient(135deg,#1A0B2E,#7A1FA2)"` background (dark flips text light; `@dark`
-`@light` force it) · `@free` no automatic layout: blocks sit at their own `{x y w h}` (`@free grid`: 12×12 cells, `x=3c w=4c`).
+`@light` force it) · `@free` no automatic layout: blocks sit at their own `{x y w h}` (`%` = share of the area under the title, not of the slide; `@free grid`: 12×12 cells, `x=3c w=4c`); a line of attributes with no text draws nothing yet.
 
 **Attributes** `{.class key=value}` at the end of a heading, image, title or list line, or alone on the line
 before a block; every element takes `x y w h` (`%` `in` `cm` `pt`; never moved by the layout once set), `size`,

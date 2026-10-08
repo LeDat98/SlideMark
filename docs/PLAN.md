@@ -771,3 +771,8 @@ difference is the card border line that stays under the shadow and the small `sh
   list); `@flow disc` (icon discs joined by lines, label under each).
 - **Orchestrator:** SKILL.md lines for the new tokens / forms, goldens + gallery, bench, a fresh-agent run on the
   owner's brief with the new SKILL.md and the blind judge (`bench/design_review_prompt.md`).
+- **Wave 2 candidates (from the t5 baseline run, 7 calls / 3 builds / 3 looks, `bench/lengthbench/t5/slidemark-guide-1`):**
+  attribute-only blocks on a `@free` slide (`{x= y= w= h= shape=chevron fill=accent}` with no text) are dropped
+  silently: draw them as filled shapes (arrows, connectors, decoration) and name them `Shape N`; `%` in `@free`
+  is a share of the body, which the agent read as the slide (SKILL.md now says so); `@iconlist cols=1` with three
+  items leaves 34% of the body empty (icon list should grow its text / icons like cards do).
