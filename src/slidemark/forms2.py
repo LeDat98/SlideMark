@@ -146,8 +146,8 @@ class Forms2Tokens(BaseModel):
     split_fill: str | None = None  # colour block when there is no image (None = surface)
     split_ratio: str = "1:1"  # image : text
     # @proscons
-    proscons_plus_color: str | None = None  # None = success
-    proscons_minus_color: str | None = None  # None = danger
+    proscons_plus_color: str | None = None  # None = secondary (palette); `success` only when stated
+    proscons_minus_color: str | None = None  # None = accent (palette); `danger` only when stated
     proscons_plus: str = "+"
     proscons_minus: str = "−"
     proscons_gap: Length | None = None  # between the two boxes (None = the slide gap)

@@ -208,9 +208,13 @@ def test_steps_caption_cycle_and_card_selectors(tmp_path):
 
 
 def test_steps_num_flag_uses_the_default_caption(tmp_path):
-    _, prs = make(tmp_path, STEPS.replace("@4 steps", "@4 steps num"))
+    # the card look's arrow shows the number: `num` adds the caption only with the heading in the arrow
+    _, prs = make(tmp_path, STEPS.replace("@4 steps", "@4 steps head=arrow num"))
     allt = " ".join(s.text_frame.text for s in prs.slides[0].shapes if s.has_text_frame)
     assert "STEP 1" in allt and "STEP 4" in allt
+    _, prs = make(tmp_path, STEPS.replace("@4 steps", "@4 steps num"), "card")
+    allt = " ".join(s.text_frame.text for s in prs.slides[0].shapes if s.has_text_frame)
+    assert "STEP" not in allt
 
 
 def test_chevron_shape_token_draws_pentagons_and_round_trips(tmp_path):
