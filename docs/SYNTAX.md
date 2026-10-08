@@ -220,7 +220,8 @@ An `@` line (anywhere in the slide, usually right after the title) overrides thi
 | `steps` | a process row: each `##` heading is an arrow, its bullets sit in a card under that arrow (below) | `@4 steps` |
 | `items` | the bullets of every box are drawn as item cards (below); `style: box.items=cards` does it for every slide | `@4 items` |
 | `num` | a numbered circle (1..n) left of every box heading (below; on `@steps` it is the `STEP n` caption) | `@4 num` |
-| `timeline` `vs` `matrix` `funnel` `pyramid` `cycle` `agenda` `statement` | a composition form: the `##` boxes (or the list / line) are drawn as that diagram (below); each takes secondary keys (`dir=` `marks=` `x=` `y=` `align=` `valign=`) and the common `size=` `fill=` `gap=` | `@timeline dir=v marks=num` |
+| `timeline` `vs` `matrix` `funnel` `pyramid` `cycle` `agenda` `statement` `stairs` `nested` | a composition form: the `##` boxes (or the list / line) are drawn as that diagram (below); each takes secondary keys (`dir=` `marks=` `x=` `y=` `align=` `valign=` `center=` `side=`) and the common `size=` `fill=` `gap=` | `@timeline dir=v marks=num` |
+| `flow disc` | `@flow` with the second word `disc`: every `##` box is an icon disc joined to the next by an arrow line, heading and text under it (below) | `@flow disc` |
 | `iconlist` `quote` `split` `proscons` `progress` `harvey` `heatmap` `pins` | composition forms with secondary attributes ("Composition forms, part 2" below) | `@iconlist cols=2` |
 | `cover` `section` `blank` `center` | force a slide type | `@section` |
 | `free` | absolute positioning: every block with `{x= y= w= h=}` (% of the area under the title, or lengths) sits exactly there, with no growth, balance or search; unplaced blocks stack on top (info `free-unplaced`) | `{x=10% y=30% w=40% h=20%}` |
@@ -255,6 +256,8 @@ step also fills the slide (`style: layout.chevron_steps=off` keeps the thin stri
 ## 設計
 - 標準フローを策定
 ```
+
+The cards take the free height first (down to the conclusion bar / footnote, items spread inside), so the text never shrinks while room is left; the fit line names the card text (`card text 16->18pt (grown)`, never the `STEP n` caption) and says `cards grown to fill` when the cards were stretched. `## Token hóa {icon=code}` puts the glyph inside the arrow; a sparse group with icons grows like one without (arrow label, icon, cards, text).
 
 `@4 steps num` adds a caption line first in every card (`STEP 1` ...); `style: steps.caption="STEP {n}" steps.caption_color=teal steps.caption_size=14` sets its text, color and size for every `@steps` slide (a size of its own: `layout.steps_caption_ratio` x body). `steps-arrow.fill=primary,secondary` (a list) cycles the arrow colors over the steps, `steps-card.fill=a,b` the cards; `steps-card.size=24 steps-card.bold=on` style the card text. `render.chevron_shape=pentagon` draws flat-tailed arrows (the importer reads them as chevrons); a list names the arrows in reading order, the last word repeats: `render.chevron_shape=pentagon,chevron` (first arrow flat, the rest notched). CSS reaches both parts: `.steps-arrow:nth-child(even) { background: ... }`, `.steps-card { ... }`.
 
@@ -382,7 +385,9 @@ unknown key, a wrong choice (`dir=x`) or a key without its form warns with the v
 | `@matrix` | exactly 4 `##` boxes in reading order: top-left, top-right, bottom-left, bottom-right | `x="低←重要度→高"` `y="低←緊急度→高"` (label + arrow along the bottom / left; leave one out and its axis is not drawn); `@1:2 matrix` column ratio; `fill=a,b,c,d` quadrant fills | `matrix.axis.color` `matrix.axis.size` `matrix.axis.w`; `matrix.fill=a,b,c,d` |
 | `@funnel` | 2-8 `##` boxes: heading inside the stage, body to its right | `dir=down` (default: the narrow end at the bottom) `up`; `@3:1 funnel` shapes : bodies | `funnel.fill=a,b,c` (cycled; default tints of `primary`) `funnel.color` `funnel.gap` `funnel.taper` (narrow / wide end, 0.3) `funnel.share` (width of the shapes, 0.5) |
 | `@pyramid` | 2-8 `##` boxes, first = the top | `dir=up` (default: narrow end on top) `down`; `@3:1 pyramid` | `pyramid.fill` `pyramid.color` `pyramid.gap` `pyramid.taper` (0.2; 0 = a point) `pyramid.share` |
-| `@cycle` | 3-6 `##` boxes around a ring: heading in the node, body outside it, curved arrows between | `dir=cw` (default) `ccw` | `cycle.fill=a,b` `cycle.color` `cycle.arrow` `cycle.arrow.w` `cycle.node.size` |
+| `@cycle` | 3-6 `##` boxes around a ring: heading in the node, body outside it, curved arrows between. A node is as large as its heading needs (never below the body size, up to what the ring holds); `## Plan {icon=target}` puts the glyph inside the node (45% of its diameter) and the heading, bold, beside it above the body | `dir=cw` (default) `ccw`; `center="Vòng lặp agent"` (a label at the ring centre) | `cycle.fill=a,b` `cycle.color` `cycle.arrow` `cycle.arrow.w` `cycle.node.size`; `cycle.center` (text) `cycle.center.size` `cycle.center.color` `cycle.center.fill` (a disc behind it); `cycle.icon.ratio` (0.45) `cycle.icon.color` `cycle.head.color` |
+| `@stairs` | 2-6 `##` boxes as cards whose heights rise left to right (bottoms aligned, the last reaches the body top); heading bold, every card text at one size (the largest the lowest card holds). An optional lead `>` stays above | `dir=up` (default) `down`; `@1:2:1 stairs` widths | `stairs.fill=a,b,c` (cycled; default tints of `primary`, light to dark) `stairs.color` `stairs.step` (height difference) `stairs.gap` `stairs.low` (lowest card, share of the body, 0.4) `stairs.tint` (lightest default, 0.3) |
+| `@nested` | 3-4 `##` boxes as concentric rings, first = the largest, heading at the top of its ring (the innermost in its middle); the bodies are an icon list on the other half (`## Học sâu {icon=cpu}` gives its list item the icon) | `side=left` (default, rings left) `right` | `nested.fill=a,b,c` (outer to inner; default tints of `secondary`) `nested.color` `nested.size` (heading pt) `nested.core` (inner / outer diameter, 0.4) `nested.share` (width of the rings' half, 0.5) `nested.line` `nested.line.w` `nested.list.title` (`off` = the list item starts with its text, not the ring heading) |
 | `@agenda` | one `1.` list alone (a `   - note` under an item is its second line). `{.accent}` at the end of an item = the current one | `@1:5 agenda` number column : text | `agenda.num.size` `agenda.num.color` `agenda.num.text` (`"第{n}章"`, `"0{n}"`) `agenda.rule` (`none` = no rules) `agenda.rule.w` `agenda.now` `agenda.dim` (the other items once one is current) |
 | `@statement` | one or two plain lines under the title: the number / sentence, then a caption | `align=left\|center\|right` `valign=top\|middle\|bottom` | `statement.size` `statement.color` `statement.sub.size` `statement.sub.color` |
 
@@ -462,6 +467,8 @@ the same words. Example: `examples/24-vocabulary-2.md`.
 ![map](map.png)
 - x=26% y=36% **Harbor HQ** product
 ```
+
+**`@flow disc`.** `@flow` draws cards and arrows; the second word `disc` draws every `##` box as a disc (the `icon=` glyph on its heading, else its step number) joined to the next by a line with an arrowhead, the heading bold under the disc and the text under the heading. `## Kho tài liệu {.above icon=database}` (or `@flow disc above=1`) lifts the first box above the row as a side node: its disc sits over the second step, joined to it by a vertical line, its text beside it. 2-7 boxes (`flow-skipped` otherwise). Tokens: `flow.disc.size` (a length; default from the room) `flow.disc.fill=a,b` (cycled, default `primary`) `flow.disc.color` `flow.line` (default `muted`) `flow.line.w`. Shapes `Flow N disc` / `Flow N line` / `Flow N text`; the importer folds them back (`{.above}` from the node's height). Example: `examples/26-ai-overview.md`.
 
 Details. `@iconlist`: the text column is `Iconlist N`, the icon a native `icon <name>` shape; an unknown icon is `unknown-icon` with
 a did-you-mean, a missing one `iconlist-icon` (info); `iconlist.icon.size` is a length, else 2.2 x the title size
@@ -1027,7 +1034,7 @@ layout and renderer, and checks that the warning carries the hint. `@free` honou
 | `rows` (an `@rows` list) | `fit` `icon` |
 | `row` (one line of an `@rows` list) | `x` `y` `w` `h` `valign` `radius` `opacity` `pad` `shadow` `rotate` `shape` `z` `fit` `icon` |
 | `list item` (`- text {color=danger}`) | `x` `y` `w` `h` `fill` `line` `radius` `opacity` `pad` `valign` `shadow` `rotate` `shape` `z` `fit` `icon` |
-| `stage` (a `##` box of `@timeline` `@funnel` `@pyramid` `@cycle`: honours `fill` `color`) | `x` `y` `w` `h` `size` `line` `font` `bold` `italic` `align` `valign` `radius` `opacity` `pad` `shadow` `rotate` `shape` `z` `fit` `icon` |
+| `stage` (a `##` box of `@timeline` `@funnel` `@pyramid` `@cycle` `@stairs` `@nested` `@flow disc`: honours `fill` `color`, and `icon` on `@cycle` `@nested` `@flow disc`) | `x` `y` `w` `h` `size` `line` `font` `bold` `italic` `align` `valign` `radius` `opacity` `pad` `shadow` `rotate` `shape` `z` `fit` `icon` |
 | `formtext` (the text of `@agenda` `@statement`: honours `size` `color`) | `x` `y` `w` `h` `font` `bold` `italic` `align` `valign` `fill` `line` `radius` `opacity` `pad` `shadow` `rotate` `shape` `z` `fit` `icon` |
 
 `size=` on a box with no text of its own sizes nothing (it sizes the box text, not its heading): `sizes: heading=` or
@@ -1035,7 +1042,7 @@ layout and renderer, and checks that the warning carries the hint. `@free` honou
 header line: `kpi.*` without a `.kpi` card, `steps*` / `steps-arrow` without `@steps`, `rows*` without `@rows`,
 `table.*` without a table, `palette` / `render.chart_*` without a chart, `bullet*` without a list, `heading.*` / `card.*` /
 `box.*` without a box, `box.num.*` without an `@num` slide, `item.*` without item cards, `rows.glyph*` without `@rows plain`,
-`timeline.*` `vs.*` `matrix.*` `funnel.*` `pyramid.*` `cycle.*` `agenda.*` `statement.*` `iconlist.*` `quote.*` `split.*` `proscons.*` `progress.*` `harvey.*` `heatmap.*` `pins.*` without that form's slide, `render.chevron_shape` without arrows, `cover.rule_w` / `rule_pos` without `cover.rule=<color>`, `footer.*` without `footer:` / `num:`, `lead.*` without a lead; the `cover.*` chrome (`rule` `bar`
+`timeline.*` `vs.*` `matrix.*` `funnel.*` `pyramid.*` `cycle.*` `agenda.*` `statement.*` `stairs.*` `nested.*` `flow.*` (without `@flow disc`) `iconlist.*` `quote.*` `split.*` `proscons.*` `progress.*` `harvey.*` `heatmap.*` `pins.*` without that form's slide, `render.chevron_shape` without arrows, `cover.rule_w` / `rule_pos` without `cover.rule=<color>`, `footer.*` without `footer:` / `num:`, `lead.*` without a lead; the `cover.*` chrome (`rule` `bar`
 `pad` `gap` `footer`) needs the composed cover (`cover.band_h` above 0 and no `{size=}` on the cover title); and
 `chevron.*` styles nothing (arrows follow `primary`, `steps-arrow.fill=` colours `@steps`). The table is `STYLE_NEEDS`
 in the same module.
