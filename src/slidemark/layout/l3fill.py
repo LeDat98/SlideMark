@@ -438,6 +438,8 @@ def _fill_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: bool =
     ]
     if any(p.y >= min(c.y for c in cards) - 2 for p in rest):
         return out  # a table / chart under the cards shares the body: they keep their height
+    if all(c.element.attrs.get("_head") == "card" for c in cards):  # `steps.head=card`: its own pass
+        return _fill_head_cards(out, items, arrows, cards, body, lt)
     dy = body.y - min(a.y for a in arrows)  # top-anchored, right under the lead
     arrow_icons = _arrow_icons(
         [p for p in out if isinstance(p.element, Shape) and p.element.shape == "icon"], arrows
@@ -473,6 +475,162 @@ def _fill_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: bool =
             break
     out = _grow_step_arrows(out, arrows, lt)
     return _compose_steps(out, body, lt, to_body)
+
+
+def _head_card_parts(card: Placed, items: list[Placed]) -> tuple[Placed | None, Placed, list[Placed]] | None:
+    """(icon disc or None, heading text, body texts) inside a ``head=card`` card, top to bottom; ``None`` when
+    the card holds anything else (a table, a second icon ...) and keeps the layout's own geometry."""
+    kids = [p for p in items if p is not card and _contains(card, p)]
+    icons = [p for p in kids if isinstance(p.element, Shape)]
+    texts = sorted((p for p in kids if isinstance(p.element, Text)), key=lambda p: (p.y, p.x))
+    if len(icons) > 1 or len(icons) + len(texts) != len(kids) or not texts:
+        return None
+    if texts[0].element.role != "heading" or any(t.element.role == "heading" for t in texts[1:]):
+        return None
+    return (icons[0] if icons else None), texts[0], texts[1:]
+
+
+def _text_need(p: Placed, scale: float, lt: LayoutTokens, tight: bool) -> int:
+    """Height (EMU) of the text of ``p`` drawn ``scale`` x larger, with its own inset (``tight``: the width
+    the renderers wrap at, a bit narrower than the estimate)."""
+    pad = _text_pad(p)
+    w = p.w - 2 * pad
+    if tight:
+        w = round(w * (1.0 - lt.l3_wrap_margin))
+    gap = measure.element_gap(p.element)
+    h = measure.paragraphs_height(p.element.paragraphs, w, p.style, p.font_scale * scale, gap=gap)
+    return round(h) + 2 * pad
+
+
+def _fill_head_cards(
+    out: list[Placed],
+    items: list[Placed],
+    arrows: list[Placed],
+    cards: list[Placed],
+    body: Rect,
+    lt: LayoutTokens,
+) -> list[Placed]:
+    """``@steps`` with the heading in the card: the cards take the free height (down to the conclusion bar /
+    footnote) but their content stays top-anchored: icon disc, caption + heading, body text, no spread rules.
+
+    The group starts at the body top. Everything in the cards grows by ONE factor (the disc, the gaps, the
+    text) as far as the content keeps ``layout.steps_card_fill_max`` of the card, up to ``layout.grow_max``
+    and ``layout.steps_text_max_pt`` for the body text (never below the size the layout chose; a text with a
+    size of its own does not grow). ``steps-card.valign`` = ``middle`` / ``bottom`` moves the whole block."""
+    parts = [_head_card_parts(c, items) for c in cards]
+    if any(pt is None for pt in parts):
+        return out
+    dy = body.y - min(a.y for a in arrows)  # top-anchored, right under the lead
+    glyphs = _arrow_icons(
+        [p for p in out if isinstance(p.element, Shape) and p.element.shape == "icon"], arrows
+    )
+    res: dict[int, Placed] = {}
+    if dy:
+        for p in [*items, *glyphs.values()]:
+            res[id(p)] = p.model_copy(update={"y": p.y + dy})
+
+    def mv(p: Placed) -> Placed:
+        return res.get(id(p), p)
+
+    cap = to_emu(lt.steps_arrow_card_h)
+    for a in arrows:  # the arrows only carry a number or an icon: the sparse growth must not make them tall
+        if mv(a).h > cap:
+            a2 = _resize_chevron(mv(a), 0, cap - mv(a).h, lt)
+            if (ic := glyphs.get(id(a))) is not None:
+                a2, res[id(ic)] = _icon_arrow(a2, mv(ic), lt)
+            res[id(a)] = a2
+    top = min(mv(c).y for c in cards)
+    up = top - (max(mv(a).y + mv(a).h for a in arrows) + to_emu(lt.steps_gap))
+    if up > 0:  # the growth passes made the arrows taller / moved them: the cards close up under them again
+        for p in items:
+            if not _is_step_arrow(p) and id(p) not in {id(g) for g in glyphs.values()}:
+                res[id(p)] = mv(p).model_copy(update={"y": mv(p).y - up})
+        top -= up
+    full = body.bottom - top
+    if full <= 0:
+        return [mv(p) for p in out]
+    mcards = [mv(c) for c in cards]
+    mparts = [(mv(i) if i else None, mv(h), [mv(b) for b in bs]) for i, h, bs in parts]  # type: ignore[misc]
+    # --- one growth factor for every card: the body text and the heading each keep their own ceiling
+    pinned = any(  # a text with a size of its own never grows
+        getattr(getattr(t.element, "style", None), "font_size", None) is not None
+        for _i, h, bs in mparts
+        for t in (h, *bs)
+    )
+    caps = [lt.grow_max]
+    for _i, h, bs in mparts:
+        for t, abs_pt in (
+            (h, lt.steps_text_max_pt * lt.steps_card_head_ratio),
+            *((b, lt.steps_text_max_pt) for b in bs),
+        ):
+            base = t.style.font_size
+            if base:
+                caps.append(measure.grow_cap(lt, base, base * t.font_scale, abs_pt))
+    s_top = 1.0 if pinned else max(min(caps), 1.0)
+    step = max(lt.l3_grow_step, 0.01)
+
+    def head_h(s: float) -> int:  # the headings of one row are as tall as the tallest: the bodies line up
+        return max(h.h if s == 1.0 else _text_need(h, s, lt, False) for _i, h, _b in mparts)
+
+    def stack(card: Placed, parts3, s: float):
+        """The new geometry of one card at growth ``s``: ({orig id: Placed}, content height)."""
+        icon, head, bodies = parts3
+        hh = head_h(s)
+        seq = [q for q in (icon, head, *bodies) if q is not None]
+        pad_top = max(seq[0].y - card.y, 0)
+        gaps = [max(b.y - (a.y + a.h), 0) for a, b in zip(seq, seq[1:], strict=False)]
+        y = card.y + pad_top
+        placed: list[Placed] = []
+        for k, q in enumerate(seq):
+            if k:
+                y += round(gaps[k - 1] * s)
+            if isinstance(q.element, Shape):
+                side = round(q.w * s)
+                placed.append(q.model_copy(update={"y": y, "w": side, "h": side}))
+                y += side
+            else:
+                h = hh if q is head else (q.h if s == 1.0 else _text_need(q, s, lt, False))
+                placed.append(q.model_copy(update={"y": y, "h": h, "font_scale": round(q.font_scale * s, 4)}))
+                y += h
+        tight = sum(
+            _text_need(q, s, lt, True)
+            - (hh if q is head else (q.h if s == 1.0 else _text_need(q, s, lt, False)))
+            for q in seq
+            if isinstance(q.element, Text)
+        )
+        return placed, y - card.y + pad_top + max(tight, 0)
+
+    best = 1.0
+    k = 1
+    while True:
+        s_try = min(1.0 + k * step, s_top)
+        if s_try <= best + 1e-9:
+            break
+        if all(
+            stack(c, pt, s_try)[1] <= full * lt.steps_card_fill_max
+            for c, pt in zip(mcards, mparts, strict=True)
+        ):
+            best = s_try
+        else:
+            break
+        k += 1
+    done = [stack(c, pt, best) for c, pt in zip(mcards, mparts, strict=True)]
+    height = min(
+        full, round(lt.steps_to_body_aspect * min(c.w for c in mcards))
+    )  # (a narrow column is not a tower)
+    for (orig_c, mc), (orig_i, orig_h, orig_b), (placed, used) in zip(
+        zip(cards, mcards, strict=True),
+        parts,
+        done,
+        strict=True,  # type: ignore[arg-type]
+    ):
+        va = str(orig_c.element.attrs.get("_valign") or "top")
+        lift = max(height - used, 0)
+        off = lift // 2 if va == "middle" else lift if va == "bottom" else 0
+        res[id(orig_c)] = mc.model_copy(update={"y": top, "h": height})
+        for orig, new in zip([q for q in (orig_i, orig_h, *orig_b) if q is not None], placed, strict=True):
+            res[id(orig)] = new.model_copy(update={"y": new.y + off}) if off else new
+    return [res.get(id(p), p) for p in out]
 
 
 def _compose_steps(out: list[Placed], body: Rect, lt: LayoutTokens, to_body: bool = False) -> list[Placed]:

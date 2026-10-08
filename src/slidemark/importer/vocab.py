@@ -108,8 +108,61 @@ def _stack(its: list[Item]) -> list[Item]:
     return sorted(its, key=lambda i: i.y)
 
 
+_STEP = re.compile(r"Step (\d+) (arrow|card)")
+
+
+def _steps_head(data: SlideData) -> None:
+    """``@steps`` drawn by SlideMark (shapes ``Step N arrow`` / ``Step N card``) in either look.
+
+    ``head=arrow``: the arrows hold the headings; the slide gets the word ``head=arrow`` (the build's default
+    is the other look). ``head=card`` (the default): every arrow shows its own number and the heading is the
+    first paragraph of the card's first text (after the ``steps.caption`` line): it goes back into the arrow,
+    where ``structure.fold_steps`` reads the step's heading."""
+    named = {(m.group(2), int(m.group(1))): it for it in data.items if (m := _STEP.fullmatch(_name(it)))}
+    ns = sorted(n for kind, n in named if kind == "arrow")
+    if len(ns) < 2 or any(not named[("arrow", n)].paras for n in ns):
+        return
+    if not all(re.fullmatch(rf"\s*{n}\s*", named[("arrow", n)].text) for n in ns):
+        if "head=arrow" not in data.words:
+            data.words.append("head=arrow")
+        return
+    from .structure import _is_step_caption
+
+    for n in ns:
+        arrow, card = named[("arrow", n)], named.get(("card", n))
+        if card is None:
+            continue
+        inside = sorted(
+            (
+                i
+                for i in data.items
+                if i is not card
+                and i is not arrow
+                and i.kind == "text"
+                and card.x - 2 <= i.cx <= card.x + card.w + 2
+                and card.y - 2 <= i.cy <= card.y + card.h + 2
+            ),
+            key=lambda i: (i.y, i.x),
+        )
+        for (
+            ic
+        ) in data.items:  # the icon (disc) at the top of the card belongs to the step: back into its arrow
+            if (ic.name or "").strip().startswith("icon ") and card.x <= ic.cx <= card.x + card.w:
+                if card.y <= ic.cy <= card.y + card.h:
+                    ic.x, ic.y = arrow.x + (arrow.w - ic.w) // 2, arrow.y + (arrow.h - ic.h) // 2
+        if not inside:
+            continue
+        paras = list(inside[0].paras)
+        cap = 1 if paras and _is_step_caption(paras[0], n) else 0
+        if len(paras) <= cap:
+            continue
+        arrow.paras = [paras[cap]]
+        inside[0].paras = paras[:cap] + paras[cap + 1 :]
+
+
 def extract(data: SlideData) -> FormFold | None:
     """Fold the named shapes of a form slide; marks them ``decor``. ``None`` when the slide holds no form."""
+    _steps_head(data)
     form = detect(data)
     if form is None:
         return None

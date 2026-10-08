@@ -597,8 +597,10 @@ class LayoutTokens(BaseModel):
     # --- wave 2026-10-08 lane D
     steps_card_pad: Length = "0.2in"  # `@steps` card (head=card): air around its top-anchored content
     steps_card_head_ratio: float = 1.3  # ... the card heading is this x the card body text
-    steps_card_gap: float = 0.5  # ... air between the card's disc / caption / heading / body, in body em
     steps_card_fill_max: float = 0.92  # ... the card text grows until it fills this share of the card
+    steps_arrow_card_h: Length = (
+        "0.8in"  # ... its arrows only carry the step number / icon: at most this tall
+    )
     iconlist_fill_air: float = 2.6  # `iconlist.fill=on`: a row is at most this x its tallest item
     cover_art_nodes: int = 11  # `cover.art=network`: dots (8..12) joined by thin lines
     cover_art_node_ratio: float = (

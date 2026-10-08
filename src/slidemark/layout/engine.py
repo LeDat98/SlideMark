@@ -1280,6 +1280,8 @@ def _card_style(ctx: _Ctx, c: Container) -> Style:
         base = fast_style(padding="0pt")
     else:
         base = _scale_pad(ctx.theme.classes.get("card", fast_style(padding=ctx.lt.box_pad)), ctx.step)
+        if c.attrs.get("_head") == "card":  # a `@steps` card with its heading inside: `layout.steps_card_pad`
+            base = base.merged(_scale_pad(fast_style(padding=ctx.lt.steps_card_pad), ctx.step))
     others = _class_styles(ctx, c, skip=("plain", "kpi"))
     if "kpi" in c.classes and (kc := ctx.theme.classes.get("kpi")) is not None:
         # `kpi.fill=` / `kpi.line=` ...: the card look of a KPI card (its text fields style the number)
@@ -1401,14 +1403,15 @@ def _head_metrics(
     h_el, hst, eff, band = parts
     icon = _icon_name(c)
     disc = _icon_disc(ctx, c) if icon else None
+    above = _above(c, kpi)
     num = None if icon or kpi else _num_of(c)  # `@num`: a numbered badge takes the icon's place
-    mark = (bool(icon) and not kpi) or num is not None  # a KPI icon sits above the label, not in the band
+    mark = (bool(icon) and not above) or num is not None  # a KPI / steps icon sits above the label
     isz, shift = (0, 0)
     if icon:
-        isz, shift = _icon_side(ctx, hst, eff, kpi, disc)
+        isz, shift = _icon_side(ctx, hst, eff, above, disc)
     elif num is not None:
         isz, shift = _num_side(ctx, hst, eff)
-    if icon and kpi:
+    if icon and above:
         isz = min(isz, max(rect_w - 2 * pad, 1))
         shift = 0
     if mark and band:
@@ -1439,6 +1442,11 @@ def _equalize_heads(ctx: _Ctx, boxes: list[tuple[Container, int, int]]) -> None:
         top = max(h for _, _, h in items)
         for c, w, _ in items:
             ctx.band_h[(id(c), w)] = top
+
+
+def _above(c, kpi: bool) -> bool:
+    """Does the box's icon sit above its heading (a KPI card, a ``@steps`` card) and not left of it?"""
+    return kpi or "steps-card" in getattr(c, "classes", ())
 
 
 def _icon_name(el) -> str | None:
@@ -1622,8 +1630,9 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
         (h_el, hst, eff, band), isz, shift, hh = metrics
         icon = _icon_name(c)
         disc = _icon_disc(ctx, c, loud=True) if icon else None
+        above = _above(c, kpi)
         num = None if icon or kpi else _num_of(c)
-        mark = (bool(icon) and not kpi) or num is not None
+        mark = (bool(icon) and not above) or num is not None
 
         def emit_mark(r: Rect, fill: str | None) -> None:  # the icon or `@num` badge left of the heading
             if icon:
@@ -1637,10 +1646,11 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
                 ctx.emit(badge, r, badge_st)
 
         rule_air, rule_h = _head_rule(ctx, c, kpi, band, pad)
-        if icon and kpi and not band:  # icon centered above the label and the number
+        if icon and above and not band:  # icon above the label (a KPI card: centred over the number)
+            ix = inner.x + ((inner.w - isz) // 2 if kpi else 0)  # (a steps card: at the content's left edge)
             ctx.emit(
                 _icon_item(icon, ctx, disc),
-                Rect(inner.x + (inner.w - isz) // 2, y, isz, isz),
+                Rect(ix, y, isz, isz),
                 fast_style(fill=icondisc.ink(ctx.theme, disc, "primary")),
             )
             y += isz + round(pad * 0.4)
@@ -1660,10 +1670,10 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
                 _emit_rule(ctx, Rect(rect.x, y, rect.w, rule_h), ctx.theme.heading_rule)
                 y += rule_h
             y += round(pad * 0.5)
-            if icon and kpi:  # a KPI icon sits under the band, centered above the number
+            if icon and above:  # a KPI icon sits under the band, centered above the number
                 ctx.emit(
                     _icon_item(icon, ctx, disc),
-                    Rect(inner.x + (inner.w - isz) // 2, y, isz, isz),
+                    Rect(inner.x + ((inner.w - isz) // 2 if kpi else 0), y, isz, isz),
                     fast_style(fill=icondisc.ink(ctx.theme, disc, "primary")),
                 )
                 y += isz + round(pad * 0.4)
@@ -1724,38 +1734,86 @@ def _cycle(theme: Theme | None, cls: str) -> list[str]:
     return parts if len(parts) > 1 and all(parts) and "(" not in (fill or "") else []
 
 
+def _step_caption_style(theme: Theme, align: str | None = "center", on_band: bool = False) -> Style:
+    """The caption line of a step card. On a heading band (``heading.band``) it keeps the band's ink unless
+    the deck states ``steps.caption_color``: the muted colour would not read on the band."""
+    return Style(
+        font_size=theme.steps_caption_size
+        or theme.sizes.get("body", DEFAULT_SIZES["body"]) * theme.layout.steps_caption_ratio,
+        bold=True,
+        align=align,
+        color=theme.steps_caption_color or (None if on_band else "muted"),
+    )
+
+
 def _step_caption(theme: Theme | None, n: int, fmt: str | None, children: list) -> list:
     """The card's children with the ``steps.caption`` line ("STEP {n}") first (no card text = a new Text)."""
     if not fmt or theme is None:
         return children
-    st = Style(
-        font_size=theme.steps_caption_size
-        or theme.sizes.get("body", DEFAULT_SIZES["body"]) * theme.layout.steps_caption_ratio,
-        bold=True,
-        align="center",
-        color=theme.steps_caption_color or "muted",
+    para = Paragraph(
+        runs=[Run(text=fmt.replace("{n}", str(n)))],
+        style=_step_caption_style(theme),
+        attrs={"_caption": True},
     )
-    para = Paragraph(runs=[Run(text=fmt.replace("{n}", str(n)))], style=st, attrs={"_caption": True})
     if children and isinstance(children[0], Text) and children[0].role == "body":
         first = children[0].model_copy(update={"paragraphs": [para, *children[0].paragraphs]})
         return [first, *children[1:]]
     return [Text(role="body", paragraphs=[para]), *children]
 
 
-def _steps_parts(
-    c: Container, theme: Theme | None = None, caption: str | None = None
-) -> tuple[list[Container], list[Container | None]]:
-    """The arrow (heading only) and the card (the rest) of every ``##`` step of an ``@steps`` group.
+def _card_look(theme: Theme | None) -> tuple[str, str]:
+    """(align, valign) of the ``@steps`` card content: ``steps-card.align`` / ``steps-card.valign``, else the
+    ``head=card`` look: left, top."""
+    own = theme.classes.get("steps-card") if theme is not None else None
+    return (
+        (own.align if own is not None and own.align else None) or "left",
+        (own.valign if own is not None and own.valign else None) or "top",
+    )
 
-    Both keep the step's classes and CSS identity (``_css_src``); a step without content has no card.
-    ``steps-arrow.fill=a,b`` / ``steps-card.fill=a,b`` cycle their colors over the steps; ``caption`` is the
-    first line of every card ("STEP {n}")."""
+
+def _heading_card(theme: Theme, title: Text, n: int, caption: str | None, align: str, classes) -> Text:
+    """The heading text of a ``head=card`` card: the ``Bước n`` caption line (if ``steps.caption`` / ``num``)
+    above the ``##`` heading, both with the card's alignment."""
+    paras = [
+        p.model_copy(update={"style": (p.style or Style()).merged(Style(align=align))})
+        for p in title.paragraphs
+    ]
+    if caption:
+        band = theme.heading_band_for(classes)[0] is not None
+        cap = Paragraph(
+            runs=[Run(text=caption.replace("{n}", str(n)))],
+            style=_step_caption_style(theme, align, band),
+            attrs={"_caption": True},
+        )
+        paras = [cap, *paras]
+    return title.model_copy(update={"paragraphs": paras})
+
+
+def _steps_parts(
+    c: Container, theme: Theme | None = None, caption: str | None = None, head_card: bool = False
+) -> tuple[list[Container], list[Container | None]]:
+    """The arrow and the card of every ``##`` step of an ``@steps`` group.
+
+    Both keep the step's classes and CSS identity (``_css_src``). ``head_card=False`` (``steps.head=arrow``):
+    the arrow holds the heading and the card the rest (a step without content has no card), ``caption`` is
+    the first line of every card ("STEP {n}"). ``head_card=True`` (the default look): the arrow shows the
+    step number (or the icon, when there is no icon disc), the card is top-anchored: icon disc, ``caption``
+    ("Bước {n}"), the heading, then the content. ``steps-arrow.fill=a,b`` / ``steps-card.fill=a,b`` cycle
+    their colors over the steps."""
     arrows: list[Container] = []
     cards: list[Container | None] = []
     cyc_a, cyc_c = _cycle(theme, "steps-arrow"), _cycle(theme, "steps-card")
+    head_card = head_card and theme is not None
+    al, va = _card_look(theme)
     for i, b in enumerate(b for b in c.children if isinstance(b, Container) and b.title is not None):
         src = b.attrs.get("_css_src", id(b))
-        keep = {k: v for k, v in b.attrs.items() if k in ("icon", "disc")}
+        on_disc = (
+            head_card
+            and theme is not None
+            and icondisc.disc_color(theme, b.attrs) is not None
+            and "icon" in b.attrs
+        )  # an icon on a disc moves into the card; a bare glyph stays in the arrow
+        keep = {k: v for k, v in b.attrs.items() if k in ("icon", "disc") and not on_disc}
         a_style = None
         if cyc_a and theme is not None:
             fill = cyc_a[i % len(cyc_a)]
@@ -1767,9 +1825,12 @@ def _steps_parts(
                 color=(own.color if own is not None and own.color else None)
                 or theme.ink_on(fill, theme.title_band_color or "bg"),
             )
+        a_title = b.title
+        if head_card:  # the heading moves into the card: the arrow shows the number
+            a_title = b.title.model_copy(update={"paragraphs": [Paragraph(runs=[Run(text=str(i + 1))])]})
         arrows.append(
             Container(
-                title=b.title,
+                title=a_title,
                 id=b.id,
                 line=b.line,
                 style=a_style,
@@ -1777,7 +1838,31 @@ def _steps_parts(
                 attrs={**keep, "_css_src": src, "shape_name": f"Step {i + 1} arrow"},
             )
         )
-        if b.children:
+        if head_card:
+            c_style = b.style
+            if cyc_c:
+                c_style = (b.style or Style()).merged(Style(fill=cyc_c[i % len(cyc_c)]))
+            title = _heading_card(theme, b.title, i + 1, caption, al, b.classes)  # type: ignore[arg-type]
+            cards.append(
+                Container(
+                    title=title,
+                    line=b.line,
+                    grid=b.grid,
+                    gap=b.gap,
+                    links=b.links,
+                    style=c_style,
+                    children=b.children,
+                    classes=[*(k for k in b.classes if k != "steps-card"), "steps-card"],
+                    attrs={
+                        **{k: v for k, v in b.attrs.items() if k not in ("icon", "disc") or on_disc},
+                        "_css_src": ("steps-card", src),
+                        "shape_name": f"Step {i + 1} card",
+                        "_head": "card",
+                        "_valign": va,
+                    },
+                )
+            )
+        elif b.children:
             c_style = b.style
             if cyc_c:
                 c_style = (b.style or Style()).merged(Style(fill=cyc_c[i % len(cyc_c)]))
@@ -1809,7 +1894,8 @@ def _place_steps(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> bool:
     growth passes then enlarge their text and ``fill_steps`` stretches them to the conclusion bar /
     footnote. ``False`` = not a steps group (fewer than two headed boxes): placed like any other box."""
     caption = ctx.theme.steps_caption or ("STEP {n}" if "num" in ctx.slide.classes else None)
-    arrows, cards = _steps_parts(c, ctx.theme, caption)
+    head_card = str(ctx.slide.attrs.get("head") or ctx.theme.steps_head).lower() != "arrow"
+    arrows, cards = _steps_parts(c, ctx.theme, caption, head_card)
     n = len(arrows)
     if n < 2 or n != len(c.children):  # other blocks in the group: a plain row of boxes
         return False
@@ -1865,15 +1951,16 @@ def _box_nat0(ctx: _Ctx, c: Container, width: int, inherit: Style) -> int | None
         return None
     style, pad, (pl, pt, pr, pb) = _cpads(ctx, c)
     kpi = "kpi" in c.classes
+    above = _above(c, kpi)
     total = pt + pb if c.children or c.title else 0
     if metrics := _head_metrics(ctx, c, width, pad, kpi, hpad=pl + pr):
         (_h_el, _hst, _eff, band), isz, _shift, hh = metrics
-        if kpi and _icon_name(c):
+        if above and _icon_name(c):
             total += isz + round(pad * 0.4)
         r_air, r_h = _head_rule(ctx, c, kpi, band, pad)
         if band:
             total = (
-                hh + r_h + round(pad * 0.5) + pb + (isz + round(pad * 0.4) if kpi and _icon_name(c) else 0)
+                hh + r_h + round(pad * 0.5) + pb + (isz + round(pad * 0.4) if above and _icon_name(c) else 0)
             )
         else:
             total += hh + (r_air + r_h if r_h else 0) + round(pad * 0.5)
@@ -4462,6 +4549,7 @@ def _chevron_steps(slide: Slide, lt: LayoutTokens) -> Slide:
     grid = (slide.grid or "").strip()
     new = slide.model_copy(deep=False)
     new.classes = [c for c in slide.classes if c not in ("steps", "chevron")]
+    new.attrs = {"head": "arrow", **slide.attrs}  # the author wrote the heading in the arrow: it stays there
     group_steps(new, list(els), grid if steps_grid_ok(grid, len(els)) else str(len(els)))
     return new
 
