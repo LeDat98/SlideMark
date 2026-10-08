@@ -46,7 +46,7 @@ from .icons import add_bar_icon, add_chevron_icon, add_icon
 from .math import add_math
 from .media import add_media, finish_timing
 from .objects import add_chart, add_image, add_table, code_paragraphs, resolve_image
-from .text import fill_text, insert_rpr_child
+from .text import fill_text, insert_rpr_child, text_width
 from .util import RenderCtx, emu, is_gradient, parse_color, rgb
 from .vocabshapes import draw_arc, draw_trapezoid
 
@@ -736,7 +736,7 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
         if el.paragraphs:
             chev = el.shape == "chevron"
             pill = bool(el.attrs.get("pill"))
-            box_w: int | None = pl.w
+            box_w: int | None = text_width(el.shape, pl.w)  # an ellipse wraps in its inscribed square
             if chev:  # the preset text rectangle starts a point depth inside both ends
                 adj = float(el.attrs.get("adj", rc.theme.layout.chevron_adj))
                 box_w = pl.w - 2 * round(adj * min(pl.w, pl.h)) - int(el.attrs.get("icon_inset", 0))

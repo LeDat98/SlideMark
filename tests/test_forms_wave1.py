@@ -1024,3 +1024,28 @@ def test_iconlist_one_item_and_many_items_stay_inside(tmp_path):
         deck, prs = make(tmp_path, text, HEAD + DISC)
         top, bottom, _ = _iconlist_extent(prs)
         assert top >= 0.9 and bottom <= 7.5
+
+
+# --- wave 2 lane D: text in an ellipse wraps in its inscribed square
+
+CYCLE_PIN = (
+    "style: cycle.node.size=2.0in\n"
+    "\n# Vòng lặp\n@cycle\n## Lập kế hoạch\nBước nhỏ\n## Quan sát\nĐọc yêu cầu\n## Hành động\nGọi công cụ\n"
+)
+
+
+def test_ellipse_text_width_is_the_inscribed_square():
+    from slidemark.render.text import text_width
+
+    assert text_width("ellipse", 1000) == 707
+    assert text_width("rect", 1000) == 1000 and text_width(None, 1000) == 1000
+    assert text_width("ellipse", 0) == 1
+
+
+def test_a_bound_phrase_wider_than_the_inscribed_square_may_break_at_its_space(tmp_path):
+    """ "kế hoạch" is bound by a no-break space; in a 2in node it fits the full width but not the inscribed
+    square, where LibreOffice would cut it inside a word: the binding is undone for that shape only."""
+    _, prs = make(tmp_path, CYCLE_PIN)
+    node = one(prs, 0, "Cycle 1")
+    assert NBSP not in node.text_frame.text and node.text_frame.text == "Lập kế hoạch"
+    assert node.width == pytest.approx(2.0 * 914400, abs=2000)
