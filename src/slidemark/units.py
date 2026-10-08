@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 EMU_PER_INCH = 914400
 EMU_PER_PT = 12700
@@ -23,6 +24,11 @@ def to_emu(value: str | float | int, ref: int = 0) -> int:
     """Convert a length to EMU. ``ref`` is the parent size used for percentages. Bare numbers are pt."""
     if isinstance(value, (int, float)):
         return round(value * EMU_PER_PT)
+    return _str_emu(value, ref)
+
+
+@lru_cache(maxsize=4096)
+def _str_emu(value: str, ref: int) -> int:
     m = _LEN.match(value)
     if not m:
         raise ValueError(f"invalid length {value!r}; use e.g. 50%, 2in, 36pt, 3cm, 120px")

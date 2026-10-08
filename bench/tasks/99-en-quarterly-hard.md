@@ -1,0 +1,2 @@
+<!-- tags: en hard section notes hidden jump chart table stacked-bar pie -->
+Create a 12-slide quarterly business review: cover, agenda with links to each section, three section dividers (Results, Customers, Plan), results (KPI cards, stacked bar of revenue by segment, table of regional performance with a merged total row), customers (pie of customer mix, 3-column box of wins/losses/risks), plan (chevron roadmap, risk table), a hidden appendix slide with raw data, and a closing slide. Speaker notes on the content slides.

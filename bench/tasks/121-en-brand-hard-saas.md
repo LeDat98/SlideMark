@@ -1,0 +1,2 @@
+<!-- tags: brand en hard css -->
+Make a 5-slide English deck for 'Kestrel Analytics' (B2B SaaS). Brand: off-white background #FAF7F2, ink text #1B1B1F, primary deep teal #0F5257, accent saffron #F2A541, fonts 'IBM Plex Sans' for body and 'IBM Plex Serif' for titles. Box cards must have no border, 12pt radius and a soft shadow; KPI numbers in saffron. Slides: cover, problem (3 boxes), product dashboard KPIs (4 KPIs), customer quote slide, pricing table with 3 plans.

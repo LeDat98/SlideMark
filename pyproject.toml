@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "slidemark"
-version = "0.0.1"
+version = "0.1.1"
 description = "Token-efficient Markdown/HTML to native, editable PowerPoint for AI agents"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -17,27 +17,33 @@ dependencies = [
     "pyyaml>=6.0",
     "pygments>=2.17",
     "pillow>=10.0",
+    "budoux>=0.7",
 ]
 
 [project.optional-dependencies]
 preview = ["pypdfium2>=4.20"]
+html = ["playwright>=1.40"]
 dev = [
     "pytest>=8",
     "hypothesis>=6",
     "ruff>=0.6",
     "tiktoken>=0.7",
     "pypdfium2>=4.20",
+    "pytest-cov>=5",
 ]
 
 [project.scripts]
 slidemark = "slidemark.cli:main"
+
+[tool.hatch.build.targets.sdist]
+exclude = [".hypothesis", ".claude", "docs/gallery", "bench", "out", "tests/golden", "examples/assets"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/slidemark"]
 
 [tool.ruff]
 line-length = 110
-extend-exclude = ["bench/corpus"]
+extend-exclude = ["bench/corpus", "bench/answers", "bench/lengthbench/*/python-pptx", "docs/COMPARE.md", ".claude/worktrees"]
 target-version = "py310"
 
 [tool.ruff.lint]

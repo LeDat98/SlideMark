@@ -1,0 +1,26 @@
+# Built-in preset "default": plain data in the public token schema (`slidemark tokens`).
+# Any deck can write the same keys in a theme file or override them inline (colors:/fonts:/sizes:/style:).
+colors:
+  bg: "#FFFFFF"
+  fg: "#1F2937"
+  primary: "#1D4ED8"
+  secondary: "#0F766E"
+  accent: "#F59E0B"
+  muted: "#6B7280"
+  border: "#D1D5DB"
+  surface: "#F3F4F6"
+  danger: "#DC2626"
+  success: "#16A34A"
+classes:
+  callout: {fill: "#EFF6FF"}
+  chart-note: {fill: "#FFFBEB"}
+lead_color: fg
+cover_band_h: 0.58
+cover_pad: 0.5in
+cover_gap: 0.2in
+cover_rule: primary
+cover_rule_h: 0.05in
+table_hl_fill: accent
+table_hl_strength: 0.22
+# series colors: primary, secondary, grey, then light tints (the accent is reserved for `hl=` emphasis)
+palette: [primary, secondary, muted, "#99AFED", "#93C1BE", border]

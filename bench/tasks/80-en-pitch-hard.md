@@ -1,0 +1,2 @@
+<!-- tags: en hard anim notes chart jump column doughnut -->
+Create an 8-slide investor pitch for Orbit Health (remote patient monitoring): cover, problem, solution, market (doughnut: US 52%, EU 28%, APAC 20%), traction (column chart of ARR 1.1, 2.4, 4.6M USD for 2024-2026), business model, team, ask. Use fade transitions between slides, speaker notes on each slide, and make the last slide link back to the cover.

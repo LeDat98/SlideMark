@@ -1,0 +1,14 @@
+{
+  "name": "slidemark",
+  "description": "SlideMark: write a deck as compact text and build a native, editable .pptx",
+  "owner": {
+    "name": "LeDat98"
+  },
+  "plugins": [
+    {
+      "name": "slidemark",
+      "source": "./skills/slidemark",
+      "description": "One skill, one page: write PowerPoint decks as compact SlideMark text and build native, editable .pptx files. Needs the slidemark command line tool (pip install slidemark)."
+    }
+  ]
+}

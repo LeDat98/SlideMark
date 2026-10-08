@@ -1,0 +1,399 @@
+"""Header design tokens: ``colors:`` / ``fonts:`` / ``sizes:`` / ``style:`` lines and YAML maps."""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from ..ir import CssRule, Deck, Style
+from .ctx import Ctx
+
+TOKEN_GROUPS = ("colors", "fonts", "sizes", "style")
+THEME_MAPS = ("classes", "layout", "render")  # full theme-like mappings in YAML front matter
+_OPEN, _CLOSE = "([{", ")]}"
+
+
+def split_pairs(text: str) -> list[str]:
+    """Split on spaces; quotes and (...) groups keep their inner spaces. Tolerates unbalanced input."""
+    out: list[str] = []
+    cur: list[str] = []
+    quote = ""
+    depth = 0
+    for ch in text:
+        if quote:
+            cur.append(ch)
+            if ch == quote:
+                quote = ""
+        elif ch in "\"'":
+            quote = ch
+            cur.append(ch)
+        elif ch in _OPEN:
+            depth += 1
+            cur.append(ch)
+        elif ch in _CLOSE:
+            depth = max(0, depth - 1)
+            cur.append(ch)
+        elif ch.isspace() and depth == 0:
+            if cur:
+                out.append("".join(cur))
+                cur = []
+        else:
+            cur.append(ch)
+    if cur:
+        out.append("".join(cur))
+    return out
+
+
+def _unquote(v: str) -> str:
+    v = v.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+        return v[1:-1]
+    if v[:1] in "\"'":  # unbalanced opening quote: keep the rest
+        return v[1:]
+    return v
+
+
+def _split_key(pair: str) -> tuple[str, str | None]:
+    """``key=value`` -> (key, value); the first ``=`` outside quotes splits. No ``=`` -> (pair, None)."""
+    key, eq, val = pair.partition("=")
+    return key.strip(), (_unquote(val) if eq else None)
+
+
+_CSS_ELEMENTS = {"slide", "h1", "h2", "p", "li", "table", "th", "td", "code", "img"}
+_PT_PROPS = {
+    "border-radius",
+    "border-width",
+    "letter-spacing",
+    "font-size",
+    "gap",
+    "padding",
+    "padding-top",
+    "padding-right",
+    "padding-bottom",
+    "padding-left",
+    "margin",
+}
+_CSS_CLASSES = {"lead", "conclusion", "footnote", "subtitle", "box", "kpi", "chart", "caption"}
+# element tokens that are real theme classes: their own meaning wins (`kpi.color` styles the number)
+_REAL_CLASSES = {"kpi"}
+_CLASS_ALIAS = {"footer": "caption", "num": "caption"}  # the footer text and the page number
+# `kpi.label.size=20` -> `.kpi h2 { font-size }`; value = the big number, note = caption = the small line
+_KPI_PARTS = {"label": ".kpi h2", "value": ".kpi .value", "note": ".kpi .caption", "caption": ".kpi .caption"}
+
+
+_HEAD_ALIAS = {"title": "h1", "heading": "h2", "body": "p", "text": "p"}
+_PROP_ALIAS = {
+    "weight": "font-weight",
+    "bold": "font-weight",
+    "size": "font-size",
+    "font": "font-family",
+    "family": "font-family",
+    "spacing": "letter-spacing",
+    "transform": "text-transform",
+    "case": "text-transform",
+    "uppercase": "text-transform",
+    "bg": "background",
+    "fill": "background",
+    "align": "text-align",
+    "italic": "font-style",
+    "underline": "text-decoration",
+}
+_FLAG_VALUES = {  # `bold=on` -> font-weight: bold
+    "bold": ("bold", "normal"),
+    "italic": ("italic", "normal"),
+    "underline": ("underline", "none"),
+    "uppercase": ("uppercase", "none"),
+}
+
+
+def _style_css_key(key: str) -> tuple[str, str, str] | None:
+    """``h1.letter-spacing`` -> (selector ``h1``, css property, alias used); None when not an element style.
+
+    Aliases: ``title`` = h1, ``heading`` = h2, ``body`` = p; ``weight`` = font-weight, ``size`` = font-size...
+    """
+    from .css import SUPPORTED
+
+    head, dot, rest = key.strip().partition(".")
+    head = head.lower()
+    sel_kpi = None
+    if head == "kpi" and rest.partition(".")[0].lower() in _KPI_PARTS and "." in rest:
+        part, _, rest = rest.partition(".")
+        sel_kpi = _KPI_PARTS[part.lower()]
+    head = _HEAD_ALIAS.get(head, _CLASS_ALIAS.get(head, head))
+    if not dot or (head not in _CSS_ELEMENTS and head not in _CSS_CLASSES):
+        return None
+    prop = rest.strip().lower().replace("_", "-")
+    alias = prop if prop in _PROP_ALIAS else ""
+    prop = _PROP_ALIAS.get(prop, prop)
+    if prop not in SUPPORTED:
+        return None
+    if sel_kpi:
+        return sel_kpi, prop, alias
+    return (head if head in _CSS_ELEMENTS else "." + head), prop, alias
+
+
+def element_hint(key: str) -> str:
+    """Did-you-mean for an element token that is not valid (``title.wieght`` -> ``h1.font-weight``)."""
+    import difflib
+
+    from .css import SUPPORTED
+
+    head, dot, rest = key.strip().partition(".")
+    h = _HEAD_ALIAS.get(head.lower(), head.lower())
+    if not dot and head.lower() in _PROP_ALIAS:
+        return f"name the element: 'h1.{_PROP_ALIAS[head.lower()]}=...' (h1 title, h2 box heading, p body)"
+    if not dot or (h not in _CSS_ELEMENTS and h not in _CSS_CLASSES):
+        return ""
+    prop = rest.strip().lower().replace("_", "-")
+    near = difflib.get_close_matches(prop, [*SUPPORTED, *_PROP_ALIAS], n=1, cutoff=0.6)
+    if not near:
+        return f"'{h}.<css-property>' takes any CSS property, e.g. {h}.font-weight=bold"
+    return f"did you mean '{h}.{_PROP_ALIAS.get(near[0], near[0])}'? element tokens take any CSS property"
+
+
+def _style_css(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int) -> bool:
+    """Route ``style:`` keys like ``h1.letter-spacing=2pt`` into a deck-level CSS rule (True = handled)."""
+    from ..theme import Theme, canonical_token
+
+    if group != "style":
+        return False
+    hit = _style_css_key(key)
+    if hit is None:
+        return False
+    sel, prop, alias = hit
+    if alias in _FLAG_VALUES:
+        on, off = _FLAG_VALUES[alias]
+        flag = value.strip().lower()
+        value = (
+            on
+            if flag in ("on", "true", "yes", "1")
+            else off
+            if flag in ("off", "false", "no", "0")
+            else value
+        )
+    if prop in _PT_PROPS and re.fullmatch(r"[+-]?(\d+\.?\d*|\.\d+)", value.strip()):
+        value = value.strip() + "pt"  # bare numbers are pt in tokens (css needs a unit)
+    path, _ = canonical_token(group, key)
+    real = sel[0] == "." and sel[1:] in _REAL_CLASSES and " " not in sel
+    if real and prop in ("border-top", "border-right", "border-bottom", "border-left"):
+        real = False  # a card border is box CSS (the class style only reaches the number's text)
+    if path is not None and (real or path in Theme.model_fields):
+        return False  # existing meanings win: class tokens (kpi.color) and Theme fields (lead.color)
+    deck.attrs.setdefault("_style_css", {}).setdefault(sel, []).append((prop, value, line))
+    return True
+
+
+def style_css_rules(deck: Deck, ctx: Ctx) -> list[CssRule]:
+    """Rules from ``style: h1.x=y`` keys, one per selector (declarations merged). Never raises."""
+    from .css import known_color_names, parse_declarations
+
+    src = deck.attrs.pop("_style_css", {})
+    names = known_color_names(deck)
+    rules: list[CssRule] = []
+    for sel, decls in src.items():
+        merged: dict[str, tuple[str, int]] = {}
+        for prop, value, line in decls:
+            merged[prop] = (value, line)
+        style = Style()
+        for prop, (value, line) in merged.items():
+            st, _ = parse_declarations(f"{prop}: {value}", line, ctx, names)
+            style = style.model_copy(update={k: v for k, v in st.model_dump().items() if v is not None})
+        if any(v is not None for v in style.model_dump().values()):
+            rules.append(CssRule(selector=sel, style=style, line=min(ln for _, ln in merged.values())))
+    return rules
+
+
+# `kpi.label="20 bold primary"`: one token for the text look of an element or class (like CSS `font`).
+# Words: a number = size (pt), bold / italic / underline, left|center|right|justify = alignment, else a color.
+_SHORT_HEADS = (
+    (_CSS_ELEMENTS - {"slide", "table", "code", "img"})
+    | _CSS_CLASSES
+    | {"title", "heading", "body", "text", "footer", "num", "steps-card", "steps-arrow", "rows", "rows-num"}
+)
+_SHORT_FLAGS = ("bold", "italic", "underline")
+_SHORT_ALIGN = ("left", "center", "right", "justify")
+
+
+def _short_head(key: str) -> bool:
+    head, dot, rest = key.strip().lower().partition(".")
+    if dot:
+        return head == "kpi" and rest in _KPI_PARTS
+    return head in _SHORT_HEADS
+
+
+def _shorthand(deck: Deck, key: str, value: str, ctx: Ctx, line: int) -> bool:
+    """``style: kpi.label="20 bold primary"`` -> ``kpi.label.size=20 .bold=on .color=primary`` (long keys).
+
+    Only a bare element or class name (a key that is otherwise an unknown token) takes the shorthand, so
+    ``radius=14`` and ``card.fill=...`` keep their meaning. A word it cannot place gets a ``bad-token``
+    hint."""
+    from ..theme import canonical_token
+
+    if not _short_head(key) or canonical_token("style", key)[0] is not None:
+        return False
+    k = key.strip().lower()
+    pairs: list[tuple[str, str]] = []
+    for w in value.split():
+        lw = w.lower()
+        if re.fullmatch(r"\d+(\.\d+)?(pt)?", lw):
+            pairs.append(("size", lw.removesuffix("pt")))
+        elif lw in _SHORT_FLAGS:
+            pairs.append((lw, "on"))
+        elif lw in _SHORT_ALIGN:
+            pairs.append(("align", lw))
+        elif re.fullmatch(r"#[0-9a-f]{3,8}|[a-z][\w-]*", lw):
+            pairs.append(("color", w))
+        else:
+            ctx.warn(
+                f"token {key}={value}: cannot read '{w}'"[:140],
+                line,
+                "bad-token",
+                f"{key} takes words: a size (24), bold, italic, underline, left|center|right|justify, color",
+            )
+            return True
+    if not pairs:
+        ctx.warn(
+            f"token {key} has no value",
+            line,
+            "bad-token",
+            f'write {key}="24 bold primary" (size, bold, color...)',
+        )
+        return True
+    for field, val in pairs:
+        set_token(deck, "style", f"{k}.{field}", val, ctx, line)
+    return True
+
+
+SLIDE_TOKEN_RE = re.compile(r"^(sizes|style)[ \t]*:[ \t]*(\S.*?)[ \t]*$")
+
+
+def take_slide_tokens(
+    lines: list[str], inside: list[bool], start: int, end: int
+) -> list[tuple[int, str, str]]:
+    """``sizes:`` / ``style:`` lines inside a slide body: ``(line index, group, text)``, blanked in ``lines``.
+
+    Only a line whose every word is ``key=value`` counts, so prose such as ``style: modern`` stays text."""
+    out: list[tuple[int, str, str]] = []
+    for i in range(start, min(end, len(lines))):
+        m = None if inside[i] else SLIDE_TOKEN_RE.match(lines[i])
+        if m and all("=" in w for w in split_pairs(m.group(2))):
+            out.append((i, m.group(1), m.group(2)))
+            lines[i] = ""
+    return out
+
+
+def slide_tokens(
+    deck: Deck, found: list[tuple[int, str, str]], ctx: Ctx
+) -> tuple[dict[str, str], list[CssRule]]:
+    """Tokens of one slide: (canonical path -> raw value, element-CSS rules). Same parsing as the header."""
+    scratch = Deck()
+    scratch.tokens = {k: v for k, v in deck.tokens.items() if k.startswith("colors.")}
+    own = set(scratch.tokens)
+    for i, group, text in found:
+        parse_token_line(scratch, group, text, ctx, i + 1)
+    rules = style_css_rules(scratch, ctx)
+    finish_tokens(scratch, ctx)
+    return {k: v for k, v in scratch.tokens.items() if k not in own}, rules
+
+
+def note_stated(deck: Deck, key: str) -> None:
+    """Record that the header stated ``key`` (colors/fonts/sizes/style/css): the design feedback reads it."""
+    stated = deck.attrs.setdefault("design_stated", [])
+    if key not in stated:
+        stated.append(key)
+
+
+def set_token(deck: Deck, group: str, key: str, value: str, ctx: Ctx, line: int) -> None:
+    from ..theme import TokenValueError, canonical_token, normalize_token
+
+    if group == "style":  # the author's own keys: `attr-ignored` (honour.py) judges them against the deck
+        deck.attrs.setdefault("style_keys", []).append((key.strip(), line))
+    if group == "style" and _shorthand(deck, key, value, ctx, line):
+        return
+    if (
+        group == "fonts" and key.strip().lower() == "font"
+    ):  # `fonts: font="Yu Gothic"`: text roles, one family
+        for role in ("heading", "body", "ea"):
+            set_token(deck, group, role, value, ctx, line)
+        return
+    if _style_css(deck, group, key, value, ctx, line):
+        note_stated(deck, group)
+        return
+    path, hint = canonical_token(group, key)
+    if path is None:
+        hint = (element_hint(key) if group == "style" else "") or hint
+        ctx.warn(f"unknown token '{key}' in {group}:", line, "unknown-token", hint.replace("\n", " "))
+        return
+    try:  # lenient: a bare word may be a color declared later; apply_tokens checks it again
+        normalize_token(path, value, None)
+    except TokenValueError as e:
+        ctx.warn(f"token {key}={value}: {e}"[:140], line, "bad-token", e.hint)
+        return
+    if path.startswith("fonts.") and "," in value:  # PowerPoint stores one typeface per role
+        first = value.split(",")[0].strip().strip("\"'")
+        ctx.add(
+            "info",
+            f"font list '{value}': PowerPoint keeps one family per role, using '{first}'",
+            line,
+            "font-list",
+            f'write {key}="{first}" (viewers without it substitute a similar font)',
+        )
+        value = first
+    deck.tokens[path] = value
+    deck.attrs.setdefault("_token_src", {})[path] = (line, key, value)
+    note_stated(deck, group)
+
+
+def finish_tokens(deck: Deck, ctx: Ctx) -> None:
+    """After the header (and header CSS): re-check values whose bare words may be color names declared later.
+
+    The parse-time check is lenient (any bare word passes); here names declared anywhere in the header (and
+    every preset's color names) count. A word still unknown is dropped with one ``bad-token`` warning that
+    carries the header line; ``apply_tokens`` re-checks against the chosen theme.
+    """
+    from ..theme import TokenValueError, normalize_token
+    from .css import known_color_names
+
+    src = deck.attrs.pop("_token_src", {})
+    names = known_color_names(deck)
+    for path, (line, key, value) in src.items():
+        if deck.tokens.get(path) != value:
+            continue
+        try:
+            normalize_token(path, value, names)
+        except TokenValueError as e:
+            del deck.tokens[path]
+            ctx.warn(f"token {key}={value}: {e}"[:140], line, "bad-token", e.hint)
+
+
+def parse_token_line(deck: Deck, group: str, value: str, ctx: Ctx, line: int) -> None:
+    for pair in split_pairs(value):
+        key, val = _split_key(pair)
+        if val is None:
+            ctx.warn(
+                f"'{pair}' in {group}: is not key=value",
+                line,
+                "bad-token",
+                "write key=value, e.g. primary=#7C5CFF",
+            )
+        else:
+            set_token(deck, group, key, val, ctx, line)
+
+
+def _flatten(prefix: str, data: Any) -> list[tuple[str, str]]:
+    if isinstance(data, dict):
+        out: list[tuple[str, str]] = []
+        for k, v in data.items():
+            out += _flatten(f"{prefix}.{k}" if prefix else str(k), v)
+        return out
+    return [(prefix, "" if data is None else str(data))]
+
+
+def parse_token_map(deck: Deck, group: str, data: Any, ctx: Ctx, line: int) -> None:
+    """YAML value of ``colors``/``fonts``/``sizes``/``style``/``classes``/``layout``/``render``."""
+    if not isinstance(data, dict):
+        if isinstance(data, str):
+            parse_token_line(deck, group, data, ctx, line)
+        return
+    for key, val in _flatten("" if group in TOKEN_GROUPS else group, data):
+        set_token(deck, group if group in TOKEN_GROUPS else "style", key, val, ctx, line)

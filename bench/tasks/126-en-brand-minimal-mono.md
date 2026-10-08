@@ -1,0 +1,2 @@
+<!-- tags: brand en hard -->
+Make a 4-slide English deck for 'Grain & Co' (architecture studio) in a strict monochrome look: background #FFFFFF, text #111111, accent #111111 only (no other hue anywhere, including tables and charts), font 'Helvetica Neue', titles uppercase with wide letter spacing, thin 1pt black rules instead of filled cards. Slides: cover, philosophy (2 columns), projects table, a column chart of projects per year (black bars).

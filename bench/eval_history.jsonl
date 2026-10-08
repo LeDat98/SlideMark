@@ -1,0 +1,10 @@
+{"date": "2026-10-05T03:03:35+00:00", "commit": "0186f74", "answers": "run-2-sonnet", "tasks": 20, "first_pass_rate": 0.9, "mean_warnings": 0.1, "mean_tokens": 157.6}
+{"date": "2026-10-05T03:03:36+00:00", "commit": "0186f74", "answers": "run-1-sonnet", "tasks": 10, "first_pass_rate": 0.9, "mean_warnings": 0.1, "mean_tokens": 167.9}
+{"date": "2026-10-05T03:11:36+00:00", "commit": "b03a3c7", "answers": "run-3-sonnet", "tasks": 20, "first_pass_rate": 0.95, "mean_warnings": 0.05, "mean_tokens": 149.6, "skill_tokens": 819, "python_pptx_tokens": 2704.3, "agent_token_ratio": 0.358}
+{"date": "2026-10-05T03:12:50+00:00", "commit": "07a770c", "answers": "run-4-sonnet", "tasks": 20, "first_pass_rate": 1.0, "mean_warnings": 0.0, "mean_tokens": 152.2, "skill_tokens": 909, "python_pptx_tokens": 2704.3, "agent_token_ratio": 0.392}
+{"date": "2026-10-05T05:21:29+00:00", "commit": "fc1b013", "answers": "run-5-sonnet", "tasks": 80, "first_pass_rate": 0.988, "mean_warnings": 0.05, "mean_tokens": 165.8}
+{"date": "2026-10-05T07:03:29+00:00", "commit": "c5e5be2", "answers": "run-5-sonnet", "tasks": 80, "first_pass_rate": 1.0, "mean_warnings": 0.0, "mean_tokens": 165.8}
+{"date": "2026-10-05T08:47:15+00:00", "metric": "brand_eval", "run": "run-6-brand", "tasks": 20, "first_pass": 0.95, "shared_palettes": [], "value": 0.95}
+{"date": "2026-10-05T09:47:44+00:00", "metric": "brand_eval", "run": "run-7-brand", "tasks": 20, "first_pass": 0.95, "shared_palettes": [], "value": 0.95}
+{"date": "2026-10-05T11:23:09+00:00", "metric": "brand_eval", "run": "run-8-brand", "tasks": 20, "first_pass": 1.0, "follows_brief": 1.0, "shared_palettes": [], "value": 1.0}
+{"date": "2026-10-05T13:03:01+00:00", "metric": "brand_eval", "run": "run-9-brand", "tasks": 20, "first_pass": 1.0, "follows_brief": 1.0, "shared_palettes": [], "value": 1.0, "first_pass_check": "18/20 (run-8: 16/20)", "note": "first_pass/value score the final files; first_pass_check = agent's own check before fixes"}

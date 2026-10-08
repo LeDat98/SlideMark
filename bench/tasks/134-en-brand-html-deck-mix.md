@@ -1,0 +1,2 @@
+<!-- tags: brand en html -->
+Make a 3-slide English deck for 'Lumen Bank' that mixes styles with shared tokens: declare the brand colors once (primary #0B3D91, accent #FFB703, bg #FFFFFF) and use them in both SlideMark slides and one @html slide via CSS variables. Slide 1: cover. Slide 2 (@html): a split hero, left half primary-colored panel with a big statement, right half 3 stacked benefit rows with accent dots. Slide 3: 3 KPIs.

@@ -37,24 +37,92 @@ class Style(Model):
     align: Literal["left", "center", "right", "justify"] | None = None
     valign: Literal["top", "middle", "bottom"] | None = None
     line_spacing: float | None = None  # multiple of font size, e.g. 1.2
-    fill: str | None = None  # background color of the shape / container
+    # background: a color, or a CSS gradient "linear-gradient(135deg, #7C5CFF, #00D1B2)" / radial
+    fill: str | None = None
     line: str | None = None  # border color
     line_width: float | None = None  # pt
     radius: float | None = None  # corner radius in pt (rounded rectangle)
     padding: Length | None = None  # inner padding of text frames / containers
     opacity: float | None = None  # 0..1
-    shadow: bool | None = None
+    # True = theme default shadow; or CSS box-shadow "0 8 24 #00000055" (x y blur [spread] color, pt)
+    shadow: bool | str | None = None
+    # --- CSS mappings (DF3; ```css fences). All optional, None = inherit ---
+    padding_top: Length | None = None  # per-side padding, overrides `padding` on that side
+    padding_right: Length | None = None
+    padding_bottom: Length | None = None
+    padding_left: Length | None = None
+    # per-side borders, canonical "<width>pt <solid|dash|dot> <color>" or "none"; override line/line_width
+    border_top: str | None = None
+    border_right: str | None = None
+    border_bottom: str | None = None
+    border_left: str | None = None
+    line_dash: Literal["solid", "dash", "dot"] | None = None  # border style of `line`
+    letter_spacing: float | None = None  # pt, added between characters
+    text_transform: Literal["upper", "lower", "capitalize", "none"] | None = None
+    underline: bool | None = None
+    strike: bool | None = None
+    rotation: float | None = None  # degrees clockwise (CSS transform: rotate(), or `{rotate=15}`)
+    shape: str | None = None  # preset geometry name of the box (`{shape=hexagon}`; table in slidemark.shapes)
+    z: int | None = (
+        None  # stacking level `{z=1..9}`: a shape without one sits at the default level, higher is later
+    )
+    margin: Length | None = None  # outer space around a block inside its cell
+    gap: Length | None = None  # gap between the children of a container / slide body
+    grid: str | None = None  # `@` grid spec from grid-template-columns / -areas ("1:2", "aab/aac")
+    width: str | None = (
+        None  # CSS width of a block: "fit-content" (hug the text), "auto", "40%", "3in", "120pt"
+    )
 
     def merged(self, *others: Style | None) -> Style:
         """Return a copy where later non-None fields override earlier ones."""
-        data = self.model_dump()
+        data = dict(self.__dict__)
         for other in others:
             if other is None:
                 continue
-            for k, v in other.model_dump().items():
-                if v is not None:
-                    data[k] = v
-        return Style(**data)
+            data.update({k: v for k, v in other.__dict__.items() if v is not None})
+        # values come from validated Styles: build the instance directly (model_construct is slow)
+        out = object.__new__(Style)
+        object.__setattr__(out, "__dict__", data)
+        object.__setattr__(out, "__pydantic_fields_set__", set())  # never read: skip the 60-key copy
+        object.__setattr__(out, "__pydantic_extra__", None)
+        object.__setattr__(out, "__pydantic_private__", None)
+        return out
+
+
+_STYLE_BLANK: dict | None = None
+
+
+def fast_style(**kw) -> Style:
+    """Build a Style from trusted values without pydantic validation (layout internals, hot path)."""
+    global _STYLE_BLANK
+    if _STYLE_BLANK is None:
+        _STYLE_BLANK = dict(Style().__dict__)
+    data = dict(_STYLE_BLANK)
+    data.update(kw)
+    out = object.__new__(Style)
+    object.__setattr__(out, "__dict__", data)
+    object.__setattr__(out, "__pydantic_fields_set__", set(kw))
+    object.__setattr__(out, "__pydantic_extra__", None)
+    object.__setattr__(out, "__pydantic_private__", None)
+    return out
+
+
+class CssRule(Model):
+    """One rule of a ```css fence: a single selector (comma lists are split) and its mapped declarations.
+
+    Selector grammar (subset of CSS, matched by the layout against the IR):
+    compound = [type] [.class]* [#id] [:nth-child(even|odd|N)] [:first-child] [:last-child]
+    selector = compound ((" " | " > ") compound)*
+    types: ``slide`` (classes = slide classes + ``cover``/``section`` layout), ``h1`` (slide title),
+    ``h2`` (box heading), ``p``/``li`` (body text), ``.lead`` ``.conclusion`` ``.footnote`` ``.subtitle``
+    (role classes), ``.box`` (any ``##`` box / Container), ``table`` ``tr`` ``th`` ``td``, ``code``,
+    ``img``, ``.chart``, ``.kpi`` ``.chevron`` ``.callout`` and any class/id written with ``{.x}``/``{#x}``.
+    Later rules and higher specificity win, like CSS; inline ``{}`` styles win over CSS.
+    """
+
+    selector: str
+    style: Style
+    line: int | None = None  # source line of the rule, for diagnostics
 
 
 class Box(Model):
@@ -81,6 +149,9 @@ class Run(Model):
     color: str | None = None
     highlight: str | None = None
     link: str | None = None  # URL, or "#<slide-id>" / "#3" for an internal jump
+    size: float | None = None  # pt of this run alone (None = the paragraph's); set by `kpi.unit.size`
+    # True = `[x]{size=28}`: the author pinned `size` exactly; no pass grows, shrinks or clamps it
+    exact: bool = False
 
 
 class Paragraph(Model):
@@ -88,6 +159,8 @@ class Paragraph(Model):
     marker: Literal["bullet", "number"] | None = None  # list paragraph if set
     level: int = 0  # list nesting depth, 0-based
     style: Style | None = None
+    # `- item {color=red}`: keys this paragraph cannot honour (x y w h radius ...), kept for `attr-ignored`
+    attrs: dict[str, Any] = Field(default_factory=dict)
 
     @property
     def plain(self) -> str:
@@ -122,6 +195,18 @@ class Image(ElementBase):
     fit: Literal["contain", "cover", "stretch"] = "contain"
 
 
+class Media(ElementBase):
+    """Embedded video or audio. Written as an image whose path has a media extension: `![demo](a.mp4)`."""
+
+    type: Literal["media"] = "media"
+    kind: Literal["video", "audio"] = "video"
+    src: str
+    alt: str = ""
+    poster: str | None = None  # image shown before playback; None = a generated placeholder frame
+    autoplay: bool = False
+    loop: bool = False
+
+
 class Cell(Model):
     paragraphs: list[Paragraph] = Field(default_factory=list)
     colspan: int = 1
@@ -135,6 +220,9 @@ class Table(ElementBase):
     header_rows: int = 1
     header_cols: int = 0
     col_widths: list[Length] | None = None  # relative weights or lengths
+    rowh: list[str] | None = (
+        None  # `{rowh=0.8in,1.05in}`: exact row heights ("auto" = free); the last repeats
+    )
 
 
 class Code(ElementBase):
@@ -161,6 +249,7 @@ class Chart(ElementBase):
         "doughnut",
         "scatter",
         "radar",
+        "waterfall",  # one series: first value absolute, then deltas; "=" cells are running totals
     ] = "column"
     title: str | None = None
     categories: list[str] = Field(default_factory=list)
@@ -184,6 +273,19 @@ class Raw(ElementBase):
     source: str = ""
 
 
+class Link(Model):
+    """A connector between two blocks of the same grid (``@`` token ``a>b`` or ``a-b``).
+
+    ``src``/``dst`` are 0-based indices into the owner's blocks (``Slide.elements`` or ``Container.children``)
+    in source order. ``arrow`` is False for a plain line (``a-b``).
+    """
+
+    src: int
+    dst: int
+    arrow: bool = True
+    label: str | None = None
+
+
 class Container(ElementBase):
     """A box that lays out its children: a ``## heading`` box, or the slide body itself.
 
@@ -197,10 +299,11 @@ class Container(ElementBase):
     grid: str | None = None
     gap: Length | None = None
     children: list[Element] = Field(default_factory=list)
+    links: list[Link] = Field(default_factory=list)  # connectors between children (`@` tokens a>b)
 
 
 Element = Annotated[
-    Text | Image | Table | Code | Chart | Shape | Raw | Container,
+    Text | Image | Media | Table | Code | Chart | Shape | Raw | Container,
     Field(discriminator="type"),
 ]
 Container.model_rebuild()
@@ -219,12 +322,20 @@ class Slide(Model):
     conclusion: Text | None = None  # `>` as the last block
     footnotes: list[Text] = Field(default_factory=list)  # `※` / `^` lines
     elements: list[Element] = Field(default_factory=list)  # the blocks, in source order
+    links: list[Link] = Field(default_factory=list)  # connectors between blocks (`@` tokens a>b)
     notes: str | None = None
     background: str | None = None  # color, "linear-gradient(...)" or image path
     transition: str | None = None
     hidden: bool = False
     classes: list[str] = Field(default_factory=list)
     attrs: dict[str, Any] = Field(default_factory=dict)
+    css: list[CssRule] = Field(default_factory=list)  # ```css fences inside this slide: this slide only
+    # `sizes:` / `style:` lines inside this slide (same keys as the header): canonical path -> raw value,
+    # applied on top of the deck theme for this slide only (`theme.slide_theme`)
+    tokens: dict[str, str] = Field(default_factory=dict)
+    # `@html` slide or a `<section>` of a deck.html: the whole slide is this HTML (laid out by Chromium at the
+    # slide size, converted to native shapes). `title` is still set (outline, import); nothing else is drawn
+    html: str | None = None
     line: int | None = None
 
 
@@ -252,6 +363,10 @@ class Deck(Model):
     footer: str | None = None
     slide_number: bool = False
     density: Literal["normal", "dense"] = "normal"
+    # inline design tokens from header lines (colors:/fonts:/sizes:/style:), canonical path -> raw value,
+    # e.g. {"colors.primary": "#7C5CFF", "classes.card.radius": "14"}; applied on top of `theme`
+    tokens: dict[str, str] = Field(default_factory=dict)
+    css: list[CssRule] = Field(default_factory=list)  # ```css fences in the deck header: every slide
     slides: list[Slide] = Field(default_factory=list)
     attrs: dict[str, Any] = Field(default_factory=dict)
     diagnostics: list[Diagnostic] = Field(default_factory=list)
@@ -261,7 +376,29 @@ class Deck(Model):
 
 
 class Placed(Model):
-    """An element with its final absolute box (EMU) and fully merged style. Renderer input."""
+    """An element with its final absolute box (EMU) and fully merged style. Renderer input.
+
+    Conventions between layout and renderer (z-order = list order):
+    - Slide title / subtitle / lead / conclusion / footnotes are ``Text`` items with that ``role``.
+    - A ``Container`` Placed is only its card (fill/line/radius from ``style``); its heading is a separate
+      ``Text(role="heading")`` Placed and its children are separate Placed items, never nested.
+    - Footer and slide number are ``Text(role="caption")`` with ``attrs={"field": "footer"|"slide_number"}``;
+      for ``slide_number`` the renderer emits a native slide-number field.
+    - ``flow`` arrows are ``Shape(shape="arrow-right")``; ``chevron`` boxes are ``Shape(shape="chevron")``
+      carrying their paragraphs.
+    - ``Placed.style`` is already merged (theme role -> classes -> inline); colors may still be theme names,
+      resolve them with ``Theme.color``. ``font_scale`` multiplies every font size of the element.
+    - Connectors (``Link``) are ``Shape(shape="line")`` with ``attrs={"head": "arrow"|"none",
+      "flip_h": bool, "flip_v": bool}``: a straight line from one corner of the box to the opposite one.
+      Elbow connectors add ``"elbow": True, "route": "v"|"h", "adj": 0..1`` (bend position) and
+      ``"src_box"``/``"dst_box"`` ``(x, y, w, h)`` so the renderer can glue both ends to the block shapes.
+    - ``.kpi`` boxes: the first paragraph is the big number (role style ``kpi``), the rest is caption text.
+    - Callouts (``> [!note]``) are ``Text`` with classes ``["callout", "<kind>"]``; badges are runs with
+      ``highlight`` set (theme color name) and ``color`` for the text.
+    - Icons (``icon=name`` on a box) are ``Shape(shape="icon", attrs={"icon": name})`` Placed items; the
+      renderer draws them as native custom geometry filled with ``style.fill`` (or ``style.color``).
+    - Slide-level settings (background, notes, hidden, transition, ids) come from ``Slide``.
+    """
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
@@ -272,3 +409,7 @@ class Placed(Model):
     h: int
     style: Style = Field(default_factory=Style)
     font_scale: float = 1.0  # autofit shrink factor applied to all font sizes of this element
+    # an author-pinned item (`{x= y= w= h=}`): (x, y, w, h, n) as the layout placed it, ``None`` for a
+    # component the author did not pin; ``n`` = items it owns in the list (itself + its children). No later
+    # pass may move or resize a pinned component: ``engine._restore_pins`` puts it back (children follow)
+    pin: tuple[int | None, int | None, int | None, int | None, int] | None = None

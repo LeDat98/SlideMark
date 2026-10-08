@@ -1,0 +1,9 @@
+{
+ "arm": "slidemark skill-only (SKILL.md with the design guide, before the 2026-10-08 wave)",
+ "model": "sonnet",
+ "calls": 7, "builds": 3, "image_looks": 3, "output_tokens": 13486,
+ "cost_units": 188231, "cost_above_start": 159663, "seconds": 93,
+ "accepted": true, "warnings_left": 0,
+ "agent_notes": "RAG slide: free blocks shrank (h= read as a share of the body, not the slide), attribute-only blocks (chevron arrows) were not drawn; cycle node labels tiny; body text small on slides 3 and 5",
+ "forms": {"1": "cover", "2": "agenda", "3": "funnel", "4": "timeline", "5": "iconlist", "6": "vs", "7": "rows", "8": "2x2 icon cards", "9": "cycle", "10": "free", "11": "table + conclusion", "12": "proscons", "13": "lead + 4 cards", "14": "steps", "15": "cover"}
+}

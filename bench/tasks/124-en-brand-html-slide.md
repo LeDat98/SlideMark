@@ -1,0 +1,2 @@
+<!-- tags: brand en html -->
+Make a 4-slide English deck for 'Orbit Labs'. Slide 2 must be designed in HTML (a whole @html slide) as a bento grid of 5 cards of different sizes with a dark #0B1020 background, cyan #22D3EE highlights and rounded 16px corners; all text must stay editable. Other slides use SlideMark syntax with the same colors via tokens: cover, bento (HTML), metrics (3 KPIs), next steps list.

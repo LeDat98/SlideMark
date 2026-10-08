@@ -1,0 +1,27 @@
+name: ci
+# GitHub Actions minutes are limited on this private repo. The daily routine already runs ruff + the full
+# pytest suite locally before every push, so CI runs once a day on the latest main (and on demand),
+# not on every push. Re-add `push:` only if the repo becomes public or gets more minutes.
+on:
+  schedule:
+    - cron: "0 23 * * *" # 08:00 JST, after the 02:45 JST routine run
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv venv --python ${{ matrix.python }} .venv
+      - run: uv pip install -e ".[dev,html]" --python .venv
+      - run: .venv/bin/playwright install --with-deps chromium
+      - run: .venv/bin/ruff check .
+      - run: .venv/bin/ruff format --check .
+      - run: .venv/bin/pytest -q --cov=slidemark --cov-report=term:skip-covered

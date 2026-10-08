@@ -1,0 +1,57 @@
+# Built-in preset "jp-business": dense Japanese consulting slides (navy title band, 10.5-12pt type).
+colors:
+  bg: "#FFFFFF"
+  fg: "#1F2937"
+  primary: "#1E3A5F"
+  secondary: "#2F6B9A"
+  accent: "#C00000"
+  muted: "#5B6573"
+  border: "#BFC7D1"
+  surface: "#F1F4F8"
+  danger: "#C00000"
+  success: "#2E7D32"
+fonts: {heading: Yu Gothic, body: Yu Gothic, mono: Consolas, ea: Yu Gothic}
+sizes:
+  title: 24
+  subtitle: 16
+  heading: 13
+  body: 11
+  lead: 16
+  quote: 11
+  caption: 9
+  footnote: 9
+  code: 10
+  table: 10.5
+  cover-title: 34
+  cover-subtitle: 18
+min_font_size: 7
+margin_x: 0.45in
+margin_y: 0.3in
+gap: 0.15in
+title_height: 0.75in
+title_band: primary
+title_band_color: "#FFFFFF"
+heading_color: primary
+heading_band: primary
+heading_band_color: "#FFFFFF"
+table_header_fill: primary
+table_header_color: "#FFFFFF"
+dense_scale: 0.9
+lead_color: fg
+classes:
+  card: {line_width: 0.5, radius: 0, padding: 7pt}
+  callout: {fill: "#FDF2F2", line: danger, padding: 7pt}
+  chart-note: {fill: "#FFF5F5"}
+  dense: {font_size: 10.5}
+  kpi: {font_size: 26}
+cover_band_h: 0.6
+cover_pad: 0.55in
+cover_gap: 0.22in
+cover_rule: accent
+cover_rule_h: 0.06in
+# series colors: navy, light steel blue, slate grey, mid blue, pale grey, green. The accent (red) is reserved
+# for emphasis (`hl=`, the cover rule), never a series: a red series reads as a warning that means nothing.
+palette: [primary, "#7FA3C7", "#6B7684", secondary, "#BFC7D1", success]
+render: {connector_width: 2}
+table_hl_fill: accent
+table_hl_strength: 0.16

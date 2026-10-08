@@ -1,0 +1,9 @@
+{
+ "arm": "slidemark skill-only (SKILL.md with the design guide + waves 1 and 2)",
+ "model": "sonnet",
+ "calls": 7, "builds": 3, "image_looks": 2, "output_tokens": 8862,
+ "cost_units": 199607, "cost_above_start": 130415, "seconds": 74,
+ "accepted": true, "warnings_left": 0,
+ "agent_notes": "nothing inexpressible; small body text on slides 5, 7, 14; 'Chuẩn hóa' wraps on slide 14",
+ "forms": {"1": "cover dark + network art", "2": "agenda", "3": "nested", "4": "timeline + conclusion", "5": "iconlist", "6": "vs + conclusion", "7": "steps num + conclusion", "8": "2x2", "9": "cycle", "10": "flow disc + above node + conclusion", "11": "table + conclusion", "12": "proscons + verdict", "13": "lead + stairs", "14": "4 num", "15": "cover dark + network art"}
+}
