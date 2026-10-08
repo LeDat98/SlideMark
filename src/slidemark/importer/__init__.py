@@ -12,7 +12,7 @@ from pathlib import Path
 from ..ir import Diagnostic
 from ..render.design_part import read_design_part
 from ..theme import DEFAULT, JP_BUSINESS, MIDNIGHT, Theme
-from . import diet, emit, recognise2
+from . import diet, emit, icondisc, recognise2
 from .design import (
     claim_fences,
     css_fence,
@@ -212,6 +212,17 @@ def _import(
     return best[1], diags
 
 
+def _token_disc(tokens: dict, colors: dict[str, str]) -> str | None:
+    """RRGGBB of the deck's own ``icon.disc`` token (a colour name of the deck, or a hex), else ``None``."""
+    v = tokens.get("icon_disc")
+    if not isinstance(v, str):
+        return None
+    v = v.strip()
+    if v in colors:
+        return colors[v].lstrip("#").upper()
+    return v.lstrip("#").upper() if re.fullmatch(r"#?[0-9A-Fa-f]{6}", v) else None
+
+
 def _drawn_accent(theme, tokens: dict, accent: str) -> str:
     """RRGGBB a ``==mark==`` run is drawn in: the accent made legible on bg / surface (``Theme.legible``)."""
     try:
@@ -281,9 +292,15 @@ def _import_with(
     )
     if info is not None:
         info["foreign"] = deck.foreign
+    disc_shape: str | None = None
+    for sd in datas:
+        icondisc.fold(sd)  # (before the deck-wide disc is read; ``build_slide`` folds again on its copies)
     if deck.foreign:
         deck.ink = recognise2.deck_ink(datas, colors.get("bg", "FFFFFF"), H)
         deck.card_shadow = card_shadow(datas, W, H)
+        deck.icon_disc, disc_shape = icondisc.deck_disc(datas)
+    else:
+        deck.icon_disc = _token_disc({**(design.get("tokens") or {}), **own_tokens}, colors)
     emit.set_palette(colors)
     rules = design_rules(design)
     deck.implied = {r: implied_style(rules, r, colors) for r in ("lead", "conclusion", "footnote")}
@@ -357,6 +374,11 @@ def _import_with(
         header.extend(token_lines(_keep_valid(recognise2.deck_tokens(datas, deck))))
         if deck.card_shadow:  # most cards share one shadow: `card.shadow=`; the others say `{shadow=}`
             header.extend(token_lines(_keep_valid({"classes.card.shadow": deck.card_shadow})))
+        if deck.icon_disc:  # most icons sit on one disc: `icon.disc=`; the others say `{disc=}`
+            disc_tokens = {"icon_disc": icondisc.color_token(deck.icon_disc, colors)}
+            if disc_shape and disc_shape != "circle":
+                disc_tokens["icon_disc_shape"] = disc_shape
+            header.extend(token_lines(_keep_valid(disc_tokens)))
     size = _size_token(W, H)
     if size:
         header.append(f"size: {size}")

@@ -42,7 +42,7 @@ from .anim import build_timing
 from .design_part import write_design_part
 from .effects import apply_fill, apply_shadow, cover_crop, set_picture
 from .htmlimg import add_html_image, add_html_native, close_html
-from .icons import add_icon
+from .icons import add_bar_icon, add_chevron_icon, add_icon
 from .math import add_math
 from .media import add_media, finish_timing
 from .objects import add_chart, add_image, add_table, code_paragraphs, resolve_image
@@ -712,6 +712,8 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             tf._txBody.find(qn("a:bodyPr")).set("vert", str(el.attrs["vert"]))
         if "callout" in el.classes and st.line and not use_placeholder:
             _accent_bar(rc, s, pl, name)
+        if el.role == "conclusion" and el.attrs.get("icon_side"):  # `conclusion.icon`: at the bar's left end
+            add_bar_icon(rc, s, pl)
     elif isinstance(el, Shape) and el.shape == "line":
         _connector(rc, s, pl, name)
     elif isinstance(el, Shape) and el.shape == "icon":
@@ -747,6 +749,10 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
                 shp.text_frame.margin_left = Emu(shp.text_frame.margin_left + int(inset))
         if el.shape == "chevron" and not st.shape:
             shp.adjustments[0] = float(el.attrs.get("adj", rc.theme.layout.chevron_adj))
+        if el.attrs.get(
+            "icon_side"
+        ):  # a chevron / `@steps` arrow with `icon=`: drawn from its final rectangle
+            add_chevron_icon(rc, s, pl, st)
         if (
             el.shape == "pie" and "pie_end" in el.attrs
         ):  # angles are 60000ths of a degree (python-pptx: / 1e5)

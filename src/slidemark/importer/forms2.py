@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass, field, replace
 from fractions import Fraction
 
+from . import icondisc
 from .emit import inline, one_line, table_lines
 from .read import CellT, Item, ParaT, RunT, SlideData
 
@@ -82,9 +83,12 @@ def _iconlist(pool: list[Item], data: SlideData, deck, Block) -> Folded | None:
             and it.y - 2 <= i.cy <= it.y + it.h  # the icon at the cell's left
         ]
         name = ""
+        extra = ""
         if box:
-            name = min(box, key=lambda i: i.x).name[5:].strip()
-        head = f"icon={name} " if name else ""
+            glyph = min(box, key=lambda i: i.x)
+            name = glyph.name[5:].strip()
+            extra = icondisc.attr(glyph.disc, getattr(deck, "icon_disc", None), getattr(deck, "colors", {}))
+        head = f"icon={name} " + (extra + " " if extra else "") if name else ""
         paras = [p for p in it.paras if p.runs and p.plain.strip()]
         if not paras:
             continue

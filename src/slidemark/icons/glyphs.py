@@ -48,6 +48,34 @@ def _wrench() -> str:
     return head + "|" + handle
 
 
+def _arrow_ring() -> str:
+    """``refresh``: a clockwise ring open at the top right, with an arrowhead at its end."""
+    cx = cy = 12.0
+    ro, ri, a0, a1 = 9.2, 6.4, -35.0, 225.0
+
+    def at(r: float, deg: float) -> tuple[float, float]:
+        a = math.radians(deg)
+        return cx + r * math.cos(a), cy + r * math.sin(a)
+
+    (x0, y0), (x1, y1), (x2, y2), (x3, y3) = at(ro, a0), at(ro, a1), at(ri, a1), at(ri, a0)
+    ring = (
+        f"M{_n(x0)} {_n(y0)}A{_n(ro)} {_n(ro)} 0 1 1 {_n(x1)} {_n(y1)}L{_n(x2)} {_n(y2)}"
+        f"A{_n(ri)} {_n(ri)} 0 1 0 {_n(x3)} {_n(y3)}Z"
+    )
+    mid = (ro + ri) / 2
+    a = math.radians(a1)
+    tan = (-math.sin(a), math.cos(a))  # clockwise (y down)
+    bx, by = at(mid, a1)
+    wing = (ro - ri) / 2 + 2.3
+    nx, ny = math.cos(a), math.sin(a)
+    head = _poly(
+        (bx + nx * wing, by + ny * wing),
+        (bx + tan[0] * 5.2, by + tan[1] * 5.2),
+        (bx - nx * wing, by - ny * wing),
+    )
+    return ring + "|" + head
+
+
 def _tooth() -> str:
     return (
         "M7.5 3C5 3 3 5 3 8C3 11 5 12.5 5.5 15.5C6 19 6.5 22 8.5 22C10.5 22 10.5 17.5 12 17.5"
@@ -196,9 +224,17 @@ GLYPHS: dict[str, str] = {
     + _poly((5.5, 15), (5.5, 21.5), (11.5, 16)),
     "bolt": _poly((13.5, 2), (4, 13.8), (10.8, 13.8), (9.5, 22), (20, 9.6), (13, 9.6)),
     "tooth": _tooth(),
+    "refresh": _arrow_ring(),
+    "tag": _poly((2.5, 2.5), (12, 2.5), (21.5, 12), (12, 21.5), (2.5, 12)) + _circ(7.2, 7.2, 1.9),
 }
 
 ALIASES: dict[str, str] = {
+    "sync": "refresh",
+    "reload": "refresh",
+    "loop": "refresh",
+    "cycle": "refresh",
+    "label": "tag",
+    "price": "tag",
     "house": "home",
     "message": "chat",
     "comment": "chat",

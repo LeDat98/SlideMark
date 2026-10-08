@@ -115,8 +115,19 @@ def test_shadow_direction_and_spread(tmp_path):
 def test_shadow_true_uses_render_token(tmp_path):
     sppr, _ = card_sppr(Style(fill="surface", shadow=True), tmp_path)
     sh = sppr.find(qn("a:effectLst")).find(qn("a:outerShdw"))
-    assert sh is not None  # "0 2 6 #00000040": 2pt down, 6pt blur
-    assert sh.get("blurRad") == str(6 * 12700) and sh.get("dist") == str(2 * 12700)
+    assert sh is not None  # "0 3 12 #00000030": 3pt down, 12pt blur, 19% black (a soft card shadow)
+    assert sh.get("blurRad") == str(12 * 12700) and sh.get("dist") == str(3 * 12700)
+    assert sh.get("dir") == "5400000" and (sh.get("algn"), sh.get("rotWithShape")) == ("ctr", "0")
+    assert sh[0].find(qn("a:alpha")).get("val") == str(round(0x30 / 255 * 100000))
+
+
+def test_soft_shadow_equals_pptxgenjs(tmp_path):
+    """`0 2 8 #0000001F` is the pptxgenjs card shadow: blurRad 101600, dist 25400, dir 90 deg, ~12% alpha."""
+    sppr, _ = card_sppr(Style(fill="surface", shadow="0 2 8 #0000001F"), tmp_path)
+    sh = sppr.find(qn("a:effectLst")).find(qn("a:outerShdw"))
+    assert (sh.get("blurRad"), sh.get("dist"), sh.get("dir")) == ("101600", "25400", "5400000")
+    assert (sh.get("algn"), sh.get("rotWithShape")) == ("ctr", "0")
+    assert abs(int(sh[0].find(qn("a:alpha")).get("val")) - 12000) <= 300
 
 
 def test_no_shadow_gives_empty_effect_list(tmp_path):
