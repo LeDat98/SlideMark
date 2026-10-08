@@ -343,10 +343,10 @@ def test_chevron_row_turned_into_steps_keeps_its_headings_in_the_arrows(tmp_path
 
 def test_card_align_and_valign_tokens(tmp_path):
     _d, _p, sh = _card_deck(tmp_path, "steps-card.align=center", name="c.pptx")
-    assert sh["Heading 1"].text_frame.paragraphs[1].alignment is not None
+    assert sh["Heading 1"].text_frame.paragraphs[0].alignment is not None
     from pptx.enum.text import PP_ALIGN
 
-    assert sh["Heading 1"].text_frame.paragraphs[1].alignment == PP_ALIGN.CENTER
+    assert sh["Heading 1"].text_frame.paragraphs[0].alignment == PP_ALIGN.CENTER
     _d, _p, top = _card_deck(tmp_path, name="t.pptx")
     _d, _p, mid = _card_deck(tmp_path, "steps-card.valign=middle", name="m.pptx")
     assert mid["Heading 2"].top >= top["Heading 2"].top  # the block moved down in its card, never up

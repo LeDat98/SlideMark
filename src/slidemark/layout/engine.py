@@ -1898,8 +1898,10 @@ def _place_steps(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> bool:
     The cards start ``steps_gap`` under the arrows and are as tall as their content here; the slide's
     growth passes then enlarge their text and ``fill_steps`` stretches them to the conclusion bar /
     footnote. ``False`` = not a steps group (fewer than two headed boxes): placed like any other box."""
-    caption = ctx.theme.steps_caption or ("STEP {n}" if "num" in ctx.slide.classes else None)
     head_card = str(ctx.slide.attrs.get("head") or ctx.theme.steps_head).lower() != "arrow"
+    # One label per step: the card look's arrow already shows the number, so `num` adds the `STEP n` caption
+    # only for `head=arrow` (the arrow holds the heading); `steps.caption=` states it for either look.
+    caption = ctx.theme.steps_caption or ("STEP {n}" if "num" in ctx.slide.classes and not head_card else None)
     arrows, cards = _steps_parts(c, ctx.theme, caption, head_card)
     n = len(arrows)
     if n < 2 or n != len(c.children):  # other blocks in the group: a plain row of boxes

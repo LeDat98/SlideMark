@@ -71,7 +71,7 @@ ChatGPT đưa AI đến hàng trăm triệu người
 Transformer là nền tảng của mọi mô hình ngôn ngữ lớn hiện nay
 
 # Mô hình ngôn ngữ viết từng token
-@4 steps num defaults
+@4 steps defaults
 ## Token hóa {icon=code}
 - Cắt văn bản thành các token
 - Một từ có thể thành vài token

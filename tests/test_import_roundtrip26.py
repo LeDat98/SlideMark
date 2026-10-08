@@ -31,8 +31,8 @@ def test_example_26_is_lossless(tmp_path):
 
 
 def test_steps_caption_comes_back_as_the_num_word(tmp_path):
-    t = _import("# T\n@3 steps num\n## a\n- x\n## b\n- y\n## c\n- z\n", tmp_path)
-    assert "@3 steps num\n" in t
+    t = _import("# T\n@3 steps head=arrow num\n## a\n- x\n## b\n- y\n## c\n- z\n", tmp_path)
+    assert "head=arrow" in t and " num" in t.split("\n## a")[0]  # (`num` alone draws no caption on the card look)
     t = _import("# T\n@3 steps\n## a\n- x\n## b\n- y\n## c\n- z\n", tmp_path)
     assert "@3 steps\n" in t
 
