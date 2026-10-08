@@ -111,7 +111,7 @@ Toàn bộ thiết kế mà agent python-pptx tự viết (64 quyết định) n
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-07 · commit `2d3e402` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-10-08 · commit `b62081e` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -356,6 +356,26 @@ Nguồn: [`examples/25-roundtrip-forms.md`](examples/25-roundtrip-forms.md)
 ![25-roundtrip-forms slide 5](docs/gallery/25-roundtrip-forms/slide-05.png)
 ![25-roundtrip-forms slide 6](docs/gallery/25-roundtrip-forms/slide-06.png)
 ![25-roundtrip-forms slide 7](docs/gallery/25-roundtrip-forms/slide-07.png)
+
+### 26-ai-overview
+
+Nguồn: [`examples/26-ai-overview.md`](examples/26-ai-overview.md)
+
+![26-ai-overview slide 1](docs/gallery/26-ai-overview/slide-01.png)
+![26-ai-overview slide 2](docs/gallery/26-ai-overview/slide-02.png)
+![26-ai-overview slide 3](docs/gallery/26-ai-overview/slide-03.png)
+![26-ai-overview slide 4](docs/gallery/26-ai-overview/slide-04.png)
+![26-ai-overview slide 5](docs/gallery/26-ai-overview/slide-05.png)
+![26-ai-overview slide 6](docs/gallery/26-ai-overview/slide-06.png)
+![26-ai-overview slide 7](docs/gallery/26-ai-overview/slide-07.png)
+![26-ai-overview slide 8](docs/gallery/26-ai-overview/slide-08.png)
+![26-ai-overview slide 9](docs/gallery/26-ai-overview/slide-09.png)
+![26-ai-overview slide 10](docs/gallery/26-ai-overview/slide-10.png)
+![26-ai-overview slide 11](docs/gallery/26-ai-overview/slide-11.png)
+![26-ai-overview slide 12](docs/gallery/26-ai-overview/slide-12.png)
+![26-ai-overview slide 13](docs/gallery/26-ai-overview/slide-13.png)
+![26-ai-overview slide 14](docs/gallery/26-ai-overview/slide-14.png)
+![26-ai-overview slide 15](docs/gallery/26-ai-overview/slide-15.png)
 <!-- gallery:end -->
 
 ## Tài liệu
