@@ -91,6 +91,9 @@ style: top.bar=primary top.bar_h=0.12in title.rule=secondary kpi.stripe=secondar
 | `title.rule=<color>` `title.rule_h=2pt` | a rule on the bottom edge of the slide title |
 | `title.rule2=<color>` `title.rule2_w=1.6in` | a second, short segment of the title rule's height on its left end (an accent over the rule) |
 | `heading.rule=<color>` `heading.rule_h=2pt` | a rule under every `##` box heading (on the lower edge of the band with `heading.band`); not on `###`, KPI cards or item cards |
+| `icon.disc=<color>` `icon.disc.size=0.7in` `icon.disc.shape=circle` `icon.color=<c>` | every `icon=` (box heading, `.kpi` card, `@iconlist` item, `@steps` / chevron arrow) sits centred on a native filled disc named `Icon disc` (`circle`, `rounded` or `square`; `none` = the bare glyph, the default). Diameter: `icon.disc.size`, else `layout.icon_disc_ratio` (2.2) x the glyph side; the glyph is `layout.icon_disc_glyph` (0.46) of it, in `icon.color` or an ink that reads on the disc (white on dark, the text colour on light). The heading text starts after the disc. `{icon=bolt disc=accent}` on one heading (or `- icon=bolt disc=accent **Title** text` in `@iconlist`) sets that disc, `disc=none` takes it away |
+| `card.elevation=0\|1\|2\|3` | one word for the card shadow: `0` none, `1` = `0 1 4 #0000001F`, `2` = `0 3 12 #00000030` (the soft pptxgenjs look), `3` = `0 8 24 #00000040`; it sets `card.shadow`, so it reaches boxes, `.kpi` cards, `@items`, `@steps` cards and `@iconlist fill=` cards (`rows.shadow=` for `@rows` bars). A card with a shadow and no border of its own is drawn WITHOUT a line (a line flattens the shadow): `card.line=border`, `{line=}`, a CSS border or `kpi.line=` keep it |
+| `conclusion.icon=<name>` | an icon at the left end of the `>` conclusion bar (the text shifts right; the bar is at least `layout.conclusion_icon_h` tall): white on the bar fill, on an `icon.disc` disc when that is set; drawn from the bar's final rectangle |
 | `kpi.stripe=<color>` `kpi.stripe_h=6pt` `kpi.stripe.side=top` | a stripe on the top edge of every `.kpi` card (a tall stripe is a header band: a label on it is judged against the stripe colour); a list `kpi.stripe=a,b,c` cycles over the cards in order, `kpi.stripe.side=left\|right\|bottom` moves it, `{stripe=teal}` on one card wins ("Card stripes" below) |
 | `kpi.rule=<color>` `kpi.rule_h=1pt` `kpi.rule_w=100%` | a divider rule between the number and its caption in every `.kpi` card (off by default). The caption becomes its own text box under the rule; `layout.kpi_rule_gap_em` is the air around it |
 | `kpi.band=<color>` `kpi.band.color=<c>` `kpi.band.size=20` | a header band on every `.kpi` card, flush on its top edge, holding the label in the band's ink (white, or what reads on the fill; like `heading.band` on boxes); `kpi.band.size` also pins the label size; an `icon=` sits under the band; `layout.kpi_band_pad` is the air around the label |
@@ -400,7 +403,7 @@ the same words. Example: `examples/24-vocabulary-2.md`.
 
 | Word | Source | Attributes | Tokens |
 |---|---|---|---|
-| `@iconlist` | `- icon=bolt **Title** text` items (or `:bolt:`); a bold lead is the title, nested bullets are more text | `cols=1..3` (default by item count) | `iconlist.icon.size` `.icon.color` `.gap` |
+| `@iconlist` | `- icon=bolt **Title** text` items (or `:bolt:`); a bold lead is the title, nested bullets are more text; `icon.disc=<color>` puts every icon on a disc (it takes the icon slot, text starts after it), `- icon=bolt disc=accent **Title**` sets one item's disc, `disc=none` removes it | `cols=1..3` (default by item count) | `iconlist.icon.size` `.icon.color` `.gap` |
 | `@quote` | a `>` block or the body text; the last line `— Name` is the attribution | `align=left\|center\|right` | `quote.size` `quote.mark` `quote.mark.color` `quote.by.color` |
 | `@split` | an image (`![alt](x.png)`) or, without one, a `fill=` colour block; everything else sits on the other side | `side=left\|right` `ratio=1:1` (image : text) `bleed=on` `fit=cover\|contain` | `split.gap` `split.fill` `split.ratio` |
 | `@proscons` (`@pros`) | two `##` boxes (any headings): first is `+`, second `−`; a last `>` line is the verdict bar | | `proscons.plus.color` `.minus.color` `.plus` `.minus` `.gap` |
@@ -502,7 +505,7 @@ Keys:
 |---|---|
 | Position | `x y w h`, in `%` of the parent area (the body area inside the margins and under the title, not the slide), `in`, `cm`, `mm`, `pt`, `px`; a bare number is pt |
 | Style | `size` (pt; on a `##` box it sizes the box text, not its heading: `sizes: heading=` or `h2.size=` does), `color`, `fill`, `line` (a one-off on one `{.kpi}` card works: `## 売上 {.kpi fill=accent}`), `font`, `align`, `valign`, `bold`, `italic`, `radius`, `opacity`, `pad` |
-| Element | `shadow` (`on`, `off`, or `"0 4 12 #00000040"` = x y blur color in pt), `rotate` (`rotate=15`: degrees clockwise, the whole box with its heading and children turns about its center), `shape` (`shape=hexagon`: a preset geometry, below), `z` (`z=1` to `z=9`: stacking, a shape without `z` sits at level 5, `z=1` goes behind it, `z=9` in front; a box takes its children along) |
+| Element | `shadow` (`on` = `render.shadow`, default `0 3 12 #00000030`; `off`; or `"0 4 12 #00000040"` = x y blur color in pt), `rotate` (`rotate=15`: degrees clockwise, the whole box with its heading and children turns about its center), `shape` (`shape=hexagon`: a preset geometry, below), `z` (`z=1` to `z=9`: stacking, a shape without `z` sits at level 5, `z=1` goes behind it, `z=9` in front; a box takes its children along) |
 | Image | `fit=contain` (default), `cover`, `stretch`; `size=60` is the share of its cell the picture fills (5-100), `pad` insets it, `align` / `valign` anchor it in the cell, `fill` shows behind a transparent picture |
 | Classes | theme colors (`.primary`, `.accent`, `.danger`, `.success`, `.muted`), `.plain` (box without card), `.kpi` (big number box) |
 
@@ -613,7 +616,7 @@ warning, info, user, users, building, factory, chart, money, yen, target, rocket
 calendar, document, mail, phone, globe, lock, shield, cloud, database, search, star, heart, truck, cart, leaf,
 arrow-up, arrow-down, arrow-right, headphones, battery, music, sparkles, smile, camera, book, graduation-cap,
 home, map-pin, wifi, code, cpu, bell, flag, gift, coffee, plane, wrench, key, play, trophy, briefcase, chat, bolt,
-tooth; close synonyms such as `house`, `message`, `lightning` work too). `icon=assets/logo.svg` (path relative to
+tooth, refresh, tag; close synonyms such as `house`, `message`, `lightning`, `sync`, `label` work too). `icon=assets/logo.svg` (path relative to
 the deck) uses your own SVG: simple filled shapes (path, rect, circle, polygon) become native geometry recolored
 like the built-in icons (white fills are cut-outs); strokes, gradients or transforms embed it as a picture. A
 missing file is a warning. An unknown name is a warning listing the closest names.

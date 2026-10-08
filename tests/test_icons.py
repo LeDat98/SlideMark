@@ -22,14 +22,15 @@ EXPECTED = (
     "check x warning info user users building factory chart money yen target rocket lightbulb gear clock "
     "calendar document mail phone globe lock shield cloud database search star heart truck cart leaf "
     "arrow-up arrow-down arrow-right headphones battery music sparkles smile camera book graduation-cap "
-    "home map-pin wifi code cpu bell flag gift coffee plane wrench key play trophy briefcase chat bolt tooth"
+    "home map-pin wifi code cpu bell flag gift coffee plane wrench key play trophy briefcase chat bolt tooth "
+    "refresh tag"
 ).split()
 E = 914400
 
 
 def test_icon_set_is_complete():
     assert sorted(icons.names()) == sorted(EXPECTED)
-    assert len(icons.names()) == 60
+    assert len(icons.names()) == 62
 
 
 @pytest.mark.parametrize("name", EXPECTED)
@@ -237,16 +238,16 @@ CHEV = """# Flow
 
 
 def test_chevron_icon_before_text():
+    """The chevron carries the icon in its attributes; the renderer draws it from the final rectangle
+    (a pass that moves the arrow, like `@steps` growth, never leaves the icon behind)."""
     deck, th, placed = lay(CHEV)
-    ics = icon_items(placed)
-    assert [p.element.attrs["icon"] for p in ics] == ["target", "gear", "rocket"]
+    assert icon_items(placed) == []
     chevrons = [p for p in placed if isinstance(p.element, Shape) and p.element.shape == "chevron"]
     assert len(chevrons) == 4
     with_icon = [c for c in chevrons if c.element.attrs.get("icon")]
-    assert len(with_icon) == 3
-    for ic, ch in zip(ics, with_icon, strict=True):
-        assert inside(ic, ch)
-        assert ch.element.attrs["icon_inset"] > ic.w  # text starts right of the icon
+    assert [c.element.attrs["icon"] for c in with_icon] == ["target", "gear", "rocket"]
+    for ch in with_icon:
+        assert ch.element.attrs["icon_inset"] > ch.element.attrs["icon_side"]  # text starts right of the icon
     assert not lint(deck, [placed], th)
 
 
@@ -257,7 +258,18 @@ def test_chevron_icon_reserves_left_inset_in_pptx(tmp_path):
     out = tmp_path / "c.pptx"
     render(deck, placed, th, out)
     shapes = list(Presentation(str(out)).slides[0].shapes)
-    assert sum(1 for s in shapes if s.name.startswith("icon ")) == 3
+    icons_ = [s for s in shapes if s.name.startswith("icon ")]
+    assert [s.name for s in icons_] == ["icon target", "icon gear", "icon rocket"]
+    chev = [
+        s
+        for s in shapes
+        if s._element.spPr.find(qn("a:prstGeom")) is not None
+        and s.has_text_frame
+        and s.text_frame.text in ("Plan", "Build", "Ship")
+    ]
+    for ic, ch in zip(icons_, chev, strict=True):  # each icon sits inside its chevron, left of the text
+        assert ch.left < ic.left and ic.left + ic.width < ch.left + ch.width
+        assert ch.top < ic.top and ic.top + ic.height < ch.top + ch.height
     plain = next(s for s in shapes if s.has_text_frame and s.text_frame.text == "Test")
     iconed = next(s for s in shapes if s.has_text_frame and s.text_frame.text == "Plan")
     assert iconed.text_frame.margin_left > plain.text_frame.margin_left

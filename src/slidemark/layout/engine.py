@@ -33,7 +33,7 @@ from ..ir import (
 from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
-from . import boxpin, cardlook, css, forms2, kpirow, measure, stepspin, vocab
+from . import boxpin, cardlook, css, forms2, icondisc, kpirow, measure, stepspin, vocab
 from .chartnote import expand_notes, scale_warning
 from .diagram import fill_tree
 from .gantt import expand_gantt
@@ -1290,11 +1290,26 @@ def _card_style(ctx: _Ctx, c: Container) -> Style:
     st = fast_style().merged(ctx.css.inherited(c), base, *others, own, c.style)
     if own.line_width and not st.line:
         st = st.merged(fast_style(line="border"))
+    if st.shadow and st.line and not _line_stated(ctx, c, own):
+        st = st.model_copy(update={"line": None})  # a shadowed card the deck gave no border: the shadow alone
     if st.color is None and (fill := _own_fill(ctx, c)) and "kpi" not in c.classes:
         ink = ctx.theme.ink_on(fill, "fg")  # `## x {fill=primary}`: the text on it is readable without color=
         if ink != "fg":
             st = st.merged(fast_style(color=ink))
     return _tighten(ctx, st)
+
+
+def _line_stated(ctx: _Ctx, c: Container, own: Style) -> bool:
+    """Did the deck ask for this card's border (``{line=}``, a CSS border, ``card.line`` / ``kpi.line`` /
+    ``item.line``, a class that has one)? Else the card class's default line is implied, and a card with a
+    shadow drops it: a border line flattens the shadow."""
+    asked = [own, c.style]
+    for name in c.classes:
+        if name not in ("plain", "card"):  # (the card class is the implied line itself)
+            asked.append(ctx.theme.classes.get("muted-box" if name == "muted" else name))
+    if any(x is not None and (x.line or x.line_width) for x in asked):
+        return True
+    return ctx.theme.card_line_set and "plain" not in c.classes
 
 
 def _own_fill(ctx: _Ctx, c: Container) -> str | None:
@@ -1385,11 +1400,12 @@ def _head_metrics(
         return None
     h_el, hst, eff, band = parts
     icon = _icon_name(c)
+    disc = _icon_disc(ctx, c) if icon else None
     num = None if icon or kpi else _num_of(c)  # `@num`: a numbered badge takes the icon's place
     mark = (bool(icon) and not kpi) or num is not None  # a KPI icon sits above the label, not in the band
     isz, shift = (0, 0)
     if icon:
-        isz, shift = _icon_side(ctx, hst, eff, kpi)
+        isz, shift = _icon_side(ctx, hst, eff, kpi, disc)
     elif num is not None:
         isz, shift = _num_side(ctx, hst, eff)
     if icon and kpi:
@@ -1400,7 +1416,7 @@ def _head_metrics(
     if band:
         hh = round(_text_need(ctx, h_el, hst, rect_w - shift, eff))
         if mark:
-            hh = max(hh, isz + 2 * pad)
+            hh = max(hh, isz + (pad if disc else 2 * pad))  # a disc is bigger: half the air above and below
     else:
         hh = round(_text_need(ctx, h_el, hst, rect_w - (2 * pad if hpad is None else hpad) - shift, eff))
         if mark and not kpi:
@@ -1435,14 +1451,70 @@ def _icon_name(el) -> str | None:
     return name if name and icons.path(name) else None
 
 
-def _icon_item(name: str) -> Shape:
-    return Shape(shape="icon", attrs={"icon": name})
+def _icon_disc(ctx: _Ctx, el, loud: bool = False) -> str | None:
+    """The disc colour of the icon on ``el``: its own ``disc=``, else ``icon.disc`` (``None`` = a bare glyph).
+
+    ``loud`` reports an unusable ``disc=`` value (once, where the icon is drawn)."""
+    return icondisc.disc_color(ctx.theme, getattr(el, "attrs", {}), ctx.diag if loud else None)
 
 
-def _icon_side(ctx: _Ctx, hst: Style, eff: float, kpi: bool) -> tuple[int, int]:
-    """(icon side, space the icon takes left of the heading text) in EMU."""
+def _icon_item(name: str, ctx: _Ctx | None = None, disc: str | None = None) -> Shape:
+    """The ``icon`` element; with a ``disc`` colour the renderer draws the disc under the glyph."""
+    if ctx is None or not disc:
+        return Shape(shape="icon", attrs={"icon": name})
+    return icondisc.icon_shape(ctx.theme, ctx.lt, name, disc)
+
+
+def _icon_side(ctx: _Ctx, hst: Style, eff: float, kpi: bool, disc: str | None = None) -> tuple[int, int]:
+    """(icon side, space the icon takes left of the heading text) in EMU.
+
+    With a ``disc`` the side is the disc's diameter (the glyph sits inside it); the gap after it stays
+    ``icon_gap`` x the glyph side the icon would have without a disc."""
     side = round((ctx.lt.icon_kpi if kpi else ctx.lt.icon_head) * (hst.font_size or 18) * eff * EMU_PER_PT)
-    return side, side + round(ctx.lt.icon_gap * side)
+    gap = round(ctx.lt.icon_gap * side)
+    if disc:
+        side = icondisc.diameter(
+            ctx.theme, ctx.lt, side, ctx.lt.icon_disc_kpi if kpi else ctx.lt.icon_disc_ratio
+        )
+    return side, side + gap
+
+
+def _bar_icon(ctx: _Ctx, c: Text, h: int, st: Style) -> tuple[dict[str, Any], Style, int] | None:
+    """``conclusion.icon``: (attributes for the bar text, its style with the room left of the text, the bar
+    height) or ``None``. A bar with an icon is at least ``layout.conclusion_icon_h`` tall.
+
+    The renderer draws the icon (and its disc) from the bar's final rectangle, vertically centred, so a pass
+    that moves the bar takes it along. The glyph is ``layout.conclusion_icon_ratio`` x the bar height; on a
+    disc (``icon.disc``) the disc is ``layout.icon_disc_max`` x the bar height and the glyph sits inside it.
+    The ink is ``icon.color``, else readable on the disc, else the bar's text colour."""
+    name = _icon_name(c) or _icon_name(Shape(shape="icon", attrs={"icon": ctx.theme.conclusion_icon}))
+    if not name:
+        return None
+    if not ctx.theme.conclusion_h:
+        h = max(h, _emu(ctx.lt.conclusion_icon_h))
+    disc = _icon_disc(ctx, c, loud=True)
+    if disc:
+        side = min(icondisc.diameter(ctx.theme, ctx.lt, round(h * ctx.lt.icon_disc_max), 1.0), h)
+    else:
+        side = round(h * ctx.lt.conclusion_icon_ratio)
+    side = max(side, 1)
+    pad = _pad(st, _emu(ctx.lt.box_pad))
+    dx = max((h - side) // 2, pad)  # the icon's margin to the left edge matches its margin above and below
+    inset = dx + side + round(ctx.lt.conclusion_icon_gap * side)
+    attrs: dict[str, Any] = {
+        "icon": name,
+        "icon_side": side,
+        "icon_dx": dx,
+        "icon_ink": icondisc.ink(ctx.theme, disc, st.color or "bg"),
+    }
+    if disc:
+        attrs.update(
+            icon_disc=disc,
+            disc_shape=ctx.theme.icon_disc_shape,
+            disc_glyph=ctx.lt.icon_disc_glyph,
+            disc_round=ctx.lt.icon_disc_round,
+        )
+    return attrs, st.merged(fast_style(padding_left=f"{inset / EMU_PER_PT:.2f}pt")), h
 
 
 def _num_of(c) -> int | None:
@@ -1549,12 +1621,17 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
     if metrics := _head_metrics(ctx, c, rect.w, pad, kpi, hpad=pl + pr):
         (h_el, hst, eff, band), isz, shift, hh = metrics
         icon = _icon_name(c)
+        disc = _icon_disc(ctx, c, loud=True) if icon else None
         num = None if icon or kpi else _num_of(c)
         mark = (bool(icon) and not kpi) or num is not None
 
         def emit_mark(r: Rect, fill: str | None) -> None:  # the icon or `@num` badge left of the heading
             if icon:
-                ctx.emit(_icon_item(icon), r, fast_style(fill=fill or "primary"))
+                ctx.emit(
+                    _icon_item(icon, ctx, disc),
+                    r,
+                    fast_style(fill=icondisc.ink(ctx.theme, disc, fill or "primary")),
+                )
             else:
                 badge, badge_st = _num_item(ctx, num or 0, hst, eff, band)
                 ctx.emit(badge, r, badge_st)
@@ -1562,9 +1639,9 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
         rule_air, rule_h = _head_rule(ctx, c, kpi, band, pad)
         if icon and kpi and not band:  # icon centered above the label and the number
             ctx.emit(
-                _icon_item(icon),
+                _icon_item(icon, ctx, disc),
                 Rect(inner.x + (inner.w - isz) // 2, y, isz, isz),
-                fast_style(fill="primary"),
+                fast_style(fill=icondisc.ink(ctx.theme, disc, "primary")),
             )
             y += isz + round(pad * 0.4)
         if band:
@@ -1573,7 +1650,7 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
             band_rect = Rect(rect.x, rect.y, rect.w, min(hh, rect.h))
             if mark:  # the band is a plain shape behind the icon / badge and the shifted heading text
                 ctx.emit(Shape(shape="rect"), band_rect, fast_style(fill=band))
-                emit_mark(Rect(rect.x + pad, rect.y + (band_rect.h - isz) // 2, isz, isz), hst.color)
+                emit_mark(Rect(rect.x + pad, rect.y + max((band_rect.h - isz) // 2, 0), isz, isz), hst.color)
                 text_rect = Rect(rect.x + shift, rect.y, rect.w - shift, band_rect.h)
                 ctx.emit(h_el, text_rect, hst.model_copy(update={"fill": None}), eff)
             else:
@@ -1585,17 +1662,18 @@ def _place_container0(ctx: _Ctx, c: Container, rect: Rect, inherit: Style) -> No
             y += round(pad * 0.5)
             if icon and kpi:  # a KPI icon sits under the band, centered above the number
                 ctx.emit(
-                    _icon_item(icon),
+                    _icon_item(icon, ctx, disc),
                     Rect(inner.x + (inner.w - isz) // 2, y, isz, isz),
-                    fast_style(fill="primary"),
+                    fast_style(fill=icondisc.ink(ctx.theme, disc, "primary")),
                 )
                 y += isz + round(pad * 0.4)
         else:
+            centred = num is not None or bool(icon and disc)  # a badge / disc: the heading text centres on it
             if mark and not kpi:
-                emit_mark(Rect(inner.x, y + (hh - isz) // 2 if num is not None else y, isz, isz), hst.color)
+                emit_mark(Rect(inner.x, y + (hh - isz) // 2 if centred else y, isz, isz), hst.color)
             if hh > inner.h * _TOL:
                 ctx.over.append(_label(c))
-            if num is not None:  # the heading text centres on its badge
+            if centred and not kpi:
                 hst = hst.merged(fast_style(valign="middle"))
             ctx.emit(h_el, Rect(inner.x + shift, y, inner.w - shift, min(hh, inner.h)), hst, eff)
             y += hh
@@ -1677,7 +1755,7 @@ def _steps_parts(
     cyc_a, cyc_c = _cycle(theme, "steps-arrow"), _cycle(theme, "steps-card")
     for i, b in enumerate(b for b in c.children if isinstance(b, Container) and b.title is not None):
         src = b.attrs.get("_css_src", id(b))
-        keep = {k: v for k, v in b.attrs.items() if k == "icon"}
+        keep = {k: v for k, v in b.attrs.items() if k in ("icon", "disc")}
         a_style = None
         if cyc_a and theme is not None:
             fill = cyc_a[i % len(cyc_a)]
@@ -1713,7 +1791,7 @@ def _steps_parts(
                     children=_step_caption(theme, i + 1, caption, b.children),
                     classes=[*b.classes, "steps-card"],
                     attrs={
-                        **{k: v for k, v in b.attrs.items() if k != "icon"},
+                        **{k: v for k, v in b.attrs.items() if k not in ("icon", "disc")},
                         "_css_src": ("steps-card", src),
                         "shape_name": f"Step {i + 1} card",
                     },
@@ -2856,13 +2934,23 @@ def _chevron_geom(
         rect = Rect(rect.x, rect.y, rect.w, min(rect.h, hcap))
     if icon := _icon_name(blk):  # the icon sits left of the text: reserve its room as a left inset
         side = min(round(ctx.lt.icon_head * (st.font_size or 18) * EMU_PER_PT), round(0.4 * rect.h))
+        gap = round(ctx.lt.icon_gap * side)
+        disc = _icon_disc(ctx, blk)
+        extra: dict[str, Any] = {"icon_ink": icondisc.ink(ctx.theme, disc, st.color or "primary")}
+        if disc:  # the disc is the mark: as big as the arrow lets it be, the glyph inside
+            side = min(
+                icondisc.diameter(ctx.theme, ctx.lt, side, ctx.lt.icon_disc_ratio),
+                round(ctx.lt.icon_disc_max * rect.h),
+            )
+            extra["icon_disc"] = disc
         sh = sh.model_copy(
             update={
                 "attrs": {
                     **sh.attrs,
                     "icon": icon,
                     "icon_side": side,
-                    "icon_inset": side + round(ctx.lt.icon_gap * side),
+                    "icon_inset": side + gap,
+                    **extra,
                 }
             }
         )
@@ -3114,21 +3202,7 @@ def _place_chevron(
         ctx.over.append(_label(blk))
     if ctx.chev_adj is not None:  # the renderer draws this point depth (default: the token)
         sh = sh.model_copy(update={"attrs": {**sh.attrs, "adj": ctx.chev_adj}})
-    ctx.emit(sh, rect, st, eff)
-    if "icon_side" in sh.attrs:  # icon just before the (centered) text block, vertically centered
-        side = sh.attrs["icon_side"]
-        left = rect.x + round(_cadj(ctx) * min(rect.w, rect.h)) + _pad(st)
-        avail = _chevron_text_w(rect, st, sh, _cadj(ctx))
-        size = (st.font_size or 18) * eff
-        line = max(
-            (measure.text_em(p.plain, bold=True) * size * EMU_PER_PT for p in sh.paragraphs), default=0
-        )
-        off = max(round((avail - min(line, avail)) / 2), 0)
-        ctx.emit(
-            _icon_item(sh.attrs["icon"]),
-            Rect(left + off, rect.y + (rect.h - side) // 2, side, side),
-            fast_style(fill=st.color or "primary"),
-        )
+    ctx.emit(sh, rect, st, eff)  # (its icon, if any, is drawn by the renderer from the final rectangle)
     # a chevron shape only carries text: place the other children (table, chart, ...) under it
     extra = (
         [ch for ch in blk.children if not isinstance(ch, (Text, Shape))] if isinstance(blk, Container) else []
@@ -3989,6 +4063,8 @@ def _layout_rows(ctx: _Ctx, el: Text, body: Rect, sg: int) -> _Ctx | None:
         return None
     unnumbered = "plain" in ctx.slide.classes  # `@rows plain`: no number badge, an optional glyph
     bar_st = fast_style().merged(*_class_styles(ctx, Shape(classes=["rows"])), ctx.css.own(el))
+    if bar_st.shadow and bar_st.line == _base_classes()["rows"].line and not ctx.css.own(el).line:
+        bar_st = bar_st.model_copy(update={"line": None})  # `rows.shadow` alone: no default border under it
     num_cls = th.classes.get("rows-num") or fast_style()
     st0 = _styled(ctx, el, _role_style(ctx, "body"))
     own = el.style  # the author's `{align= valign= radius= rotate= z=}` on the list
@@ -4515,7 +4591,12 @@ def _attach_bar(
     if tab is None:
         return tail
     y = tab.y + tab.h + to_emu(lt.bar_attach_gap)
-    return [p.model_copy(update={"y": y}) if p.element is bar and y < p.y else p for p in tail]
+    return [
+        p.model_copy(update={"y": y})
+        if isinstance(p.element, Text) and p.element.role == "conclusion" and y < p.y
+        else p
+        for p in tail
+    ]
 
 
 def _clone_ctx(c: _Ctx) -> _Ctx:
@@ -4864,6 +4945,11 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             h = min(h, round(H * ctx.lt.footnote_max))
             if theme.conclusion_h:  # `conclusion.h=1.05in`: the bar is exactly this tall
                 h = max(_emu(theme.conclusion_h), 1)
+            if mark := _bar_icon(ctx, c, h, st):  # `conclusion.icon=refresh`: an icon at the left of the bar
+                c, st, h = c.model_copy(update={"attrs": {**c.attrs, **mark[0]}}), mark[1], mark[2]
+                if not theme.conclusion_h:
+                    need = round(_text_need(ctx, c, st, inner_w, 1.0))
+                    h = min(max(h, need), round(H * ctx.lt.footnote_max))
             eff = fit_text(c, Rect(0, 0, inner_w, h), st)
             put(tail, c, Rect(Mx, bottom - h, inner_w, h), st, eff)
             bottom = bottom - h - max(sg, round(gap * ctx.lt.conclusion_gap))  # one card gutter above the bar

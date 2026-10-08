@@ -46,7 +46,7 @@ from ..ir import (
     fast_style,
 )
 from ..units import EMU_PER_PT, slide_size, to_emu
-from . import css, measure
+from . import css, icondisc, measure
 from .grid import Rect
 
 _STEP = 0.5  # pt step of the size search
@@ -665,7 +665,7 @@ def compose(ctx, slide: Slide, kind: str, body: Rect | None, sg: int) -> tuple[A
 
 # --------------------------------------------------------------------------- @iconlist
 
-_ICON_HEAD = re.compile(r"^\s*(?:icon=(\S+)|:([A-Za-z0-9_-]+):)\s*")
+_ICON_HEAD = re.compile(r"^\s*(?:icon=(\S+)(?:\s+disc=(\S+))?|:([A-Za-z0-9_-]+):)\s*")
 _SEP = re.compile(r"^[\s:\uff1a\u2014\u2013-]+")
 
 
@@ -674,7 +674,8 @@ def _iconlist_item(ctx, group: list[Paragraph], n: int) -> dict[str, Any]:
     first = group[0]
     text = _plain(first)
     m = _ICON_HEAD.match(text)
-    name = (m.group(1) or m.group(2)) if m else None
+    name = (m.group(1) or m.group(3)) if m else None
+    disc = m.group(2) if m else None  # `icon=bolt disc=accent`: this item's own disc colour
     runs = _strip_runs(first.runs, _ICON_HEAD) if m else list(first.runs)
     runs = _lstrip(runs)
     nested = [p.model_copy(update={"marker": None, "level": 0}) for p in group[1:]]
@@ -712,7 +713,12 @@ def _iconlist_item(ctx, group: list[Paragraph], n: int) -> dict[str, Any]:
             "start every item with icon=name (or :name:), e.g. - icon=bolt **Fast** builds in seconds",
             level="info",
         )
-    return {"icon": name.lower() if name and not icons.is_file(name) else name, "title": title, "text": text}
+    return {
+        "icon": name.lower() if name and not icons.is_file(name) else name,
+        "disc": disc,
+        "title": title,
+        "text": text,
+    }
 
 
 def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
@@ -746,6 +752,7 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
     pad = _pt(base.font_size * 0.6) if fill else 0
     radius = card.radius if fill else None
     icon_col = _paint(ctx, th.iconlist_icon_color, "primary", "iconlist.icon.color")
+    discs = [icondisc.disc_color(th, {"disc": it["disc"]} if it["disc"] else None, ctx.diag) for it in items]
     pinned = _attr_size(ctx, slide)
     cap = pinned or _grow_cap(ctx, base.font_size or 18)
     rg = sg
@@ -764,6 +771,10 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
             if th.iconlist_icon_size is not None
             else _pt(th.iconlist_icon_ratio * S)
         )
+        if any(
+            discs
+        ):  # a disc takes the icon slot: `icon.disc.size`, else the slot x `layout.icon_disc_list`
+            icon = icondisc.diameter(th, ctx.lt, icon, ctx.lt.icon_disc_list)
         gi = _length(ctx, th.iconlist_gap, body.w, round(th.iconlist_gap_ratio * icon))
         tw = cw - icon - gi - 2 * pad
         if tw < _pt(S * 4):
@@ -800,6 +811,9 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
                 align="left",
                 fill=fill,
                 radius=radius,
+                shadow=(card.shadow or None)
+                if fill
+                else None,  # `card.shadow` / `card.elevation` reach the cards
                 padding_left=f"{(pad + icon + gi) / EMU_PER_PT:.2f}pt",
                 padding_right=f"{pad / EMU_PER_PT:.2f}pt",
                 padding_top="0pt",
@@ -808,11 +822,12 @@ def _iconlist(ctx, slide: Slide, body: Rect, sg: int) -> bool:
         )
         ctx.emit(_text_el(f"Iconlist {i + 1}", paras_of(it, S), "iconlist"), Rect(x, y, cw, h), st)
         if it["icon"]:
-            ctx.emit(
-                Shape(shape="icon", classes=["iconlist-icon"], attrs={"icon": it["icon"]}),
-                Rect(x + pad, y + (h - icon) // 2, icon, icon),
-                fast_style(fill=icon_col or "primary", line=None),
+            disc = discs[i]
+            shape = icondisc.icon_shape(th, ctx.lt, it["icon"], disc).model_copy(
+                update={"classes": ["iconlist-icon"]}
             )
+            ink = icon_col if th.iconlist_icon_color else icondisc.ink(th, disc, "primary")
+            ctx.emit(shape, Rect(x + pad, y + (h - icon) // 2, icon, icon), fast_style(fill=ink, line=None))
     return True
 
 

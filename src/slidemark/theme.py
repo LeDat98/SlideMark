@@ -580,6 +580,20 @@ class LayoutTokens(BaseModel):
         # moves up to the rest); move = only the bar moves up; off = the bar stays at the bottom
     )
     bar_attach_gap: Length = "0.15in"  # air between a table and the bar attached to it
+    # --- wave 2026-10-08 lane A
+    icon_disc_ratio: float = 2.2  # `icon.disc`: disc diameter / the glyph side the icon would have without it
+    icon_disc_glyph: float = 0.46  # ... the glyph is this share of the disc diameter (centred in it)
+    icon_disc_kpi: float = (
+        1.4  # ... a `.kpi` card icon: disc diameter / the bare icon side (the number needs room)
+    )
+    icon_disc_list: float = (
+        1.0  # ... an `@iconlist` item: disc diameter / the icon slot (that slot is already large)
+    )
+    icon_disc_round: float = 0.25  # ... `icon.disc.shape=rounded`: corner radius / disc diameter
+    icon_disc_max: float = 0.8  # ... a disc is at most this share of the height it sits in (chevrons, bars)
+    conclusion_icon_ratio: float = 0.62  # `conclusion.icon`: glyph (or disc) side / bar height
+    conclusion_icon_gap: float = 0.5  # ... the air after it, in icon sides
+    conclusion_icon_h: Length = "0.55in"  # ... a bar with an icon is at least this tall (`conclusion.h` wins)
 
 
 class RenderTokens(BaseModel):
@@ -617,7 +631,7 @@ class RenderTokens(BaseModel):
     ink_light: str = "#FFFFFF"  # text on dark fills
     highlight: str = "#FFFF00"  # default ==highlight== color
     code_style: str = "default"  # pygments style for code blocks
-    shadow: str = "0 2 6 #00000040"  # `shadow: true`: CSS-like "x y blur [spread] color" (pt)
+    shadow: str = "0 3 12 #00000030"  # `shadow=on`: CSS-like "x y blur [spread] color" (pt)
     slide_bg: str = "#FFFFFF"  # slide background when neither the slide nor the theme has `bg`
     gantt_grid: float = (
         0.45  # `.gantt` table: body vertical lines keep this share of the border color (rest = fill)
@@ -950,6 +964,23 @@ class Theme(Forms3Tokens):  # Forms2/3Tokens: DL3b part 2 + DL3d part 2 tokens (
 
     render: RenderTokens = Field(default_factory=RenderTokens)
 
+    # --- wave 2026-10-08 lane A
+    icon_disc: str | None = (
+        None  # `icon.disc=secondary`: every `icon=` sits on a disc of this colour (None = bare)
+    )
+    icon_disc_size: Length | None = (
+        None  # ... its diameter (None = `layout.icon_disc_ratio` x the glyph side)
+    )
+    icon_disc_shape: str = "circle"  # ... `circle`, `rounded` or `square`
+    icon_color: str | None = (
+        None  # ink of an icon glyph (None = readable on the disc, else the heading colour)
+    )
+    card_elevation: int | None = None  # `card.elevation=0..3`: shorthand for `card.shadow` (see `ELEVATIONS`)
+    card_line_set: bool = (
+        False  # the deck states `card.line` / `card.border`: a shadowed card keeps its border
+    )
+    conclusion_icon: str | None = None  # `conclusion.icon=refresh`: an icon at the left of the conclusion bar
+
     def color(self, value: str | None) -> str | None:
         """Resolve a theme color name ("primary") or pass a hex value through."""
         if value is None:
@@ -1178,6 +1209,9 @@ def theme_from_data(data: dict, name: str) -> Theme:
     base["name"] = name
     merged = merge_data(base, data)
     merged["name"] = name
+    card = (data.get("classes") or {}).get("card")
+    if isinstance(card, dict) and card.get("line") is not None:
+        merged["card_line_set"] = True  # the preset states a card border: a shadowed card keeps it
     return Theme.model_validate(merged)
 
 
@@ -1248,7 +1282,7 @@ def token_paths(theme: Theme | None = None) -> list[str]:
     th = theme or Theme(name="none")
     out: list[str] = []
     for f in Theme.model_fields:
-        if f == "name":
+        if f in ("name", "card_line_set"):  # (card_line_set: set by `card.line` / `card.border`, not a token)
             continue
         if f == "colors":
             out += [f"colors.{k}" for k in th.colors]
@@ -1357,6 +1391,8 @@ def apply_tokens(theme: Theme, tokens: dict[str, str]) -> tuple[Theme, list[Diag
             pairs = normalize_token(path, raw, names) if isinstance(raw, str) else [(path, raw)]
             for p, v in pairs:
                 _set_path(trial, p.split("."), v)
+            if any(p in _CARD_LINE_PATHS for p, _v in pairs):
+                trial["card_line_set"] = True  # a shadowed card keeps the border the deck asked for
             if path.startswith("sizes.") and isinstance(raw, str) and raw.strip().endswith("!"):
                 trial["pinned"] = [*trial.get("pinned", []), path.split(".", 1)[1]]  # `heading=20!`
             Theme.model_validate(trial)
@@ -1866,6 +1902,88 @@ def _dl2_value(path: str, raw: str, names: set[str] | None) -> list[tuple[str, A
     return [(path, ",".join(items))]
 
 
+# --- wave 2026-10-08 lane A: icon discs, card elevation, conclusion icon
+ELEVATIONS: dict[int, bool | str] = {
+    0: False,
+    1: "0 1 4 #0000001F",
+    2: "0 3 12 #00000030",
+    3: "0 8 24 #00000040",
+}
+DISC_SHAPES = ("circle", "rounded", "square")
+_DISC_SHAPE_ALIASES = {
+    "round": "circle",
+    "ellipse": "circle",
+    "oval": "circle",
+    "roundrect": "rounded",
+    "rounded-rect": "rounded",
+    "rounded-square": "rounded",
+    "rect": "square",
+    "rectangle": "square",
+    "box": "square",
+}
+_CARD_LINE_PATHS = ("classes.card.line", "classes.card.line_width", "classes.card.line_dash")
+
+
+def disc_shape(raw: object) -> str | None:
+    """``circle`` / ``rounded`` / ``square`` of a disc-shape word (or a synonym); ``None`` if unknown."""
+    v = str(raw).strip().lower()
+    v = _DISC_SHAPE_ALIASES.get(v, v)
+    return v if v in DISC_SHAPES else None
+
+
+def _lane_a_value(path: str, raw: str, names: set[str] | None) -> list[tuple[str, Any]] | None:
+    """``icon.disc`` ``.size`` ``.shape``, ``icon.color``, ``card.elevation``, ``conclusion.icon``.
+
+    ``None`` = not one of them (the generic rules apply)."""
+    v = _unquote(raw)
+    low = v.lower()
+    if path in ("icon_disc", "icon_color"):
+        if low in ("none", "null", "off", "no", "false"):
+            return [(path, None)]
+        if path == "icon_disc" and low in ("on", "yes", "true"):
+            return [(path, "primary")]
+        return [(path, _color_value(raw, names))]
+    if path == "icon_disc_size":
+        if low in ("none", "null", "off", "auto"):
+            return [(path, None)]
+        return [(path, _length_value(raw))]
+    if path == "icon_disc_shape":
+        got = disc_shape(v)
+        if got is None:
+            near = difflib.get_close_matches(low, [*DISC_SHAPES, *_DISC_SHAPE_ALIASES], n=1, cutoff=0.5)
+            tip = f"did you mean '{near[0]}'? " if near else ""
+            raise TokenValueError(
+                f"'{v}' is not a disc shape", f"{tip}write icon.disc.shape=circle, rounded or square"
+            )
+        return [(path, got)]
+    if path == "card_elevation":
+        if low in ("none", "off"):
+            low = "0"
+        if low not in ("0", "1", "2", "3"):
+            raise TokenValueError(
+                f"'{v}' is not an elevation", "write card.elevation=0 (flat), 1, 2 (soft) or 3 (deep)"
+            )
+        level = int(low)
+        return [(path, level), ("classes.card.shadow", ELEVATIONS[level])]
+    if path == "conclusion_icon":
+        if low in ("none", "null", "off", "no", "false"):
+            return [(path, None)]
+        from . import icons
+
+        if icons.is_file(v):
+            return [(path, v)]
+        if not icons.path(low):
+            near = difflib.get_close_matches(low, icons.names(), n=1, cutoff=0.4)
+            raise TokenValueError(
+                f"unknown icon '{v}'",
+                f"did you mean '{near[0]}'? or icon=file.svg for your own"
+                if near
+                else "see 'slidemark docs icons'",
+            )
+        return [(path, low)]
+    return None
+
+
 def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[str, Any]]:
     """Validate a raw token value by its field type and map CSS-like shorthands.
 
@@ -1879,6 +1997,8 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
     if (got := forms2_normalize(path, raw, names)) is not None:  # DL3b part 2: iconlist.* quote.* ...
         return got
     if (got := forms3_normalize(path, raw, names)) is not None:  # DL3d part 2: steps-card.h quote.bar ...
+        return got
+    if (got := _lane_a_value(path, raw, names)) is not None:  # icon.disc* icon.color card.elevation ...
         return got
     parts = path.split(".")
     leaf = parts[-1]
