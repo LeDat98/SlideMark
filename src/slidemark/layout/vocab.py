@@ -871,6 +871,7 @@ def _cycle(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     def chord_ok(dia: int) -> bool:  # neighbours stay apart: the chord holds both nodes and an arrow
         return 2 * ring_r(dia) * math.sin(math.pi / n) / lt.cycle_chord_ratio >= dia
 
+    d_room = d_cap = 0
     if th.cycle_node_size:
         d = _emu(th.cycle_node_size)
     else:
@@ -885,6 +886,15 @@ def _cycle(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         if text_nodes:  # a node grows until its heading fits at the body size (the ring allows it)
             while d < d_cap and not head_fits(base_pt, inner_of(d)):
                 d = min(d + unit, d_cap)
+    # a heading the largest node still cannot hold at the body size goes beside its node (as with an icon);
+    # the node then carries the step number
+    numbered = False
+    if text_nodes and not pinned and not th.cycle_node_size:
+        top0 = max(min(hi * ratio, d / EMU_PER_PT * 0.3), base_pt)
+        if _largest(top0, lo, lambda s_: head_fits(s_, inner_of(d)))[0] < base_pt - 1e-9:
+            numbered, d = True, min(d_room, d_cap)
+            text_nodes.clear()
+    outside = [bool(icons_[i]) or (numbered and parts[i][0] is not None) for i in range(n)]
     r = ring_r(d)
     ccx, ccy = body.x + body.w // 2, body.y + body.h // 2
     aw = _emu(th.cycle_arrow_w)
@@ -910,7 +920,7 @@ def _cycle(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
 
     def side_paras(i: int, s: float) -> list[Paragraph]:
         h, bd = parts[i]
-        if icons_[i]:  # the heading moved out of the node: it leads the text beside it
+        if outside[i]:  # the heading moved out of the node: it leads the text beside it
             return _paras(h, bd, s, ratio, _own(bx[i], "color") or out_head)
         return [p for t in bd for p in t.paragraphs]
 
@@ -959,8 +969,17 @@ def _cycle(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
                 p.model_copy(update={"style": fast_style(font_size=hsize, bold=True).merged(p.style)})
                 for p in h.paragraphs
             ]
-            if h is not None and not icons_[i]
-            else []
+            if h is not None and not outside[i]
+            else (
+                [
+                    Paragraph(
+                        runs=[Run(text=str(i + 1), bold=True)],
+                        style=fast_style(font_size=min(hi * ratio, d / EMU_PER_PT * 0.4), bold=True),
+                    )
+                ]
+                if numbered and outside[i] and not icons_[i]
+                else []
+            )
         )
         c.emit(
             Shape(shape="ellipse", paragraphs=paras, attrs={"shape_name": f"Cycle {i + 1}"}),
@@ -991,7 +1010,16 @@ def _cycle(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             x = round(px + d / 2 + sg) if right else round(px - d / 2 - sg - bw)
             sin = math.sin(math.radians(angles[i]))
             if sin < -0.3:  # upper half: the text hangs from the top of its node
-                rect, va = Rect(x, round(py - d / 2), bw, bh), "top"
+                tw = bw
+                if sin < -0.9 and right:  # the top node: the arc leaving it runs under the text, so the text
+                    # starts where the arc has dropped below the text's last line
+                    need = min(_need(c, ps, bw, _text_style(c, bsize)), bh)
+                    drop = max(need - d / 2, 0) + 0.04 * 914400
+                    dx = math.sqrt(max(r * r - (r - drop) ** 2, 0.0)) if drop < r else r
+                    x2 = max(x, round(px + dx))
+                    if x2 + bw * 0.8 <= body.right:
+                        x, tw = x2, min(bw, body.right - x2)
+                rect, va = Rect(x, round(py - d / 2), tw, bh), "top"
             elif sin > 0.3:  # lower half: it stands on the bottom of its node
                 rect, va = Rect(x, round(py + d / 2 - bh), bw, bh), "bottom"
             else:
@@ -1011,6 +1039,7 @@ def _cycle(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         fit=hfit and bfit,
         icons=sum(1 for ic in icons_ if ic),
         center=csize,
+        numbered=numbered,
     )
     if not (hfit and bfit):
         c.over.append("@cycle text")

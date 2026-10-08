@@ -286,6 +286,40 @@ def test_cycle_icon_sits_in_the_node_and_the_heading_moves_beside_it(tmp_path):
     assert text.left > node.left + node.width or text.left + text.width < node.left  # beside, not inside
 
 
+CYCLE_LONG = (
+    "\n# Năm nút chữ dài\n@cycle\n"
+    "## Thu thập yêu cầu của khách hàng\nPhỏng vấn và khảo sát\n## Phân tích\nTìm điểm đau\n"
+    "## Thiết kế giải pháp\nPhác thảo\n## Xây dựng nguyên mẫu\nLàm nhanh\n"
+    "## Kiểm thử cùng người dùng\nLấy phản hồi\n"
+)
+
+
+def test_cycle_headings_a_node_cannot_hold_at_the_body_size_go_beside_it_under_a_number(tmp_path):
+    deck, prs = make(tmp_path, CYCLE_LONG)
+    assert not clean(deck), [str(d) for d in clean(deck)]
+    node = one(prs, 0, "Cycle 1")
+    assert tx(node) == "1" and min(sizes(node)) >= 16  # never below the body size
+    text = one(prs, 0, "Cycle 1 text")
+    paras = text.text_frame.paragraphs
+    assert pt(paras[0]) == "Thu thập yêu cầu của khách hàng" and paras[0].runs[0].font.bold
+    assert pt(paras[1]).startswith("Phỏng vấn")
+    # short headings keep the old look: the heading in the node
+    _d, prs = make(tmp_path, CYCLE4, name="short")
+    assert tx(one(prs, 0, "Cycle 1")) == "Quan sát"
+    # a pinned node size is the author's: the heading stays in the node
+    _d, prs = make(tmp_path, CYCLE_LONG, head=HEAD + "style: cycle.node.size=0.9in\n", name="pin")
+    assert tx(one(prs, 0, "Cycle 1")).startswith("Thu thập")
+
+
+def test_the_numbered_cycle_round_trips_through_the_importer(tmp_path):
+    out = tmp_path / "n.pptx"
+    build(HEAD + CYCLE_LONG, out)
+    md, _ = import_pptx(out)
+    lines = md.splitlines()
+    assert "## Thu thập yêu cầu của khách hàng" in lines and "Phỏng vấn và khảo sát" in lines
+    assert "## 1" not in lines
+
+
 def test_cycle_without_icons_keeps_the_heading_in_the_node(tmp_path):
     _d, prs = make(tmp_path, CYCLE4)
     assert tx(one(prs, 0, "Cycle 1")) == "Quan sát"

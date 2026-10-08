@@ -275,6 +275,7 @@ def _vocab(v: dict, theme: Theme, dense_k: float):
         facts = ([f"node text {round(v['head'])}pt"] if v.get("head") else []) + (
             [f"{_n(v['icons'], 'icon')} in nodes"] if v.get("icons") else []
         )
+        facts += ["numbered nodes, headings beside them"] if v.get("numbered") else []
         facts += [f"centre label {round(v['center'])}pt"] if v.get("center") else []
         return f"cycle {n} nodes ({v.get('dir')})", [*facts, text]
     if form == "stairs":

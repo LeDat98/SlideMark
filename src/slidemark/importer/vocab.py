@@ -216,7 +216,13 @@ def _cycle(form: str, named: list[Item], texts: list[Item], data: SlideData | No
         icon = _icon_in(data, nodes[n])
         head = [p for p in nodes[n].paras if p.plain.strip()]
         rest = [p for p in (bodies[n].paras if n in bodies else []) if p.plain.strip()]
-        if icon and not head and rest:  # the heading moved out of the node: it leads the text beside it
+        numbered = (  # a node that only holds its number: the bold first line beside it is the heading
+            bool(head)
+            and head[0].plain.strip() == str(n)
+            and bool(rest)
+            and all(r.bold for r in rest[0].runs if r.text.strip())
+        )
+        if (icon and not head and rest) or numbered:  # the heading moved out of the node
             head, rest = rest[:1], rest[1:]
         blk = _box(nodes[n], head[:1], rest)
         blk.icon = icon
