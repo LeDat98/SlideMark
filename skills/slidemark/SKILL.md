@@ -77,7 +77,7 @@ text is a defect, not a style. Forms that give a slide its shape (see "Compositi
 - Grids: `@2x2` / `@3` cards with icons; `@kpi` for numbers; `@matrix` for two axes.
 - A picture bleeding over half the slide with content on top: `@split bleed=on`.
 - Numbers: `@statement` (one 60–72pt figure + a small label) or `{.kpi .hero}`; before/after and pros/cons
-  as `@vs` / `@proscons`; a sequence as `@timeline`, `@steps num`, `@flow disc` or `@cycle` with arrows; levels
+  as `@vs` / `@proscons`; a sequence as `@timeline`, `@steps`, `@flow disc` or `@cycle` with arrows; levels
   as `@stairs`; layers as `@nested`.
 - Finish: an icon beside each heading, the one key figure or claim in the accent (`==x==`, `hl=`, `{.hero}`).
 
@@ -159,7 +159,7 @@ Enterprise,1.1%,0.8%
 > Keep the success team on enterprise accounts
 
 # Q4 plan
-@steps num defaults
+@steps defaults
 ## Oct {.accent}
 - Hire 4 AEs
 ## Nov
@@ -256,9 +256,9 @@ goes full width below. Each table/chart/image/code outside a box is its own bloc
 
 **`@` line** (only if the automatic layout is wrong; one per slide, tokens space separated):
 `@3` columns · `@2x2` grid · `@1:2` ratios · `@aab/aac` areas (letters = blocks in order, `.` empty) ·
-`chevron` steps (heading + 1–2 short bullets) · `steps` numbered arrows over cards, each card: icon disc, caption
-(`steps num`, text from `steps.caption="Bước {n}"`), bold heading, text, top-anchored (`steps head=arrow` puts the
-headings in the arrows instead) · `rows` a `1.` list alone as numbered bars (`rows plain` = unnumbered, `rows.glyph=■ rows.stripe=a,b`) ·
+`chevron` steps (heading + 1–2 short bullets) · `steps` numbered arrows over cards, each card: icon disc, bold
+heading, text, top-anchored; one label per step (`steps.caption="Bước {n}"` adds a caption; `steps head=arrow`
+puts the headings in the arrows, then `num` captions the number) · `rows` a `1.` list alone as numbered bars (`rows plain` = unnumbered, `rows.glyph=■ rows.stripe=a,b`) ·
 `items` bullets of each box as item cards (`item.fill` `item.border-left="5pt solid secondary"` `item.size`) · `num` a
 numbered circle on each box heading (`box.num.fill`) · `flow` cards with arrows · `a>b` arrow, `a-b` line between blocks · `@dense` · `@build` click-to-reveal · `@t=fade` transition ·
 `@bg=#0B1020` or `@bg="linear-gradient(135deg,#1A0B2E,#7A1FA2)"` background (dark flips text light; `@dark`
@@ -295,7 +295,8 @@ styles one list line; a chart frame takes `{fill= radius= pad=}`.
   body; `iconlist.icon.size/.color`, `iconlist.fill=off` to keep them compact, `fill=surface` on the `@` line = cards).
 - `@quote align=center` + `> "text"` then `> — Name` (large quotation with mark and attribution; `quote.size` `quote.mark.color`).
 - `@split side=right ratio=2:3 bleed=on` + `![alt](x.png)` (or a `fill=` block) + any text/boxes (picture beside content).
-- `@proscons` + two `##` boxes (pros, cons) + optional last `> verdict` (+/− discs, verdict bar; `proscons.plus.color`).
+- `@proscons` + two `##` boxes (pros, cons) + optional last `> verdict` (+/− discs in `secondary` / `accent`, verdict
+  bar; `proscons.plus.color=success proscons.minus.color=danger` for green / red).
 - `@progress max=100` + `- label 72%` (or a table label|value) → labelled bars (`progress.fill/.track/.h`).
 - `@harvey` + a table of 0–4 (or 0/25/50/75/100%) → native Harvey balls (`harvey.size/.fill/.line`).
 - `@heatmap min=0 max=100 colors=#F3F6FA,primary` + a numeric table → interpolated cell fills, auto ink (`text=auto|on|off`).
