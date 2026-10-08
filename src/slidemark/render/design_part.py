@@ -236,8 +236,9 @@ def design_payload(deck: Deck, slide_ids: list[int | None]) -> dict[str, Any]:
     recase = _transforms(deck)
     for i, sl in enumerate(deck.slides):
         ent: dict[str, Any] = {}
-        if sl.css:
-            ent["css"] = rules_payload(sl.css)
+        own = [r for r in sl.css if r.line != -1]  # (-1: the ink rules `dark` / `light` derive: not source)
+        if own:
+            ent["css"] = rules_payload(own)
         if names or recase:
             els: list[list[str]] = []
             _boxes(sl.elements, names, els, recase)

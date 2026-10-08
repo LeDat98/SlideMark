@@ -66,7 +66,7 @@ def _did_you_mean(d: Diagnostic) -> str | None:
 
 def _safe(old: str, near: str, universe: list[str] | tuple[str, ...]) -> bool:
     """A did-you-mean fix is applied only when ``near`` is the one name of ``universe`` within edit distance 1
-    of ``old`` (a missing, extra, wrong or swapped letter): ``chrt`` -> ``chart``, never ``eye`` -> ``yen``."""
+    of ``old`` (one letter off): ``shiled`` -> ``shield``, never ``eye`` -> ``yen``."""
     got = unique_near(old.rstrip("="), [u.rstrip("=") for u in universe])
     return got is not None and got.lower() == near.rstrip("=").lower()
 

@@ -428,6 +428,7 @@ def fold_steps(pool: list[Item]) -> list[Item]:
     for n in arrows:
         arrow, card = named[("arrow", n)], named.get(("card", n))
         paras = list(arrow.paras)
+        caption = False
         if card is not None:
             inside = [
                 i
@@ -441,11 +442,11 @@ def fold_steps(pool: list[Item]) -> list[Item]:
             for k, i in enumerate(sorted(inside, key=lambda i: (i.y, i.x))):
                 ps = list(i.paras)
                 if k == 0 and ps and _is_step_caption(ps[0], n):  # `steps.caption` is a token, not content
-                    ps = ps[1:]
+                    ps, caption = ps[1:], True
                 paras += ps
                 drop.add(i.uid)
             drop.add(card.uid)
-        new[arrow.uid] = replace(arrow, paras=paras, steps=True)
+        new[arrow.uid] = replace(arrow, paras=paras, steps=True, caption=caption)
     return [new.get(i.uid, i) for i in pool if i.uid not in drop]
 
 
@@ -1342,6 +1343,16 @@ def join_chunks(chunks: list[tuple[str, list[str]]], top: bool) -> list[str]:
     return res
 
 
+def _slide_bg(data: SlideData, deck: DeckInfo, found) -> tuple[str, bool] | None:
+    """(``primary`` / ``#0B2A3C``, dark?) of a slide whose own background is not the deck's, or ``None``."""
+    if not data.bg or any(w.startswith("bg=") for w in found.words):
+        return None
+    base = deck.colors.get("bg", "FFFFFF")
+    if recognise2._dist(data.bg.upper(), base.upper()) <= recognise2.T.same_fill:
+        return None
+    return recognise2.name_or_hex(deck, data.bg), recognise2._lum(data.bg.upper()) < 0.2
+
+
 def _free_chunks(
     seq: list[Block], loose: list[Item], lead_item: Item | None, deck: DeckInfo, out: Out
 ) -> list[tuple[str, list[str]]]:
@@ -1561,6 +1572,7 @@ def build_slide(
     if info is not None:
         info["links"] = links
     extra: list[str] = []
+    slide_bg = _slide_bg(data, deck, found)
     title_only = (
         title is not None
         and active is None  # a composed form (its shapes left the pool) is a content slide
@@ -1587,8 +1599,13 @@ def build_slide(
             for i in data.items
         )
         starts = {nums[0] for _, nums in deck.sections if nums}
+        single = sum(len(b.paras) for b in blocks) + len(by_role["lead"]) == 1
         if n == 1 and not anchored and (footer_row or len(deck.sections) == 1):
             extra.append("section")
+        elif n > 1 and slide_bg and slide_bg[1] and single and n not in starts:
+            extra.append(
+                "cover"
+            )  # a dark full-bleed slide with a title and one line closes the deck: a cover
         elif n > 1 and deck.sections and n not in starts:
             extra.append("cover")
     if any(_NUM_BADGE.fullmatch((i.name or "").lower().strip()) for i in data.items):
@@ -1602,6 +1619,12 @@ def build_slide(
         extra.append("items")  # `@4 items`: the item cards are the boxes' bullets
     if rows_mode == "plain":
         extra.append("plain")  # `@rows plain`: bars without number badges
+    if slide_bg:
+        extra.append("bg=" + slide_bg[0])
+        if slide_bg[1]:
+            extra.append("dark")
+    if any(i.steps and i.caption for i in pool):
+        extra.append("num")  # `@4 steps num`: the `STEP n` caption of every card, folded away above
     extra.extend(found.words)  # `bg=primary dark` of a cover drawn over a slide-filling rectangle
     if data.transition:
         extra.append("t=" + data.transition)
@@ -1618,7 +1641,7 @@ def build_slide(
         if info is not None:
             info["tokens"] = []
     else:
-        tokens = [*tokens, *links, *extra]
+        tokens = list(dict.fromkeys([*tokens, *links, *extra]))
     # slide `style:` / `sizes:` lines of both recognisers, one line each (runs.merge_lines)
     lines.extend(merge_lines([found.style_line(), *data.style_lines]))
     if info is not None:

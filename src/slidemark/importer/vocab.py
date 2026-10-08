@@ -286,6 +286,17 @@ def _nested(
         if n in lists:
             blk.icon = _icon_beside(data, lists[n])
         boxes.append(blk)
+    if data is not None and lists:  # no list item starts with its ring heading: `nested.list.title=off`
+        pairs = [(heads[n], lists[n]) for n in lists if n in heads]
+        firsts = [([p for p in lst.paras if p.plain.strip()] or [None])[0] for _h, lst in pairs]
+        titled = [
+            f is not None
+            and f.plain.strip() == ([p for p in h.paras if p.plain.strip()] or [None])[0].plain.strip()
+            for (h, _l), f in zip(pairs, firsts, strict=True)
+            if [p for p in h.paras if p.plain.strip()]
+        ]
+        if titled and not any(titled):
+            data.style_lines.append("style: nested.list.title=off")
     first = lists.get(min(lists)) if lists else None
     right = first is not None and rings[min(rings)].cx > first.cx
     return FormFold("nested", ["nested"] + (["side=right"] if right else []), boxes)

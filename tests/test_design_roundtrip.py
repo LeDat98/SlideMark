@@ -17,7 +17,7 @@ from slidemark.render.design_part import read_design_part, style_to_css
 
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = ROOT / "examples"
-DESIGNED = ["13-brand-aurora", "14-brand-terracotta", "15-html-mixed"]
+DESIGNED = ["13-brand-aurora", "14-brand-terracotta", "15-html-mixed", "26-ai-overview"]
 MIXED = EXAMPLES / "15-html-mixed.md"
 
 

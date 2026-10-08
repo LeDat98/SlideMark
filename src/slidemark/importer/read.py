@@ -114,6 +114,7 @@ class Item:
         ""  # table: `lo;hi;colors;text` of an `@heatmap` (the renderer appends it to the shape name)
     )
     adj: float | None = None  # first ``a:avLst`` guide of the preset geometry / 100000 (chevron point depth)
+    caption: bool = False  # chevron: the card's generated `STEP n` line was folded away (`@N steps num`)
     rec: str = ""  # set by recognise.py: the form this foreign shape was read as (kpi, numcard, quote, ...)
     rec_attrs: str = ""  # attributes recognise.py adds to the `##` line of the box this item is
     disc: str | None = None  # icon glyph: RRGGBB of the filled `Icon disc` under it (``icondisc.fold``)
@@ -165,6 +166,7 @@ class SlideData:
     connectors: int = 0
     num_field: bool = False
     transition: str | None = None  # ``t=`` value: "fade", "push:0.5", ...
+    bg: str | None = None  # RRGGBB of the slide's own solid background (``<p:bg>``), None = the master's
     build: bool = False  # click-by-click appear animations on shapes
     chart_notes: list[tuple[tuple[int, int, int, int], str]] = field(default_factory=list)  # `note=` callouts
     style_lines: list[str] = field(default_factory=list)  # recognise.py: slide `sizes:` / `style:` lines
@@ -758,6 +760,13 @@ def read_slide(slide, ctx: ReadCtx) -> SlideData:
     part = slide.part
     _walk(slide.shapes, Tf(), data, ctx, part)
     _attach_notes(data)
+    try:
+        bg = slide._element.find(qn("p:cSld")).find(qn("p:bg"))
+        if bg is not None:
+            fill = bg.find(qn("p:bgPr")).find(qn("a:solidFill"))
+            data.bg = _hex(fill) if fill is not None else None
+    except Exception:
+        data.bg = None
     try:
         data.transition = read_transition(slide._element)
         data.build = bool(
