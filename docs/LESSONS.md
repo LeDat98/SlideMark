@@ -327,3 +327,10 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] The sparse and chevron growth passes stretch the arrow row after placement, so the steps card pass closes the arrow-to-card gap itself and caps number-only arrows.
 - [render] An ellipse wraps text in its inscribed 0.707 square: phrase bindings are planned on that width (closes the open ellipse line above).
 - [test] Dict-by-name lookups of shapes lose repeated names such as `Icon disc`: collect lists.
+- [bench] The contact sheets differ in scale: the pptxgenjs sheet is 640 px per slide, the SlideMark `--png` sheet 420-430 px, so the same point size looks 1.5x smaller in ours; measured on t5 slide 8 the SlideMark card text is 1.4x wider relative to the slide than pptxgenjs's. "Body text small inside large areas" in the blind judge was partly this: render both arms at the same tile width before judging type size.
+- [layout] The fit line and the real sizes agree (slide 5 icon list 24 / 20pt, slide 8 cards 27.5 / 20.8pt, bars 21-27pt): check `font_size * font_scale` of the Placed list or the .pptx runs before believing "the text stays at 16pt".
+- [layout] A growth pass cannot see a pinned size (`sizes: body=16!`) or a CSS `font-size` on the Placed list: both leave `font_scale` at 1, so "the layout grew this text" (`font_scale > 1`) is the test that keeps a later pass off them.
+- [layout] The bar shrank to fit one line (`_bar_shrink`) below the body text of its slide (21.45pt under 21.6pt, 20pt under 24pt): `conclusion.floor` wraps it to two lines at the body size instead.
+- [layout] An `@iconlist` of 3 columns with the icon beside the text left a 2.6in text column and wrapped every title: the icon goes above the text in a row of 3+ columns (`iconlist.icon.pos=auto`).
+- [theme] A short `style:` key (`card.heading.max`) reaches only a `Theme` field or `STYLE_ALIASES`; a `LayoutTokens` field needs an alias to `layout.<x>` (or the long `layout.` form).
+

@@ -1029,9 +1029,9 @@ class Theme(Forms4Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
     conclusion_floor: float = Field(
         1.0, ge=0.0
     )  # `conclusion.floor`: the bar text is never under this x the body text of its slide (it wraps first)
-    iconlist_title_max: float = 28  # `iconlist.title.max`: the item title grows to at most this size (pt) ...
+    iconlist_title_max: float = 32  # `iconlist.title.max`: the item title grows to at most this size (pt) ...
     iconlist_text_max: float = (
-        22  # `iconlist.text.max`: ... the item text to at most this (both under `grow.max`)
+        28  # `iconlist.text.max`: ... the item text to at most this (both under `grow.max`)
     )
     iconlist_icon_pos: Literal["auto", "left", "top"] = (
         "auto"  # `iconlist.icon.pos`: icon beside the text, or above it (auto: top for a row of 3+ columns)
