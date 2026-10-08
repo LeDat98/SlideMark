@@ -116,6 +116,8 @@ class Item:
     adj: float | None = None  # first ``a:avLst`` guide of the preset geometry / 100000 (chevron point depth)
     rec: str = ""  # set by recognise.py: the form this foreign shape was read as (kpi, numcard, quote, ...)
     rec_attrs: str = ""  # attributes recognise.py adds to the `##` line of the box this item is
+    disc: str | None = None  # icon glyph: RRGGBB of the filled `Icon disc` under it (``icondisc.fold``)
+    disc_shape: str | None = None  # ... and its shape (circle | rounded | square)
 
     @property
     def cx(self) -> float:

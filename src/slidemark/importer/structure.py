@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from functools import cmp_to_key
 
 from ..ir import Diagnostic
-from . import forms2, recognise, recognise2, recognise3
+from . import forms2, icondisc, recognise, recognise2, recognise3
 from .emit import (
     _attr,
     chart_lines,
@@ -50,6 +50,7 @@ class DeckInfo:
     foreign: bool = False  # no stored design part: geometry recognition (recognise2) is allowed
     palette: list[str] = field(default_factory=list)  # RRGGBB the build's default chart palette draws
     card_shadow: str | None = None  # foreign deck: the shadow most cards share (written as ``card.shadow=``)
+    icon_disc: str | None = None  # RRGGBB of the deck-wide ``icon.disc=`` (icons that differ say ``{disc=}``)
     body_top: int = (
         0  # foreign deck: where the rebuilt body starts (EMU; 0 = unknown), set with ``layout.top_gap``
     )
@@ -73,6 +74,7 @@ class Block:
     steps: bool = False  # chevron box of an ``@steps`` slide (the card text is its content)
     callout: str = "note"
     icon: str | None = None
+    icon_disc: str | None = None  # RRGGBB of the disc under the icon (``icondisc.fold``)
     lines: list[str] = field(default_factory=list)  # kind "fence": the fence lines (a recovered diagram)
     links: list[str] = field(default_factory=list)  # box: link tokens between its children
     card: bool = False  # box: an ``Item N`` card (a bullet drawn as a card by ``@items``)
@@ -220,7 +222,9 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
     items = data.items
     for it in items:
         nm = it.name.lower().strip()
-        if nm.startswith("icon ") and it.kind == "shape":
+        if nm == "icon disc" and it.kind == "shape":
+            it.role = "decor"  # the disc under an icon glyph: ``icondisc.fold`` carried it to the glyph
+        elif nm.startswith("icon ") and it.kind == "shape":
             it.role = "icon"
         elif (
             it.ph in ("ftr", "sldNum", "dt")
@@ -844,7 +848,9 @@ def _attach_icons(icons: list[Item], blocks: list[Block]) -> None:
     for ic in icons:
         inside = [b for b in boxes if b.x <= ic.cx <= b.x + b.w and b.y <= ic.cy <= b.y + b.h]
         if inside:
-            min(inside, key=lambda b: b.w * b.h).icon = ic.name.strip()[5:].strip()
+            box = min(inside, key=lambda b: b.w * b.h)
+            box.icon = ic.name.strip()[5:].strip()
+            box.icon_disc = ic.disc
 
 
 # --------------------------------------------------------------------------- grid
@@ -1285,6 +1291,8 @@ def emit_block(b: Block, out: Out, in_box: bool = False) -> list[tuple[str, list
     attrs = (".kpi " if kpi or b.tile else "") + (".tile " if b.tile else "")
     attrs += (f".{cname} " if cname else "") + (".num " if b.num == "heading" else "")
     attrs += f"icon={b.icon} " if b.icon else ""
+    if b.icon and (dattr := icondisc.attr(b.icon_disc, out.deck.icon_disc, out.deck.colors)):
+        attrs += dattr + " "
     attrs += " ".join(_control_attrs(b.item if not (b.chevron or b.drawn) else None, out.shadow))
     if b.item is not None and b.item.rec_attrs:
         attrs = (attrs + " " + b.item.rec_attrs).strip() + " "
@@ -1345,6 +1353,7 @@ def build_slide(
 ) -> list[str]:
     from . import vocab  # (it needs Block from this module)
 
+    icondisc.fold(data)  # a glyph on a disc is one icon: the disc rides on the glyph
     fold_into_tables(data)
     found = recognise2.recognise(data, deck, n)  # DL3d lane C: designed shapes -> tokens (foreign decks)
     recognise3.recognise(data, deck, n, found)  # DL3d part 2: lane E forms
