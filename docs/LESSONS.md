@@ -334,3 +334,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] An `@iconlist` of 3 columns with the icon beside the text left a 2.6in text column and wrapped every title: the icon goes above the text in a row of 3+ columns (`iconlist.icon.pos=auto`).
 - [theme] A short `style:` key (`card.heading.max`) reaches only a `Theme` field or `STYLE_ALIASES`; a `LayoutTokens` field needs an alias to `layout.<x>` (or the long `layout.` form).
 
+- [bench] Judge contact sheets must share one tile width: a sheet 1.5x larger reads as "bigger type" and moved the pptxgenjs arm from 3.5 to 4.0; build every arm's sheet with `slidemark.preview.contact_sheet` (420 px tiles).

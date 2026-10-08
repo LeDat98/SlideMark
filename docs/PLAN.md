@@ -796,3 +796,8 @@ difference is the card border line that stays under the shadow and the small `sh
   step label (caption off when the arrow shows the number unless `steps.caption` is set), a 4-up card heading never
   wraps (shrink to one line down to the body size, else widen), `@proscons` default colours as palette tints
   (`secondary` / `accent`) with `success` / `danger` only when asked.
+- **Scale bias found (lane E, 2026-10-08):** the pptxgenjs sheet of rounds 9-10 was built at 640 px per slide, ours at
+  420 px, so the judge read our type as smaller. Rebuilt at the same width, **round 11: SlideMark wave 2 3.5 ranked
+  first, pptxgenjs 3.5 second** ("G makes one decision per role and repeats it; T shrinks type to fit cards, boxes
+  almost everything"). Still named on G: the `cols=1` icon list leaves the right half empty (slide 5), duplicate step
+  numbers (slide 7, lane F), takeaway bars as dark as the titles, slide 14 cards floating.
