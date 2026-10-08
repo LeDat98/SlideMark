@@ -16,7 +16,7 @@ from typing import Any
 
 from .ir import Container, Slide, Text
 
-FORMS = ("timeline", "vs", "matrix", "funnel", "pyramid", "cycle", "agenda", "statement")
+FORMS = ("timeline", "vs", "matrix", "funnel", "pyramid", "cycle", "agenda", "statement", "stairs", "nested")
 COMMON = ("gap", "size", "fill")
 
 # per form: attribute -> allowed words (None = free text)
@@ -26,18 +26,26 @@ KEYS: dict[str, dict[str, tuple[str, ...] | None]] = {
     "matrix": {"x": None, "y": None},
     "funnel": {"dir": ("down", "up")},
     "pyramid": {"dir": ("up", "down")},
-    "cycle": {"dir": ("cw", "ccw")},
+    "cycle": {"dir": ("cw", "ccw"), "center": None},
     "agenda": {},
     "statement": {"align": ("left", "center", "right"), "valign": ("top", "middle", "bottom")},
+    "stairs": {"dir": ("up", "down")},
+    "nested": {"side": ("left", "right")},
+    "flowdisc": {"above": ("on", "off", "1", "0")},  # `@flow disc`: a pseudo form (``flow`` is a grid word)
 }
 DEFAULTS = {"timeline": {"dir": "h", "marks": "on"}, "funnel": {"dir": "down"}, "pyramid": {"dir": "up"}}
 DEFAULTS["cycle"] = {"dir": "cw"}
 DEFAULTS["statement"] = {"align": "center", "valign": "middle"}
+DEFAULTS["stairs"] = {"dir": "up"}
+DEFAULTS["nested"] = {"side": "left"}
 ALL_KEYS = tuple(sorted({k for d in KEYS.values() for k in d} | set(COMMON)))
 
 # `##` boxes the form needs (min, max); agenda and statement read a list / text instead
 COUNTS = {"timeline": (2, 10), "vs": (2, 3), "matrix": (4, 4), "funnel": (2, 8), "pyramid": (2, 8)}
 COUNTS["cycle"] = (3, 6)
+COUNTS["stairs"] = (2, 6)
+COUNTS["nested"] = (3, 4)
+COUNTS["flowdisc"] = (2, 7)
 
 EXAMPLE = {
     "timeline": "@timeline dir=h marks=on, then `## 2026 Q1` + one line per milestone ({.accent} = now)",
@@ -48,14 +56,22 @@ EXAMPLE = {
     "cycle": "@cycle, then 3-6 `## ` boxes in loop order",
     "agenda": "@agenda, then one `1.` list alone ({.accent} on the current item)",
     "statement": "@statement, then **+18%** and one caption line",
+    "stairs": "@stairs, then 2-6 `## ` boxes from the lowest step to the highest (dir=down reverses)",
+    "nested": "@nested, then 3-4 `## ` boxes from the outer ring to the inner one",
+    "flowdisc": "@flow disc, then 2-7 `## ` boxes in order ({.above} on the first = a node above the row)",
 }
+WORD = {"flowdisc": "flow disc"}  # how a pseudo form reads on the `@` line
 
 _ACCENT = re.compile(r"\s*\{\.accent\}\s*$")
 
 
 def form_of(slide: Slide) -> str | None:
-    """The slide's form word (the first of ``FORMS`` among its classes), else ``None``."""
-    return next((c for c in slide.classes if c in FORMS), None)
+    """The slide's form word (the first of ``FORMS`` among its classes), ``flowdisc`` for ``@flow disc``,
+    else ``None``."""
+    got = next((c for c in slide.classes if c in FORMS), None)
+    if got is None and "flow" in slide.classes and "disc" in slide.classes:
+        return "flowdisc"
+    return got
 
 
 def boxes(slide: Slide) -> list[Container] | None:
@@ -104,13 +120,14 @@ def fits(form: str, slide: Slide) -> str | None:
         lo, hi = COUNTS[form]
         bx = boxes(slide)
         n = len(bx or [])
+        word = WORD.get(form, form)
         if bx is None:
-            return f"@{form} needs `## ` boxes and nothing else (put other blocks on another slide)"
+            return f"@{word} needs `## ` boxes and nothing else (put other blocks on another slide)"
         if not lo <= n <= hi:
             return (
-                f"@{form} needs {lo}-{hi} `## ` boxes, found {n}"
+                f"@{word} needs {lo}-{hi} `## ` boxes, found {n}"
                 if lo != hi
-                else (f"@{form} needs exactly {lo} `## ` boxes, found {n}")
+                else (f"@{word} needs exactly {lo} `## ` boxes, found {n}")
             )
         return None
     if form == "agenda":
@@ -127,12 +144,13 @@ def check_attrs(form: str | None, attrs: dict[str, Any]) -> list[tuple[str, str,
     whose value is wrong. Pure; the parser turns them into warnings."""
     out: list[tuple[str, str, str]] = []
     mine = {**{k: None for k in COMMON}, **(KEYS.get(form or "", {}))}
+    word = WORD.get(form or "", form)
     for k in ALL_KEYS:
         if k not in attrs or k == "gap":  # gap is a grid key on every slide
             continue
         v = str(attrs[k])
         if form is None:
-            owners = [f for f in FORMS if k in KEYS[f]] or ["any form"]
+            owners = [WORD.get(f, f) for f in KEYS if k in KEYS[f]] or ["any form"]
             out.append(
                 (
                     "attr-ignored",
@@ -147,13 +165,13 @@ def check_attrs(form: str | None, attrs: dict[str, Any]) -> list[tuple[str, str,
             out.append(
                 (
                     "attr-ignored",
-                    f"'@' key {k}= is not used by @{form}",
-                    f"@{form} takes {take} (and size= fill= gap=)",
+                    f"'@' key {k}= is not used by @{word}",
+                    f"@{word} takes {take} (and size= fill= gap=)",
                 )
             )
         elif k in KEYS[form] and KEYS[form][k] is not None and v not in KEYS[form][k]:  # type: ignore[operator]
             words = "|".join(KEYS[form][k])  # type: ignore[arg-type]
-            out.append(("bad-attr", f"@{form} {k}={v} is not a choice", f"write {k}={words}"))
+            out.append(("bad-attr", f"@{word} {k}={v} is not a choice", f"write {k}={words}"))
         elif k == "size":
             try:
                 ok = 4 <= float(re.sub(r"pt$", "", v)) <= 400

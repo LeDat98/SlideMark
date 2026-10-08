@@ -316,7 +316,7 @@ KNOWN_WORDS = (
     "grid",
     *forms.FORMS,
 )
-KNOWN_WORDS = (*KNOWN_WORDS, *forms2.WORDS)  # DL3b part 2: @iconlist @quote @split @proscons ...
+KNOWN_WORDS = (*KNOWN_WORDS, "disc", *forms2.WORDS)  # DL3b part 2: @iconlist @quote @split @proscons ...
 TRANSITIONS = ("fade", "push", "wipe", "split", "cover", "zoom", "morph")
 _N = re.compile(r"^\d+$")
 _CXR = re.compile(r"^\d+x\d+$")
