@@ -40,6 +40,7 @@ PROBES: dict[str, str] = {
     "list item": "# T\n> lead\n- one {<A>}\n- two\n- three\n",
     "stage": "# T\n@funnel\n## a {<A>}\n- x\n## b\n- y\n## c\n- z\n",
     "formtext": "# T\n@statement\n{A}\nbig line\n\ncaption\n",
+    "shape": "# T\n@free\n{x=50% y=20% w=30% h=30% fill=accent <A>}\n",
 }
 EXTRA_HEAD = {
     "chevron": "style: layout.chevron_steps=off\n",

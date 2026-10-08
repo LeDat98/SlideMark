@@ -616,10 +616,12 @@ warning, info, user, users, building, factory, chart, money, yen, target, rocket
 calendar, document, mail, phone, globe, lock, shield, cloud, database, search, star, heart, truck, cart, leaf,
 arrow-up, arrow-down, arrow-right, headphones, battery, music, sparkles, smile, camera, book, graduation-cap,
 home, map-pin, wifi, code, cpu, bell, flag, gift, coffee, plane, wrench, key, play, trophy, briefcase, chat, bolt,
-tooth, refresh, tag; close synonyms such as `house`, `message`, `lightning`, `sync`, `label` work too). `icon=assets/logo.svg` (path relative to
+tooth, refresh, tag, eye, brain, layers, microphone, list, video; close synonyms such as `house`, `message`,
+`lightning`, `sync`, `label`, `tags`, `arrow`, `image`, `robot`, `tool`, `loop` work too). `icon=assets/logo.svg` (path relative to
 the deck) uses your own SVG: simple filled shapes (path, rect, circle, polygon) become native geometry recolored
 like the built-in icons (white fills are cut-outs); strokes, gradients or transforms embed it as a picture. A
-missing file is a warning. An unknown name is a warning listing the closest names.
+missing file is a warning. An unknown name is a warning listing up to three close names; `build` rewrites the
+source only for the one name within one letter (`chrt` -> `chart`, never `eye` -> `yen`), and the icon is left out.
 
 **Badge.** `[text]{.badge}` is a small filled label inside text; add a color class to change it:
 `[済]{.badge .success}`, `[NEW]{.badge .danger}`.
@@ -1021,16 +1023,17 @@ layout and renderer, and checks that the warning carries the hint. `@free` honou
 | `kpi` (`y` `h` `w` place the row, also beside a list or table; `x` makes a card absolute) | `fit` |
 | `step` (box of an `@steps` row; `valign` moves the text once a conclusion bar or `fill_steps` stretched the card) | `x` `y` `w` `h` `fit` |
 | `chevron` (compact `@chevron` row) | `radius` `fit` |
-| `text` (a paragraph or list outside a box; `radius` and `shape` show with `fill` or `line`) | `fit` `icon` |
+| `text` (a paragraph or list outside a box; `radius` and shape show with `fill` or `line`) | `fit` `icon` |
 | `callout` | `fit` `icon` |
 | `image` | `color` `font` `bold` `italic` `icon` |
 | `table` (`align` is one letter per column) | `radius` `rotate` `shape` `fit` `icon` |
-| `chart` (`radius` `shape` show with `fill` or `line`, `opacity` with `fill`, `align` with `w`, `valign` with `h`) | `rotate` `fit` `icon` |
+| `chart` (`radius` and shape show with `fill` or `line`, `opacity` with `fill`, `align` with `w`, `valign` with `h`) | `rotate` `fit` `icon` |
 | `code` | `fit` `icon` |
 | `rows` (an `@rows` list) | `fit` `icon` |
 | `row` (one line of an `@rows` list) | `x` `y` `w` `h` `valign` `radius` `opacity` `pad` `shadow` `rotate` `shape` `z` `fit` `icon` |
 | `list item` (`- text {color=danger}`) | `x` `y` `w` `h` `fill` `line` `radius` `opacity` `pad` `valign` `shadow` `rotate` `shape` `z` `fit` `icon` |
 | `stage` (a `##` box of `@timeline` `@funnel` `@pyramid` `@cycle`: honours `fill` `color`) | `x` `y` `w` `h` `size` `line` `font` `bold` `italic` `align` `valign` `radius` `opacity` `pad` `shadow` `rotate` `shape` `z` `fit` `icon` |
+| `shape` (a content-less `{x= y= w= h= shape= fill=}` block: honours `x y w h fill line radius opacity shadow rotate shape z`) | `size` `color` `font` `align` `valign` `bold` `italic` `pad` `fit` `icon` |
 | `formtext` (the text of `@agenda` `@statement`: honours `size` `color`) | `x` `y` `w` `h` `font` `bold` `italic` `align` `valign` `fill` `line` `radius` `opacity` `pad` `shadow` `rotate` `shape` `z` `fit` `icon` |
 
 `size=` on a box with no text of its own sizes nothing (it sizes the box text, not its heading): `sizes: heading=` or

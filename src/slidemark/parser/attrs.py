@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .. import forms, forms2, icons, shapes
-from ..ir import Box, Chart, ElementBase, Image, Media, Style, Table
-from .ctx import Ctx, closest
+from ..ir import Box, Chart, ElementBase, Image, Media, Shape, Style, Table
+from .ctx import Ctx, closest, unique_near
 from .tabular import apply_chart_kv, apply_table_kv
 
 _TOKEN = re.compile(
@@ -266,13 +266,15 @@ def apply_attrs(
                 low = v.strip().lower()
                 near = difflib.get_close_matches(low, ICON_NAMES, n=3, cutoff=0.3)
                 tip = "or icon=file.svg for your own"
-                if near and closest(low, near, 0.5) == near[0]:  # fix.py reads "did you mean '<name>'"
-                    more = f" (also {', '.join(near[1:])})" if len(near) > 1 else ""
-                    hint = f"did you mean '{near[0]}'?{more} {tip}"
-                else:
+                if (safe := unique_near(low, ICON_NAMES)) is not None:  # fix.py reads "did you mean '<name>'"
+                    more = [n for n in near if n != safe]
                     hint = (
-                        f"closest: {', '.join(near)}; {tip}" if near else f"see 'slidemark docs icons'; {tip}"
+                        f"did you mean '{safe}'?" + (f" (also {', '.join(more)})" if more else "") + f" {tip}"
                     )
+                elif near:  # far names are never rewritten: the source stays, the icon is left out
+                    hint = f"did you mean one of {', '.join(near)}? {tip}"
+                else:
+                    hint = f"see 'slidemark docs icons'; {tip}"
                 ctx.warn(f"unknown icon '{v}'", line, "unknown-icon", hint)
         else:
             sink[k] = v
@@ -289,6 +291,48 @@ def apply_attrs(
         for row in el.rows:
             for cell in row:
                 cell.style = (cell.style or Style()).merged(Style(padding=style["padding"]))
+
+
+# --------------------------------------------------------------------------- shape blocks
+
+
+def is_shape_attrs(a: Attrs) -> bool:
+    """A `{x= y= w= h= shape= fill= line=}` line that, with no content after it, is a drawn shape: a position
+    (any of ``x y w h``) and a look (``shape`` ``fill`` ``line``)."""
+    return any(k in a.kv for k in _BOX) and any(k in a.kv for k in ("shape", "fill", "line"))
+
+
+def shape_block(a: Attrs, ctx: Ctx, line: int | None) -> Shape:
+    """The text-less shape of an attribute-only block: a preset (``shape=``, default ``rect``) with ``fill``
+    ``line`` ``line.w`` ``radius`` ``rotate`` ``opacity`` ``shadow`` ``z``; ``shape=line`` is a connector
+    (``head=arrow`` adds an arrow head)."""
+    kv = dict(a.kv)
+    width = kv.pop("line.w", None)
+    head = kv.pop("head", None)
+    name = kv.get("shape", "").strip().lower()
+    connector = name in ("line", "connector")
+    if connector:
+        kv.pop("shape")
+        el = Shape(shape="line", line=line)
+        if head is not None and head.strip().lower() not in ("arrow", "none"):
+            ctx.warn(f"bad head '{head}'", line, "bad-attr", "use head=arrow or head=none")
+        el.attrs["head"] = "arrow" if (head or "").strip().lower() == "arrow" else "none"
+    else:
+        el = Shape(shape="rect", line=line)
+        if head is not None:
+            ctx.warn("head= is for shape=line", line, "bad-attr", "put head=arrow on a {shape=line} block")
+    apply_attrs(el, Attrs(a.classes, a.id, kv), ctx, line)
+    if not connector and el.style is not None and el.style.radius and not el.style.shape:
+        el.shape = "rounded-rect"  # `radius=` rounds the corners of the default rectangle
+    if width is not None:
+        w = _float(width)
+        if w is None or w < 0:
+            ctx.warn(f"bad line.w '{width}'", line, "bad-attr", "line.w is a width in pt, e.g. line.w=2pt")
+        else:
+            el.style = (el.style or Style()).merged(Style(line_width=w))
+    if connector and (el.style is None or not el.style.line):
+        ctx.warn("a line needs a color", line, "bad-attr", "write line=accent (and line.w=2pt)")
+    return el
 
 
 # --------------------------------------------------------------------------- the `@` line

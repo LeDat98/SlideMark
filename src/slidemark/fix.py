@@ -12,9 +12,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import icons
 from .ir import Diagnostic
-from .parser.attrs import STANDALONE
-from .parser.core import FENCE_RE, H1_RE, HR_RE, fence_map, split_lines
+from .parser.attrs import AT_KEYS, KNOWN_CLASSES, KNOWN_WORDS, STANDALONE, VALID_KEYS
+from .parser.core import FENCE_RE, H1_RE, HEADER_KEYS, HR_RE, fence_map, split_lines
+from .parser.ctx import unique_near
 
 MAX_PASSES = 4
 _GRID = re.compile(r"^(\d+|\d+x\d+|\d+(?:\.\d+)?(?::\d+(?:\.\d+)?)+|[a-z.]+(?:/[a-z.]+)+)$")
@@ -62,6 +64,13 @@ def _did_you_mean(d: Diagnostic) -> str | None:
     return m.group(1) if m else None
 
 
+def _safe(old: str, near: str, universe: list[str] | tuple[str, ...]) -> bool:
+    """A did-you-mean fix is applied only when ``near`` is the one name of ``universe`` within edit distance 1
+    of ``old`` (a missing, extra, wrong or swapped letter): ``chrt`` -> ``chart``, never ``eye`` -> ``yen``."""
+    got = unique_near(old.rstrip("="), [u.rstrip("=") for u in universe])
+    return got is not None and got.lower() == near.rstrip("=").lower()
+
+
 def _swap_token(line: str, old: str, new: str) -> str | None:
     """Replace the whitespace-delimited token ``old`` once; ``None`` when it is not there."""
     m = re.search(r"(?<![^\s@])" + re.escape(old) + r"(?!\S)", line)
@@ -95,6 +104,8 @@ def _unknown_token(src: _Src, d: Diagnostic) -> list[Edit]:
     old = _quoted(d.message, -1)  # the message starts with the quoted '@'
     if not near or not old or not 0 <= i < len(src.lines) or not src.lines[i].startswith("@"):
         return []
+    if not _safe(old, near, [*KNOWN_WORDS, *AT_KEYS]):
+        return []
     if "' key '" in d.message:  # `foo=1` -> `bg=1`: the token starts with the key
         m = re.search(r"(?<![^\s@])" + re.escape(old) + r"=", src.lines[i])
         new = src.lines[i][: m.start()] + near + src.lines[i][m.end() :] if m and near.endswith("=") else None
@@ -110,7 +121,10 @@ def _unknown_attr(src: _Src, d: Diagnostic) -> list[Edit]:
     i = (d.line or 0) - 1
     if not near or not old:
         return []
-    if d.message.startswith("unknown class"):
+    classes = d.message.startswith("unknown class")
+    if not _safe(old.lstrip("."), near.lstrip("."), KNOWN_CLASSES if classes else VALID_KEYS):
+        return []
+    if classes:
         pat, rep = re.compile(r"(?<=[{\s])" + re.escape(old) + r"(?=[\s}])"), near
     else:
         pat, rep = re.compile(r"(?<=[{\s])" + re.escape(old) + r"=(?!=)"), near
@@ -125,7 +139,7 @@ def _unknown_attr(src: _Src, d: Diagnostic) -> list[Edit]:
 def _unknown_icon(src: _Src, d: Diagnostic) -> list[Edit]:
     near, old = _did_you_mean(d), _quoted(d.message)
     i = (d.line or 0) - 1
-    if not near or not old:
+    if not near or not old or not _safe(old, near, icons.names()):
         return []
     for k in (i, i - 1, i + 1):
         if 0 <= k < len(src.lines) and not src.inside[k]:
@@ -151,7 +165,7 @@ def _unknown_callout(src: _Src, d: Diagnostic) -> list[Edit]:
 
 def _unknown_header(src: _Src, d: Diagnostic) -> list[Edit]:
     near, old = _did_you_mean(d), _quoted(d.message)
-    if not near or not old:
+    if not near or not old or not _safe(old, near, HEADER_KEYS):
         return []
     pat = re.compile(r"^(\s*)" + re.escape(old) + r"(\s*:)")
     for k in range((d.line or 1) - 1, min(len(src.lines), (d.line or 1) + 40)):

@@ -18,8 +18,10 @@ from .attrs import (
     RawLink,
     apply_attrs,
     check_transition,
+    is_shape_attrs,
     parse_at,
     parse_attr_body,
+    shape_block,
     split_trailing_attrs,
 )
 from .blocks import convert
@@ -280,7 +282,15 @@ def _scan_body(lines: list[str], inside: list[bool], c: Chunk, ctx: Ctx) -> tupl
     buf: list[str] = []
     buf_line = c.start + 1
     pending: Attrs | None = None
+    pending_line = c.start + 1
     notes: str | None = None
+
+    def shape_out() -> None:
+        """A `{x= y= w= h= shape= fill=}` line with no content after it is a shape block (`Item("shape")`)."""
+        nonlocal pending
+        if pending is not None and is_shape_attrs(pending):
+            items.append(Item("shape", pending_line, pending=pending))
+            pending = None
 
     def flush() -> None:
         nonlocal buf, pending
@@ -298,19 +308,23 @@ def _scan_body(lines: list[str], inside: list[bool], c: Chunk, ctx: Ctx) -> tupl
             continue
         if text.startswith("???"):
             flush()
+            shape_out()
             rest = [text[3:].strip()] + lines[i + 1 : c.end]
             notes = "\n".join(rest).strip()
             break
         if text.strip().lower() == "@end":
             flush()
+            shape_out()
             items.append(Item("end", i + 1))
             continue
         if text.startswith("@"):
             flush()
+            shape_out()
             items.append(Item("at", i + 1, text=text[1:].strip()))
             continue
         if text.startswith("※") or re.match(r"^\^[ \t]", text):
             flush()
+            shape_out()
             # `※` is part of a Japanese footnote's text (agents copy it from the brief); `^ ` is only a marker
             items.append(Item("foot", i + 1, text=text.strip() if text.startswith("※") else text[1:].strip()))
             continue
@@ -327,7 +341,8 @@ def _scan_body(lines: list[str], inside: list[bool], c: Chunk, ctx: Ctx) -> tupl
             a = parse_attr_body(sm.group(1))
             if a is not None:
                 flush()
-                pending = a
+                shape_out()
+                pending, pending_line = a, i + 1
                 continue
         if buf and buf[-1].strip() and text.strip() and text.startswith(">") != buf[-1].startswith(">"):
             flush()  # no lazy continuation into or out of a `>` quote
@@ -339,6 +354,7 @@ def _scan_body(lines: list[str], inside: list[bool], c: Chunk, ctx: Ctx) -> tupl
             buf_line = i + 1
         buf.append(text)
     flush()
+    shape_out()
     if pending is not None:
         ctx.warn(
             "attribute line has no block after it", None, "dangling-attrs", "put {…} directly before a block"
@@ -427,6 +443,8 @@ def _build_flat(items: list[Item], ctx: Ctx, kpi: bool = False) -> list[Any]:
                     apply_attrs(t, a, ctx, it.line)
             carry = None
             out.append(t)
+        elif it.kind == "shape" and it.pending is not None:
+            out.append(shape_block(it.pending, ctx, it.line))
     return _kpi_text(out) if kpi else out
 
 

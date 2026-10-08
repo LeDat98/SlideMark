@@ -23,7 +23,7 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 from . import forms, forms2
-from .ir import Chart, Code, Container, Deck, Diagnostic, Image, Media, Placed, Slide, Table, Text
+from .ir import Chart, Code, Container, Deck, Diagnostic, Image, Media, Placed, Shape, Slide, Table, Text
 
 # The documented attribute keys (docs/SYNTAX.md "Attributes"): position, style, image, `icon` on boxes and the
 # element-control keys `shadow rotate shape z` (DL3: every element kind takes the full set).
@@ -74,6 +74,7 @@ LABEL = {
     "list item": "a list item",
     "stage": "a form box",
     "formtext": "a form's text",
+    "shape": "a drawn shape",
 }
 
 _FIT = "fit= is for images: ![alt](a.png){fit=cover|contain|stretch}"
@@ -88,6 +89,9 @@ _STAGE_GEO = (
     "a form places its shapes: @1:2 ratios, gap= and its own tokens set the geometry, @free places blocks"
 )
 _STAGE_TEXT = "size= on the @ line sizes the form's text; fill= and color= go on the box, the rest are tokens"
+_SHAPE_TEXT = (
+    "a text-less shape has no text: size color font align valign bold italic pad apply to a box or text"
+)
 _STAGE_DECO = (
     "a form draws its own shapes: shadow= rotate= shape= z= apply to ordinary boxes, not to the form"
 )
@@ -120,6 +124,7 @@ HONOURED: dict[str, str] = {
     "list item": "size color font align bold italic",
     "stage": "fill color",
     "formtext": "size color",
+    "shape": "x y w h fill line radius opacity shadow rotate shape z",
 }
 IGNORED: dict[str, dict[str, str]] = {
     "title": {"fit": _FIT, "icon": _ICON},
@@ -171,6 +176,7 @@ IGNORED: dict[str, dict[str, str]] = {
         "fit": _FIT,
         "icon": _ICON,
     },
+    "shape": {**_ig("size color font align valign bold italic pad", _SHAPE_TEXT), "fit": _FIT, "icon": _ICON},
     "formtext": {
         **_ig("x y w h", _STAGE_GEO),
         **_ig("font bold italic align valign fill line radius opacity pad", _STAGE_TEXT),
@@ -279,6 +285,8 @@ def _walk(slide: Slide, theme: Any, index: int) -> Iterator[tuple[Any, str]]:
             yield el, "chart"
         elif isinstance(el, Code):
             yield el, "code"
+        elif isinstance(el, Shape):  # `{x= y= w= h= shape= fill=}` with no content: a drawn shape
+            yield el, "shape"
 
     for el in shaped.elements:
         yield from rec(el, None)

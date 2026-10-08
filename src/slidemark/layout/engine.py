@@ -1124,7 +1124,12 @@ def _no_new_wraps(ctx: _Ctx, el: Table, ncols: int, anchors, width: int, st: Sty
 
 
 def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
-    if rect.w <= 0 or rect.h <= 0:
+    if (
+        isinstance(el, Shape) and el.shape == "line" and not el.paragraphs
+    ):  # a straight line may have h=0 or w=0
+        if rect.w < 0 or rect.h < 0 or rect.w + rect.h == 0:
+            return
+    elif rect.w <= 0 or rect.h <= 0:
         return
     if m := _margin(ctx, el):  # CSS margin: the element shrinks inside its cell
         rect = rect.inset(m)
@@ -1145,7 +1150,7 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
             el = el.model_copy(update={"paragraphs": plain})
         st = _text_style(ctx, el, inherit)
         eff = _grown(ctx, el, measure.effective_scale(st.font_size or 18, ctx.scale, ctx.theme.min_font_size))
-        need = _text_need(ctx, el, st, rect.w, eff)
+        need = _text_need(ctx, el, st, rect.w, eff) if getattr(el, "paragraphs", None) else 0
         if need > rect.h * _TOL:
             ctx.over.append(_label(el))
         elif (

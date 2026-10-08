@@ -84,6 +84,30 @@ def _tooth() -> str:
     )
 
 
+def _brain() -> str:
+    """Two bumpy hemispheres with a gap between them and a small stem."""
+
+    def half(mirror: bool) -> str:
+        pts = []
+        for k in range(64):
+            t = 2 * math.pi * k / 64
+            r = 1 + 0.085 * math.cos(7 * t)
+            x = min(7.8 + 6.4 * r * math.cos(t), 11.2)
+            y = 11 + 8.4 * r * math.sin(t)
+            pts.append((24 - x if mirror else x, y if y < 18.6 else 18.6))
+        return _poly(*pts)
+
+    return half(False) + "|" + half(True) + "|" + _poly((10.2, 18), (13.8, 18), (13, 22), (11, 22))
+
+
+def _microphone() -> str:
+    return (
+        _rrect(8.5, 2, 7, 12, 3.5)
+        + "|"
+        + "M5 11H7A5 5 0 0 0 17 11H19A7 7 0 0 1 13 17.9V20.5H16.5V22.5H7.5V20.5H11V17.9A7 7 0 0 1 5 11Z"
+    )
+
+
 GLYPHS: dict[str, str] = {
     "headphones": "M3.5 15V12A8.5 8.5 0 0 1 20.5 12V15H18.5V12A6.5 6.5 0 0 0 5.5 12V15Z"
     + "|"
@@ -226,12 +250,48 @@ GLYPHS: dict[str, str] = {
     "tooth": _tooth(),
     "refresh": _arrow_ring(),
     "tag": _poly((2.5, 2.5), (12, 2.5), (21.5, 12), (12, 21.5), (2.5, 12)) + _circ(7.2, 7.2, 1.9),
+    "eye": "M1.5 12C4 7 8 5 12 5C16 5 20 7 22.5 12C20 17 16 19 12 19C8 19 4 17 1.5 12Z"
+    + _circ(12, 12, 4.2)
+    + "|"
+    + _circ(12, 12, 2.2),
+    "brain": _brain(),
+    "layers": _poly((12, 3), (22, 8), (12, 13), (2, 8))
+    + "|"
+    + _poly((2, 12.2), (4.4, 11), (12, 14.8), (19.6, 11), (22, 12.2), (12, 17.2))
+    + "|"
+    + _poly((2, 16.2), (4.4, 15), (12, 18.8), (19.6, 15), (22, 16.2), (12, 21.2)),
+    "microphone": _microphone(),
+    "list": _circ(4.5, 6, 1.7)
+    + "|"
+    + _rect(8.5, 4.7, 13, 2.6)
+    + "|"
+    + _circ(4.5, 12, 1.7)
+    + "|"
+    + _rect(8.5, 10.7, 13, 2.6)
+    + "|"
+    + _circ(4.5, 18, 1.7)
+    + "|"
+    + _rect(8.5, 16.7, 13, 2.6),
+    "video": _rrect(2, 6, 13.5, 12, 2.5) + "|" + _poly((17, 10.6), (22, 7.2), (22, 16.8), (17, 13.4)),
 }
 
 ALIASES: dict[str, str] = {
     "sync": "refresh",
     "reload": "refresh",
     "loop": "refresh",
+    "tags": "tag",
+    "arrow": "arrow-right",
+    "image": "camera",
+    "picture": "camera",
+    "robot": "cpu",
+    "ai": "cpu",
+    "mic": "microphone",
+    "voice": "microphone",
+    "stack": "layers",
+    "items": "list",
+    "checklist": "list",
+    "mind": "brain",
+    "view": "eye",
     "cycle": "refresh",
     "label": "tag",
     "price": "tag",
@@ -267,7 +327,6 @@ ALIASES: dict[str, str] = {
     "tea": "coffee",
     "cafe": "coffee",
     "password": "key",
-    "video": "play",
     "dental": "tooth",
     "power": "battery",
 }

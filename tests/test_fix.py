@@ -59,8 +59,8 @@ def test_unknown_class_and_attr():
 
 
 def test_unknown_icon():
-    new, fixed = fix("# T\n## A {icon=chrt}\nx\n## B\ny\n")
-    assert fixed == ["unknown-icon"] and "{icon=chart}" in new
+    new, fixed = fix("# T\n## A {icon=shiled}\nx\n## B\ny\n")
+    assert fixed == ["unknown-icon"] and "{icon=shield}" in new
 
 
 def test_unknown_callout():

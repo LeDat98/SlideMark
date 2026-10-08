@@ -31,7 +31,7 @@ from .honour import audit
 from .ir import Chart, Code, Container, Deck, Diagnostic, Image, Media, Placed, Raw, Shape, Table, Text
 from .layout.forms2 import fit_part
 from .theme import DEFAULT_SIZES, Theme
-from .units import EMU_PER_PT
+from .units import EMU_PER_INCH, EMU_PER_PT
 
 FREE_MIN = 0.10  # free space below this share of the body is not worth a word
 FREE_ABOVE = 0.20  # ... and the band above a centred block is named only when it is this large
@@ -381,9 +381,15 @@ def _slide_line(deck: Deck, slide, items: list[Placed], theme: Theme, i: int) ->
         parts = [p for p in parts if p[0] == "lead"] + [_vocab(fit["vocab"], theme, dense_k)]
     if kind == "free":
         pinned = sum(1 for e in slide.elements if getattr(e, "box", None) is not None and e.box.x is not None)
-        parts = [(f"free {_n(len(slide.elements), 'block')}, {pinned} pinned", [])] + [
-            p for p in parts if p[0] == "lead"
-        ]
+        drawn = sum(1 for e in slide.elements if isinstance(e, Shape))
+        head = f"free {_n(len(slide.elements), 'block')}, {pinned} pinned" + (
+            f", {_n(drawn, 'shape')}" if drawn else ""
+        )
+        area = []  # what `%` refers to: the body under the title, in inches
+        if body and body[2] > 0 and body[3] > 0:
+            k = EMU_PER_INCH
+            area = [f"free area {body[0] / k:.1f},{body[1] / k:.1f} {body[2] / k:.1f}x{body[3] / k:.1f}in"]
+        parts = [(head, area)] + [p for p in parts if p[0] == "lead"]
     bar_in: list[Placed] = []
     if slide.conclusion is not None and slide.conclusion.paragraphs and body:
         bar = next((p for p in items if isinstance(p.element, Text) and p.element.role == "conclusion"), None)

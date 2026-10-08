@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from functools import cmp_to_key
 
 from ..ir import Diagnostic
-from . import forms2, icondisc, recognise, recognise2, recognise3
+from . import forms2, freeshape, icondisc, recognise, recognise2, recognise3
 from .emit import (
     _attr,
     chart_lines,
@@ -1342,6 +1342,46 @@ def join_chunks(chunks: list[tuple[str, list[str]]], top: bool) -> list[str]:
     return res
 
 
+def _free_chunks(
+    seq: list[Block], loose: list[Item], lead_item: Item | None, deck: DeckInfo, out: Out
+) -> list[tuple[str, list[str]]]:
+    """``@free``: every block pinned (``x= y= w= h=`` from the body's corner), the loose shapes as
+    attribute-only blocks, all in drawing order (an item's source position; made-up blocks come last)."""
+    o = freeshape.origin(
+        deck.margin_x, deck.body_top, deck.margin_y, lead_item.y + lead_item.h if lead_item else None
+    )
+    names = {
+        v: k
+        for k, v in deck.colors.items()
+        if k in ("primary", "secondary", "accent", "muted", "success", "danger")
+    }
+    order: list[tuple[int, int, int, str, object]] = []
+    for b in seq:
+        uid = b.item.uid if b.item is not None else 10**9
+        order.append((uid, b.y, b.x, "block", b))
+    for it in loose:
+        order.append((it.uid, it.y, it.x, "shape", it))
+    order.sort(key=lambda t: t[:3])
+    chunks: list[tuple[str, list[str]]] = []
+    for pos, (_u, _y, _x, kind, obj) in enumerate(order):
+        if kind == "shape":
+            chunks.append(("meta", [freeshape.shape_line(obj, o, names)]))
+            continue
+        b = obj
+        got = emit_block(b, out)
+        if not got:
+            continue
+        pin = freeshape.pin(b.x, b.y, b.w, b.h, o)
+        first_kind, first = got[0]
+        got[0] = ("meta", freeshape.pin_first(first, pin))
+        chunks.extend(got)
+        if b.kind == "box":
+            nxt = next((t for t in order[pos + 1 :]), None)
+            if nxt is not None and not (nxt[3] == "block" and nxt[4].kind == "box"):
+                chunks.append(("meta", ["@end"]))
+    return chunks
+
+
 def build_slide(
     n: int,
     data: SlideData,
@@ -1377,6 +1417,7 @@ def build_slide(
     badges = [
         i for i in data.items if i.rec == "num" and i.role == "decor"
     ]  # (like icons: push a heading down)
+    loose = freeshape.free_shapes(pool, deck.foreign)  # text-less presets: shape blocks of a `@free` slide
     blocks = make_blocks(pool, deck, [*icons, *badges])
     _attach_icons(icons, blocks)
     if vform is not None and not vform.keep:
@@ -1472,6 +1513,21 @@ def build_slide(
                 hint="add arrows back with '@' tokens such as a>b if they matter",
             )
         )
+    free_mode = bool(loose) and active is None and not groups and not rows_slide and not vform
+    if free_mode:
+        if top or inner or lost:
+            diags.append(
+                Diagnostic(
+                    level="info",
+                    message="connectors dropped on a @free slide",
+                    slide=n,
+                    rule="import-skipped",
+                    hint="add arrows back with {x= y= w= h= shape=line line=accent} blocks",
+                )
+            )
+        top, inner, links_ok = [], {}, False
+    else:
+        links_ok = True
     out = Out(deck, n, diags, save_image, classes)
     shared = Counter(it.shadow for it in data.items if it.shadow and it.fill).most_common(1)
     out.shadow = shared[0][0] if shared and shared[0][1] >= 2 else None
@@ -1498,7 +1554,7 @@ def build_slide(
         info["at"] = None
         info["form"] = vform.form if vform is not None else None
     seq = [*grid, *extras]
-    links = link_tokens(top, seq, drop_next="flow" in tokens)
+    links = link_tokens(top, seq, drop_next="flow" in tokens) if links_ok else []
     for b in seq:
         if b.kind == "box" and id(b) in inner:
             b.links = link_tokens(inner[id(b)], b.children)
@@ -1557,7 +1613,12 @@ def build_slide(
     if info is not None:
         info["extra"] = extra
         info["title_only"] = title_only
-    tokens = [*tokens, *links, *extra]
+    if free_mode:  # every block is pinned: the arrangement words say nothing, the slide's own words stay
+        tokens = ["free", *(w for w in extra if re.match(r"(t=|bg=|dark$|light$|build$|hidden$)", w))]
+        if info is not None:
+            info["tokens"] = []
+    else:
+        tokens = [*tokens, *links, *extra]
     # slide `style:` / `sizes:` lines of both recognisers, one line each (runs.merge_lines)
     lines.extend(merge_lines([found.style_line(), *data.style_lines]))
     if info is not None:
@@ -1573,6 +1634,9 @@ def build_slide(
         for g, tk in zip(groups, group_tokens, strict=True):
             starts[pos] = tk
             pos += len(g)
+    if free_mode:
+        chunks = _free_chunks(seq, loose, lead_item=(by_role["lead"] or [None])[0], deck=deck, out=out)
+        seq = []
     for i, b in enumerate(seq):
         if i in starts and i > 0:
             chunks.append(("meta", ["@end", "@" + " ".join(starts[i])]))

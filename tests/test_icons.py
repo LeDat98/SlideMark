@@ -23,14 +23,14 @@ EXPECTED = (
     "calendar document mail phone globe lock shield cloud database search star heart truck cart leaf "
     "arrow-up arrow-down arrow-right headphones battery music sparkles smile camera book graduation-cap "
     "home map-pin wifi code cpu bell flag gift coffee plane wrench key play trophy briefcase chat bolt tooth "
-    "refresh tag"
+    "refresh tag eye brain layers microphone list video"
 ).split()
 E = 914400
 
 
 def test_icon_set_is_complete():
     assert sorted(icons.names()) == sorted(EXPECTED)
-    assert len(icons.names()) == 62
+    assert len(icons.names()) == 68
 
 
 @pytest.mark.parametrize("name", EXPECTED)
