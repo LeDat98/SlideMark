@@ -3,7 +3,7 @@ lang: vi
 colors: bg=#FFFFFF fg=#14272F primary=#0B2A3C secondary=#1B8A8F accent=#F2A33A surface=#EEF4F6 border=#CFDDE2 muted=#5A6F78
 fonts: heading=Arial body=Arial
 sizes: title=36 heading=20 body=16 lead=20 caption=12
-style: radius=8 title.band=none heading.band=none cycle.fill=primary,secondary flow.disc.fill=primary,secondary stairs.fill=#BFE3E5,#7FC4C8,#1B8A8F,#0B2A3C
+style: radius=8 title.band=none heading.band=none card.elevation=2 icon.disc=secondary conclusion.icon=refresh cycle.fill=primary,secondary flow.disc.fill=primary,secondary stairs.fill=#BFE3E5,#7FC4C8,#1B8A8F,#0B2A3C
 footer: AI: từ nền tảng đến ứng dụng
 num: on
 
