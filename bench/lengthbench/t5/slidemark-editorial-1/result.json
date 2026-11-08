@@ -1,0 +1,9 @@
+{
+ "arm": "slidemark skill-only, experiment: editorial as the default preset (SKILL.md: keep the default look unless the brief names a brand)",
+ "model": "sonnet",
+ "calls": 5, "builds": 2, "image_looks": 2, "output_tokens": 5389,
+ "cost_units": 183312, "cost_above_start": 98695, "seconds": 46,
+ "accepted": true, "warnings_left": 2,
+ "agent_notes": "kept the default look (header: sizes, icon.disc, footer, num only); two warnings left: overlap on slide 15 (cover art vs title) and the advisory design-slide (emphasis not stated on 12 slides); slide 14 card text small",
+ "forms": {"1": "dark cover + network art", "2": "icon list", "3": "nested", "4": "timeline + conclusion", "5": "iconlist cards", "6": "vs", "7": "steps", "8": "2x2 icon cards", "9": "cycle", "10": "flow disc + above node", "11": "table + conclusion", "12": "proscons", "13": "stairs + lead", "14": "4 num", "15": "dark cover + rings art"}
+}
