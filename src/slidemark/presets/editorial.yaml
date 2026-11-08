@@ -27,6 +27,7 @@ sizes:
   table: 15
   cover-title: 52
   cover-subtitle: 22
+subtitle_font: body
 title_color: primary
 title_bold: false
 heading_color: primary
@@ -49,15 +50,25 @@ icon_disc: "#E3E5EA"
 icon_color: primary
 # series colors: ink first, then muted slate / sage / sand / clay / mauve (the accent is reserved for `hl=`)
 palette: [primary, "#5E7A9B", "#7C8F6F", "#B8915A", "#9C6B50", "#6E6479"]
+# chart bars are quiet slate (never heavy ink); the `hl=` bar is the accent tint (diagram fills keep the palette)
+chart_series: ["#8794AB", "#C2C9D6", "#7C8F6F", "#B8915A", "#9C6B50", "#6E6479"]
+layout:
+  # one vertical rhythm: content hugs its size, is centred in the body and keeps air above the footer
+  vcentre: true
+  html_fit: true
 render:
   connector_color: secondary
   connector_width: 1
   line_width: 0.75
+  chart_hl_tint: 0.16
+  chart_hl_line: 1.25
+  chart_note_pointer: false
 classes:
   # hairline cards on the paper: white fill, #BFC0C0 border, small corners, no shadow
   card: {fill: "#FFFFFF", line: border, line_width: 0.75, radius: 4, padding: 10pt}
   callout: {fill: "#ECECEC", line: border, line_width: 0.75, radius: 4}
-  chart-note: {fill: "#FFFFFF", line: accent, line_width: 0.75, radius: 3, bold: false}
+  # a chart takeaway: small accent text on the paper, no box, no arrow (the reference callout)
+  chart-note: {fill: bg, line: bg, line_width: 0, color: accent, bold: false, padding: 2pt}
   node: {fill: "#FFFFFF", line: secondary, line_width: 1, radius: 4, padding: 6pt}
   decision: {fill: "#FFFFFF", line: secondary}
   kpi: {color: primary}

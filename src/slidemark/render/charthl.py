@@ -8,6 +8,7 @@ from pptx.enum.chart import XL_MARKER_STYLE
 from pptx.oxml.ns import qn
 from pptx.util import Pt
 
+from ..contrast import mix
 from ..ir import Chart
 from ..layout import chartnote
 from ..theme import Theme
@@ -19,6 +20,20 @@ _BAR_LIKE = ("bar", "column", "stacked-bar", "stacked-column")
 
 def hl_color(theme: Theme) -> RGBColor:
     return RGBColor.from_string(hex6(theme, theme.render.chart_hl))
+
+
+def _mark(pt, theme: Theme, color: RGBColor) -> None:
+    """The focus look of one bar: solid ``chart_hl``, or (``chart_hl_tint`` > 0) a tint with a hairline."""
+    rt = theme.render
+    pt.format.fill.solid()
+    if rt.chart_hl_tint > 0:
+        pt.format.fill.fore_color.rgb = RGBColor.from_string(
+            mix(f"#{hex6(theme, 'bg')}", f"#{hex6(theme, rt.chart_hl)}", rt.chart_hl_tint).lstrip("#")
+        )
+        pt.format.line.color.rgb = color
+        pt.format.line.width = Pt(max(rt.chart_hl_line, 0.75))
+    else:
+        pt.format.fill.fore_color.rgb = color
 
 
 def apply_hl(
@@ -76,9 +91,13 @@ def apply_hl(
                         pt.marker.format.line.color.rgb = color
                     elif kind in _BAR_LIKE and si < real_series:
                         pt = ser.points[i]
-                        if real_series == 1:  # one series: the point itself takes the color
+                        if real_series == 1 or (
+                            rt.chart_hl_tint > 0 and si == 0
+                        ):  # the point takes the focus
+                            _mark(pt, theme, color)
+                        elif rt.chart_hl_tint > 0:  # the other series of that category stay quiet
                             pt.format.fill.solid()
-                            pt.format.fill.fore_color.rgb = color
+                            pt.format.fill.fore_color.rgb = RGBColor.from_string(pal[si % len(pal)])
                         else:  # several series keep their colors: an outline marks the category
                             pt.format.fill.solid()  # (a point without a fill falls back to the auto color)
                             pt.format.fill.fore_color.rgb = RGBColor.from_string(pal[si % len(pal)])
