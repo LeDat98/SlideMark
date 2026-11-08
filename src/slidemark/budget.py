@@ -18,6 +18,7 @@ Never raises.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from types import SimpleNamespace
 
 from .ir import Chart, Container, Diagnostic, Image, Media, Placed, Shape, Slide, Table
 from .theme import Theme
@@ -39,6 +40,17 @@ def _containers(slide: Slide) -> Iterator[Container]:
 def _graphs(slide: Slide) -> list[tuple[int, list]]:
     """(node count, links) of every diagram on the slide: mermaid containers and connector-joined blocks."""
     out: list[tuple[int, list]] = []
+    from .forms5 import graph_of
+
+    if (g := graph_of(slide)) is not None:  # @swimlane steps / @sequence participants and messages
+        nodes, arrows, labels = g
+        out.append(
+            (
+                nodes,
+                [SimpleNamespace(label=lb) for lb in labels]
+                + [SimpleNamespace(label="")] * (arrows - len(labels)),
+            )
+        )
     if slide.links:
         out.append((len({i for lk in slide.links for i in (lk.src, lk.dst)}), list(slide.links)))
     for c in _containers(slide):

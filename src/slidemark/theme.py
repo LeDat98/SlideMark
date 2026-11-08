@@ -18,7 +18,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .contrast import best_ink, nearest_passing, ratio
-from .forms4 import Forms4Tokens
+from .forms5 import Forms5Tokens
 from .ir import Diagnostic, Length, Style
 
 PRESET_DIR = Path(__file__).parent / "presets"
@@ -821,7 +821,7 @@ def _base_classes() -> dict[str, Style]:
     }
 
 
-class Theme(Forms4Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2026-10-08 lane B form tokens
+class Theme(Forms5Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2026-10-08 lane B form tokens
     model_config = ConfigDict(extra="forbid")
 
     name: str
@@ -2134,12 +2134,17 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
     from .forms2 import normalize as forms2_normalize
     from .forms3 import normalize as forms3_normalize
     from .forms4 import normalize as forms4_normalize
+    from .forms5 import normalize as forms5_normalize
 
     if (got := forms2_normalize(path, raw, names)) is not None:  # DL3b part 2: iconlist.* quote.* ...
         return got
     if (got := forms3_normalize(path, raw, names)) is not None:  # DL3d part 2: steps-card.h quote.bar ...
         return got
     if (got := _lane_a_value(path, raw, names)) is not None:  # icon.disc* icon.color card.elevation ...
+        return got
+    if (
+        got := forms5_normalize(path, raw, names)
+    ) is not None:  # wave 2026-11-08 lane C: swimlane.* sequence.*
         return got
     if (got := forms4_normalize(path, raw, names)) is not None:  # wave 2026-10-08 lane B: cycle.center ...
         return got

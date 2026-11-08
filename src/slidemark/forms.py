@@ -38,6 +38,10 @@ DEFAULTS["cycle"] = {"dir": "cw"}
 DEFAULTS["statement"] = {"align": "center", "valign": "middle"}
 DEFAULTS["stairs"] = {"dir": "up"}
 DEFAULTS["nested"] = {"side": "left"}
+FORMS = (*FORMS, "swimlane", "sequence")  # wave 2026-11-08 lane C (rules and tokens: forms5.py)
+KEYS["swimlane"] = {"dir": ("h", "v")}
+KEYS["sequence"] = {}
+DEFAULTS["swimlane"] = {"dir": "h"}
 ALL_KEYS = tuple(sorted({k for d in KEYS.values() for k in d} | set(COMMON)))
 
 # `##` boxes the form needs (min, max); agenda and statement read a list / text instead
@@ -60,6 +64,10 @@ EXAMPLE = {
     "nested": "@nested, then 3-4 `## ` boxes from the outer ring to the inner one",
     "flowdisc": "@flow disc, then 2-7 `## ` boxes in order ({.above} on the first = a node above the row)",
 }
+EXAMPLE["swimlane"] = (
+    "@swimlane, then `## Lane` boxes with one `- step` per item (`- 3: step` = column 3, {.focal} marks one)"
+)
+EXAMPLE["sequence"] = "@sequence, then one list of `- Client > API: POST /order` (`>>` = dashed reply)"
 WORD = {"flowdisc": "flow disc"}  # how a pseudo form reads on the `@` line
 
 _ACCENT = re.compile(r"\s*\{\.accent\}\s*$")
@@ -116,6 +124,10 @@ def statement_lines(slide: Slide) -> tuple[Any, list[Any]] | None:
 
 def fits(form: str, slide: Slide) -> str | None:
     """``None`` when the slide holds what ``form`` needs, else one sentence saying what is missing."""
+    if form in ("swimlane", "sequence"):
+        from . import forms5
+
+        return forms5.fits(form, slide)
     if form in COUNTS:
         lo, hi = COUNTS[form]
         bx = boxes(slide)

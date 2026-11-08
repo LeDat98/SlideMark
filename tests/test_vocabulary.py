@@ -62,6 +62,9 @@ ALL = {
     "stairs": STAIRS,
     "nested": NESTED,
 }
+# wave 2026-11-08 lane C
+ALL["swimlane"] = "# T\n@swimlane\n## Dev\n- Build\n- 3: Fix {.focal}\n## QA\n- 2: Test\n- 4: Sign off\n"
+ALL["sequence"] = "# T\n@sequence\n- Client > API: POST /order\n- API >> Client: 201\n"
 
 
 def make(tmp_path, text: str, head: str = HEAD, name: str = "d"):

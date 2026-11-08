@@ -853,6 +853,8 @@ def _connector(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
     st = pl.style
     cx.line.color.rgb = rgb(rc.theme, st.line or rc.theme.render.connector_color)
     cx.line.width = Pt(st.line_width if st.line_width is not None else rc.theme.render.connector_width)
+    if st.line_dash in _DASH:  # a dashed reply / lifeline (`@sequence`)
+        cx.line.dash_style = _DASH[st.line_dash]
     if "line_alpha" in el.attrs:  # `cover.art`: a thin line that is only partly opaque
         set_line_alpha(cx.line, el.attrs["line_alpha"])
     if el.attrs.get("head") == "arrow":

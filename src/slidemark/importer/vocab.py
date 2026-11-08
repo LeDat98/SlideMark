@@ -34,6 +34,8 @@ _NAMES = {
     "nested": re.compile(r"Nested (\d+)(?: text| list| icon)?"),
     "flowdisc": re.compile(r"Flow (\d+) (?:disc|line|text|icon)"),
     "coverart": re.compile(r"Cover art (\d+)"),
+    "swimlane": re.compile(r"Lane \d+(?: head)?|Step \d+(?: next)?"),
+    "sequence": re.compile(r"Seq .+ (?:head|lifeline)|Seq \d+ (?:msg|label)(?: reply| self)?(?: \d)?"),
 }
 _TEXT = {
     "timeline": re.compile(r"Timeline (\d+)( now)?"),
@@ -49,6 +51,8 @@ _WITH_DATA = (
     "cycle",
     "nested",
     "flowdisc",
+    "swimlane",
+    "sequence",
 )  # folds that also read the slide's other shapes (the icons drawn in the nodes)
 
 
@@ -169,6 +173,7 @@ def extract(data: SlideData) -> FormFold | None:
     named = [it for it in data.items if _NAMES[form].fullmatch(_name(it))]
     for it in named:
         it.role = "decor"
+    data.form_conns = data.conns
     data.conns, data.connectors = [], 0  # stems, axis arrows and rules are the form's, not links
     texts = [it for it in named if it.kind == "text" or it.paras]
     fold = {
@@ -182,6 +187,8 @@ def extract(data: SlideData) -> FormFold | None:
         "nested": _nested,
         "flowdisc": _flowdisc,
         "coverart": _coverart,
+        "swimlane": _swimlane,
+        "sequence": _sequence,
         "vs": _vs,
         "matrix": _matrix,
     }[form]
@@ -402,6 +409,131 @@ def _flowdisc(
         blk.icon = _icon_in(data, d)
         boxes.append(blk)
     return FormFold("flowdisc", ["flow", "disc"], boxes)
+
+
+def _swimlane(
+    form: str, named: list[Item], texts: list[Item], data: SlideData | None = None
+) -> FormFold | None:
+    lanes: dict[int, Item] = {}
+    heads: dict[int, Item] = {}
+    steps: dict[int, Item] = {}
+    for it in named:
+        m = re.fullmatch(r"(Lane|Step) (\d+)( head| next)?", _name(it))
+        if not m or m.group(3) == " next":
+            continue
+        kind = (m.group(1), bool(m.group(3)))
+        {("Lane", False): lanes, ("Lane", True): heads, ("Step", False): steps}[kind][int(m.group(2))] = it
+    if len(lanes) < 2 or len(steps) < 2:
+        return None
+    ns = sorted(lanes)
+    vertical = abs(lanes[ns[1]].x - lanes[ns[0]].x) > abs(lanes[ns[1]].y - lanes[ns[0]].y)
+    flow = (lambda i: i.y) if vertical else (lambda i: i.x)  # along the flow
+    across = (lambda i: i.cx) if vertical else (lambda i: i.cy)
+
+    def lane_of(it: Item) -> int:
+        return min(ns, key=lambda n: abs(across(lanes[n]) - across(it)))
+
+    xs = sorted({flow(s) for s in steps.values()})
+    diffs = [b - a for a, b in zip(xs, xs[1:], strict=False) if b - a > 20000]
+    pitch = min(diffs) if diffs else 1
+    per: dict[int, list[tuple[int, int, Item]]] = {n: [] for n in ns}
+    for k, it in steps.items():
+        per[lane_of(it)].append((k, round((flow(it) - xs[0]) / pitch) + 1, it))
+    prev = 0
+    cols: dict[int, int] = {}
+    for k in sorted(steps):  # written order = the order of the `Step N` numbers
+        it = steps[k]
+        col = next(c for kk, c, i in per[lane_of(it)] if kk == k)
+        cols[k] = col
+    boxes = []
+    for n in ns:
+        paras: list[ParaT] = []
+        for k, _c, it in sorted(per[n], key=lambda t: t[0]):
+            ps = [p for p in it.paras if p.plain.strip()]
+            if not ps:
+                continue
+            col = cols[k]
+            first = replace(ps[0], marker="bullet", level=0, size=None, runs=[_plain(r) for r in ps[0].runs])
+            order = sorted(steps)
+            before = [kk for kk in order if kk < k]
+            prev = cols[before[-1]] if before else 0
+            if col != prev + 1 and first.runs:
+                first.runs[0] = replace(first.runs[0], text=f"{col}: {first.runs[0].text}")
+            paras.append(first)
+            paras += [
+                replace(p, marker="bullet", level=1, size=None, runs=[_plain(r) for r in p.runs])
+                for p in ps[1:]
+            ]
+        head = [
+            replace(p, size=None, runs=[_plain(r) for r in p.runs])
+            for p in (heads[n].paras if n in heads else [])
+            if p.plain.strip()
+        ][:1]
+        boxes.append(_box(lanes[n], head, paras))
+    return FormFold("swimlane", ["swimlane"] + (["dir=v"] if vertical else []), boxes)
+
+
+def _sequence(
+    form: str, named: list[Item], texts: list[Item], data: SlideData | None = None
+) -> FormFold | None:
+    parts: list[tuple[int, str]] = []
+    labels: list[tuple[Item, str]] = []
+    for it in named:
+        nm = _name(it)
+        if re.fullmatch(r"Seq .+ head", nm) and it.text:
+            parts.append((it.cx, it.text.replace("\n", " ").strip()))
+        elif (m := re.fullmatch(r"Seq \d+ label( reply| self)?", nm)) and it.text:
+            labels.append((it, (m.group(1) or "").strip()))
+    parts.sort()
+    if len(parts) < 2 or data is None:
+        return None
+    xs = [x for x, _ in parts]
+    tol = round(0.08 * 914400)
+
+    def who(x: float) -> int | None:
+        k = min(range(len(xs)), key=lambda i: abs(xs[i] - x))
+        return k if abs(xs[k] - x) <= tol else None
+
+    rows: list[tuple[float, str]] = []
+    used: set[int] = set()
+    for cn in data.form_conns:
+        if abs(cn.y0 - cn.y1) > tol or (a := who(cn.x0)) is None or (b := who(cn.x1)) is None or a == b:
+            continue
+        if not cn.arrow_end and cn.arrow_start:
+            a, b = b, a
+        best = None
+        for j, (it, kind) in enumerate(labels):
+            gap = cn.y0 - (it.y + it.h)
+            lo, hi = min(cn.x0, cn.x1), max(cn.x0, cn.x1)
+            if (
+                kind != "self"
+                and j not in used
+                and -tol <= gap <= 0.4 * 914400
+                and lo - tol <= it.cx <= hi + tol
+            ):
+                if best is None or gap < best[0]:
+                    best = (gap, j)
+        text = ""
+        if best is not None:
+            used.add(best[1])
+            text = labels[best[1]][0].text.replace("\n", " ").strip()
+        arrow = ">>" if cn.dash else ">"
+        rows.append((cn.y0, f"{parts[a][1]} {arrow} {parts[b][1]}" + (f": {text}" if text else "")))
+    for it, kind in labels:
+        if kind == "self":
+            k = max((i for i in range(len(xs)) if xs[i] <= it.x + tol), default=None)
+            if k is not None:
+                rows.append(
+                    (it.cy, f"{parts[k][1]} > {parts[k][1]}: {it.text.replace(chr(10), ' ').strip()}")
+                )
+    if not rows:
+        return None
+    rows.sort()
+    paras = [ParaT(runs=[RunT(text=t)], marker="bullet") for _y, t in rows]
+    first = next(it for it in named if re.fullmatch(r"Seq .+ head", _name(it)))
+    return FormFold(
+        "sequence", ["sequence"], [Block("text", first.x, first.y, first.w, first.h, paras=paras)]
+    )
 
 
 def _agenda(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:

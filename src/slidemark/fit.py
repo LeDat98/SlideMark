@@ -287,6 +287,10 @@ def _vocab(v: dict, theme: Theme, dense_k: float):
             f"disc {round(v.get('disc') or 0)}pt",
             text,
         ]
+    if form in ("swimlane", "sequence"):  # wave 2026-11-08 lane C
+        from .forms5 import fit_line
+
+        return fit_line(v, text)
     if form == "agenda":
         return f"agenda {n} rows" + (", current marked" if v.get("now") else ""), [
             f"numbers {round(v.get('num') or 0)}pt",

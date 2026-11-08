@@ -260,7 +260,11 @@ def emphasis_count(slide: Slide) -> int:
     """Emphases on the slide, one per element that carries any: an attribute (``.hero`` ``hl=`` ``note=``; a
     chart's ``hl=`` + ``note=`` are one takeaway) or an inline mark (``==x==``, ``[x]{.danger}``, a badge; a
     column of status badges in one table is one emphasis)."""
-    return sum(1 for el in _walk(slide) if any(p(el) for p in EMPHASIS_ELEMENT) or _marked(el))
+    from .forms5 import emphasis_marks  # a `{.focal}` step of @swimlane / message of @sequence
+
+    return emphasis_marks(slide) + sum(
+        1 for el in _walk(slide) if any(p(el) for p in EMPHASIS_ELEMENT) or _marked(el)
+    )
 
 
 def stated_groups(slide: Slide) -> dict[str, bool]:

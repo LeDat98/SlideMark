@@ -155,6 +155,7 @@ class ConnT:
     arrow_end: bool = False  # a:tailEnd (the end of the line; what the renderer draws for ``a>b``)
     arrow_start: bool = False  # a:headEnd
     order: int = 0
+    dash: bool = False  # a dashed line (a `@sequence` reply)
 
 
 @dataclass
@@ -173,6 +174,7 @@ class SlideData:
     words: list[str] = field(
         default_factory=list
     )  # recognise.py: words of the slide's `@` line (`kpi`, `num`)
+    form_conns: list[ConnT] = field(default_factory=list)  # vocab.extract: the connectors a form drew
 
 
 @dataclass
@@ -930,6 +932,9 @@ def _read_conn(el, tf: Tf, order: int) -> ConnT | None:
         _arrow(ln, "a:tailEnd"),
         _arrow(ln, "a:headEnd"),
         order,
+        ln is not None
+        and ln.find(qn("a:prstDash")) is not None
+        and ln.find(qn("a:prstDash")).get("val") != "solid",
     )
 
 
