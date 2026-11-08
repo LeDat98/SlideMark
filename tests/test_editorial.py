@@ -86,7 +86,9 @@ def test_mermaid_classes_render(tmp_path):
     d = build(src, tmp_path / "m.pptx")
     assert not [x for x in d.diagnostics if x.level == "warning" and not x.rule.startswith("design")]
     slide = Presentation(tmp_path / "m.pptx").slides[0]
-    dashed = [s for s in slide.shapes if 'prstDash val="dash"' in s._element.xml]
+    dashed = [
+        s for s in slide.shapes if 'prstDash val="dash"' in s._element.xml and not s.name.startswith("Legend")
+    ]
     assert len(dashed) == 1  # only the `.security` node
 
 

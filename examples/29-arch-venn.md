@@ -4,7 +4,7 @@ num: on
 colors: accent=#BF4520
 fonts: heading=Georgia body=Arial
 sizes: title=34 body=17
-style: radius=4
+style: radius=4 diagram.tag.track=0.08
 
 # Order platform in three tiers
 @arch

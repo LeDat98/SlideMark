@@ -909,7 +909,10 @@ def _glue(slide, cx, attrs: dict, fh: bool, fv: bool) -> None:
     else:
         s_idx, e_idx = (1, 3) if fh else (3, 1)
     c_nv = cx._element.find(qn("p:nvCxnSpPr")).find(qn("p:cNvCxnSpPr"))
-    for tag, shp, idx in (("a:stCxn", src, s_idx), ("a:endCxn", dst, e_idx)):
+    free = attrs.get("free_ends") or []  # ends off a connection site (a port): left unglued
+    for tag, shp, idx, end in (("a:stCxn", src, s_idx, "s"), ("a:endCxn", dst, e_idx, "e")):
+        if end in free:
+            continue
         el = etree.SubElement(c_nv, qn(tag))
         el.set("id", str(shp.shape_id))
         el.set("idx", str(idx))

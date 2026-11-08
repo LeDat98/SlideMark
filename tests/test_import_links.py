@@ -19,8 +19,14 @@ ARROW = {"a:tailEnd": "triangle"}
 
 
 def _connectors(path: Path) -> list[int]:
-    return [  # card rules (decor, named "Rule") are not links: whether a card has room for them is layout
-        sum(1 for sh in s.shapes if sh._element.tag.endswith("cxnSp") and sh.name.lower() != "rule")
+    return [  # card rules (decor, named "Rule") and legend swatches are not links (a card's room is layout)
+        sum(
+            1
+            for sh in s.shapes
+            if sh._element.tag.endswith("cxnSp")
+            and sh.name.lower() != "rule"
+            and not sh.name.startswith("Legend")
+        )
         for s in Presentation(str(path)).slides
     ]
 

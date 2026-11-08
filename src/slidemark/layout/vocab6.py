@@ -13,15 +13,17 @@ rectangles, bends in a free channel; the arrow colour is ``render.connector_colo
 
 from __future__ import annotations
 
+import itertools
 import math
 import re
 from typing import Any
 
 from .. import forms, forms6
-from ..ir import Link, Paragraph, Run, Shape, Slide, Text, fast_style
+from ..ir import Paragraph, Run, Shape, Slide, Text, fast_style
 from ..units import EMU_PER_PT
 from . import diagramkit as DK
 from . import measure
+from . import ports as PO
 from . import vocab as V
 from .grid import Rect
 
@@ -99,6 +101,21 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     has_title = [bool(A.tiers[i][0]) for i in range(n)]
     tag_h = [0]
 
+    # the most elbows (arrows that change column) any two neighbouring tiers share: each needs a level
+    tier_of = {id(nd): ti for ti, (_t, r_) in enumerate(A.tiers) for nd in r_}
+    stacked = 1
+    for g in range(max(n - 1, 0)):
+        m_ = sum(
+            1
+            for e in edges
+            if min(tier_of[id(A.nodes[e.src])], tier_of[id(A.nodes[e.dst])])
+            <= g
+            < max(tier_of[id(A.nodes[e.src])], tier_of[id(A.nodes[e.dst])])
+        )
+        stacked = max(stacked, m_)
+    if cols:
+        stacked = 1
+
     def plan(k: float) -> _Plan:
         K = K0.scaled(k)
         tag_h[0] = DK.tag_size(K, "X")[1]
@@ -117,10 +134,11 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         gt = V._emu(th.arch_gap) if th.arch_gap else 0
         if not gt:
             if cols:
-                gt = max(round(0.55 * _IN), labw + round(0.3 * _IN)) if labelled else round(0.55 * _IN)
-                gt = min(gt, round(2.0 * _IN))
+                gt = max(round(0.55 * _IN), labw + round(0.6 * _IN)) if labelled else round(0.55 * _IN)
+                gt = min(gt, round(2.2 * _IN))
             else:
                 gt = round((0.55 if labelled else 0.45) * _IN)
+                gt = max(gt, round((0.2 + 0.3 * stacked) * _IN))
         nat = max(DK.node_width(c, K, nd.name, nd.sub, nd.tag) for nd in A.nodes)
         w = V._emu(th.arch_node_w) if th.arch_node_w else min(max(nat, round(1.3 * _IN)), round(2.6 * _IN))
         lw = 0
@@ -212,7 +230,12 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             zones.append(Rect(x0 + P.lw, y, P.tier_w[i] - P.lw, P.tier_h[i]))
             y += P.tier_h[i] + P.gt
     band_fill = th.arch_tier_fill or V._eng()._tint(th, "muted", 0.07)
+    group_fill = th.diagram_group_fill or V._eng()._tint(th, "muted", 0.07)
     caps: list[Rect] = []
+
+    def own_fill(i: int) -> str | None:
+        return V._own(slide.elements[i], "fill")
+
     for i, (title, _row) in enumerate(A.tiers):
         z = zones[i]
         lk = looks[i]
@@ -223,12 +246,11 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
                 st = fast_style(
                     fill=fill, line=th.arch_tier_line, **({"radius": radius} if radius is not None else {})
                 )
-            else:  # a dashed hairline container
+            else:  # a light solid container: paper-2 fill, hairline border, caption on a knockout
                 st = fast_style(
-                    fill=own,
+                    fill=own or group_fill,
                     line=th.diagram_tag_line,
                     line_width=DK.hairline(c),
-                    line_dash="dash",
                     radius=V._pt(V._emu(th.diagram_group_radius)),
                 )
             if fill_ok(st):
@@ -247,7 +269,9 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             )
         cst = cap_st
         if lk == "box":
-            cst = V._text_style(c, K.label, align="center", valign="middle", padding="0pt", fill="bg")
+            cst = V._text_style(
+                c, K.label, align="center", valign="middle", padding="0pt", fill=own_fill(i) or group_fill
+            )
         DK.emit_text(
             c,
             f"Arch tier {i + 1} label",
@@ -289,33 +313,31 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             rect = Rect(x, y, P.w, P.h)
             rects[kidx] = rect
             node_draws.append((nd, rect))
-    # arrows (glued to the node rectangles, drawn under the nodes), then the nodes, then the labels
-    E = V._eng()
+    # arrows (own ports and bend levels, drawn under the nodes), then the nodes, then the labels
+    pairs = [(e.src, e.dst) for e in edges]
+    routes = PO.plan(
+        pairs, rects, "h" if cols else None, labelled={i for i, e in enumerate(edges) if e.label}
+    )
     done = 0
     placed: list[tuple[Any, Any]] = []
-    for e in edges:
-        if e.src not in rects or e.dst not in rects:
+    for e, rt in zip(edges, routes, strict=True):
+        if rt is None:
             continue
-        before = len(c.out)
-        E._emit_links(c, [Link(src=e.src, dst=e.dst, arrow=True)], rects, "h" if cols else None)
-        if len(c.out) == before:
-            continue
-        pl = c.out[-1]
-        pl.element.attrs["shape_name"] = f"Arch edge {done + 1}"
-        pl.element.attrs["under"] = True
+        pl = PO.emit(c, rt, rects, f"Arch edge {done + 1}")
         kind = "primary" if e.focal and e.kind == "flow" else e.kind
         col, dash, wd = DK.style_of(K, kind, e.focal)
         DK.restyle(pl, col, dash, wd)
         pl.element.attrs["kind"] = kind
         done += 1
         placed.append((e, pl))
-    _stagger(placed)
     for nd, rect in node_draws:
         DK.node(
             c, K, f"Arch node {nd.name}", f"Arch tag {nd.name}", rect,
             DK.node_paras(c, K, nd.name, nd.sub), nd.tag, nd.classes,
         )  # fmt: skip
     obstacles = [*rects.values(), *caps]
+    for _e, pl in placed:
+        obstacles += PO.segment_rects(DK.polyline(pl))
     for e, pl in placed:
         if e.label:
             kind = "primary" if e.focal and e.kind == "flow" else e.kind
@@ -352,69 +374,6 @@ def fill_ok(st) -> bool:
     return bool(st.fill or st.line)
 
 
-def _stagger(placed: list[tuple[Any, Any]]) -> None:
-    """Arrows of different sources and targets that would share one bend line get their own: the arrows of
-    one gap whose spans overlap are bundled by shared end (one source or target = one bus) and the bundles
-    take evenly spaced positions between the two tiers."""
-    groups: dict[tuple[str, int, int], list[tuple[Any, Any]]] = {}
-    for e, pl in placed:
-        at = pl.element.attrs
-        if not at.get("elbow"):
-            continue
-        if at.get("route") == "h":
-            key = ("h", pl.x, pl.x + pl.w)
-        else:
-            key = ("v", pl.y, pl.y + pl.h)
-        groups.setdefault(key, []).append((e, pl))
-    for (route, _lo, _hi), items in groups.items():
-        if len(items) < 2:
-            continue
-        parent = list(range(len(items)))
-
-        def find(i: int, parent=parent) -> int:
-            while parent[i] != i:
-                parent[i] = parent[parent[i]]
-                i = parent[i]
-            return i
-
-        for i in range(len(items)):
-            for j in range(i + 1, len(items)):
-                if items[i][0].src == items[j][0].src or items[i][0].dst == items[j][0].dst:
-                    parent[find(i)] = find(j)
-        bundles: dict[int, list[int]] = {}
-        for i in range(len(items)):
-            bundles.setdefault(find(i), []).append(i)
-        if len(bundles) < 2:
-            continue
-
-        def span(ix: list[int], route=route, items=items) -> tuple[int, int]:
-            if route == "v":
-                xs = [v for i in ix for v in (items[i][1].x, items[i][1].x + items[i][1].w)]
-            else:
-                xs = [v for i in ix for v in (items[i][1].y, items[i][1].y + items[i][1].h)]
-            return min(xs), max(xs)
-
-        order = sorted(bundles.values(), key=lambda ix: span(ix)[0])
-        clusters: list[list[list[int]]] = []
-        for ix in order:
-            if clusters and span(ix)[0] < max(span(m)[1] for m in clusters[-1]):
-                clusters[-1].append(ix)
-            else:
-                clusters.append([ix])
-        for cl in clusters:
-            if len(cl) < 2:
-                continue
-            for pos, ix in enumerate(cl):
-                f = (pos + 1) / (len(cl) + 1)
-                for i in ix:
-                    pl = items[i][1]
-                    at = pl.element.attrs
-                    down = not (
-                        pl.element.attrs.get("flip_v") if route == "v" else pl.element.attrs.get("flip_h")
-                    )
-                    at["adj"] = round(f if down else 1 - f, 4)
-
-
 def _radius(th) -> Any:
     card = th.classes.get("node") or th.classes.get("card")
     return card.radius if card is not None and card.radius is not None else None
@@ -442,26 +401,33 @@ _BOX_CACHE: dict[tuple, tuple[float, float, float, float]] = {}
 
 
 def _best_box(
-    ins: list[tuple[float, float, float]], outs: list[tuple[float, float, float]], margin: float
+    ins: list[tuple[float, float, float]],
+    outs: list[tuple[float, float, float]],
+    margin: float,
+    ar: float = _AR,
 ) -> tuple[float, float, float, float]:
     """Memoised ``_best_box0``: the geometry is the same at every text size the layout tries."""
     key = (
         tuple(map(round, (v for c in ins for v in c))),
         tuple(map(round, (v for c in outs for v in c))),
         round(margin),
+        ar,
     )
     got = _BOX_CACHE.get(key)
     if got is None:
         if len(_BOX_CACHE) > 512:
             _BOX_CACHE.clear()
-        got = _BOX_CACHE[key] = _best_box0(ins, outs, margin)
+        got = _BOX_CACHE[key] = _best_box0(ins, outs, margin, ar)
     return got
 
 
 def _best_box0(
-    ins: list[tuple[float, float, float]], outs: list[tuple[float, float, float]], margin: float
+    ins: list[tuple[float, float, float]],
+    outs: list[tuple[float, float, float]],
+    margin: float,
+    ar: float = _AR,
 ) -> tuple[float, float, float, float]:
-    """``(cx, cy, w, h)`` of the largest box of aspect ``_AR`` inside every circle of ``ins`` and outside
+    """``(cx, cy, w, h)`` of the largest box of aspect ``ar`` inside every circle of ``ins`` and outside
     every circle of ``outs`` (``margin`` from the outlines); ``w = 0`` when the region is empty."""
     x0, y0, r0 = ins[0]
     best = (x0, y0, 0.0, 0.0)
@@ -472,7 +438,7 @@ def _best_box0(
             cy = y0 - r0 + 2 * r0 * iy / steps
 
             def ok(w: float, cx=cx, cy=cy) -> bool:
-                h = w / _AR
+                h = w / ar
                 pts = []
                 for fx in (-1, -0.5, 0, 0.5, 1):
                     for fy in (-1, 0, 1):
@@ -490,7 +456,86 @@ def _best_box0(
                 mid = (lo_w + hi_w) / 2
                 lo_w, hi_w = (mid, hi_w) if ok(mid) else (lo_w, mid)
             if lo_w > best[2]:
-                best = (cx, cy, lo_w, lo_w / _AR)
+                best = (cx, cy, lo_w, lo_w / ar)
+    return best
+
+
+def _box_free(
+    cx: float,
+    cy: float,
+    w: float,
+    h: float,
+    ins: list[tuple[float, float, float]],
+    outs: list[tuple[float, float, float]],
+    margin: float,
+) -> bool:
+    for fx in (-1, -0.5, 0, 0.5, 1):
+        for fy in (-1, 0, 1):
+            px, py = cx + fx * w / 2, cy + fy * h / 2
+            if not all(_inside(px, py, ci, -margin) for ci in ins):
+                return False
+            if any(_inside(px, py, co, margin) for co in outs):
+                return False
+    return True
+
+
+def _outward(
+    circ: tuple[float, float, float],
+    outs: list[tuple[float, float, float]],
+    w: float,
+    h: float,
+    direction: tuple[float, float],
+    margin: float,
+) -> tuple[float, float] | None:
+    """Centre of a ``w`` x ``h`` box inside ``circ`` and outside ``outs`` that lies furthest along
+    ``direction`` (the name of an outer set sits towards the outside of its circle), or ``None``."""
+    cx0, cy0, r = circ
+    best, best_s = None, -1e18
+    steps = 28
+    for iy in range(steps + 1):
+        for ix in range(steps + 1):
+            cx = cx0 - r + 2 * r * ix / steps
+            cy = cy0 - r + 2 * r * iy / steps
+            if not _box_free(cx, cy, w, h, [circ], outs, margin):
+                continue
+            dx, dy = cx - cx0, cy - cy0
+            sc = dx * direction[0] + dy * direction[1] - 0.3 * abs(dx * direction[1] - dy * direction[0])
+            if sc > best_s:
+                best, best_s = (cx, cy), sc
+    return best
+
+
+_WEAK = {"a", "an", "the", "of", "to", "and", "for", "in", "on", "or", "by", "at", "with", "is", "are"}
+
+
+def _balanced(text: str, size: float, w: float, c, K) -> list[str]:
+    """``text`` as one line when it fits ``w`` (EMU), else the fewest lines (up to 3) that fit, split where
+    the widths are most even and no line ends on a function word ("A PLAN THE / TEAM")."""
+    words = text.split()
+    tr = c.theme.diagram_label_track
+
+    def wid(ws: list[str]) -> float:
+        return DK.small_w(K, " ".join(ws), size, tr)
+
+    if len(words) < 2 or wid(words) <= w:
+        return [text]
+    best: list[str] = [text]
+    for n in (2, 3):
+        if len(words) < n:
+            break
+        top: tuple[float, list[str]] | None = None
+        for cuts in itertools.combinations(range(1, len(words)), n - 1):
+            parts = [words[a:b] for a, b in zip((0, *cuts), (*cuts, len(words)), strict=True)]
+            cost = max(
+                wid(pt) * (1.8 if pt[-1].lower().strip(".,") in _WEAK and pt is not parts[-1] else 1.0)
+                for pt in parts
+            )
+            if top is None or cost < top[0]:
+                top = (cost, [" ".join(pt) for pt in parts])
+        assert top is not None
+        best = top[1]
+        if max(wid(ln.split()) for ln in best) <= w:
+            return best
     return best
 
 
@@ -582,6 +627,7 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
 
     def solve(k: float, mode: str) -> dict[str, Any]:
         K = K0.scaled(k)
+        K.sub = max(K.sub, min(9.0, th.diagram_sub_size))  # a venn sublabel never drops below 9 pt
         name_pt = round(K.name + 3, 1)
         r_h = (body.h - 2 * air) / extent(1.0)[1]
         r_w = body.w * (0.96 if mode == "in" else 0.5) / extent(1.0)[0]
@@ -620,15 +666,14 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             st = V._text_style(c, name_pt, align=al, valign="middle")
             need = V._need(c, _set_paras(c, K, heads[i], parts[i][1], bxi[2], name_pt), round(bxi[2]), st)
             fit = fit and need <= bxi[3]
-        ob = _best_box(list(circ), [], margin)
-        ofit = True
+        ob, ocore, ofit = (0.0, 0.0, 0.0, 0.0), None, True
         if otext:
-            ost = V._text_style(c, K.name, bold=True, align="center", valign="middle")
-            op = _core_paras(c, K, oname, osub, K.name)
-            ofit = ob[2] > 0 and V._need(c, op, round(ob[2]), ost) <= ob[3]
+            ob, ocore, ofit = _core_label(c, K, list(circ), margin, oname, osub)
+        else:
+            ob = _best_box(list(circ), [], margin)
         return {
             "r": r, "circ": circ, "boxes": boxes_, "aligns": aligns, "ob": ob, "fit": fit, "ofit": ofit,
-            "mode": mode, "K": K, "name_pt": name_pt, "ox": ox,
+            "mode": mode, "K": K, "name_pt": name_pt, "ox": ox, "core": ocore, "margin": margin,
         }  # fmt: skip
 
     want = th.venn_text if th.venn_text in ("in", "out") else "auto"
@@ -665,7 +710,6 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             fast_style(fill=col, opacity=th.venn_alpha, line=lc, line_width=line_w),
         )
     # the overlap of all sets: an exact lens (a freeform), solid
-    ob = S["ob"]
     core_fill = "accent" if focal_overlap else th.venn_core
     if otext:
         poly = _lens(circ)
@@ -676,27 +720,54 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
                 Rect(min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)),
                 fast_style(fill=core_fill, line=None),
             )
+    gx = sum(ci[0] for ci in circ) / n
+    gy = sum(ci[1] for ci in circ) / n
     for i in range(n):
         bxi = S["boxes"][i]
         paras = _set_paras(c, K, heads[i], parts[i][1], bxi[2], name_pt)
         if not paras or bxi[2] <= 0:
             continue
         w, h = round(bxi[2]), round(bxi[3])
+        cx_, cy_ = bxi[0], bxi[1]
+        if S["mode"] == "in":
+            # a name sits towards the outside of its circle: a box of the text's own size, pushed outwards
+            st_ = V._text_style(c, name_pt, color=th.venn_name_color, align="center", valign="middle")
+            nat = max(
+                (
+                    max(
+                        DK.small_w(K, r.text, p.style.font_size or K.sub, th.diagram_label_track)
+                        if p.style.text_transform == "caps"
+                        else _tw(r.text, p.style.font_size or name_pt, bool(p.style.bold))
+                        for r in p.runs
+                    )
+                    for p in paras
+                ),
+                default=w,
+            )
+            tw_ = min(w, round(nat + 6 * EMU_PER_PT))
+            th_ = round(V._need(c, paras, tw_, st_))
+            vx, vy = circ[i][0] - gx, circ[i][1] - gy
+            vn = math.hypot(vx, vy) or 1.0
+            outs = [circ[j] for j in range(n) if j != i]
+            got = _outward(circ[i], outs, tw_, th_, (vx / vn, vy / vn), S["margin"] + 0.05 * circ[i][2])
+            if got is not None and th_ <= h * 1.05:
+                cx_, cy_, w, h = got[0], got[1], tw_, th_
         V._emit_text(
             c,
             f"Venn {i + 1} name",
             paras,
-            Rect(round(bxi[0] - w / 2), round(bxi[1] - h / 2), w, h),
+            Rect(round(cx_ - w / 2), round(cy_ - h / 2), w, h),
             V._text_style(c, name_pt, color=th.venn_name_color, align=S["aligns"][i], valign="middle"),
         )
-    if otext and ob[2] > 0:
-        w, h = round(ob[2]), round(ob[3])
+    if otext and S["core"] is not None:
+        (ocx, ocy, ow, oh), oparas_fn = S["core"]
         ink = th.ink_on(core_fill, "bg")
+        w, h = round(ow), round(oh)
         V._emit_text(
             c,
             "Venn overlap",
-            _core_paras(c, K, oname, osub, K.name, ink),
-            Rect(round(ob[0] - w / 2), round(ob[1] - h / 2), w, h),
+            oparas_fn(ink),
+            Rect(round(ocx - w / 2), round(ocy - h / 2), w, h),
             V._text_style(c, K.name, color=ink, align="center", valign="middle"),
         )
     info.update(n=n, size=name_pt, fit=S["fit"] and S["ofit"], overlap=bool(otext), text=S["mode"])
@@ -705,13 +776,59 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     return True
 
 
-def _core_paras(c, K, name: str, sub: str, name_pt: float, ink: str | None = None) -> list[Paragraph]:
-    """The label of the overlap: the bold name and, after a colon, a mono capitals sublabel."""
+def _core_paras(
+    c, K, name: str, sub: list[str] | str, name_pt: float, sub_pt: float, ink: str | None = None
+) -> list[Paragraph]:
+    """The label of the overlap: the bold name and the mono capitals sublabel (one or two lines)."""
     st = fast_style(font_size=name_pt, bold=True, **({"color": ink} if ink else {}))
     out = [Paragraph(runs=[Run(text=name)], style=st)]
-    if sub:
-        out.append(DK.small_para(c, K, sub, K.sub, c.theme.diagram_label_track, ink))
+    for ln in [sub] if isinstance(sub, str) else sub:
+        if ln:
+            out.append(DK.small_para(c, K, ln, sub_pt, c.theme.diagram_label_track, ink))
     return out
+
+
+_CORE_AR = (1.5, 2.0, 1.0, 2.6, 0.7, 3.4)
+
+
+def _core_label(c, K, circ, margin: float, oname: str, osub: str):
+    """``(box, (box, paras of an ink), fits)`` of the label of the overlap: the largest sizes (name down to
+    9 pt, sublabel down to 8 pt) and the box shape (aspect 1.5 .. 3.4) that fit the lens, the sublabel on one
+    line or two balanced ones, never a word split."""
+    th = c.theme
+    best = _best_box(circ, [], margin)
+    names = [round(K.name - 0.5 * i, 1) for i in range(int((K.name - 9) / 0.5) + 1)] or [K.name]
+    for wrap in (False, True):  # first shrink the sublabel to 8 pt on one line, then break it
+        for nm in names:
+            for sub_pt in (K.sub, max(K.sub - 0.5, 8.0), 8.0):
+                for ar in _CORE_AR:
+                    box = _best_box(circ, [], margin, ar)
+                    if box[2] <= 0:
+                        continue
+                    w = round(box[2])
+                    lines = _balanced(osub, sub_pt, w - 2 * EMU_PER_PT, c, K) if (osub and wrap) else [osub]
+                    paras = _core_paras(c, K, oname, lines, nm, sub_pt)
+                    st = V._text_style(c, nm, bold=True, align="center", valign="middle")
+                    wide = max(
+                        [_tw(wd, nm, True) for wd in oname.split() or [oname]]
+                        + [DK.small_w(K, ln, sub_pt, th.diagram_label_track) for ln in lines if ln]
+                    )
+                    if wide <= w and V._need(c, paras, w, st) <= box[3]:
+                        return box, (box, _CoreInk(c, K, oname, lines, nm, sub_pt)), True
+    nm = names[-1]
+    lines = _balanced(osub, 8.0, round(best[2]), c, K) if osub else []
+    return best, (best, _CoreInk(c, K, oname, lines, nm, 8.0)), False
+
+
+class _CoreInk:
+    """The paragraphs of the overlap label, drawn once the ink colour is known."""
+
+    def __init__(self, c, K, name: str, lines: list[str], name_pt: float, sub_pt: float) -> None:
+        self.a = (c, K, name, lines, name_pt, sub_pt)
+
+    def __call__(self, ink: str | None) -> list[Paragraph]:
+        c, K, name, lines, name_pt, sub_pt = self.a
+        return _core_paras(c, K, name, lines, name_pt, sub_pt, ink)
 
 
 FORMS = {"arch": _arch, "venn": _venn}

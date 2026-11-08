@@ -378,7 +378,8 @@ def place_label(
     gap: int = round(4 * PT),
 ) -> tuple[Rect, bool]:
     """Where an arrow label of ``w`` x ``h`` goes: beside a segment of ``poly`` with ``gap`` air from the
-    stroke (above / below a horizontal segment, right / left of a vertical one), clear of ``obstacles``.
+    stroke (above / below a horizontal segment, right / left of a vertical one), as near the middle of the
+    segment as the ``obstacles`` (nodes, rules, other arrows, other labels) allow.
     Returns ``(rect, clear)``; ``clear`` is False when only a knockout on the stroke was left."""
     segs = []
     for (x0, y0), (x1, y1) in zip(poly, poly[1:], strict=False):
@@ -386,32 +387,50 @@ def place_label(
         if length > 0:
             segs.append((length, x0, y0, x1, y1))
     segs.sort(key=lambda s: -s[0])
-    cands: list[Rect] = []
-    horiz = [s for s in segs if s[2] == s[4]]
-    vert = [s for s in segs if s[1] == s[3]]
-    for length, x0, y0, x1, _y1 in horiz:
-        if length + 1 < w + 2 * gap and len(horiz) > 1 and length < 0.5 * w:
-            continue
-        lo, hi = min(x0, x1), max(x0, x1)
-        for t in (0.5, 0.3, 0.7, 0.15, 0.85):
-            cx = lo + t * (hi - lo)
-            cx = min(max(cx, lo + w / 2), max(hi - w / 2, lo + w / 2))
-            for dy in (-(h + gap), gap):
-                cands.append(Rect(round(cx - w / 2), round(y0 + dy), w, h))
-    for _length, x0, y0, _x1, y1 in vert:
-        lo, hi = min(y0, y1), max(y0, y1)
-        for t in (0.5, 0.3, 0.7, 0.15, 0.85):
-            cy = lo + t * (hi - lo)
-            for dx in (gap, -(gap + w)):
-                cands.append(Rect(round(x0 + dx), round(cy - h / 2), w, h))
-    for r in cands:
-        if bounds is not None and (
-            r.x < bounds.x or r.right > bounds.right or r.y < bounds.y or r.bottom > bounds.bottom
-        ):
-            continue
-        if any(_hit(r, o, round(1 * PT)) for o in obstacles):
-            continue
-        return r, True
+    cands: list[tuple[float, Rect]] = []
+    step = max(round(2 * PT), 1)
+    for rank, (length, x0, y0, x1, y1) in enumerate(segs):
+        penalty = 0.0 if rank == 0 else 0.2 + 0.05 * rank
+        if y0 == y1:  # horizontal: above / below
+            lo, hi = min(x0, x1), max(x0, x1)
+            room = max(hi - lo - w, 0)
+            if length + 1 < w + 2 * gap and len(segs) > 1 and length < 0.5 * w:
+                continue
+            for off in range(0, int(room / 2) + step, step):
+                for sgn in (1, -1) if off else (1,):
+                    cx = (lo + hi) / 2 + sgn * off
+                    if room > 0 and not lo + w / 2 - 1 <= cx <= hi - w / 2 + 1:
+                        continue
+                    for k, dy in enumerate((-(h + gap), gap)):
+                        cands.append(
+                            (
+                                penalty + off / max(length, 1) + 0.01 * k,
+                                Rect(round(cx - w / 2), round(y0 + dy), w, h),
+                            )
+                        )
+        else:  # vertical: right / left
+            lo, hi = min(y0, y1), max(y0, y1)
+            room = max(hi - lo - h, 0)
+            for off in range(0, int(room / 2) + step, step):
+                for sgn in (1, -1) if off else (1,):
+                    cy = (lo + hi) / 2 + sgn * off
+                    for k, dx in enumerate((gap, -(gap + w))):
+                        cands.append(
+                            (
+                                penalty + off / max(length, 1) + 0.01 * k,
+                                Rect(round(x0 + dx), round(cy - h / 2), w, h),
+                            )
+                        )
+    cands.sort(key=lambda t: t[0])
+    for margin in (round(2.5 * PT), round(1 * PT)):  # roomy first, then tight
+        for _score, r in cands:
+            if bounds is not None and (
+                r.x < bounds.x or r.right > bounds.right or r.y < bounds.y or r.bottom > bounds.bottom
+            ):
+                continue
+            if any(_hit(r, o, margin) for o in obstacles):
+                continue
+            return r, True
     if segs:
         length, x0, y0, x1, y1 = segs[0]
         return Rect(round((x0 + x1) / 2 - w / 2), round((y0 + y1) / 2 - h / 2), w, h), False
@@ -488,16 +507,18 @@ def legend_height(K: Look) -> int:
     return round((K.label * 1.6 + K.legend * 1.9) * PT) + round(44 * PT)
 
 
-def legend(c, K: Look, x: int, y: int, w: int, entries: list[tuple[str, str]]) -> int:
-    """The legend strip at ``(x, y)`` over width ``w``: a hairline, the ``LEGEND`` caption, then one swatch
-    and label per entry. Returns the height used."""
+def legend(c, K: Look, x: int, y: int, w: int, entries: list[tuple[str, str]], rule: bool = True) -> int:
+    """The legend strip at ``(x, y)`` over width ``w``: a hairline (``rule``; a diagram that ends in a rule of
+    its own, like a swimlane, passes False: never two hairlines), the ``LEGEND`` caption, then one swatch and
+    label per entry. Returns the height used."""
     th = c.theme
     y += round(10 * PT)  # air between the diagram and the strip
-    c.emit(
-        Shape(shape="line", attrs={"head": "none", "shape_name": "Legend rule"}),
-        Rect(x, y, w, 0),
-        fast_style(line=th.diagram_tag_line, line_width=hairline(c)),
-    )
+    if rule:
+        c.emit(
+            Shape(shape="line", attrs={"head": "none", "shape_name": "Legend rule"}),
+            Rect(x, y, w, 0),
+            fast_style(line=th.diagram_tag_line, line_width=hairline(c)),
+        )
     cap_h = round(K.label * 1.6 * PT)
     caption(c, K, "Legend caption", "Legend", x, y + round(7 * PT), cap_h)
     row_y = y + round(7 * PT) + cap_h + round(5 * PT)
@@ -556,3 +577,49 @@ def legend(c, K: Look, x: int, y: int, w: int, entries: list[tuple[str, str]]) -
 def centred(body: Rect, w: int, h: int, top_share: float = 0.5) -> tuple[int, int]:
     """``(x, y)`` of a ``w`` x ``h`` block centred in ``body`` (``top_share`` of the free height above)."""
     return body.x + max(body.w - w, 0) // 2, body.y + round(max(body.h - h, 0) * top_share)
+
+
+def generic_legend(c, slide) -> tuple[list[tuple[str, str]], Look, int] | None:
+    """The automatic legend of an ordinary slide (no form): its boxes use role classes (``.focal`` ``.store``
+    ...) or are joined by ``a>b`` connectors. ``(entries, look, band height)`` or ``None`` (not wanted:
+    fewer than two roles / arrow kinds, or ``legend=off``)."""
+    from ..ir import Container, Text
+
+    roles: set[str] = set()
+    plain = False
+    linked = bool(slide.links)
+
+    def walk(els: list, in_linked: bool) -> None:
+        nonlocal plain, linked
+        for e in els:
+            cls = set(getattr(e, "classes", []) or [])
+            has = cls & set(ROLES)
+            roles.update(has)
+            node = in_linked or (isinstance(e, Container) and e.title is not None)
+            if node and not has and isinstance(e, (Text, Container)):
+                plain = plain or bool(getattr(e, "paragraphs", None)) or isinstance(e, Container)
+            if isinstance(e, Container):
+                lk = bool(e.links)
+                linked = linked or lk
+                walk(e.children, lk)
+
+    walk(list(slide.elements), bool(slide.links))
+    kinds = ["flow"] if linked else []
+    if not roles or not wants_legend(c, sorted(roles), kinds, slide):
+        return None
+    texts = [
+        p.plain
+        for e in slide.elements
+        for p in (getattr(e, "paragraphs", None) or ([] if not isinstance(e, Container) else []))
+    ]
+    if any(isinstance(e, Container) and e.title is not None for e in slide.elements):
+        texts += [
+            p.plain
+            for e in slide.elements
+            if isinstance(e, Container) and e.title
+            for p in e.title.paragraphs
+        ]
+    ja = "ja" if any(has_wide(t) for t in texts) else None
+    K = look(c, slide)
+    entries = legend_entries(c, [r for r in ROLES if r in roles], kinds, plain, ja)
+    return entries, K, legend_height(K)
