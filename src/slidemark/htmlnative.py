@@ -201,6 +201,9 @@ function emitBox(el, cs, r, allowPic) {
   const bw = SIDES.map((s) => (['none', 'hidden'].includes(cs['border' + s + 'Style']) ? 0 : px(cs['border' + s + 'Width'])));
   const bc = SIDES.map((s) => hex(cs['border' + s + 'Color']));
   const uniform = bw[0] > 0 && bw.every((v) => v === bw[0]) && bc[0] && bc.every((c) => c && c[0] === bc[0][0]);
+  // a dashed / dotted outline with a thicker solid bar on the left edge (`border-left: 4px solid`): the outline
+  // keeps its dash on all four sides and the bar is drawn over its left edge
+  const lbar = !uniform && bw[0] > 0 && bw[0] === bw[1] && bw[1] === bw[2] && bc[0] && bc[1] && bc[2] && bc[0][0] === bc[1][0] && bc[1][0] === bc[2][0] && bw[3] > bw[0] && bc[3];
   const clipText = /text/.test(cs.webkitBackgroundClip || cs.backgroundClip || '');
   let grad = null, urlbg = false;
   const bi = cs.backgroundImage;
@@ -219,13 +222,16 @@ function emitBox(el, cs, r, allowPic) {
   const clip = clipShape(cs, r);
   const shape = clip === 'pentagon' || clip === 'chevron' || clip === 'ellipse' ? clip : (pct >= 50 ? 'ellipse' : null);
   const shadow = shadowOf(cs, op);
-  if (bg || grad || uniform) {
+  if (bg || grad || uniform || lbar) {
+    const outline = uniform || lbar;
     put({k: 'rect', x: r.left, y: r.top, w: r.width, h: r.height, shape,
       fill: grad ? null : bg && bg[0], grad, alpha: (bg && !grad ? bg[1] : 1) * op,
-      line: uniform ? bc[0][0] : null, lw: uniform ? bw[0] : 0, rad, shadow: bg || grad ? shadow : null,
-      ld: uniform ? ({dashed: 'dash', dotted: 'dot'}[cs.borderTopStyle] || null) : null});
+      line: outline ? bc[0][0] : null, lw: outline ? bw[0] : 0, rad, shadow: bg || grad ? shadow : null,
+      ld: outline ? ({dashed: 'dash', dotted: 'dot'}[cs.borderTopStyle] || null) : null});
   }
-  if (!uniform) {
+  if (lbar) {
+    put({k: 'rect', x: r.left, y: r.top, w: bw[3], h: r.height, fill: bc[3][0], alpha: 1, line: null, lw: 0, rad: 0});
+  } else if (!uniform) {
     const g = [[0, r.left, r.top, r.width, bw[0]], [2, r.left, r.bottom - bw[2], r.width, bw[2]],
                [3, r.left, r.top, bw[3], r.height], [1, r.right - bw[1], r.top, bw[1], r.height]];
     for (const [i, x, y, w, h] of g) {
@@ -352,6 +358,7 @@ function emitGroup(el, cs, nodes) {
   const first = rs.find((x) => x.t !== '\n');
   const lh = lineH(cs);
   let x = Math.min(c.l, rr.left), w = Math.max(c.rt, rr.right) - x;
+  if (/flex|grid/.test(cs.display) && cs.textAlign !== 'center') { x = rr.left; w = rr.width; }  // text beside a box (a swatch) in a flex row starts where the browser drew it
   const align = cs.textAlign === 'start' ? 'left' : cs.textAlign === 'end' ? 'right' : cs.textAlign;
   if (rr.height < lh * 1.6) {  // one line: a little slack so font differences do not wrap it
     const slack = 8;
@@ -448,11 +455,12 @@ function emitSvg(el, cs, r) {
     const lw = s ? parseFloat(g.strokeWidth) * sc : 0;
     const base = {fill: f && f[0], alpha: fa || 1, line: s && s[0], lw, rad: 0};
     const arrow = g.markerEnd && g.markerEnd !== 'none';
+    const dash = g.strokeDasharray && g.strokeDasharray !== 'none' ? (parseFloat(g.strokeDasharray) <= 2 * (parseFloat(g.strokeWidth) || 1) ? 'dot' : 'dash') : null;
     if (t === 'rect') {
       const [x, y] = tpt(m, n.x.baseVal.value, n.y.baseVal.value);
       const w = n.width.baseVal.value * Math.abs(m.a), h = n.height.baseVal.value * Math.abs(m.d);
       if (!f && !s) return;
-      const rx = (n.rx.baseVal.value || n.ry.baseVal.value) * Math.abs(m.a);
+      const rx = (n.rx.baseVal.value || n.ry.baseVal.value || px(g.rx) || px(g.ry)) * Math.abs(m.a);
       items.push({k: 'rect', x, y, w, h, ...base, rad: rx});
     } else if (t === 'circle' || t === 'ellipse') {
       const rx = (t === 'circle' ? n.r.baseVal.value : n.rx.baseVal.value) * Math.abs(m.a);
@@ -463,7 +471,7 @@ function emitSvg(el, cs, r) {
     } else if (t === 'line') {
       if (!s) return;
       const [x1, y1] = tpt(m, n.x1.baseVal.value, n.y1.baseVal.value), [x2, y2] = tpt(m, n.x2.baseVal.value, n.y2.baseVal.value);
-      items.push({k: 'line', x1, y1, x2, y2, color: s[0], lw, head: arrow ? 'arrow' : 'none'});
+      items.push({k: 'line', x1, y1, x2, y2, color: s[0], lw, head: arrow ? 'arrow' : 'none', ld: dash});
     } else if (t === 'polyline' || t === 'polygon' || t === 'path') {
       let pts = [];
       let closed = t === 'polygon';
@@ -503,10 +511,11 @@ function emitSvg(el, cs, r) {
       if (segs > 24) { bad = 'path with many segments'; return; }
       for (let i = 0; i < segs; i++) {
         const a = pts[i], b = pts[(i + 1) % pts.length];
-        items.push({k: 'line', x1: a[0], y1: a[1], x2: b[0], y2: b[1], color: s[0], lw, head: i === segs - 1 && arrow ? 'arrow' : 'none'});
+        items.push({k: 'line', x1: a[0], y1: a[1], x2: b[0], y2: b[1], color: s[0], lw, head: i === segs - 1 && arrow ? 'arrow' : 'none', ld: dash});
       }
     } else if (t === 'text') {
-      const txt = n.textContent.replace(/\s+/g, ' ').trim();
+      let txt = n.textContent.replace(/\s+/g, ' ').trim();
+      if (g.textTransform === 'uppercase') txt = txt.toUpperCase(); else if (g.textTransform === 'lowercase') txt = txt.toLowerCase();
       if (!txt || !f) return;
       if (n.querySelector('[dy],[y]')) { bad = 'multi-line svg text'; return; }
       const b = n.getBoundingClientRect();
@@ -516,7 +525,9 @@ function emitSvg(el, cs, r) {
         hl: null, sup: false, sub: false, mono: /mono|courier|consolas/i.test(g.fontFamily || ''), href: null, fs, ff: fam(g)};
       let x = b.left, w = b.width + 8;
       if (anchor === 'center') x -= 4; else if (anchor === 'right') x -= 8;
-      items.push({k: 'text', x, y: b.top, w, h: b.height, align: anchor, lh: b.height, fs, ff: run.ff, ls: 0,
+      run.t = txt;
+      const ls = px(g.letterSpacing);
+      items.push({k: 'text', x, y: b.top, w, h: b.height, align: anchor, lh: b.height, fs, ff: run.ff, ls,
         paras: [{runs: [run], marker: null, level: 0, fs}]});
     } else {
       bad = '<' + t + '>';
@@ -703,7 +714,11 @@ def _line(it: dict, ox: int, oy: int) -> Placed:
         y=oy + round(min(y1, y2) * EMU_PER_PX),
         w=round(abs(x2 - x1) * EMU_PER_PX),
         h=round(abs(y2 - y1) * EMU_PER_PX),
-        style=Style(line=_color(it["color"]), line_width=round(max(it["lw"], 0.5) * PT_PER_PX, 2)),
+        style=Style(
+            line=_color(it["color"]),
+            line_width=round(max(it["lw"], 0.5) * PT_PER_PX, 2),
+            line_dash=it.get("ld") or None,
+        ),
     )
 
 

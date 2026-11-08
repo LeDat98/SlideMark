@@ -783,6 +783,9 @@ def _base_classes() -> dict[str, Style]:
         # the body keeps its normal ink. `muted-box.color=muted` brings the grey body text back.
         "muted-box": Style(line="muted"),
         "dense": Style(font_size=11),
+        # the small line above a slide title (`{eyebrow=...}`, header `eyebrow: section`): the theme mono face
+        # unless `eyebrow.font=` names one; `eyebrow.size .color .font .case .spacing` restyle it
+        "eyebrow": Style(font_size=10, color="muted", letter_spacing=1.8, text_transform="upper"),
         "kpi": Style(font_size=36, bold=True, color="primary", align="center", valign="middle"),
         # callout kinds (`> [!note]` ...): border color. Badges: `[x]{.badge}`.
         "note": Style(line="primary"),
@@ -840,6 +843,7 @@ class Theme(Forms6Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
     heading_color: str = "fg"
     title_color: str = "fg"
     title_bold: bool = True  # `title.bold=off`: slide titles in the regular weight (serif display faces)
+    eyebrow: str | None = None  # `eyebrow: section`: every slide shows its section's name above the title
     lead_color: str = "fg"
     title_band: str | None = None  # full-width band color behind the slide title (None = no band)
     title_band_color: str = "bg"  # title text color when a band is drawn
@@ -1418,7 +1422,13 @@ def canonical_token(group: str, key: str) -> tuple[str | None, str]:
         parts = parts[1:]
     if len(parts) == 2:
         cls, field = parts[0], _norm(parts[1])
-        field = {"border": "line", "border_width": "line_width", "size": "font_size"}.get(field, field)
+        field = {
+            "border": "line",
+            "border_width": "line_width",
+            "size": "font_size",
+            "case": "text_transform",
+            "spacing": "letter_spacing",
+        }.get(field, field)
         if field in _STYLE_FIELDS and re.fullmatch(r"[A-Za-z][\w-]*", cls):
             return f"classes.{cls}.{field}", ""
         return None, _did_you_mean(field, list(_STYLE_FIELDS), prefix=f"{cls}.")
@@ -2155,6 +2165,21 @@ def normalize_token(path: str, raw: str, names: set[str] | None) -> list[tuple[s
         got := _lane_d_value(path, raw, names)
     ) is not None:  # wave 2026-10-08 lane D: steps.head cover.art ...
         return got
+    if path == "eyebrow":  # `eyebrow: section` (text from the section slides) | `off`
+        v = _unquote(raw).lower()
+        if v in ("section", "on", "auto"):
+            return [(path, "section")]
+        if v in ("off", "none", "no", "false", "0", ""):
+            return [(path, None)]
+        raise TokenValueError(f"eyebrow: '{raw}' is not a mode", "write eyebrow: section (or off)")
+    if path.startswith("classes.") and path.endswith(".text_transform"):
+        v = _unquote(raw).lower()
+        word = {"uppercase": "upper", "lowercase": "lower", "off": "none", "normal": "none"}.get(v, v)
+        if word not in ("upper", "lower", "capitalize", "none"):
+            raise TokenValueError(
+                f"case '{raw}' is not a case", "write case=upper, lower, capitalize or none"
+            )
+        return [(path, word)]
     if path == "heading_wrap":  # wave 2026-10-08 lane F
         return _lane_f_value(path, raw)
     parts = path.split(".")

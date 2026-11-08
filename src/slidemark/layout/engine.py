@@ -3408,6 +3408,43 @@ def _place_chevron(
 # --------------------------------------------------------------------------- slide frame
 
 
+def _is_section(s: Slide, i: int) -> bool:
+    return s.layout == "section" or (
+        s.layout is None and i > 0 and bool(s.title) and not s.elements and not s.conclusion
+    )
+
+
+def _eyebrow_text(theme: Theme, deck: Deck, slide: Slide, index: int) -> str:
+    """The line above the title: ``{eyebrow=...}`` of the slide, else (``eyebrow: section``) the title of the
+    last section slide before it. ``off`` / empty = none."""
+    own = slide.attrs.get("eyebrow")
+    if own is not None:
+        text = str(own).strip()
+        return "" if text.lower() in ("off", "none") else text
+    if theme.eyebrow != "section":
+        return ""
+    for i in range(index - 1, -1, -1):
+        s = deck.slides[i]
+        if _is_section(s, i) and s.title and s.title.paragraphs:
+            return "".join(p.plain for p in s.title.paragraphs).strip()
+    return ""
+
+
+def _eyebrow_style(ctx: _Ctx) -> Style:
+    """Caption look of the eyebrow: theme mono face, then the ``eyebrow`` class, then ``.eyebrow`` css rules.
+
+    ``eyebrow.font=heading|body|mono`` names a theme face; any other value is a font name."""
+    t = ctx.theme
+    st = _role_style(ctx, "caption").merged(
+        fast_style(font=t.fonts.mono, align="left", valign="bottom", bold=False),
+        t.classes.get("eyebrow"),
+        ctx.css.virtual(["eyebrow"]),
+    )
+    if st.font and st.font.lower() in ("heading", "body", "mono"):
+        st = st.merged(fast_style(font=getattr(t.fonts, st.font.lower())))
+    return st
+
+
 def _text_el(role: str, text: str, attrs: dict | None = None) -> Text:
     return Text(role=role, paragraphs=[Paragraph(runs=[_run(text)])], attrs=attrs or {})  # type: ignore[arg-type]
 
@@ -4867,6 +4904,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         kind = "content"
         if slide.title and not slide.elements and not slide.conclusion:
             kind = "cover" if index == 0 else "section"
+    if kind in ("cover", "section", "blank") and str(slide.attrs.get("eyebrow", "off")).lower() != "off":
+        ctx.diag(
+            "eyebrow-ignored",
+            f"a {kind} slide has no eyebrow line",
+            "put {eyebrow=...} on a content slide (or write the text in the subtitle)",
+            level="info",
+        )
     if deck.css or slide.css:
         ctx.css = css.CssIndex(deck, slide, index, kind)
         for n in {id(n): n for n in ctx.css.nodes.values()}.values():
@@ -5009,20 +5053,28 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         if kind != "blank" and slide.title:
             tr_h = to_emu(theme.title_height)
             st = _role_style(ctx, "title")
+            eb_text = _eyebrow_text(theme, deck, slide, index)
+            eb_st = eb_h = None
+            if eb_text:  # the eyebrow takes a line above the title: everything below moves down by it
+                eb_st = _eyebrow_style(ctx)
+                eb_h = round((eb_st.font_size or 10) * 1.3 * EMU_PER_PT) + _emu("3pt")
+                if theme.title_band:
+                    eb_st = eb_st.merged(fast_style(color=theme.title_band_color))
+            eb = (eb_h + (My // 3 if theme.title_band else 0)) if eb_h else 0  # (a band: air above the line)
             if theme.title_band:
                 st = st.merged(fast_style(color=theme.title_band_color))
                 put(
                     head,
                     Shape(shape="rect", id="band"),
-                    Rect(0, 0, W, tr_h + My // 2),
+                    Rect(0, 0, W, tr_h + My // 2 + eb),
                     fast_style(fill=theme.title_band, line=None),
                 )
-                r = Rect(Mx, 0, inner_w, tr_h + My // 2)
-                y = tr_h + My // 2 + sg
+                r = Rect(Mx, eb, inner_w, tr_h + My // 2)
+                y = tr_h + My // 2 + eb + sg
                 head_bottom = r.bottom
             else:
-                r = Rect(Mx, My, inner_w, tr_h)
-                y = My + tr_h
+                r = Rect(Mx, My + eb, inner_w, tr_h)
+                y = My + eb + tr_h
                 head_bottom = y
             if kind == "free" and getattr(slide.title, "box", None) is not None:
                 r = _apply_box(ctx, slide.title, Rect(0, 0, W, H), True)  # an explicit title box wins
@@ -5030,6 +5082,13 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                 r = _pin_rect(ctx, slide.title, r, W, H)  # `# T {x= y= w= h=}`: the title box placed
             st = _styled(ctx, slide.title, st, classes=False)
             put(head, slide.title, r, st, fit_text(slide.title, r, st))
+            if eb_text and eb_st is not None:
+                put(
+                    head,
+                    _text_el("caption", eb_text, {"field": "eyebrow"}),
+                    Rect(r.x, max(r.y - (eb_h or 0), 0), r.w, eb_h or 0),
+                    eb_st,
+                )
             if (
                 theme.title_rule or theme.title_rule2
             ) and kind != "free":  # `title.rule=<color>`: a rule on the bottom edge of the title

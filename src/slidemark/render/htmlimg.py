@@ -16,6 +16,7 @@ from pptx.util import Emu
 
 from ..ir import Placed, Raw
 from ..theme import DEFAULT_SIZES, Theme
+from .htmlkit import KIT_CSS, KIT_DEFS
 from .util import RenderCtx, hex6
 
 __all__ = ["HtmlRenderer", "add_html_image", "add_html_native", "close_html", "render_html_png"]
@@ -59,7 +60,11 @@ def _tokens(theme: Theme) -> str:
     for name, value in theme.colors.items():
         key = re.sub(r"[^\w-]", "-", str(name)).strip("-")
         if key:
-            parts.append(f"--{key}:#{hex6(theme, value)}")
+            h = hex6(theme, value)
+            parts.append(f"--{key}:#{h}")
+            parts.append(
+                f"--{key}-rgb:{int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)}"
+            )  # rgba(var(--x-rgb), .1)
     parts.append(f"--font-heading:{_stack(theme.fonts.heading, theme.fonts.ea)}")
     parts.append(f"--font-body:{_family(theme)}")
     parts.append(f"--font-mono:{_stack(theme.fonts.mono)}".replace(", sans-serif", ", monospace"))
@@ -77,9 +82,10 @@ def _page(source: str, theme: Theme) -> str:
         '<!doctype html><html><head><meta charset="utf-8">'
         f"<style>{_tokens(theme)}"
         f"*{{box-sizing:border-box}}html,body{{margin:0;padding:0;height:100%;background:#{bg};}}"
+        f"{KIT_CSS}"
         f"body{{font-family:{_family(theme)};font-size:{size:.1f}px;color:#{fg};overflow:hidden}}"
         "body>svg{display:block}"  # a top-level svg is a block: no inline baseline gap (false overflow)
-        f"</style></head><body>{source}</body></html>"
+        f"</style></head><body>{KIT_DEFS}{source}</body></html>"
     )
 
 
