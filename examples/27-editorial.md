@@ -3,11 +3,11 @@ lang: en
 num: on
 colors: accent=#BF4520
 fonts: heading=Georgia body=Arial
-sizes: title=38 body=17
+sizes: title=38
 style: radius=4
 footer: Platform review
 
-# Platform review
+# Platform review {eyebrow="Engineering · Q3 2026"}
 Architecture, throughput and cost, Q3
 @defaults
 
@@ -30,7 +30,7 @@ flowchart LR
   A[Checkout]:::input --> B{Fraud check}
   B --> C[Orders DB]:::store
   B --> D[Stripe]:::external
-  B --> E[Key vault]:::security
+  B --> E[Key vault]:::optional
   C --> F[Reports]:::focal
 ```
 @noemph defaults
@@ -74,7 +74,7 @@ Reports,Analytics,"$1,100",+1%
 - 読み取りレプリカを追加
 - 決済APIを分離
 - ログを一元化
-## 管理 {.security}
+## 管理 {.optional}
 - 鍵はVaultで集中管理
 - 四半期ごとに権限を棚卸し
 ※ 出所：社内計測（2026年9月）。遅延は95パーセンタイル値。

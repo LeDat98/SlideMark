@@ -76,6 +76,8 @@ def apply_hl(
                         pt.marker.format.line.color.rgb = color
                     elif kind in _BAR_LIKE and si < real_series:
                         pt = ser.points[i]
+                        if real_series > 1 and rt.chart_hl_first and si > 0:
+                            continue  # the outline marks one bar: the first series' (others keep their fill)
                         if real_series == 1:  # one series: the point itself takes the color
                             pt.format.fill.solid()
                             pt.format.fill.fore_color.rgb = color

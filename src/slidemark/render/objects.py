@@ -260,6 +260,13 @@ def add_table(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
                 round(t_border[0] * 12700) if t_border else 6350,
                 t_border[1] if t_border else None,
             )
+            if theme.table_rules == "rows" and not t_border:  # hairlines between rows, no vertical lines
+                tcp = cell._tc.get_or_add_tcPr()
+                for side in ("left", "right"):
+                    _cell_side(tcp, side, None, theme)
+                if t.header_rows and r in (t.header_rows - 1, t.header_rows):
+                    rule = (1.0, "solid", theme.table_head_rule)  # the header rule: under it, over row 1
+                    _cell_side(tcp, "bottom" if r < t.header_rows else "top", rule, theme)
             if fill.lower().startswith(("linear", "radial")):
                 _cell_fill(rc, cell, Style(fill=fill))
     if "gantt" in t.classes and not t_border and 0 <= theme.render.gantt_grid < 1:
@@ -851,7 +858,7 @@ def add_chart(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         tf.text = ch.title
         run = tf.paragraphs[0].runs[0]
         run.font.size = Pt(size * theme.render.chart_title_scale)
-        run.font.bold = True
+        run.font.bold = theme.render.chart_title_bold
         run.font.color.rgb = rgb(theme, "fg")
         chart.chart_title.include_in_layout = False
     else:

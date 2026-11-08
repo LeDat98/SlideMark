@@ -909,9 +909,9 @@ eyebrow: section            (header: every content slide shows its section's nam
 # Checkout p99 latency {eyebrow="Fishbone · Diagram design"}   (own text; `{eyebrow=off}` removes it on one slide)
 ```
 
-- Section name = the title of the last `section` slide (a title-only slide or `@section`) before the slide. A cover, a section or a blank slide never shows one (an `{eyebrow=}` there gives the info `eyebrow-ignored`).
+- Section name = the title of the last `section` slide (a title-only slide or `@section`) before the slide. A section or a blank slide never shows one (an `{eyebrow=}` there gives the info `eyebrow-ignored`); a cover takes a meta line (see "Editorial quiet defaults"). With no section slide yet the deck name is used.
 - Why an attribute on the title: no new line type, no lookup, ~6 tokens per slide (`{eyebrow="Architecture"}`); the deck-wide mode is ~3 tokens once, so most decks write it once.
-- Tokens (`style:`): `eyebrow.size=10` (pt) `eyebrow.color=muted` `eyebrow.font=mono` (`mono` / `heading` / `body` or a font name) `eyebrow.case=upper` (`upper` `lower` `capitalize` `none`) `eyebrow.spacing=1.8` (pt between letters, = 0.18 em at 10 pt). `{.eyebrow}` in a css fence styles it too. Presets: off everywhere (a preset may set `eyebrow: section` in its own YAML).
+- Tokens (`style:`): `eyebrow.size=10` (pt) `eyebrow.color=muted` `eyebrow.font=mono` (`mono` / `heading` / `body` or a font name) `eyebrow.case=upper` (`upper` `lower` `capitalize` `none`) `eyebrow.spacing=1.8` (pt between letters, = 0.18 em at 10 pt). `{.eyebrow}` in a css fence styles it too. Presets: `editorial` on, the others off (a preset sets `eyebrow: section` in its own YAML).
 - The text box is named `Eyebrow`, so the importer reads it back as `{eyebrow="TEXT"}` on the title (the text is stored uppercase in the file).
 - CJK text: the uppercase and the tracking do not change it; set `eyebrow.font=body` for a sans face.
 
@@ -1154,3 +1154,16 @@ header line: `kpi.*` without a `.kpi` card, `steps*` / `steps-arrow` without `@s
 `pad` `gap` `footer`) needs the composed cover (`cover.band_h` above 0 and no `{size=}` on the cover title); and
 `chevron.*` styles nothing (arrows follow `primary`, `steps-arrow.fill=` colours `@steps`). The table is `STYLE_NEEDS`
 in the same module.
+
+## Editorial quiet defaults (tokens, all overridable)
+
+`theme: editorial` is a preset of ordinary tokens; any deck can set the same lines on another theme.
+
+- Eyebrow on every content slide: the preset sets `eyebrow: section`. Text = the last section slide's title, else the deck name (the cover title / `title:`); `{eyebrow=...}` on a slide wins, `{eyebrow=off}` or the header line `eyebrow: off` removes it. A cover takes a meta eyebrow above its title: its own `{eyebrow="Engineering · Q3 2026"}`, else the header `author:`, else the `footer:` text (never a copy of the title).
+- Quiet lead: `sizes: lead=14 subtitle=14`, `lead_color: secondary` (the preset). A deck can restate them.
+- Size to content, never stretch: `style: grow.max=1 layout.l3_fill=off layout.cards_to_body=off layout.beside_align=1 layout.diagram_grow=1 layout.table_grow=1 layout.table_alone_grow=1 layout.table_free=off layout.center_min_fill=0 layout.body_valign=center`; the block is centred in the body.
+- Box anatomy: `heading.font=body|mono|heading|<name>` (face of box headings), `heading.bold=off`; `card.font_size`-style class tokens in `classes:` of a preset (`classes.card.font_size=13`).
+- Tables: `table.rules=rows` draws hairlines between rows only (no vertical rules) and a 1 pt rule of `table.head_rule` (default `primary`) under the header; default `grid`.
+- Charts: `render.chart_title_bold=off`, `render.chart_label_scale=0.9`, `render.chart_legend_scale=0.9`, `render.chart_text_ratio=0` (no growth for big frames), `render.chart_hl_first=on` (the `hl=` outline marks the first series' bar only). `classes.chart-note.font/color/italic` style the `note=` callout (a class font wins over the chart font).
+- html kit: `layout.html_hug=on` makes `.stack>.board` size to its content and centres the stack; `.card` / `.node` take the fill of `classes.card.fill` (`--card-fill`).
+- CJK phrase lines: `layout.cjk_phrase_lines=on` makes the layout reserve the lines that whole-phrase wrapping needs (a paragraph the viewer wraps as `注文処理は単一` / `の DB` takes 3 lines: `注文処理は` / `単一の DB に` / `集中`), so the renderer's phrase breaks always fit; off by default (it moves the goldens of every Japanese deck).

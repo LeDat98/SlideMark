@@ -259,7 +259,14 @@ def _role_style0(ctx: _Ctx, role: str, cover: bool = False) -> Style:
     if role == "title":
         st = st.merged(fast_style(bold=t.title_bold, color=t.title_color, valign="middle"))
     elif role == "heading":
-        st = st.merged(fast_style(bold=True, color=t.heading_color))
+        hf = t.heading_font
+        st = st.merged(
+            fast_style(
+                bold=t.heading_bold,
+                color=t.heading_color,
+                **({"font": getattr(t.fonts, hf)} if hf in ("heading", "body", "mono") else {"font": hf}),
+            )
+        )
     elif role == "subtitle":
         st = st.merged(fast_style(color="muted"))
     elif role == "lead":
@@ -3427,6 +3434,22 @@ def _eyebrow_text(theme: Theme, deck: Deck, slide: Slide, index: int) -> str:
         s = deck.slides[i]
         if _is_section(s, i) and s.title and s.title.paragraphs:
             return "".join(p.plain for p in s.title.paragraphs).strip()
+    return (deck.title or "").strip()  # no section yet (or none at all): the deck name
+
+
+def _cover_eyebrow_text(theme: Theme, deck: Deck, slide: Slide) -> str:
+    """The meta line above a cover title: ``{eyebrow=...}`` of the cover, else (``eyebrow: section``) the
+    deck author, else the footer text; never the title itself."""
+    own = slide.attrs.get("eyebrow")
+    if own is not None:
+        text = str(own).strip()
+        return "" if text.lower() in ("off", "none") else text
+    if theme.eyebrow != "section":
+        return ""
+    title = "".join(p.plain for p in slide.title.paragraphs).strip() if slide.title else ""
+    for cand in (deck.author, deck.footer):
+        if cand and cand.strip() and cand.strip() != title:
+            return cand.strip()
     return ""
 
 
@@ -4904,7 +4927,7 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         kind = "content"
         if slide.title and not slide.elements and not slide.conclusion:
             kind = "cover" if index == 0 else "section"
-    if kind in ("cover", "section", "blank") and str(slide.attrs.get("eyebrow", "off")).lower() != "off":
+    if kind in ("section", "blank") and str(slide.attrs.get("eyebrow", "off")).lower() != "off":
         ctx.diag(
             "eyebrow-ignored",
             f"a {kind} slide has no eyebrow line",
@@ -5039,6 +5062,19 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
                     s_r = Rect(Mx, top + th + sp, text_w, sh)
             if t_r is not None:
                 put(head, slide.title, t_r, t_st, t_fs)
+                if kind == "cover" and (eb_text := _cover_eyebrow_text(theme, deck, slide)):
+                    eb_st = _eyebrow_style(ctx)
+                    eb_h = round((eb_st.font_size or 10) * 1.3 * EMU_PER_PT) + _emu("3pt")
+                    th = round(_text_need(ctx, slide.title, t_st, t_r.w, t_fs))
+                    ey = max(t_r.bottom - th - eb_h - _emu("6pt"), 0)  # just above the first title line
+                    if theme.title_band:
+                        eb_st = eb_st.merged(fast_style(color=theme.title_band_color))
+                    put(
+                        head,
+                        _text_el("caption", eb_text, {"field": "eyebrow"}),
+                        Rect(t_r.x, ey, t_r.w, eb_h),
+                        eb_st,
+                    )
             if s_r is not None:
                 put(head, sub, s_r, s_st, s_fs)
             body = (

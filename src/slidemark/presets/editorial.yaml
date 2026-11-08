@@ -18,18 +18,20 @@ colors:
 fonts: {heading: Georgia, body: Arial, mono: Consolas, ea: Yu Gothic}
 sizes:
   title: 38
-  subtitle: 20
-  heading: 20
-  body: 17
-  lead: 22
+  subtitle: 14
+  heading: 14
+  body: 14
+  lead: 14
   caption: 12
   footnote: 10
-  table: 15
+  table: 12
   cover-title: 52
   cover-subtitle: 22
+eyebrow: section
 title_color: primary
 title_bold: false
 heading_color: primary
+heading_font: body
 lead_color: secondary
 cover_band_h: 0
 cover_rule: accent
@@ -38,6 +40,8 @@ cover_rule_h: 0.04in
 cover_rule_pos: above
 table_header_fill: bg
 table_header_color: primary
+table_rules: rows
+table_head_rule: primary
 table_body_fill: bg
 table_hl_fill: accent
 table_hl_strength: 0.1
@@ -53,12 +57,19 @@ render:
   connector_color: secondary
   connector_width: 1
   line_width: 0.75
+  chart_title_scale: 1.0
+  chart_title_bold: false
+  chart_label_scale: 0.9
+  chart_legend_scale: 0.9
+  chart_text_ratio: 0
+  chart_hl_first: true
 classes:
   # hairline cards on the paper: white fill, #BFC0C0 border, small corners, no shadow
-  card: {fill: "#FFFFFF", line: border, line_width: 0.75, radius: 4, padding: 10pt}
+  card: {fill: "#FFFFFF", line: border, line_width: 0.75, radius: 4, padding: 10pt, font_size: 13}
   callout: {fill: "#ECECEC", line: border, line_width: 0.75, radius: 4}
-  chart-note: {fill: "#FFFFFF", line: accent, line_width: 0.75, radius: 3, bold: false}
+  chart-note: {fill: bg, line: accent, line_width: 0, radius: 3, bold: false, italic: true, color: accent, font: Georgia}
   node: {fill: "#FFFFFF", line: secondary, line_width: 1, radius: 4, padding: 6pt}
+  diagram-node: {bold: true, font_size: 12}
   decision: {fill: "#FFFFFF", line: secondary}
   kpi: {color: primary}
   rows: {fill: "#FFFFFF", line: border, line_width: 0.75}
@@ -71,3 +82,24 @@ classes:
   input: {fill: "#4F5D751A", line: muted}
   optional: {line: muted, line_dash: dash}
   security: {fill: "#BF45200D", line: accent, line_dash: dash}
+layout:
+  grow_max: 1
+  l3_fill: false
+  cards_to_body: false
+  kpi_to_body: false
+  steps_stretch: false
+  card_stretch: false
+  top_gap: 0.3in
+  body_valign: center
+  beside_min: 0
+  beside_align: 1.0
+  sparse_note: 1
+  center_min_fill: 0
+  table_grow: 1
+  table_alone_grow: 1
+  table_grow_roomy: 1
+  table_free: false
+  table_fill_width: true
+  diagram_grow: 1
+  html_hug: true
+  cjk_phrase_lines: true
