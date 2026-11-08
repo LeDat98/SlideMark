@@ -23,7 +23,7 @@ def test_editorial_tokens():
     assert th.colors["border"] == "#BFC0C0"
     assert th.colors["link"] == "#2E5AA8"
     assert th.fonts.heading == "Georgia" and th.fonts.body == "Arial" and th.fonts.ea == "Yu Gothic"
-    assert th.title_band is None and th.title_rule is None and th.title_bold is True
+    assert th.title_band is None and th.title_rule is None and th.title_bold is False
     card = th.classes["card"]
     assert card.fill == "#FFFFFF" and card.line == "border" and not card.shadow
     assert all(not st.shadow for st in th.classes.values())
@@ -48,7 +48,7 @@ def test_title_bold_is_a_token(tmp_path):
         shape = next(s for s in slide.shapes if s.has_text_frame and "Hello" in s.text_frame.text)
         return shape.text_frame.paragraphs[0].runs[0].font.bold
 
-    assert title_bold("theme: editorial\n\n# Hello\n- a\n")
+    assert not title_bold("theme: editorial\n\n# Hello\n- a\n")
     assert title_bold("theme: default\n\n# Hello\n- a\n")
     assert title_bold("theme: editorial\nstyle: title.bold=on\n\n# Hello\n- a\n")
 

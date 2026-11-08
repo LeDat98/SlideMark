@@ -1,6 +1,6 @@
 # Built-in preset "editorial": quiet paper, ink and one rust accent; hairline borders, no shadows.
-# Tuned after blind judge round 13 (2026-11-08): white cards on the paper, bold serif titles, an ink takeaway bar,
-# one arrow colour, and the accent kept off timeline dots and agenda numbers.
+# Faithful to the source (owner, 2026-11-08): serif titles in the regular weight, a paper-2 takeaway bar with ink
+# text, white cards with hairline borders, one arrow colour, the accent only on the focal element.
 # Palette and rules adapted from diagram-design by Cathryn Lavery (MIT).
 # The accent is for 1-2 focal elements per slide (`.focal`, `hl=`, the cover rule); series are ink and slate.
 colors:
@@ -11,7 +11,7 @@ colors:
   accent: "#BF4520"
   muted: "#5A6580"
   border: "#BFC0C0"
-  surface: "#FFFFFF"
+  surface: "#ECECEC"
   danger: "#9B3A2B"
   success: "#46704A"
   link: "#2E5AA8"
@@ -28,7 +28,7 @@ sizes:
   cover-title: 52
   cover-subtitle: 22
 title_color: primary
-title_bold: true
+title_bold: false
 heading_color: primary
 lead_color: secondary
 cover_band_h: 0
@@ -41,8 +41,8 @@ table_header_color: primary
 table_body_fill: bg
 table_hl_fill: accent
 table_hl_strength: 0.1
-conclusion_fill: primary
-conclusion_color: bg
+conclusion_fill: surface
+conclusion_color: primary
 timeline_dot: secondary
 agenda_num_color: primary
 icon_disc: "#E3E5EA"
