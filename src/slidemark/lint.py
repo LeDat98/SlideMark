@@ -12,6 +12,8 @@ Rules (all warnings, cheap to read for an agent):
 - ``tiny-text``: text renders below the theme's minimum font size.
 - ``alt``: an image without alt text.
 - ``connector-crosses``: a connector runs through a block that is not one of its ends.
+- ``diagram-budget`` (info, never a warning): a diagram over 9 nodes / 12 arrows, an arrow label over 14
+  characters, or more than 2 accent shapes (``budget.py``; thresholds are ``layout.diagram_*`` tokens).
 - ``design-none`` / ``design-slide``: header lines not stated / slides short of a form, one emphasis or values
   (deck-level, see ``design.py``; added by ``lint_deck``, not by ``lint``).
 - ``attr-ignored``: an attribute or ``style:`` token the layout does not honour where it was written
@@ -22,6 +24,7 @@ from __future__ import annotations
 
 import re
 
+from .budget import budget_diagnostic
 from .contrast import nearest_passing
 from .contrast import ratio as _ratio
 from .design import design_diagnostics
@@ -643,6 +646,8 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
             "link neighbouring blocks only, or reorder the blocks / use an @ areas grid",
             block,
         )
+    if (info := budget_diagnostic(slide, items, theme, index)) is not None:
+        out.append(info)
     return out
 
 

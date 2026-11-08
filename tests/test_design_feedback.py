@@ -20,13 +20,21 @@ EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 SKILL = Path(__file__).resolve().parent.parent / "src" / "slidemark" / "skill" / "SKILL.md"
 
 BODY = "# Plan\n- one\n- two\n"
-CONTENT_ONLY = "# Cover\nA subtitle\n\n# Market\n- a\n- b\n\n# Costs\n- c\n- d\n"
-FRAME = "colors: primary=#7C5CFF\nfonts: heading=Georgia\nsizes: title=30\nstyle: radius=8\n\n"
+CONTENT_ONLY = "theme: none\n\n# Cover\nA subtitle\n\n# Market\n- a\n- b\n\n# Costs\n- c\n- d\n"
+FRAME = "theme: none\ncolors: primary=#7C5CFF\nfonts: heading=Georgia\nsizes: title=30\nstyle: radius=8\n\n"
 DECIDED = "@2 noemph defaults\n## A\n- a\n## B\n- b\n"  # form + emphasis + values
 
 
 def _rules(text: str) -> dict[str, object]:
     d = parse(text)
+    return {x.rule: x for x in design.design_diagnostics(d)}
+
+
+def _bare(text: str) -> dict[str, object]:
+    """Like ``_rules`` but a deck without a ``theme:`` line gets ``theme: none`` (no preset frame)."""
+    d = parse(text)
+    if d.theme == "default":
+        d.theme = "none"
     return {x.rule: x for x in design.design_diagnostics(d)}
 
 
@@ -44,7 +52,7 @@ def _short(text: str) -> dict[int, list[str]]:
 
 
 def test_design_none_names_every_missing_line():
-    got = _rules(BODY)["design-none"]
+    got = _bare(BODY)["design-none"]
     assert got.level == "warning" and got.slide is None and got.line is None
     assert got.message == "design: colors: fonts: sizes: style: not stated"
     assert got.hint.startswith("add colors: fonts: sizes: style: to the header")
@@ -64,56 +72,88 @@ def test_design_none_names_every_missing_line():
     ],
 )
 def test_design_none_lists_only_the_missing_lines(header, missing):
-    got = _rules(f"{header}\n\n{BODY}")["design-none"]
+    got = _bare(f"{header}\n\n{BODY}")["design-none"]
     assert got.message == f"design: {missing} not stated"
     assert got.hint.startswith(f"add {missing} to the header")
 
 
 def test_design_none_quiet_when_all_four_lines_are_stated():
-    assert "design-none" not in _rules(FRAME + BODY)
+    assert "design-none" not in _bare(FRAME + BODY)
 
 
 def test_design_none_hint_mentions_css_only_when_style_is_missing():
-    got = _rules("colors: primary=#7C5CFF\nstyle: radius=8\n\n" + BODY)["design-none"]
+    got = _bare("colors: primary=#7C5CFF\nstyle: radius=8\n\n" + BODY)["design-none"]
     assert got.message == "design: fonts: sizes: not stated" and "css fence" not in got.hint
 
 
 def test_header_css_fence_stands_in_for_style_only():
-    got = _rules("```css\nh1 { color: #C2410C }\n```\n\n" + BODY)["design-none"]
+    got = _bare("```css\nh1 { color: #C2410C }\n```\n\n" + BODY)["design-none"]
     assert got.message == "design: colors: fonts: sizes: not stated"
     done = "colors: a=#111111\nfonts: heading=Georgia\nsizes: title=30\n"
     full = done + "```css\nh1 { color: #C2410C }\n```\n\n"
-    assert "design-none" not in _rules(full + BODY)
+    assert "design-none" not in _bare(full + BODY)
 
 
 def test_design_none_fires_for_slide_css_fence_only():
     # a css fence inside a slide is that slide's choice, not the deck's
-    got = _rules("# A\n- x\n```css\nh1 { color: #C2410C }\n```\n")["design-none"]
+    got = _bare("# A\n- x\n```css\nh1 { color: #C2410C }\n```\n")["design-none"]
     assert "style:" in got.message
 
 
-def test_theme_preset_alone_is_not_a_decision():
-    assert _rules("theme: midnight\n\n" + BODY)["design-none"].message.endswith("style: not stated")
-    assert "colors:" in _rules("footer: ACME\nnum: on\n\n" + BODY)["design-none"].message
+def test_builtin_preset_stands_in_for_colors_fonts_style():
+    # 2026-11-08: no `theme:` line (the default preset) and an explicit built-in preset both count
+    for text in (BODY, "theme: midnight\n\n" + BODY, "theme: jp-business\n\n" + BODY):
+        got = _rules(text)["design-none"]
+        assert got.message == "design: sizes: not stated", text
+        assert got.hint == "add sizes: to the header"
+    assert "design-none" not in _rules("theme: midnight\nsizes: title=30\n\n" + BODY)
+    assert "design-none" not in _rules("sizes: title=30\n\n" + BODY)
+
+
+def test_theme_none_asks_for_all_four_lines():
+    got = _rules("theme: none\n\n" + BODY)["design-none"]
+    assert got.message == "design: colors: fonts: sizes: style: not stated"
+    assert "colors:" in _rules("theme: none\nfooter: ACME\nnum: on\n\n" + BODY)["design-none"].message
+
+
+def test_unknown_theme_name_is_not_a_preset():
+    assert _rules("theme: no-such-theme\n\n" + BODY)["design-none"].message.startswith("design: colors:")
+
+
+def test_facts_names_the_preset():
+    assert design.facts(parse(BODY)).startswith("design: preset default; ")
+    line = design.facts(parse("theme: midnight\nsizes: title=30\nfooter: A\n\n" + BODY))
+    assert line.startswith("design: preset midnight, sizes footer; ")
+
+
+@pytest.mark.parametrize("cls", ["focal"])
+def test_focal_role_counts_as_emphasis(cls):
+    assert "emphasis" in _got(f"## A {{.{cls}}}\n- a")
+
+
+@pytest.mark.parametrize("cls", ["store", "external", "input", "optional", "security"])
+def test_role_classes_count_as_values(cls):
+    assert "values" in _got(f"@2\n## A {{.{cls}}}\n- a\n## B\n- b")
+    assert "emphasis" not in _got(f"@2\n## A {{.{cls}}}\n- a\n## B\n- b")
 
 
 @pytest.mark.parametrize("theme", ["./brand.yaml", "brand.yml", "template.pptx", "corp.potx"])
 def test_theme_file_stands_in_for_style_only(theme):
-    got = _rules(f"theme: {theme}\n\n{BODY}")["design-none"]
+    got = _bare(f"theme: {theme}\n\n{BODY}")["design-none"]
     assert got.message == "design: colors: fonts: sizes: not stated"
     done = "colors: a=#111111\nfonts: heading=Georgia\nsizes: title=30\n"
-    assert "design-none" not in _rules(f"theme: {theme}\n{done}\n{BODY}")
+    assert "design-none" not in _bare(f"theme: {theme}\n{done}\n{BODY}")
 
 
 def test_design_none_in_yaml_front_matter():
-    got = _rules("---\ncolors:\n  primary: '#7C5CFF'\n---\n" + BODY)["design-none"]
+    got = _bare("---\ncolors:\n  primary: '#7C5CFF'\n---\n" + BODY)["design-none"]
     assert got.message == "design: fonts: sizes: style: not stated"
 
 
 def test_design_none_for_deck_built_in_python():
-    deck = Deck(slides=[Slide()])
+    deck = Deck(theme="none", slides=[Slide()])
     assert "design-none" in {d.rule for d in design.design_diagnostics(deck)}
-    deck = Deck(slides=[Slide()], tokens={"colors.primary": "#7C5CFF"})
+    deck = Deck(theme="none", slides=[Slide()], tokens={"colors.primary": "#7C5CFF"})
     got = {d.rule: d for d in design.design_diagnostics(deck)}["design-none"]
     assert got.message == "design: fonts: sizes: style: not stated"
 
@@ -373,7 +413,7 @@ def test_design_slide_names_the_missing_groups_per_slide():
 
 
 def test_design_slide_hint_names_the_groups_and_the_two_directives():
-    got = _rules(CONTENT_ONLY)["design-slide"]
+    got = _bare(CONTENT_ONLY)["design-slide"]
     assert got.hint == design.SLIDE_HINT
     for word in ("form", "emphasis", "value", "@noemph", "@defaults"):
         assert word in got.hint
@@ -381,7 +421,7 @@ def test_design_slide_hint_names_the_groups_and_the_two_directives():
 
 
 def test_design_slide_singular():
-    assert _rules(BODY)["design-slide"].message == "slide 1 (form, emphasis, values) is short of a decision"
+    assert _bare(BODY)["design-slide"].message == "slide 1 (form, emphasis, values) is short of a decision"
 
 
 def test_two_emphases_are_reported_as_keep_one():
@@ -474,7 +514,10 @@ def test_facts_all_decided_has_no_short_list():
 
 
 def test_facts_lists_stated_keys_in_fixed_order():
-    text = "footer: ACME\nstyle: radius=8\nfonts: heading=Georgia\ncolors: primary=#7C5CFF\n\n# A\n" + DECIDED
+    text = (
+        "theme: none\nfooter: ACME\nstyle: radius=8\nfonts: heading=Georgia\ncolors: primary=#7C5CFF\n\n# A\n"
+        + DECIDED
+    )
     assert design.facts(parse(text)).startswith("design: colors fonts style footer; ")
 
 
@@ -585,7 +628,7 @@ def test_examples_state_their_design(path):
 def test_every_example_decides_every_slide(path):
     d = parse(path.read_text(encoding="utf-8"))
     line = design.facts(d)
-    m = re.fullmatch(r"design: [a-z\- ]+; (\d+)/(\d+) slides decided form\+emphasis\+values", line)
+    m = re.fullmatch(r"design: [a-z\-, ]+; (\d+)/(\d+) slides decided form\+emphasis\+values", line)
     assert m, line
     assert m.group(1) == m.group(2) and 0 < int(m.group(2)) <= len(d.slides)
 
@@ -609,7 +652,7 @@ def test_every_example_gets_feedback_without_crashing(path):
 
 
 def test_content_only_deck_string_fires_both():
-    got = _rules("# Quarterly review\n- Revenue grew\n- Costs fell\n\n# Next steps\n- Hire\n- Ship\n")
+    got = _bare("# Quarterly review\n- Revenue grew\n- Costs fell\n\n# Next steps\n- Hire\n- Ship\n")
     assert set(got) == {"design-none", "design-slide"}
     assert got["design-slide"].message == (
         "slides 1 (form, emphasis, values), 2 (form, emphasis, values) are short of a decision"

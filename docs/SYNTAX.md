@@ -961,7 +961,7 @@ tell an agent whether it made design decisions (`docs/DESIGN_REQUIRED.md`, "Tigh
 
 | Rule | Fires when | Message -> hint |
 |---|---|---|
-| `design-none` | the header lacks some of `colors:` `fonts:` `sizes:` `style:`; one warning names every missing line. A deck ` ```css ` fence or a theme file (`theme: ./brand.yaml`, `template.pptx`) stands in for `style:`; `theme: <preset>` alone never counts | `design: fonts: sizes: not stated` -> `add fonts: sizes: to the header` (when `style:` is missing the hint adds `(a css fence or theme file also counts for style:)`) |
+| `design-none` | the header lacks some of `colors:` `fonts:` `sizes:` `style:`; one warning names every missing line. A deck ` ```css ` fence or a theme file (`theme: ./brand.yaml`, `template.pptx`) stands in for `style:`. A built-in preset (an explicit `theme: midnight`, or no `theme:` line = `default`) is a decided frame (2026-11-08) and stands in for `colors:` `fonts:` `style:`; `sizes:` is still asked; `theme: none` asks for all four | `design: sizes: not stated` (with a preset) -> `add fonts: sizes: to the header` (when `style:` is missing the hint adds `(a css fence or theme file also counts for style:)`) |
 | `design-slide` | a content slide is short of one of the three groups below; one warning per deck lists the slides | `slides 4 (values), 8 (form, emphasis) are short of a decision` -> `per slide state form (@N @steps table chart), one emphasis (.hero hl= ==x==) or @noemph, a value (size= color= fill= x y w h) or @defaults` |
 
 The three groups a content slide states (cover, section and slides with nothing but a title and notes are exempt):
@@ -1032,6 +1032,16 @@ sparse slides print one line (`info slides 7,9 sparse: slide 7 is sparse (42% fr
 the part of the body rectangle outside the bounding box of the content (chrome and a conclusion bar attached to the
 body count as content); covers, sections, `@free` and `@html` slides are never sparse. `layout.sparse_note` is the
 threshold (`0.99` silences it); the check lives in `src/slidemark/fit.py` (`SPARSE`, `fit_report`).
+
+### `diagram-budget`
+
+An **info** (never a warning, not counted in "0 warnings"; one per slide, reasons combined) when a diagram is more
+complex than the editorial rules allow: `slide 4 diagram-budget: 11 nodes (keep <= 9: split into two diagrams)`.
+It fires for a ```` ```mermaid ```` fence or blocks joined by `a>b` connectors with more than 9 nodes or 12 arrows,
+an arrow label (`-->|label|`, a connector label) over 14 characters, or more than 2 shapes in the accent colour
+(fill or line) on a diagram slide. Thresholds are layout tokens, `0` turns one off:
+`style: lint.diagram_nodes=12` (also `lint.diagram_edges` `lint.diagram_label` `lint.diagram_accents`, or
+`layout.diagram_nodes` ...). Implemented in `src/slidemark/budget.py`.
 
 ### `attr-ignored`
 
