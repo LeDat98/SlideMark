@@ -55,6 +55,11 @@ The first `design-slide` counted any attribute as a choice, so `{.kpi}` or `labe
      already serves this slide).
 - The facts line reads `design: colors fonts sizes style footer; 9/14 slides decided form+emphasis+values`
   and lists the slides short of a group: `slides 4 (values), 8 (form, emphasis)`.
+- 2026-11-08: a built-in preset counts for colors/fonts/style. An explicit `theme: <built-in name>`, or no
+  `theme:` line (the default preset), is a decided frame and stands in for `colors:` `fonts:` `style:`; only
+  `sizes:` is still asked (the type scale depends on the deck's density). `theme: none` asks for all four, a
+  theme file or css fence counts as before. Facts line: `design: preset default, sizes; ...`. The role classes
+  `.focal` (emphasis) and `.store .external .input .optional .security` (values) are recognised by name.
 - Still advisory (warnings never cost a rebuild by themselves), and the eval counts them as `design` not as
   first-pass failures.
 - Implemented in DL3c (`src/slidemark/design.py`; message and hint texts in `docs/SYNTAX.md` "Diagnostics: design

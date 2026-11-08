@@ -68,6 +68,11 @@ class LayoutTokens(BaseModel):
     def _bools(cls, data):
         return _coerce_bools(cls, data)
 
+    # --- lint: the diagram complexity budget (info rule `diagram-budget`; 0 = off)
+    diagram_nodes: int = 9  # more nodes than this in one diagram: "probably two diagrams"
+    diagram_edges: int = 12  # more arrows than this
+    diagram_label: int = 14  # an arrow label longer than this many characters
+    diagram_accents: int = 2  # more shapes than this in the accent colour on a diagram slide
     top_gap: Length = "0.25in"  # title band (or lead) -> body, the same on every slide
     line_latin: float = 1.2  # line height / font size for Latin text
     line_cjk: float = 1.3  # ... for CJK text
@@ -1329,6 +1334,10 @@ STYLE_ALIASES = {
     "grow.max": "layout.grow_max",
     "card.heading.max": "layout.card_heading_max_pt",  # wave 2026-10-08 lane E
     "card.text.max": "layout.card_body_max_pt",
+    "lint.diagram_nodes": "layout.diagram_nodes",
+    "lint.diagram_edges": "layout.diagram_edges",
+    "lint.diagram_label": "layout.diagram_label",
+    "lint.diagram_accents": "layout.diagram_accents",
 }
 _STYLE_FIELDS = tuple(Style.model_fields)
 _NUM = re.compile(r"^-?\d+(?:\.\d+)?$")

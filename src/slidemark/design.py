@@ -4,21 +4,23 @@ Two warnings and one facts fragment, all computed from the parsed ``Deck`` (no l
 
 - ``design-none``: one warning naming every header line that is missing among ``colors:`` ``fonts:``
   ``sizes:`` ``style:``. A deck ``css`` fence or a theme file (``theme: ./brand.yaml``, a ``.pptx``) stands
-  in for ``style:``; ``theme: <preset>`` alone never counts.
+  in for ``style:``. A built-in preset (an explicit ``theme: <name>`` or no ``theme:`` line = the default
+  preset) is a decided frame (2026-11-08) and stands in for ``colors:`` ``fonts:`` ``style:``; ``sizes:`` is
+  still asked (the type scale depends on the deck's density). ``theme: none`` asks for all four.
 - ``design-slide``: one line for the deck listing the content slides that are short of a group. Every content
   slide must state three things (cover, section and notes-only slides are exempt):
 
   1. **form**: a layout directive (``@3`` ``@2x2`` ``@1:2`` ``@aab/aac``, ``@steps`` ``@chevron`` ``@rows``
      ``@items`` ``@kpi`` ``@free`` ``@html`` ``@timeline`` ...) or a block that is not the default list:
      table, chart, image, code, boxes with headings, KPI cards, mermaid, callout.
-  2. **emphasis**: exactly one (``.hero``, ``hl=``, ``==x==``, ``{.accent}`` / ``{.danger}`` /
+  2. **emphasis**: exactly one (``.hero``, ``.focal``, ``hl=``, ``==x==``, ``{.accent}`` / ``{.danger}`` /
      ``{.success}``, ``note=``, a badge), or ``@noemph``. Two or more are reported too
      (``emphasis: 2 stated, keep one``).
   3. **values**: at least one chosen value on the slide (``size=`` ``color=`` ``fill=`` ``x y w h``, chart
      ``colors=`` / ``size=`` / ``labels=<pos>``, table ``widths=`` / ``rowh=`` / ``align=``, a slide
      ``sizes:`` / ``style:`` line, ``@bg=``) or ``@defaults``.
 
-- ``facts()``: ``design: colors fonts sizes style footer; 9/14 slides decided form+emphasis+values`` for the
+- ``facts()``: ``design: preset default, sizes footer; 9/14 slides decided form+emphasis+values`` for the
   build output, with ``; short: 4 (values), 8 (form, emphasis)`` when some slides are short.
 
 The detection is table driven: tuples of predicates per group and place (slide, element) say what counts, so
@@ -38,9 +40,11 @@ from .ir import Chart, Container, Deck, Diagnostic, Slide, Table
 
 # the header lines `design-none` asks for, in the order it names them
 REQUIRED_LINES = ("colors", "fonts", "sizes", "style")
-# what stands in for `style:` (a deck css fence, a theme file); `theme: <preset>` alone never counts
+# what stands in for `style:` (a deck css fence, a theme file)
 STYLE_STANDINS = ("css", "theme-file")
-DESIGN_KEYS = (*REQUIRED_LINES, *STYLE_STANDINS)
+# a built-in preset (explicit `theme: <name>` or the default) is a decided frame: it stands in for these lines
+PRESET_STANDS_FOR = ("colors", "fonts", "style")
+DESIGN_KEYS = ("preset", *REQUIRED_LINES, *STYLE_STANDINS)
 EXTRA_KEYS = ("footer", "num")  # shown in the facts line, not decisions on their own
 THEME_FILES = (".yaml", ".yml", ".pptx", ".potx")  # `theme: ./brand.yaml` / a template is a decision
 # JSON/API decks have no header record: the group is read from the token path
@@ -48,7 +52,9 @@ _TOKEN_PREFIX = {"colors.": "colors", "fonts.": "fonts", "sizes.": "sizes"}
 
 NONE_MESSAGE = "design: {lines} not stated"
 NONE_HINT = "add {lines} to the header"
-NONE_STYLE_HINT = " (a css fence or theme file also counts for style:)"
+NONE_STYLE_HINT = (
+    " (a css fence or theme file also counts for style:; a built-in theme: preset for colors: fonts: style:)"
+)
 
 # Slide frame -----------------------------------------------------------------------------------------------
 
@@ -89,7 +95,9 @@ FORM_CLASSES = {
     "diagram",
     "callout",
 }
-EMPHASIS_CLASSES = {"hero", "accent", "danger", "success"}
+EMPHASIS_CLASSES = {"hero", "accent", "danger", "success", "focal"}
+# diagram role classes (a node's chosen look): values, recognised without any theme
+ROLE_CLASSES = {"store", "external", "input", "optional", "security"}
 # slide (`@` line) classes: words that change only the look are values, a few are neither, the rest are forms
 SLIDE_VALUE_CLASSES = {"dense", "dark", "light"}
 SLIDE_NEUTRAL_CLASSES = {"build", "noemph", "defaults"}  # animation / the two opt-out directives
@@ -116,8 +124,19 @@ FIELD_DEFAULTS: dict[str, dict[str, Any]] = {
 RUN_EMPHASIS = ("color", "highlight")
 
 
+def preset_name(deck: Deck) -> str | None:
+    """The built-in preset the deck uses (``theme: midnight``, or ``default`` without a ``theme:`` line);
+    ``None`` for ``theme: none``, a theme file or an unknown name."""
+    low = (deck.theme or "default").strip().lower()
+    if low == "none" or low.endswith(THEME_FILES):
+        return None
+    from .theme import available
+
+    return low if low in available() else None
+
+
 def stated(deck: Deck) -> list[str]:
-    """What the deck header decided: colors fonts sizes style css theme-file (then footer num)."""
+    """What the deck header decided: preset colors fonts sizes style css theme-file (then footer num)."""
     got: list[str] = list(deck.attrs.get("design_stated") or [])
     if "design_stated" not in deck.attrs:  # decks built from JSON or Python carry tokens but no header record
         for path in deck.tokens:
@@ -128,6 +147,8 @@ def stated(deck: Deck) -> list[str]:
         got.append("css")
     if deck.theme.strip().lower().endswith(THEME_FILES):
         got.append("theme-file")
+    if preset_name(deck):
+        got.append("preset")
     if deck.footer:
         got.append("footer")
     if deck.slide_number:
@@ -138,10 +159,12 @@ def stated(deck: Deck) -> list[str]:
 
 def missing_lines(deck: Deck) -> list[str]:
     """The header lines still to state among ``colors`` ``fonts`` ``sizes`` ``style`` (a css fence or a theme
-    file stands in for ``style``)."""
+    file stands in for ``style``; a built-in preset for ``colors`` ``fonts`` ``style``)."""
     got = set(stated(deck))
     if got & set(STYLE_STANDINS):
         got.add("style")
+    if "preset" in got:
+        got.update(PRESET_STANDS_FOR)
     return [k for k in REQUIRED_LINES if k not in got]
 
 
@@ -174,7 +197,9 @@ def _styled(style: Any) -> bool:
 
 
 def _value_class(c: str) -> bool:
-    return c not in AUTO_CLASSES and c not in FORM_CLASSES and c not in EMPHASIS_CLASSES
+    return c in ROLE_CLASSES or (
+        c not in AUTO_CLASSES and c not in FORM_CLASSES and c not in EMPHASIS_CLASSES
+    )
 
 
 def _chart_value(el: Any) -> bool:
@@ -320,6 +345,11 @@ def facts(deck: Deck) -> str:
     """``design: colors fonts style; 9/14 slides decided form+emphasis+values; short: 4 (values)``."""
     try:
         keys = stated(deck)
+        named = [k for k in keys if k != "preset"]
+        if "preset" in keys:
+            named = [f"preset {preset_name(deck)}" + ("," if named else ""), *named]
+            # `preset default, sizes footer`
+        keys = named
         short, total = slide_shortfalls(deck)
         done = f"{total - len(short)}/{total} slides decided {'+'.join(GROUPS)}"
         line = f"design: {' '.join(keys) or 'none'}; {done}"
