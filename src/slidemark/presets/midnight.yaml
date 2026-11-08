@@ -17,6 +17,13 @@ classes:
   card: {radius: 8}
   callout: {fill: surface, line_width: 1.25}
   chart-note: {fill: surface}
+  # diagram roles: `## Postgres {.store}` or mermaid `A[DB]:::store` (tints are alpha fills over the slide)
+  focal: {fill: "#FBBF241F", line: accent, line_width: 1.25}
+  store: {fill: "#E2E8F00D", line: muted}
+  external: {fill: "#E2E8F008", line: border}
+  input: {fill: "#2DD4BF1A", line: muted}
+  optional: {line: muted, line_dash: dash}
+  security: {fill: "#FBBF241A", line: accent, line_dash: dash}
 table_hl_fill: accent
 table_hl_strength: 0.2
 # series colors: primary, secondary, slate, then deeper / softer shades (the accent is reserved for `hl=`)

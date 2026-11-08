@@ -526,7 +526,9 @@ def _emit(ctx, E, c: Container, area: Rect, frame: _Frame, cap_style: Style, b: 
                 ctx.emit(
                     Shape(shape="line", attrs=attrs),
                     box,
-                    fast_style(line="primary", line_width=ctx.theme.render.connector_width),
+                    fast_style(
+                        line=ctx.theme.render.connector_color, line_width=ctx.theme.render.connector_width
+                    ),
                 )
             continue
         p0, p1 = frame.unpt(rt.p0), frame.unpt(rt.p1)
@@ -549,7 +551,7 @@ def _emit(ctx, E, c: Container, area: Rect, frame: _Frame, cap_style: Style, b: 
         ctx.emit(
             Shape(shape="line", attrs=attrs),
             box,
-            fast_style(line="primary", line_width=ctx.theme.render.connector_width),
+            fast_style(line=ctx.theme.render.connector_color, line_width=ctx.theme.render.connector_width),
         )
     for i, r in label_real.items():
         text = " ".join((c.links[i].label or "").split())
