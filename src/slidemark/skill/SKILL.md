@@ -363,9 +363,9 @@ category or a series). Numbers may be
 - A ` ```css ` fence (header = whole deck, in a slide = that slide) styles `slide h1 h2 p li .lead
   .conclusion .footnote .box .kpi table th td tr code img .chart` and your `{.class}`: colours, gradients,
   borders, radius, shadows, fonts, spacing, `transform: rotate()`.
-- A ` ```html ` fence under a title draws what syntax cannot (fishbone, kanban, journey map, treemap, sankey):
-  boxes with inline CSS and `<svg>` lines / `marker-end` arrows become editable shapes. The block is about
-  1180 x 490 px (16px = 12pt; `<svg viewBox="0 0 1180 490">`). Same rules: hairline borders, one accent.
+- A ` ```html ` fence under a title draws what syntax cannot (fishbone, kanban, journey map, treemap):
+  inline-CSS boxes and `<svg>` lines / `marker-end` arrows become editable shapes. Block about 1180 x 490 px
+  (`<svg viewBox="0 0 1180 490">`); text >= 20px (15pt), labels >= 16px; hairline borders, one accent.
 - `@html` + one ` ```html ` fence = a slide written in HTML/CSS, converted to editable shapes (`var(--primary)`
   reads your tokens).
 

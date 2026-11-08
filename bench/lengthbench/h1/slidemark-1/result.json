@@ -1,0 +1,9 @@
+{
+ "arm": "slidemark skill-only (SKILL.md with the html-fence line: designed fences under a title become native shapes)",
+ "model": "sonnet",
+ "calls": 5, "builds": 3, "image_looks": 2, "output_tokens": 6085,
+ "cost_units": 120543, "cost_above_start": 95163, "seconds": 64,
+ "accepted": true, "warnings_left": 0, "pictures": 0,
+ "agent_notes": "fishbone, kanban and journey map as ```html fences (svg + inline CSS), all editable shapes; text inside the diagrams small (agent used 11-14px); SKILL.md now states text >= 20px, labels >= 16px",
+ "forms": {"1": "cover", "2": "html fishbone + conclusion", "3": "html kanban", "4": "html journey map with sentiment line"}
+}
