@@ -48,7 +48,8 @@ Settle these in your reasoning, then write them into the deck (`build` echoes th
    and the fit line / `sparse` info (`sparse: 42% free`) name slides that stay empty: decide their form (merge,
    add a figure, `@rows` / `@items` / side by side) rather than raising `size=`.
 
-`design-none` names the missing header lines (`colors:` `fonts:` `sizes:` `style:`); `design-slide` the slides
+`design-none` names the missing header lines (a built-in `theme:` counts for colours, fonts, style; `sizes:` is
+yours); `design-slide` the slides
 short of a form, one emphasis (or `@noemph`), values (or `@defaults`). Advisory.
 
 ## Design guide (what separates a deck people keep from one they close)
@@ -65,6 +66,7 @@ short of a form, one emphasis (or `@noemph`), values (or `@defaults`). Advisory.
   `style: icon.disc=secondary`), numbered discs (`@rows`, `num`), one chart style, one card style. Bars and
   stripes are not a motif.
 - Starting points (write your own hexes when the brand or topic suggests them; do not default to blue):
+  `theme: editorial` (paper, ink, slate, one tangerine accent, serif titles, hairline borders) ·
   navy + teal + amber `colors: primary=#0B2A3C secondary=#1B8A8F accent=#F2A33A surface=#EEF4F6` ·
   forest + moss + cream `primary=#1E3A2F secondary=#6B8F71 accent=#D9A441 bg=#FBF8F1` ·
   charcoal + coral `primary=#2B2D42 secondary=#8D99AE accent=#EF6F4C surface=#F4F5F7` ·
@@ -91,8 +93,8 @@ equivalent fallback). Japanese: Meiryo or Yu Gothic.
 
 **Never**: a rule under the slide title (`title.rule`, `heading.rule`) and decorative bars or stripes
 (`top.bar`, `bottom.bar`, `box.stripe`, `kpi.stripe`, `item.border-left`, a vertical band beside the content).
-Both read as machine-made. To lift a card use a tinted `fill`, a shadow (`style: card.elevation=2`: a soft
-shadow and no border line; `1` lighter, `3` deeper, or `card.shadow="0 3 12 #00000030"`) or an icon disc.
+Both read as machine-made. Borders, not shadows: lift a card with a hairline line (`border=border`), a tinted
+`fill` or an icon disc.
 **Avoid**: the same form on consecutive slides; a full stop at the end of a title; titles that move, change
 font or size between slides of one kind; centred paragraphs (centre titles only); titles under 36pt or body
 under 14pt (pin floors: `sizes: title=36! body=14!`, then cut text, widen the block or split the slide
@@ -122,7 +124,7 @@ lang: en
 colors: bg=#FAF7F2 fg=#1F2933 primary=#0F4C5C accent=#E36414 surface=#FFFFFF border=#D9D2C5
 fonts: heading="Georgia" body="Calibri"
 sizes: title=34 heading=18 body=16 lead=20
-style: radius=6 title.band=none card.shadow="0 2 8 #00000022" table.header.fill=primary palette=primary,#5F9EA0,#B8B8AA
+style: radius=6 title.band=none border=border table.header.fill=primary palette=primary,#5F9EA0,#B8B8AA
 footer: Q3 review
 num: on
 
@@ -318,6 +320,8 @@ styles one list line; a chart frame takes `{fill= radius= pad=}`.
   on one heading or `- icon=bolt disc=accent **T** text` in `@iconlist`, `disc=none` removes it.
   `conclusion.icon=refresh` puts an icon at the left of the conclusion bar.
 - **Flowchart, org chart:** ` ```mermaid ` with `graph TD` / `graph LR`, `A[申請] --> B{承認?}`, `B -->|yes| C`.
+  Node roles (boxes `{.store}` or mermaid `A[DB]:::store`): `.focal` (the one highlighted node) `.store`
+  `.external` `.input` `.optional` (dashed) `.security`. At most 9 nodes, 12 arrows, labels of 14 characters.
 - **Math:** ` ```math ` LaTeX → native equation. **Images:** `![what it shows](a.png)` (alt text required);
   `![alt](demo.mp4)` video/audio; ` ```svg ` inline SVG. Other fences are code.
 
