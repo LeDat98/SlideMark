@@ -848,3 +848,18 @@ Fonts map to Office-safe faces (Georgia / Arial / Consolas, Yu Gothic for Japane
   with the owner (switch only if not below the wave-3 arm) did not pass, so `main` keeps `default`; the cost gain
   (fewer calls and builds when the agent need not pick a palette) is real and worth a later default that keeps the
   editorial rules (borders, one accent, roles) with a warmer palette.
+
+## Run 2026-11-08 (part 2): rebuild the editorial look to the reference (owner: "ugly, too plain, many UI/UX errors")
+Review (bench/reference/diagram-design, renders of the skill's own examples, side by side with ours): we ported the
+palette, not the system. Missing: eyebrow + regular serif title, node anatomy (type tag, bold name, mono sublabel),
+semantic arrow kinds with mono masked labels, a legend strip, compact centred diagrams (our engine fills the body),
+neutral venn with a solid ink overlap, activation bars, kanban badges / meta lines / blocked cards, fishbone tags and
+sub-bones. Process faults: lanes built forms from text specs without the reference; QA was "0 warnings"; the preset
+was tuned toward a business-deck judge. Owner order: 4, 1, 2, 3.
+- [x] 4. Editorial preset back to the source (regular-weight titles, paper-2 takeaway bar).
+- [ ] 1. Lane F: `@arch @swimlane @sequence @venn` to the reference (anatomy, arrow kinds `> => ~> -->`, labels,
+  legend, density, activation bars, lens overlap), `layout/diagramkit.py`.
+- [ ] 2. Lane G: eyebrow line (auto from `@section`), html CSS kit (`.node .tag .sub .label .legend .board .col
+  .badge .card .arrow` + global markers), example 30 rewritten with the kit.
+- [ ] 3. Reference QA: each form rendered next to its reference; a UI/UX checklist review
+  (`bench/ui_review_prompt.md`), fixes until only fonts and the 16:9 frame differ; SKILL.md lines.
