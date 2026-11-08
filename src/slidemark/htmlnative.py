@@ -127,7 +127,7 @@ function put(o) {
     Object.assign(o, {x: a.x, y: a.y, w: a.w, h: a.h});
     if (Math.abs(a.rot) > 0.01) o.rot = (a.rot % 360 + 360) % 360;
     if (a.sc !== 1) {
-      if (o.k === 'text') { o.fs *= a.sc; o.lh *= a.sc; for (const p of o.paras) p.fs *= a.sc; }
+      if (o.k === 'text') { o.fs *= a.sc; o.lh *= a.sc; for (const p of o.paras) { p.fs *= a.sc; for (const r of p.runs) r.fs *= a.sc; } }
       if (o.k === 'rect') { o.rad *= a.sc; o.lw *= a.sc; }
     }
   }
@@ -595,7 +595,7 @@ def _tmpdir() -> Path:
     return Path(d)
 
 
-def _runs(raw: list[dict], default_color: str | None) -> list[Run]:
+def _runs(raw: list[dict], default_color: str | None, para_fs: float = 0.0) -> list[Run]:
     runs: list[Run] = []
     for r in raw:
         link = r.get("href")
@@ -612,6 +612,11 @@ def _runs(raw: list[dict], default_color: str | None) -> list[Run]:
                 color=_color(r["c"]) or default_color,
                 highlight=_color(r["hl"]),
                 link=link if link and link.startswith(("http://", "https://", "mailto:")) else None,
+                # a run whose size differs from its paragraph's (<span style="font-size:16px"> in a 20px box)
+                size=round(r["fs"] * PT_PER_PX, 2) if r.get("fs") and abs(r["fs"] - para_fs) > 0.4 else None,
+                exact=bool(
+                    r.get("fs") and abs(r["fs"] - para_fs) > 0.4
+                ),  # drawn as measured, even above the paragraph
             )
         )
     return runs
@@ -639,7 +644,7 @@ def _text(it: dict, ox: int, oy: int, theme: Theme) -> Placed:
     )
     paras = [
         Paragraph(
-            runs=_runs(p["runs"], None),
+            runs=_runs(p["runs"], None, p["fs"]),
             marker=p["marker"],
             level=min(p["level"], 3),
             style=Style(font_size=round(p["fs"] * PT_PER_PX, 2)),
@@ -818,6 +823,9 @@ def _scale_items(items: list[dict], z: float) -> None:
                 it[k] = it[k] * z
         for p in it.get("paras", ()):
             p["fs"] = p["fs"] * z
+            for r in p.get("runs", ()):
+                if isinstance(r.get("fs"), (int, float)):
+                    r["fs"] = r["fs"] * z
         sh = it.get("shadow")
         if sh:
             parts = sh.split()

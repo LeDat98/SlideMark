@@ -890,6 +890,14 @@ from `<style>`), is laid out by Chromium as a whole-slide HTML slide. `data-rend
 `<html data-slidemark="native">` forces that for one slide or all. Theme tokens are CSS custom properties in every HTML slide (`var(--primary)`, `var(--font-body)`,
 `var(--size-body)`), so HTML slides and SlideMark slides of one deck share one design.
 
+A ` ```html ` fence under a slide title that carries its own design (an `<svg>`, a `<style>`, or inline box /
+position CSS such as `position`, `background`, `border`, `width`, `transform`) keeps that layout: it is measured
+by Chromium inside the body block and drawn as native shapes (fishbone, kanban, journey map, treemap, sankey).
+The block is about 1180 x 490 px at 96 px per inch (16:9, with a title; 16px = 12pt), so give an `<svg>` a
+`viewBox="0 0 1180 490"` and `width/height="100%"`. `var(--primary)` / `--accent` / `--muted` / `--border` /
+`--secondary` read the tokens in CSS and in SVG attributes (`fill="var(--accent)"`). `{zoom=1}` keeps the pixel
+sizes; the default `auto` enlarges short content and scales text and boxes by the same factor.
+
 ## Editorial preset and diagram roles
 
 `theme: editorial` is a quiet look (paper `#F5F5F5`, ink `#2D3142`, one rust accent `#BF4520`; white hairline cards, no shadows, no title band, regular-weight Georgia titles, ink-led chart series, slate 1 pt connectors). Palette and rules adapted from diagram-design by Cathryn Lavery (MIT). Everything in it is a token: `colors:` `fonts:` `sizes:` `style:` override any value; `title.bold=off` (field `title_bold`) gives regular titles to any theme, `render.connector_color=muted` colours every `a>b` / mermaid connector (default `primary`).

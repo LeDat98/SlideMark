@@ -213,9 +213,7 @@ def test_html_fence_plain_blocks():
     assert [e.type for e in deck.slides[0].elements] == ["text", "table"]
 
 
-@pytest.mark.parametrize(
-    "fence", ["<svg><circle/></svg>", "", "   ", "<h1>Title</h1>", "<script>x()</script>"]
-)
+@pytest.mark.parametrize("fence", ["", "   ", "<h1>Title</h1>", "<script>x()</script>"])
 def test_html_fence_not_understood_stays_raw(fence):
     deck = parse(f"# T\n```html\n{fence}\n```\n")
     raws = [e for e in deck.slides[0].elements if isinstance(e, Raw)]
@@ -228,3 +226,21 @@ def test_deep_and_broken_html_never_raises():
     parse_html("<div>" * 5000 + "x" + "</span>" * 10)
     parse_html("<table>" * 300 + "<td colspan=999999 rowspan=999999>x")
     parse_html("<<<>>></p></li><ul><li><li><td>")
+
+
+@pytest.mark.parametrize(
+    "fence",
+    [
+        "<svg><circle/></svg>",
+        '<div style="background:#fff;border:1px solid #ccc">Card</div>',
+        '<div style="position:relative"><div style="position:absolute;left:0;top:0">x</div></div>',
+        "<style>.a{color:red}</style><p class=a>x</p>",
+    ],
+)
+def test_designed_html_fence_goes_to_the_native_converter(fence):
+    # a fence with its own design (svg, <style>, box / position CSS) keeps its layout: raw HTML for the
+    # Chromium-measured native converter, silently (it is understood, not a fallback)
+    deck = parse(f"# T\n```html\n{fence}\n```\n")
+    raws = [e for e in deck.slides[0].elements if isinstance(e, Raw)]
+    assert len(raws) == 1 and raws[0].kind == "html"
+    assert not [x for x in deck.diagnostics if x.rule == "html-fallback"]
