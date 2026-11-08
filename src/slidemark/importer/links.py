@@ -350,6 +350,7 @@ def recover_diagram(blocks: list[Block], conns: list[ConnT], items: list[Item]) 
         and (b.item.fill or b.item.line)
         and b.item.prst in NODE_PRST
         and b.item.text
+        and not b.item.name.startswith("Flow edge")  # (a knockout label, not a node)
     ]
     if len(nodes) < 3:
         return None
@@ -368,7 +369,7 @@ def recover_diagram(blocks: list[Block], conns: list[ConnT], items: list[Item]) 
         for b in blocks
         if b.kind == "text"
         and b.item is not None
-        and not (b.item.fill or b.item.line)
+        and (not (b.item.fill or b.item.line) or b.item.name.startswith("Flow edge"))  # (a knockout label)
         and b not in nodes
         and b.item.text
         and len(b.item.paras) == 1

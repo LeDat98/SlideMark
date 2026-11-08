@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE
 from pptx.oxml.ns import qn
 
 from slidemark import icons
@@ -307,23 +308,32 @@ B -->|escalate| E[Director]
 """
 
 
-def test_elbow_from_diamond_is_glued_to_both_nodes(tmp_path):
+def test_diamond_branches_leave_through_separate_vertices(tmp_path):
+    """Three branches of a decision: straight down from the bottom vertex (glued to both nodes), the other two
+    out of the left / right vertex and one bend to the top of their node: no shared trunk."""
     deck = parse(APPROVAL_SIDES)
     th = get_theme(deck.theme)
     placed = [layout_slide(deck.slides[0], deck, th, 0)]
     out = tmp_path / "a.pptx"
     render(deck, placed, th, out)
     sl = Presentation(str(out)).slides[0]
-    ids = {s.shape_id: s for s in sl.shapes}
+    diamond = next(s for s in sl.shapes if s.shape_type == 1 and s.auto_shape_type == MSO_SHAPE.DIAMOND)
     cxns = [s for s in sl.shapes if s._element.tag == qn("p:cxnSp")]
-    elbows = [c for c in cxns if c._element.spPr.find(qn("a:prstGeom")).get("prst") == "bentConnector3"]
-    assert len(elbows) == 2  # yes / escalate; "no" is straight down
-    for c in elbows:
+    glued = []
+    for c in cxns:
         nv = c._element.find(qn("p:nvCxnSpPr")).find(qn("p:cNvCxnSpPr"))
         st, en = nv.find(qn("a:stCxn")), nv.find(qn("a:endCxn"))
-        assert st is not None and en is not None
-        assert ids[int(st.get("id"))].auto_shape_type is not None
-        assert (st.get("idx"), en.get("idx")) == ("2", "0")  # bottom-middle -> top-middle
+        if st is not None and en is not None and int(st.get("id")) == diamond.shape_id:
+            glued.append((st.get("idx"), en.get("idx")))
+    assert glued == [("2", "0")]  # "no" is straight down, bottom-middle -> top-middle
+    legs = [
+        c
+        for c in cxns
+        if c._element.find(qn("p:nvCxnSpPr")).find(qn("p:cNvCxnSpPr")).find(qn("a:stCxn")) is None
+    ]
+    starts = {(c.begin_x, c.begin_y) for c in legs} | {(c.end_x, c.end_y) for c in legs}
+    mid_y = diamond.top + diamond.height // 2
+    assert (diamond.left, mid_y) in starts and (diamond.left + diamond.width, mid_y) in starts
 
 
 def test_parser_icon_names_in_sync():

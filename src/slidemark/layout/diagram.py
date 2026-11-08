@@ -11,11 +11,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ..ir import Container, Paragraph, Run, Shape, Style, Text, fast_style
+from ..ir import Container, Shape, Style, Text, fast_style
 from ..theme import DEFAULT_SIZES
 from ..units import EMU_PER_INCH as IN
 from ..units import EMU_PER_PT
 from . import measure
+from . import ports as PO
 from .grid import Rect, parse_spec
 
 MIN_W, MIN_H = 1.4, 0.55  # inches: smallest node
@@ -24,7 +25,9 @@ DIAMOND_MIN_W, DIAMOND_MIN_H = 1.9, 0.95
 RANK_GAP, RANK_GAP_MAX = 0.45, 1.0  # inches between ranks (arrows must stay visible)
 CROSS_GAP, CROSS_GAP_MAX = 0.3, 0.8  # inches between nodes of one rank
 SIDE_STEP = 0.24  # inches between nested side routes (back edges)
-LABEL_OFF = 0.05  # inches between an edge and its label
+CLR = round(0.125 * IN)  # 12 px: the least distance of a connector from a node it passes
+MINSEG = round(0.22 * IN)  # the least straight run before an arrowhead and after leaving a node
+SEP = round(0.125 * IN)  # the least distance of two parallel connectors
 TOL = 1.01
 RANK_GK_MIN = 0.75  # arrows between ranks keep at least this share of the base gap
 STEP = round(0.04 * IN)  # node width search step
@@ -55,7 +58,8 @@ class _Route:
     adj: float
     p0: tuple[int, int]
     p1: tuple[int, int]
-    side: bool = False
+    side: bool = False  # a loop around the nodes: drawn as straight legs
+    legs: bool = False  # an L-shaped connector: drawn as straight legs (a native elbow has two bends)
 
 
 class _Frame:
@@ -204,7 +208,7 @@ class _Built:
     rects: dict[int, Rect]
     routes: list[tuple[int, _Route, bool]]
     labels: dict[int, Rect]  # link index -> real rect
-    cap_eff: float
+    K: object  # the diagram kit look (label size) the labels were measured with
     bad: list[tuple[int, int]]  # links that refer to a missing node
     bx0: int
     by0: int
@@ -280,6 +284,8 @@ def _build(
     szh: float = 1.0,
 ) -> _Built:
     """Lay the flowchart out at squeeze ``q`` (<= 1) or node growth ``sz`` (>= 1; text up to body_pt)."""
+    from . import diagramkit as DK  # (lazy: diagramkit imports the vocabulary, which imports this module)
+
     n = len(kids)
     vertical = not frame.t
     sgn = -1 if frame.m else 1
@@ -330,26 +336,17 @@ def _build(
     kb = max(ks)
     k = kb * max(sz, 1.0)
     gk = max(min(kb, 1.0), 0.5) * max(sz, 1.0)
-    # ---- edge labels (sizes first: they widen the gaps between ranks); never below LABEL_MIN_PT
-    cap_base = cap_style.font_size or 12
-    cap_eff = measure.effective_scale(cap_base, scale, ctx.theme.min_font_size)
-    cap_eff = max(cap_eff, min(1.0, LABEL_MIN_PT / cap_base))
-    if sz > 1.0:
-        cap_eff *= min(sz, 1.25)
-    cap_pad = E._pad(cap_style)
+    # ---- edge labels (sizes first: they widen the gaps between ranks): mono capitals of the diagram kit
+    K = DK.look(ctx).scaled(min(scale, 1.0))
     lab_dims: dict[int, tuple[int, int]] = {}
     for i, ln in enumerate(c.links):
         text = " ".join((ln.label or "").split())
         if not text or ln.src not in pos or ln.dst not in pos or ln.src == ln.dst:
             continue
-        lw = (
-            round(measure.text_em(text) * cap_base * cap_eff * EMU_PER_PT * 1.1)
-            + 2 * cap_pad
-            + round(0.04 * IN)
+        lab_dims[i] = (
+            DK.small_w(K, text, K.label, ctx.theme.diagram_label_track) + round(8 * EMU_PER_PT),
+            round(K.label * 1.6 * EMU_PER_PT),
         )
-        para = Paragraph(runs=[Run(text=text)])
-        lh = round(measure.paragraphs_height([para], 10**9, cap_style, cap_eff)) + 2 * cap_pad
-        lab_dims[i] = (lw, lh)
 
     def rank_cross(i: int) -> tuple[int, int]:
         r, cc = pos[i]
@@ -452,43 +449,41 @@ def _build(
         rects[i] = Rect(xs[cc] + (cw[cc] - nd.w) // 2, ys[r] + (rh[r] - nd.h) // 2, nd.w, nd.h)
     # ---- connectors and labels in the frame
     frects = {i: frame.rect(r) for i, r in rects.items()}
-    routes: list[tuple[int, _Route, bool]] = []  # (link index, route, glue boxes?)
-    bad: list[tuple[int, int]] = []
-    side_k = 0
-    for i, ln in enumerate(c.links):
-        if ln.src not in frects or ln.dst not in frects or ln.src == ln.dst:
-            bad.append((ln.src, ln.dst))
-            continue
-        a, b = frects[ln.src], frects[ln.dst]
-        others = [r for j, r in frects.items() if j not in (ln.src, ln.dst)]
-        rt = _route(a, b, others, list(frects.values()), side_k, round(SIDE_STEP * IN * gk))
-        if rt.side:
-            side_k += 1
-        routes.append((i, rt, not rt.side))
-    fnodes = list(frects.values())
-    placed_labels: list[tuple[int, Rect]] = []  # (link index, frame rect)
-    for i, rt, _g in routes:
+    bad: list[tuple[int, int]] = [
+        (ln.src, ln.dst) for ln in c.links if ln.src not in frects or ln.dst not in frects or ln.src == ln.dst
+    ]
+    ok_links = [i for i, ln in enumerate(c.links) if (ln.src, ln.dst) not in bad]
+    by_link = _route_all(c.links, ok_links, frects, round(SIDE_STEP * IN * gk))
+    routes: list[tuple[int, _Route, bool]] = [(i, by_link[i], not by_link[i].side) for i in ok_links]
+    real_polys = {i: [frame.unpt(p) for p in rt.pts] for i, rt, _g in routes}
+    obstacles = list(rects.values())
+    for pts in real_polys.values():
+        obstacles += PO.segment_rects(pts)
+    label_real: dict[int, Rect] = {}
+    for i, _rt, _g in routes:
         if i not in lab_dims:
             continue
-        lw, lh = frame.dims(*lab_dims[i])
-        lines = [o.pts for j, o, _g in routes if j != i]
-        taken = [r for _, r in placed_labels]
-        placed_labels.append((i, _label_rect(rt, lw, lh, fnodes, taken, round(LABEL_OFF * IN), lines)))
+        lw, lh = lab_dims[i]
+        r_, _clear = DK.place_label(real_polys[i], lw, lh, obstacles)
+        label_real[i] = r_
+        obstacles.append(r_)
     # ---- bounding box
     all_real: list[Rect] = list(rects.values())
     for _i, rt, _g in routes:
         for p in rt.pts:
             q_ = frame.unpt(p)
             all_real.append(Rect(q_[0], q_[1], 0, 0))
-    label_real = {i: frame.unrect(r) for i, r in placed_labels}
     all_real += list(label_real.values())
     bx0, by0 = min(r.x for r in all_real), min(r.y for r in all_real)
     bx1, by1 = max(r.right for r in all_real), max(r.bottom for r in all_real)
-    return _Built(nodes, rects, routes, label_real, cap_eff, bad, bx0, by0, bx1 - bx0, by1 - by0)
+    return _Built(nodes, rects, routes, label_real, K, bad, bx0, by0, bx1 - bx0, by1 - by0)
 
 
 def _emit(ctx, E, c: Container, area: Rect, frame: _Frame, cap_style: Style, b: _Built) -> None:
     """Shift the layout into ``area`` (centered across, top-anchored along the page) and emit it."""
+    from . import diagramkit as DK  # (lazy: diagramkit imports the vocabulary, which imports this module)
+    from . import vocab as V
+
     dx = area.x + max(area.w - b.bw, 0) // 2 - b.bx0
     dy = area.y - b.by0  # top-anchored: the leftover stays below (the slide policy moves very sparse slides)
 
@@ -497,7 +492,10 @@ def _emit(ctx, E, c: Container, area: Rect, frame: _Frame, cap_style: Style, b: 
 
     rects, routes, label_real, nodes = b.rects, b.routes, b.labels, b.nodes
     # ---- emit: card, nodes, connectors, labels
-    card = Rect(b.bx0 + dx, b.by0 + dy, b.bw, b.bh)
+    pad = (
+        2 * 9525
+    )  # the legs of a loop overlap at their corners: the card holds them (rows move blocks, not parts)
+    card = Rect(b.bx0 + dx - pad, b.by0 + dy - pad, b.bw + 2 * pad, b.bh + 2 * pad)
     ctx.emit(c, card, E._card_style(ctx, c))
     for i, nd in enumerate(nodes):
         el = nd.el
@@ -512,16 +510,19 @@ def _emit(ctx, E, c: Container, area: Rect, frame: _Frame, cap_style: Style, b: 
     for i, rt, _glue in routes:
         ln = c.links[i]
         head = "arrow" if ln.arrow else "none"
-        if rt.side:  # a loop around the nodes: straight segments render the same everywhere
+        if rt.side or rt.legs:  # a loop or an L: straight segments render the same everywhere
             pts = [frame.unpt(p) for p in rt.pts]
             pts = [(x + dx, y + dy) for x, y in pts]
+            last = len(pts) - 2
             for s_i, (u, v) in enumerate(zip(pts, pts[1:], strict=False)):
-                if s_i == 1:  # the middle leg overlaps its neighbours so the corners stay closed
-                    ex = (v[0] > u[0]) - (v[0] < u[0])
-                    ey = (v[1] > u[1]) - (v[1] < u[1])
-                    u, v = (u[0] - ex * 9525, u[1] - ey * 9525), (v[0] + ex * 9525, v[1] + ey * 9525)
+                ex = (v[0] > u[0]) - (v[0] < u[0])
+                ey = (v[1] > u[1]) - (v[1] < u[1])
+                if s_i > 0:  # legs overlap at the corners so they stay closed
+                    u = (u[0] - ex * 9525, u[1] - ey * 9525)
+                if s_i < last:
+                    v = (v[0] + ex * 9525, v[1] + ey * 9525)
                 attrs = {
-                    "head": head if s_i == 2 else "none",
+                    "head": head if s_i == last else "none",
                     "flip_h": v[0] < u[0],
                     "flip_v": v[1] < u[1],
                     "side": True,
@@ -557,40 +558,191 @@ def _emit(ctx, E, c: Container, area: Rect, frame: _Frame, cap_style: Style, b: 
             box,
             fast_style(line=ctx.theme.render.connector_color, line_width=ctx.theme.render.connector_width),
         )
+    K = b.K
+    size, tr = K.label, ctx.theme.diagram_label_track
+    st = V._text_style(ctx, size, align="center", valign="middle", padding="0pt", fill="bg")
     for i, r in label_real.items():
         text = " ".join((c.links[i].label or "").split())
-        el = Text(role="caption", paragraphs=[Paragraph(runs=[Run(text=text)])])
-        ctx.emit(el, shift(r), cap_style, b.cap_eff)
+        el = Text(
+            role="caption",
+            paragraphs=[DK.small_para(ctx, K, text, size, tr)],
+            attrs={"shape_name": f"Flow edge {i + 1} label", "nowrap": True},
+        )
+        ctx.emit(el, shift(r), st)
 
 
 # --------------------------------------------------------------------------- routing (frame coordinates)
 
 
-def _route(a: Rect, b: Rect, others: list[Rect], everyone: list[Rect], side_k: int, step: int) -> _Route:
-    """Connector from node ``a`` to node ``b``; the rank axis points down."""
-    if b.y >= a.bottom:  # forward: bottom-middle -> top-middle
-        p0, p1 = (_cx(a), a.bottom), (_cx(b), b.y)
-        if abs(p1[0] - p0[0]) <= 2:
-            p1 = (p0[0], p1[1])
-            if not _poly_hits([p0, p1], others):
-                return _Route([p0, p1], "v", False, 0.5, p0, p1)
-        else:
-            lo, hi = p0[1], p1[1]
-            for cy in _channel_centers(others, lo, hi):
-                pts = [p0, (p0[0], cy), (p1[0], cy), p1]
-                if not _poly_hits(pts, others):
-                    return _Route(pts, "v", True, (cy - lo) / (hi - lo), p0, p1)
-    elif a.y < b.bottom:  # same rank: side by side
-        right = b.x >= a.right
-        p0 = (a.right if right else a.x, _cy(a))
-        p1 = (b.x if right else b.right, _cy(a))
-        if not _poly_hits([p0, p1], others):
-            return _Route([p0, p1], "h", False, 0.5, p0, p1)
-    return _side_route(a, b, everyone, side_k, step)
+def _infl(r: Rect, m: int) -> Rect:
+    return Rect(r.x - m, r.y - m, r.w + 2 * m, r.h + 2 * m)
 
 
-def _channel_centers(others: list[Rect], lo: int, hi: int) -> list[int]:
-    """Centers of the free bands between ``lo`` and ``hi`` (frame y), nearest to ``lo`` first."""
+def _segs(pts: list[tuple[int, int]]) -> list[tuple[tuple[int, int], tuple[int, int]]]:
+    return [(u, v) for u, v in zip(pts, pts[1:], strict=False) if u != v]
+
+
+def _clear(pts: list[tuple[int, int]], a: Rect, b: Rect, others: list[Rect]) -> bool:
+    """No segment passes within ``CLR`` of another node; none but the first / last grazes ``a`` / ``b``."""
+    segs = _segs(pts)
+    if not segs:
+        return False
+    if any(_hits(u, v, _infl(r, CLR)) for r in others for u, v in segs):
+        return False
+    ia, ib = _infl(a, CLR), _infl(b, CLR)
+    last = len(segs) - 1
+    for k, (u, v) in enumerate(segs):
+        if k > 0 and _hits(u, v, ia):
+            return False
+        if k < last and _hits(u, v, ib):
+            return False
+    if last > 0 and (_hits(*segs[0], ib) or _hits(*segs[-1], ia)):
+        return False
+    return True
+
+
+def _min_run(pts: list[tuple[int, int]], minseg: int) -> bool:
+    """The first and the last straight run (before the arrowhead) are at least ``minseg`` long."""
+    segs = _segs(pts)
+    if len(segs) < 2:
+        return True
+    ln = [abs(v[0] - u[0]) + abs(v[1] - u[1]) for u, v in segs]
+    return ln[0] >= minseg and ln[-1] >= minseg
+
+
+def _clash(p: list[tuple[int, int]], q: list[tuple[int, int]]) -> bool:
+    """Two connectors run side by side closer than ``SEP`` (or on top of each other) over some length."""
+    for u, v in _segs(p):
+        for s, t in _segs(q):
+            if u[1] == v[1] and s[1] == t[1]:
+                if abs(u[1] - s[1]) < SEP and min(max(u[0], v[0]), max(s[0], t[0])) > max(
+                    min(u[0], v[0]), min(s[0], t[0])
+                ):
+                    return True
+            elif u[0] == v[0] and s[0] == t[0]:
+                if abs(u[0] - s[0]) < SEP and min(max(u[1], v[1]), max(s[1], t[1])) > max(
+                    min(u[1], v[1]), min(s[1], t[1])
+                ):
+                    return True
+    return False
+
+
+def _levels(lo: int, hi: int, others: list[Rect], minseg: int) -> list[int]:
+    """Candidate levels (frame y) for the bend of a connector from ``lo`` to ``hi``: the middle of every free
+    band first, then positions on either side of it; each keeps ``minseg`` from both ends."""
+    out: list[int] = []
+    for u, v in _channel_bands(others, lo, hi):
+        top = max(u + (CLR if u != lo else 0), lo + minseg)
+        bot = min(v - (CLR if v != hi else 0), hi - minseg)
+        if top > bot:
+            continue
+        mid = (top + bot) // 2
+        out.append(mid)
+        for k in range(1, 6):
+            d = round(1.5 * SEP * k)
+            out += [y for y in (mid + d, mid - d) if top <= y <= bot]
+    return out
+
+
+def _candidates(
+    a: Rect, b: Rect, others: list[Rect], prefer_l: bool, prefer_in: bool, minseg: int
+) -> list[_Route]:
+    """Routes of a forward connector (``b`` below ``a``), best first; every end is the middle of a side."""
+    acx, bcx, acy, bcy = _cx(a), _cx(b), _cy(a), _cy(b)
+    p0, p1 = (acx, a.bottom), (bcx, b.y)
+    straight: list[_Route] = []
+    if abs(bcx - acx) <= round(0.03 * IN):
+        straight.append(_Route([p0, (acx, b.y)], "v", False, 0.5, p0, (acx, b.y)))
+    elbows = [
+        _Route([p0, (acx, y), (bcx, y), p1], "v", True, (y - p0[1]) / max(p1[1] - p0[1], 1), p0, p1)
+        for y in _levels(a.bottom, b.y, others, minseg)
+    ]
+    legs: list[_Route] = []
+    if bcx != acx:
+        sx = a.right if bcx > acx else a.x  # leave through the side that faces the target
+        q0 = (sx, acy)
+        legs.append(_Route([q0, (bcx, acy), p1], "v", False, 0.5, q0, p1, legs=True))
+        ex = (
+            b.x if acx < b.x else b.right if acx > b.right else None
+        )  # arrive through the side facing the source
+        if ex is not None:
+            r1 = (ex, bcy)
+            legs.append(_Route([p0, (acx, bcy), r1], "v", False, 0.5, p0, r1, legs=True))
+    if prefer_l:
+        return straight + legs[:1] + elbows + legs[1:]
+    if prefer_in:
+        return straight + legs[1:] + elbows + legs[:1]
+    return straight + elbows + legs
+
+
+def _route_all(links: list, idx: list[int], frects: dict[int, Rect], step: int) -> dict[int, _Route]:
+    """Route every link (frame coordinates, rank axis down). Connectors never pass closer than ``CLR`` to a
+    node, never run along one, keep a straight run of ``MINSEG`` before the head, leave a node that fans out
+    through different sides (no shared trunk) and arrive at the middle of a side."""
+    out: dict[int, _Route] = {}
+    fan_out: dict[int, int] = {}
+    fan_in: dict[int, int] = {}
+    fwd: dict[int, bool] = {}
+    for i in idx:
+        ln = links[i]
+        a, b = frects[ln.src], frects[ln.dst]
+        fwd[i] = b.y >= a.bottom
+        if fwd[i]:
+            fan_out[ln.src] = fan_out.get(ln.src, 0) + 1
+            fan_in[ln.dst] = fan_in.get(ln.dst, 0) + 1
+
+    def rank(i: int) -> tuple[int, int]:
+        ln = links[i]
+        a, b = frects[ln.src], frects[ln.dst]
+        if not fwd[i]:
+            return (3, i)
+        if abs(_cx(b) - _cx(a)) <= round(0.03 * IN):
+            return (0, i)  # a straight connector keeps the middle of its sides
+        if fan_out[ln.src] > 1 or fan_in[ln.dst] > 1:
+            return (1, i)
+        return (2, i)
+
+    taken: list[list[tuple[int, int]]] = []
+    side_k = 0
+    for i in sorted(idx, key=rank):
+        ln = links[i]
+        a, b = frects[ln.src], frects[ln.dst]
+        others = [r for j, r in frects.items() if j not in (ln.src, ln.dst)]
+        everyone = list(frects.values())
+        rt: _Route | None = None
+        if fwd[i]:
+            minseg = min(MINSEG, max(round(0.1 * IN), round((b.y - a.bottom) * 0.4)))
+            cands = _candidates(
+                a, b, others, fan_out[ln.src] > 1, fan_in[ln.dst] > 1 and fan_out[ln.src] <= 1, minseg
+            )
+            for strict in (3, 2, 1):  # relax: no clash, then no minimum run, then clearance only
+                for cand in cands:
+                    if not _clear(cand.pts, a, b, others):
+                        continue
+                    if strict >= 2 and not _min_run(cand.pts, minseg):
+                        continue
+                    if strict >= 3 and any(_clash(cand.pts, t) for t in taken):
+                        continue
+                    rt = cand
+                    break
+                if rt is not None:
+                    break
+        elif a.y < b.bottom:  # same rank: side by side
+            right = b.x >= a.right
+            p0 = (a.right if right else a.x, _cy(a))
+            p1 = (b.x if right else b.right, _cy(b))
+            if p0[1] == p1[1] and not _poly_hits([p0, p1], others):
+                rt = _Route([p0, p1], "h", False, 0.5, p0, p1)
+        if rt is None:
+            rt = _side_route(a, b, everyone, side_k, step, taken)
+            side_k += 1
+        taken.append(rt.pts)
+        out[i] = rt
+    return out
+
+
+def _channel_bands(others: list[Rect], lo: int, hi: int) -> list[tuple[int, int]]:
+    """The free bands between ``lo`` and ``hi`` (frame y), nearest to ``lo`` first."""
     cur = lo
     free: list[tuple[int, int]] = []
     for r in sorted(others, key=lambda r: r.y):
@@ -601,73 +753,33 @@ def _channel_centers(others: list[Rect], lo: int, hi: int) -> list[int]:
         cur = max(cur, r.bottom)
     if cur < hi:
         free.append((cur, hi))
-    return [(u + v) // 2 for u, v in free if v > u]
+    return [(u, v) for u, v in free if v > u]
 
 
-def _side_route(a: Rect, b: Rect, everyone: list[Rect], side_k: int, step: int) -> _Route:
-    """Out of the right side of ``a``, around the nodes, into the right side of ``b`` (route ``h``)."""
+def _side_route(
+    a: Rect, b: Rect, everyone: list[Rect], side_k: int, step: int, taken: list[list[tuple[int, int]]]
+) -> _Route:
+    """A loop around the nodes (a back edge, or a connector that would cross a node): out of the right side of
+    ``a`` into the right side of ``b``; else around the left; else down below the nodes and up the left."""
     ya, yb = _cy(a), _cy(b)
     lo, hi = min(ya, yb), max(ya, yb)
     near = [r for r in everyone if r.y <= hi and r.bottom >= lo]
     others = [r for r in everyone if r is not a and r is not b]
-    ext = max(r.right for r in near)
-    bend = ext + step * (side_k + 1)
-    p0 = (a.right, ya)
-    p1 = (b.right, yb)
-    right = _Route([p0, (bend, ya), (bend, yb), p1], "h", False, 0.5, p0, p1, side=True)
-    if not _poly_hits(right.pts, others):
-        return right
-    # the right side is blocked (a node of the target's rank sits beside it): go around the left side
-    bend = min(r.x for r in near) - step * (side_k + 1)
-    p0, p1 = (a.x, ya), (b.x, yb)
-    left = _Route([p0, (bend, ya), (bend, yb), p1], "h", False, 0.5, p0, p1, side=True)
-    return left if not _poly_hits(left.pts, others) else right
-
-
-def _label_rect(
-    rt: _Route,
-    lw: int,
-    lh: int,
-    nodes: list[Rect],
-    taken: list[Rect],
-    off: int,
-    lines: list[list[tuple[int, int]]],
-) -> Rect:
-    """Rect of an edge label next to its connector: never on the line, never over a node or another label."""
-    segs = [(u, v) for u, v in zip(rt.pts, rt.pts[1:], strict=False) if u != v]
-    if rt.side:
-        order = [segs[1]] if len(segs) > 1 else segs
-    elif rt.elbow:
-        order = [segs[1], segs[0], segs[-1]] if len(segs) >= 3 else segs
-    else:
-        order = segs[:1]
-    order = order + [s for s in segs if s not in order]
-    toward = 1 if rt.p1[0] >= rt.p0[0] else -1
-    if rt.side:
-        toward = 1 if rt.pts[1][0] >= rt.p0[0] else -1  # outer side of the loop
-    cands: list[Rect] = []
-    for u, v in order:
-        fracs = (0.8, 0.6, 0.4) if rt.elbow and (u, v) == order[0] else (0.5, 0.75, 0.25)
-        if u[0] == v[0]:  # vertical segment
-            for frac in fracs:
-                my = round(u[1] + (v[1] - u[1]) * frac)
-                for s in (toward, -toward):
-                    x = u[0] + off if s > 0 else u[0] - off - lw
-                    cands.append(Rect(x, my - lh // 2, lw, lh))
-        else:  # horizontal segment
-            for frac in fracs:
-                mx = round(u[0] + (v[0] - u[0]) * frac)
-                for y in (u[1] - off - lh, u[1] + off):
-                    cands.append(Rect(mx - lw // 2, y, lw, lh))
-    margin = round(0.02 * IN)
-    for r in cands:
-        if (
-            not any(_overlap(r, n, margin) for n in nodes)
-            and not any(_overlap(r, t, margin) for t in taken)
-            and not _poly_hits_any(lines, r)
-        ):
-            return r
-    return cands[0]
+    k = step * (side_k + 1)
+    right_bend = max(r.right for r in near) + k
+    left_bend = min(r.x for r in near) - k
+    low = max(r.bottom for r in everyone) + k
+    cands = [
+        [(a.right, ya), (right_bend, ya), (right_bend, yb), (b.right, yb)],
+        [(a.x, ya), (left_bend, ya), (left_bend, yb), (b.x, yb)],
+        [(_cx(a), a.bottom), (_cx(a), low), (left_bend, low), (left_bend, yb), (b.x, yb)],
+    ]
+    for strict in (True, False):
+        for pts in cands:
+            if _clear(pts, a, b, others) and not (strict and any(_clash(pts, t) for t in taken)):
+                return _Route(pts, "h", False, 0.5, pts[0], pts[-1], side=True)
+    pts = cands[0]
+    return _Route(pts, "h", False, 0.5, pts[0], pts[-1], side=True)
 
 
 # --------------------------------------------------------------------------- slide-level trees (a>b links)

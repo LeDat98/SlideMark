@@ -272,7 +272,7 @@ def test_venn_two_sets_and_focal_set_takes_the_accent(tmp_path):
     a, b = one(prs, "Venn 1 set"), one(prs, "Venn 2 set")
     assert str(b.fill.fore_color.rgb).upper() == "BF4520" and str(a.fill.fore_color.rgb).upper() != "BF4520"
     assert str(one(prs, "Venn overlap fill").fill.fore_color.rgb) == "2D3142"  # not focal: solid ink
-    assert one(prs, "Venn overlap").text_frame.text == "A plan that ships"
+    assert one(prs, "Venn overlap").text_frame.text.replace("\xa0", " ") == "A plan that ships"
     assert a.left + a.width > b.left  # they overlap
 
 

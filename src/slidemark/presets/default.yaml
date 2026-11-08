@@ -16,9 +16,9 @@ classes:
   chart-note: {fill: "#FFFBEB"}
   # diagram roles: `## Postgres {.store}` or mermaid `A[DB]:::store` (tints are alpha fills over the slide)
   focal: {fill: "#F59E0B14", line: accent, line_width: 1.25}
-  store: {fill: "#1F29370D", line: muted}
+  store: {fill: "#1F293714", line: muted, line_width: 1}
   external: {fill: "#1F293708", line: border}
-  input: {fill: "#0F766E1A", line: muted}
+  input: {fill: "#FFFFFF", line: muted, border_left: "3pt solid primary"}
   optional: {line: muted, line_dash: dash}
   security: {fill: "#F59E0B0D", line: accent, line_dash: dash}
 lead_color: fg

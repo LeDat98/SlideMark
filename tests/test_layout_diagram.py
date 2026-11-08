@@ -156,7 +156,7 @@ def test_edge_labels_sit_next_to_the_line_not_over_nodes():
     labs = labels(placed)
     assert sorted(text_of(lb) for lb in labs) == ["no", "yes"]
     for lb in labs:
-        assert lb.style.fill is None
+        assert lb.style.fill == "bg"  # a knockout of the slide colour, mono capitals (the diagram kit)
         for n in ns:
             assert not overlap(rect(lb), rect(n))
         for ln in lines(placed):
@@ -197,16 +197,20 @@ def test_lr_back_edge_loops_below():
     assert back.element.attrs["head"] == "arrow"
 
 
-def test_branching_uses_one_bus_and_distinct_labels():
+def test_branching_leaves_through_separate_ports_and_distinct_labels():
     _deck, _theme, placed = check_clean(BRANCH)
     ns = nodes(placed)
     src, kids = ns[0], ns[1:]
     assert len({(k.y, k.h) for k in kids}) == 1 and kids[0].y > src.y + src.h
     ls = lines(placed)
-    assert len(ls) == 3
-    elbows = [ln for ln in ls if ln.element.attrs["elbow"]]
-    assert len(elbows) == 2 and all(ln.element.attrs["route"] == "v" for ln in elbows)
-    assert {ln.element.attrs["adj"] for ln in elbows} == {elbows[0].element.attrs["adj"]}  # same bus height
+    straight = [ln for ln in ls if not ln.element.attrs.get("side") and not ln.element.attrs["elbow"]]
+    assert len(straight) == 1  # the middle branch goes straight down from the bottom of the source ...
+    legs = [ln for ln in ls if ln.element.attrs.get("side")]
+    assert (
+        len(legs) == 4
+    )  # ... the outer two leave through the left / right side and bend once: no shared trunk
+    starts = {(ln.x + (0 if not ln.element.attrs["flip_h"] else ln.w), ln.y) for ln in legs[::2]}
+    assert len(starts) == 2 and not any(ln.y < src.y + src.h // 2 - 1 for ln in legs[::2])
     labs = labels(placed)
     assert sorted(text_of(lb) for lb in labs) == ["bug", "feature", "question"]
     for i, a in enumerate(labs):
@@ -284,7 +288,7 @@ def test_sparse_diagram_grows_text_and_sits_under_the_title():
     assert 14 <= pt <= body * 1.35
     para = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "body")
     assert node_pt(para) >= body  # the sentence below keeps the body size
-    assert all(node_pt(lab) >= 10 for lab in labels(placed))  # edge labels stay readable
+    assert all(node_pt(lab) >= 8 for lab in labels(placed))  # edge labels stay readable (kit labels: 8 pt)
     title = next(p for p in placed if isinstance(p.element, Text) and p.element.role == "title")
     top = min(p.y for p in [*ns, *lines(placed), *labels(placed)])
     assert top <= title.y + title.h + 0.6 * IN  # top-anchored under the title, not centered in the body

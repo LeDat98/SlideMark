@@ -858,10 +858,11 @@ def _connector(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         cx._element.remove(style_el)
     if elbow:
         _elbow_geometry(cx, el.attrs, pl, fh, fv)
+    gattrs = {**el.attrs, "_ends": ((x0, y0), (x1, y1))}  # the ends find their boxes when the boxes moved
     if el.attrs.get("under"):  # drawn before (under) its boxes (diagram kit): glued once they exist
-        rc.glue.append((cx, el.attrs, fh, fv))
+        rc.glue.append((cx, gattrs, fh, fv))
     else:
-        _glue(slide, cx, el.attrs, fh, fv)
+        _glue(slide, cx, gattrs, fh, fv)
     st = pl.style
     cx.line.color.rgb = rgb(rc.theme, st.line or rc.theme.render.connector_color)
     cx.line.width = Pt(st.line_width if st.line_width is not None else rc.theme.render.connector_width)
@@ -895,19 +896,46 @@ def _find_box(slide, box) -> object | None:
     return None
 
 
+_SITE_TOL = 12000  # EMU (about 1.3 px): how far an arrow end may be from a connection site
+
+
+def _find_site(slide, pt: tuple[int, int], idx: int) -> object | None:
+    """The rectangle / rounded rectangle / diamond whose connection site ``idx`` (0 top, 1 left, 2 bottom,
+    3 right) is at ``pt``. A layout pass that moves a block (vertical centring) does not always move the
+    ``src_box`` / ``dst_box`` of its connectors; the end of the arrow itself is always right."""
+    for shp in slide.shapes:
+        if shp.shape_type != MSO_SHAPE_TYPE.AUTO_SHAPE or shp.auto_shape_type not in (
+            MSO_SHAPE.RECTANGLE,
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            MSO_SHAPE.DIAMOND,
+        ):
+            continue
+        x, y, w, h = shp.left, shp.top, shp.width, shp.height
+        sx, sy = ((x + w // 2, y), (x, y + h // 2), (x + w // 2, y + h), (x + w, y + h // 2))[idx]
+        if abs(sx - pt[0]) <= _SITE_TOL and abs(sy - pt[1]) <= _SITE_TOL:
+            return shp
+    return None
+
+
 def _glue(slide, cx, attrs: dict, fh: bool, fv: bool) -> None:
     """Attach both ends to the connected boxes (connection sites 0 top, 1 left, 2 bottom, 3 right).
 
     Glued connectors follow their boxes when the slide is edited, and LibreOffice routes them by the sides.
     """
     route = attrs.get("route")
-    src, dst = _find_box(slide, attrs.get("src_box")), _find_box(slide, attrs.get("dst_box"))
-    if route not in ("v", "h") or src is None or dst is None:
+    if route not in ("v", "h"):
         return
     if route == "v":
         s_idx, e_idx = (0, 2) if fv else (2, 0)
     else:
         s_idx, e_idx = (1, 3) if fh else (3, 1)
+    src, dst = _find_box(slide, attrs.get("src_box")), _find_box(slide, attrs.get("dst_box"))
+    ends = attrs.get("_ends")
+    if ends and (src is None or dst is None):
+        src = src or _find_site(slide, ends[0], s_idx)
+        dst = dst or _find_site(slide, ends[1], e_idx)
+    if src is None or dst is None:
+        return
     c_nv = cx._element.find(qn("p:nvCxnSpPr")).find(qn("p:cNvCxnSpPr"))
     free = attrs.get("free_ends") or []  # ends off a connection site (a port): left unglued
     for tag, shp, idx, end in (("a:stCxn", src, s_idx, "s"), ("a:endCxn", dst, e_idx, "e")):

@@ -98,9 +98,9 @@ classes:
   steps-arrow: {fill: primary}
   # diagram roles: `## Postgres {.store}` or mermaid `A[DB]:::store`
   focal: {fill: "#BF452014", line: accent, line_width: 1.25}
-  store: {fill: "#2D31420D", line: muted}
+  store: {fill: "#2D314214", line: muted, line_width: 1}
   external: {fill: "#2D314208", line: border}
-  input: {fill: "#4F5D751A", line: muted}
+  input: {fill: "#FFFFFF", line: muted, border_left: "3pt solid secondary"}
   optional: {line: muted, line_dash: dash}
   security: {fill: "#BF45200D", line: accent, line_dash: dash}
 layout:

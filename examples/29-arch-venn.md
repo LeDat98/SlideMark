@@ -5,21 +5,22 @@ colors: accent=#BF4520
 fonts: heading=Georgia body=Arial
 sizes: title=34 body=17
 style: radius=4
+footer: Order platform
 
 # Order platform in three tiers
 @arch
 @noemph defaults
 ## Clients
-- [EXT] Web app {.external}
-- [EXT] Mobile app {.external}
+- [EXT] Web app: browser · SPA {.external}
+- [EXT] Mobile app: iOS · Android {.external}
 ## Services
 - [API] API gateway: auth · limits {.focal}
-- [SVC] Orders
-- [SVC] Billing
+- [SVC] Orders: order service
+- [SVC] Billing: invoices · tax
 ## Data
 - [DB] Postgres: orders · users {.store}
-- [MQ] Queue {.optional}
-- [EXT] Stripe {.external}
+- [MQ] Queue: events · async {.optional}
+- [EXT] Stripe: card payments {.external}
 > Web app ~> API gateway: HTTPS, Mobile app ~> API gateway: HTTPS, API gateway => Orders: place order, Orders > Billing: invoice, Orders > Postgres: write, Orders --> Queue: publish, Billing ~> Stripe: charge
 
 # 受注データ基盤の構成
@@ -58,4 +59,4 @@ Business sustains
 Where to play and why
 ## Execution
 Who does what by when
-> Ships: a plan the team can run
+> Ships: a plan to run
