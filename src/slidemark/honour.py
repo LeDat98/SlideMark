@@ -246,7 +246,18 @@ def _walk(slide: Slide, theme: Any, index: int) -> Iterator[tuple[Any, str]]:
     form = forms.form_of(slide)
     if form and forms.fits(form, slide) is not None:
         form = None  # not composed: ordinary blocks
-    drawn = form in ("timeline", "funnel", "pyramid", "cycle", "stairs", "nested", "flowdisc", "swimlane")
+    drawn = form in (
+        "timeline",
+        "funnel",
+        "pyramid",
+        "cycle",
+        "stairs",
+        "nested",
+        "flowdisc",
+        "swimlane",
+        "arch",
+        "venn",
+    )
 
     def rec(el: Any, parent: Container | None) -> Iterator[tuple[Any, str]]:
         if isinstance(el, Container) and drawn and parent is None:

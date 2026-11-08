@@ -1322,3 +1322,6 @@ _FORMS.update(vocab4.FORMS)
 from . import vocab5  # noqa: E402  (wave 2026-11-08 lane C: @swimlane @sequence)
 
 _FORMS.update(vocab5.FORMS)
+from . import vocab6  # noqa: E402  (wave 2026-11-08 lane D: @arch @venn)
+
+_FORMS.update(vocab6.FORMS)

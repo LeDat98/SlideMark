@@ -51,6 +51,10 @@ def _graphs(slide: Slide) -> list[tuple[int, list]]:
                 + [SimpleNamespace(label="")] * (arrows - len(labels)),
             )
         )
+    from . import forms6
+
+    if (arch := forms6.graph(slide)) is not None:  # `@arch`: the nodes of its tiers and the `>` line's arrows
+        out.append(arch)
     if slide.links:
         out.append((len({i for lk in slide.links for i in (lk.src, lk.dst)}), list(slide.links)))
     for c in _containers(slide):

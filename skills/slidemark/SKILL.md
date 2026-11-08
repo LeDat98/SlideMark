@@ -304,6 +304,10 @@ styles one list line; a chart frame takes `{fill= radius= pad=}`.
 - `@harvey` + a table of 0–4 (or 0/25/50/75/100%) → native Harvey balls (`harvey.size/.fill/.line`).
 - `@heatmap min=0 max=100 colors=#F3F6FA,primary` + a numeric table → interpolated cell fills, auto ink (`text=auto|on|off`).
 - `@pins legend=right|bottom|off` + image + `- x=32% y=58% label` → numbered pins on the image plus a legend (`pins.fill/.size`).
+- `@arch` + `## Tier` boxes of `- Node: sublabel {.store}` items + last line `> Web > API, API > DB: write` (elbow arrows).
+- `@swimlane` + `## Lane` boxes of `- step` items (column = order, `- 3: text`), arrows join steps across lanes.
+- `@sequence` + `- Client > API: POST` items (`>>` dashed reply, `A > A: retry` loop); participants inferred.
+- `@venn` + 2-3 `## Set` boxes + last `> overlap text` (`{.focal}` fills a set or the overlap in the accent).
 
 ## Components
 

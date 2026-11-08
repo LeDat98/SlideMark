@@ -2452,12 +2452,14 @@ def _channels(rects: list[Rect], axis: str, lo: int, hi: int) -> list[tuple[int,
     return [(a, b) for a, b in out if b > a]
 
 
-def _emit_links(ctx: _Ctx, links: list[Link], rects: dict[int, Rect]) -> None:
+def _emit_links(ctx: _Ctx, links: list[Link], rects: dict[int, Rect], prefer: str | None = None) -> None:
     """Connectors between block rects, emitted after the blocks so they sit on top.
 
     Routing by relative position: a destination clearly below (or above) the source is reached from the
     bottom-middle (top-middle) to the top-middle (bottom-middle); side by side blocks connect right-middle to
     left-middle. Offset ends get an elbow (``bentConnector3``) whose middle segment runs in a free channel.
+    ``prefer="h"`` (``@arch dir=h``) routes blocks that are side by side horizontally even when one lies
+    lower than the other.
     """
     tol = round(0.03 * EMU_PER_INCH)
     for ln in links:
@@ -2471,7 +2473,8 @@ def _emit_links(ctx: _Ctx, links: list[Link], rects: dict[int, Rect]) -> None:
             continue
         others = [r for k, r in rects.items() if k not in (ln.src, ln.dst)]
         route, adj = "", 0.5
-        if b.y >= a.bottom or a.y >= b.bottom:  # clearly below / above: vertical route
+        side = b.x >= a.right or a.x >= b.right
+        if (b.y >= a.bottom or a.y >= b.bottom) and not (prefer == "h" and side):  # clearly below / above
             down = b.y >= a.bottom
             p0 = (_cx(a), a.bottom if down else a.y)
             p1 = (_cx(b), b.y if down else b.bottom)

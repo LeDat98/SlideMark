@@ -246,7 +246,9 @@ EMPHASIS_SLIDE: tuple[Callable[[Slide], bool], ...] = (lambda s: OPT_OUT["emphas
 VALUE_SLIDE: tuple[Callable[[Slide], bool], ...] = (
     lambda s: OPT_OUT["values"] in s.classes,  # @defaults
     lambda s: any(c in SLIDE_VALUE_CLASSES for c in s.classes),  # @dense @dark @light
-    lambda s: bool(s.attrs),  # @gap= and unknown keys
+    lambda s: any(
+        k != "form_text" for k in s.attrs
+    ),  # @gap= and unknown keys (not the lifted `>` line of @arch / @venn)
     lambda s: s.background is not None,  # @bg=
     lambda s: bool(s.css) or bool(s.tokens),  # a ```css fence or a `sizes:` / `style:` line in the slide
 )

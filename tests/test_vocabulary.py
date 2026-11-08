@@ -61,6 +61,9 @@ ALL = {
     "statement": STATEMENT,
     "stairs": STAIRS,
     "nested": NESTED,
+    "arch": "\n# Platform\n@arch\n## Clients\n- Web app\n## Services\n- API gateway: auth {.focal}\n"
+    "## Data\n- Postgres {.store}\n> Web app > API gateway, API gateway > Postgres: write\n",
+    "venn": "\n# Sets\n@venn\n## Design\nCraft\n## Product\nNeeds\n> Our team\n",
 }
 # wave 2026-11-08 lane C
 ALL["swimlane"] = "# T\n@swimlane\n## Dev\n- Build\n- 3: Fix {.focal}\n## QA\n- 2: Test\n- 4: Sign off\n"

@@ -28,7 +28,8 @@ def test_budgets():
     # 6900 since icon discs / card.elevation / conclusion.icon (wave 2026-10-08; lane B's forms come next)
     # 7100 since @stairs / @nested / @flow disc / @cycle icons (wave 2026-10-08 lane B)
     # 7300 since cover.art, the steps card look and shape blocks (wave 2)
-    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 7300
+    # 7400 since @arch / @swimlane / @sequence / @venn and the node roles (run 2026-11-08, diagram-design types)
+    assert _tokens((SKILL / "SKILL.md").read_text(encoding="utf-8")) <= 7400
     refs = sorted((SKILL / "reference").glob("*.md"))
     assert len(refs) >= 5
     for p in refs:

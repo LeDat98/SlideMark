@@ -36,6 +36,8 @@ _NAMES = {
     "coverart": re.compile(r"Cover art (\d+)"),
     "swimlane": re.compile(r"Lane \d+(?: head)?|Step \d+(?: next)?"),
     "sequence": re.compile(r"Seq .+ (?:head|lifeline)|Seq \d+ (?:msg|label)(?: reply| self)?(?: \d)?"),
+    "venn": re.compile(r"Venn (?:(\d+) (?:set|name|text)|overlap(?: fill)?)"),  # wave 2026-11-08 lane D
+    "arch": re.compile(r"Arch (?:tier \d+(?: label)?|node .+|edge \d+(?: label)?)"),
 }
 _TEXT = {
     "timeline": re.compile(r"Timeline (\d+)( now)?"),
@@ -174,6 +176,7 @@ def extract(data: SlideData) -> FormFold | None:
     for it in named:
         it.role = "decor"
     data.form_conns = data.conns
+    conns = data.conns  # (`@arch` reads its arrows from them)
     data.conns, data.connectors = [], 0  # stems, axis arrows and rules are the form's, not links
     texts = [it for it in named if it.kind == "text" or it.paras]
     fold = {
@@ -189,9 +192,13 @@ def extract(data: SlideData) -> FormFold | None:
         "coverart": _coverart,
         "swimlane": _swimlane,
         "sequence": _sequence,
+        "venn": _venn,
+        "arch": lambda *a: None,  # (extract calls `_arch` itself: it needs the connectors)
         "vs": _vs,
         "matrix": _matrix,
     }[form]
+    if form == "arch":
+        return _arch(named, data, conns)
     return fold(form, named, texts, data) if form in _WITH_DATA else fold(form, named, texts)
 
 
@@ -334,6 +341,120 @@ def _stairs(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:
         boxes.append(_box(it, paras[:1], paras[1:]))
     down = cards[0][1].h > cards[-1][1].h  # the first card is the tallest: the staircase falls
     return FormFold("stairs", ["stairs"] + (["dir=down"] if down else []), boxes)
+
+
+def _venn(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:
+    """``@venn``: ``Venn N name`` is the set heading, ``Venn N text`` its body; ``Venn overlap`` becomes the
+    final ``>`` line (the item is the slide's conclusion, without the form's own bold). The accent fills
+    (``{.focal}``) are not read back: a circle is only a translucent ellipse."""
+    names: dict[int, Item] = {}
+    bodies: dict[int, Item] = {}
+    for it in named:
+        m = re.fullmatch(r"Venn (\d+) (name|text)", _name(it))
+        if m:
+            (names if m.group(2) == "name" else bodies)[int(m.group(1))] = it
+    if len(names) < 2:
+        return None
+    boxes = []
+    for n in sorted(names):
+        head = [p for p in names[n].paras if p.plain.strip()][:1]
+        rest = [p for p in (bodies[n].paras if n in bodies else []) if p.plain.strip()]
+        boxes.append(_box(bodies.get(n, names[n]), head, rest))
+    ov = next((it for it in named if _name(it) == "Venn overlap" and it.paras), None)
+    if ov is not None:
+        ov.paras = [replace(p, runs=[_plain(r) for r in p.runs]) for p in ov.paras]
+        ov.role = "conclusion"
+    return FormFold("venn", ["venn"], boxes)
+
+
+def _arch(named: list[Item], data: SlideData, conns: list) -> FormFold | None:
+    """``@arch``: a ``Arch tier N label`` text is the tier heading, the ``Arch node <name>`` texts inside the
+    tier (by position) are its list items (a second paragraph is the sublabel: ``name: sub``), the connectors
+    become the final ``>`` line (``A > B: label``, the label from ``Arch edge N label``). Role classes
+    (``{.focal}``) and a pinned ``size=`` are not read back: the shapes only carry colours."""
+    labels: dict[int, Item] = {}
+    bands: dict[int, Item] = {}
+    nodes: list[Item] = []
+    elabels: dict[int, str] = {}
+    for it in named:
+        nm = _name(it)
+        if m := re.fullmatch(r"Arch tier (\d+)( label)?", nm):
+            (labels if m.group(2) else bands)[int(m.group(1))] = it
+        elif nm.startswith("Arch node ") and it.paras:
+            nodes.append(it)
+        elif m := re.fullmatch(r"Arch edge (\d+) label", nm):
+            elabels[int(m.group(1))] = " ".join(p.plain.strip() for p in it.paras if p.plain.strip())
+    tiers = sorted(set(labels) | set(bands))
+    if len(tiers) < 2 or not nodes:
+        return None
+    zone = {n: bands.get(n) or labels[n] for n in tiers}
+    cols = len(tiers) > 1 and abs(zone[tiers[0]].x - zone[tiers[1]].x) > abs(
+        zone[tiers[0]].y - zone[tiers[1]].y
+    )
+
+    def tier_of(it: Item) -> int:
+        key = (lambda z: z.cx) if cols else (lambda z: z.cy)
+        pos = it.cx if cols else it.cy
+        lo, hi = (
+            ((lambda z: z.x), (lambda z: z.x + z.w)) if cols else ((lambda z: z.y), (lambda z: z.y + z.h))
+        )
+        inside = [n for n in tiers if lo(zone[n]) <= pos <= hi(zone[n])]
+        return inside[0] if inside else min(tiers, key=lambda n: abs(key(zone[n]) - pos))
+
+    def text_of(it: Item) -> str:
+        ps = [p.plain.strip() for p in it.paras if p.plain.strip()]
+        return ps[0] + (": " + " ".join(ps[1:]) if len(ps) > 1 else "") if ps else ""
+
+    by_tier: dict[int, list[Item]] = {n: [] for n in tiers}
+    for it in sorted(nodes, key=lambda i: (i.y, i.x) if not cols else (i.y, i.x)):
+        by_tier[tier_of(it)].append(it)
+    boxes = []
+    for n in tiers:
+        lab = labels.get(n)
+        head = [
+            replace(p, runs=[_plain(r) for r in p.runs])
+            for p in (lab.paras if lab else [])
+            if p.plain.strip()
+        ]
+        rows = sorted(by_tier[n], key=lambda i: (i.y, i.x))
+        paras = [ParaT(runs=[RunT(text=text_of(it))], marker="bullet") for it in rows if text_of(it)]
+        if not paras:
+            return None
+        boxes.append(_box(zone[n], head[:1], paras))
+
+    # arrows: the shapes a connector is glued to, else the nodes nearest to its two ends
+    def node_at(sid: int | None, x: float, y: float) -> Item | None:
+        got = next((it for it in nodes if sid and it.sid == sid), None)
+        if got is not None:
+            return got
+        return min(nodes, key=lambda it: abs(it.cx - x) + abs(it.cy - y))
+
+    def name_of(it: Item) -> str:
+        return _name(it)[len("Arch node ") :].strip()
+
+    edges = []
+    for k, cn in enumerate(sorted(conns, key=lambda c: c.order), 1):
+        if not cn.arrow_end:
+            continue
+        a, b = node_at(cn.st, cn.x0, cn.y0), node_at(cn.en, cn.x1, cn.y1)
+        if a is None or b is None or a is b:
+            continue
+        edges.append(f"{name_of(a)} > {name_of(b)}" + (f": {elabels[k]}" if elabels.get(k) else ""))
+    if edges:
+        last = max(it.y + it.h for it in named)
+        data.items.append(
+            Item(
+                "text",
+                min(it.x for it in named),
+                last,
+                max(it.x + it.w for it in named) - min(it.x for it in named),
+                1,
+                name="Conclusion",
+                paras=[ParaT(runs=[RunT(text=", ".join(edges))])],
+                role="conclusion",
+            )
+        )
+    return FormFold("arch", ["arch"] + (["dir=h"] if cols else []), boxes)
 
 
 def _icon_beside(data: SlideData | None, it: Item) -> str | None:
