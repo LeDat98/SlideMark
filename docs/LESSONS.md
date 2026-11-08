@@ -356,3 +356,4 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] A class `font_size` / `bold` on `node` leaks into every form that reads `node`: flowchart-only looks go in `diagram-node`. Role classes alone add a `Legend ...` shape, so tests that count shapes skip that prefix.
 - [layout] The eyebrow fallback must not use `deck.title` unless slide 1 is a cover (it is just the first slide's title otherwise); a title-only first slide has `layout=None` but renders as a cover.
 - [review] The reference itself puts knockout labels on lane rules (REVISE, DEPLOY TRIGGER): a reviewer's rule stricter than the reference is not a defect; check the reference before "fixing".
+- [worktree] An isolated lane's worktree starts from the remote default branch, not the orchestrator's local HEAD: push (or tell the lane to `git merge <local branch>` first) before spawning, or the lane redoes work on an old base and conflicts on merge (lane K, 2026-11-08).
