@@ -61,6 +61,9 @@ ALL = {
     "statement": STATEMENT,
     "stairs": STAIRS,
     "nested": NESTED,
+    "arch": "\n# Platform\n@arch\n## Clients\n- Web app\n## Services\n- API gateway: auth {.focal}\n"
+    "## Data\n- Postgres {.store}\n> Web app > API gateway, API gateway > Postgres: write\n",
+    "venn": "\n# Sets\n@venn\n## Design\nCraft\n## Product\nNeeds\n> Our team\n",
 }
 
 

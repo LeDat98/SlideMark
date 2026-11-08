@@ -16,7 +16,20 @@ from typing import Any
 
 from .ir import Container, Slide, Text
 
-FORMS = ("timeline", "vs", "matrix", "funnel", "pyramid", "cycle", "agenda", "statement", "stairs", "nested")
+FORMS = (
+    "timeline",
+    "vs",
+    "matrix",
+    "funnel",
+    "pyramid",
+    "cycle",
+    "agenda",
+    "statement",
+    "stairs",
+    "nested",
+    "arch",
+    "venn",
+)
 COMMON = ("gap", "size", "fill")
 
 # per form: attribute -> allowed words (None = free text)
@@ -31,6 +44,8 @@ KEYS: dict[str, dict[str, tuple[str, ...] | None]] = {
     "statement": {"align": ("left", "center", "right"), "valign": ("top", "middle", "bottom")},
     "stairs": {"dir": ("up", "down")},
     "nested": {"side": ("left", "right")},
+    "arch": {"dir": ("v", "h")},  # wave 2026-11-08 lane D: tiers as rows (v) or columns (h)
+    "venn": {},
     "flowdisc": {"above": ("on", "off", "1", "0")},  # `@flow disc`: a pseudo form (``flow`` is a grid word)
 }
 DEFAULTS = {"timeline": {"dir": "h", "marks": "on"}, "funnel": {"dir": "down"}, "pyramid": {"dir": "up"}}
@@ -38,6 +53,7 @@ DEFAULTS["cycle"] = {"dir": "cw"}
 DEFAULTS["statement"] = {"align": "center", "valign": "middle"}
 DEFAULTS["stairs"] = {"dir": "up"}
 DEFAULTS["nested"] = {"side": "left"}
+DEFAULTS["arch"] = {"dir": "v"}
 ALL_KEYS = tuple(sorted({k for d in KEYS.values() for k in d} | set(COMMON)))
 
 # `##` boxes the form needs (min, max); agenda and statement read a list / text instead
@@ -46,6 +62,8 @@ COUNTS["cycle"] = (3, 6)
 COUNTS["stairs"] = (2, 6)
 COUNTS["nested"] = (3, 4)
 COUNTS["flowdisc"] = (2, 7)
+COUNTS["arch"] = (2, 6)
+COUNTS["venn"] = (2, 3)
 
 EXAMPLE = {
     "timeline": "@timeline dir=h marks=on, then `## 2026 Q1` + one line per milestone ({.accent} = now)",
@@ -58,6 +76,8 @@ EXAMPLE = {
     "statement": "@statement, then **+18%** and one caption line",
     "stairs": "@stairs, then 2-6 `## ` boxes from the lowest step to the highest (dir=down reverses)",
     "nested": "@nested, then 3-4 `## ` boxes from the outer ring to the inner one",
+    "arch": "@arch, then 2-6 `## Tier` boxes of `- Node {.focal}` items, last line `> A > B, B > C: label`",
+    "venn": "@venn, then 2-3 `## Set` boxes (+ a last `> overlap text` for the centre)",
     "flowdisc": "@flow disc, then 2-7 `## ` boxes in order ({.above} on the first = a node above the row)",
 }
 WORD = {"flowdisc": "flow disc"}  # how a pseudo form reads on the `@` line
@@ -129,7 +149,9 @@ def fits(form: str, slide: Slide) -> str | None:
                 if lo != hi
                 else (f"@{word} needs exactly {lo} `## ` boxes, found {n}")
             )
-        return None
+        from . import forms6
+
+        return forms6.fits_extra(form, slide)
     if form == "agenda":
         return (
             None if agenda_items(slide) else "@agenda needs one numbered list (1. 2. 3.) alone on the slide"

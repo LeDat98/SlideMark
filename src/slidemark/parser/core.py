@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from .. import forms, forms2
+from .. import forms, forms2, forms6
 from ..ir import Chart, Container, Deck, Link, Paragraph, Run, Slide, Style, Table, Text
 from .attrs import (
     FLAGS,
@@ -1068,6 +1068,13 @@ def _check_form(slide: Slide, ctx: Ctx) -> None:
             rule,
             "the slide is laid out as ordinary blocks; " + forms.EXAMPLE[form],
         )
+    elif form in (
+        "arch",
+        "venn",
+    ):  # wave 2026-11-08 lane D: the final `>` line holds the edges / overlap text
+        forms6.lift(slide, form)
+        for rule, msg, hint in forms6.check(form, slide):
+            ctx.add("warning", msg, line, rule, hint)
 
 
 def _infer_cover(slide: Slide, index: int, ctx: Ctx | None = None) -> None:

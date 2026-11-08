@@ -39,6 +39,10 @@ def _containers(slide: Slide) -> Iterator[Container]:
 def _graphs(slide: Slide) -> list[tuple[int, list]]:
     """(node count, links) of every diagram on the slide: mermaid containers and connector-joined blocks."""
     out: list[tuple[int, list]] = []
+    from . import forms6
+
+    if (arch := forms6.graph(slide)) is not None:  # `@arch`: the nodes of its tiers and the `>` line's arrows
+        out.append(arch)
     if slide.links:
         out.append((len({i for lk in slide.links for i in (lk.src, lk.dst)}), list(slide.links)))
     for c in _containers(slide):

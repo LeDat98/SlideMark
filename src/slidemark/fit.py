@@ -287,6 +287,10 @@ def _vocab(v: dict, theme: Theme, dense_k: float):
             f"disc {round(v.get('disc') or 0)}pt",
             text,
         ]
+    if form == "arch":
+        return f"architecture {n} nodes in {v.get('tiers')} tiers, {_n(v.get('edges') or 0, 'arrow')}", [text]
+    if form == "venn":
+        return f"venn {n} sets" + (", centre label" if v.get("overlap") else ""), [text]
     if form == "agenda":
         return f"agenda {n} rows" + (", current marked" if v.get("now") else ""), [
             f"numbers {round(v.get('num') or 0)}pt",

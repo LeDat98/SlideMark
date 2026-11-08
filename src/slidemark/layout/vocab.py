@@ -1318,3 +1318,7 @@ _FORMS: dict[str, Callable] = {
 from . import vocab4  # noqa: E402  (wave 2026-10-08 lane B: @stairs @nested @flow disc)
 
 _FORMS.update(vocab4.FORMS)
+
+from . import vocab6  # noqa: E402  (wave 2026-11-08 lane D: @arch @venn)
+
+_FORMS.update(vocab6.FORMS)

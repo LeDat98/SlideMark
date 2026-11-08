@@ -480,6 +480,8 @@ def _is_line(p: Placed) -> bool:
 def _is_band(p: Placed) -> bool:
     """Decoration drawn behind other items (title band, background shapes)."""
     el = p.element
+    if isinstance(el, Shape) and not el.paragraphs and p.style.opacity is not None and p.style.opacity < 1:
+        return True  # a translucent shape is an overlay (the circles of `@venn` overlap by design)
     return isinstance(el, Shape) and not el.paragraphs and el.shape in ("rect", "rounded-rect")
 
 
@@ -498,6 +500,8 @@ def _backdrop(items: list[Placed], i: int, bg: list[RGB], theme: Theme) -> list[
             if _is_image(q.style.fill, theme):
                 return []  # a picture behind the text: no verdict
             got = _backs(q.style.fill, theme, bg[0] if bg else None)
+            if got and q.style.opacity is not None and 0 <= q.style.opacity < 1 and bg:
+                got = [_blend((g, q.style.opacity), bg[0]) for g in got]  # a translucent circle (`@venn`)
             if got:
                 return got
     return bg
