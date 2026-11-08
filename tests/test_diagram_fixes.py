@@ -270,7 +270,7 @@ def test_venn_text_is_at_least_8pt_and_core_label_is_inside_the_lens(tmp_path):
             if s.name.startswith("Venn") and s.has_text_frame and s.text_frame.text.strip():
                 assert min(run_sizes(s)) >= 8.0, (s.name, run_sizes(s))
         names = named(sl, r"Venn \d+ name")
-        assert all(min(run_sizes(s)) >= 8.5 for s in names)  # sublabels are 9 pt
+        assert all(min(run_sizes(s)) >= 8.0 for s in names)  # sublabels are 9 pt, down to 8 to keep one line
         core = named(sl, "Venn overlap")[0]
         lens = named(sl, "Venn overlap fill")[0]
         assert core.left >= lens.left and core.left + core.width <= lens.left + lens.width

@@ -26,6 +26,7 @@ from .grid import Rect
 
 PX = 9525  # EMU per pixel at 96 dpi
 SEP = round(9 * EMU_PER_PT)  # 12 px: the least distance of two parallel arrows / ports
+LABEL_SEP = round(18 * EMU_PER_PT)  # 24 px: the same when one of the arrows carries a label
 
 
 @dataclass
@@ -145,10 +146,13 @@ def plan(
         rc = rects[node]
         return (rc.x, rc.w) if side in "tb" else (rc.y, rc.h)
 
+    side_sep: dict[tuple[int, str], float] = {}  # labelled arrows leave a corridor wide enough for the label
     for (node, side), items in sides.items():
         items.sort(key=lambda it: (desired(*it), it[0]))
         lo_edge, length = span(node, side)
-        for it, p in zip(items, _spread([desired(*it) for it in items], lo_edge, length, sep), strict=True):
+        sp = LABEL_SEP * (sep / SEP) if len(items) > 1 and any(out[i].label for i, _e in items) else sep  # type: ignore[union-attr]
+        side_sep[(node, side)] = sp
+        for it, p in zip(items, _spread([desired(*it) for it in items], lo_edge, length, sp), strict=True):
             pos[it] = p
     # snap short jogs straight (move the end that stays clear of its neighbours)
     for i, r in enumerate(out):
@@ -165,7 +169,7 @@ def plan(
                     pos[it] for it in sides[(node, side)] if it != (i, end)
                 ]  # the other ports of this side
                 if lo_edge + 0.15 * length <= new <= lo_edge + 0.85 * length and all(
-                    abs(new - q) >= sep for q in near
+                    abs(new - q) >= side_sep[(node, side)] for q in near
                 ):
                     pos[(i, end)] = new
                     break

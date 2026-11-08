@@ -938,7 +938,7 @@ def _read_conn(el, tf: Tf, order: int) -> ConnT | None:
     )
 
 
-_LEGEND = re.compile(r"Legend (?:rule|caption|\w+ (?:swatch|label))")
+_LEGEND = re.compile(r"Legend (?:rule|caption|\w+ (?:swatch(?: stripe)?|label))")
 
 
 def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:

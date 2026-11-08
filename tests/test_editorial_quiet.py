@@ -45,6 +45,8 @@ def _named(slide, prefix):
 
 
 def _sizes(shape):
+    if not shape.has_text_frame:  # (a card's side border is a line)
+        return set()
     return {r.font.size.pt for p in shape.text_frame.paragraphs for r in p.runs if r.font.size}
 
 

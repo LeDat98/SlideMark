@@ -504,7 +504,7 @@ def legend_width(K: Look, entries: list[tuple[str, str]]) -> int:
 
 
 def legend_height(K: Look) -> int:
-    return round((K.label * 1.6 + K.legend * 1.9) * PT) + round(44 * PT)
+    return round((K.label * 1.6 + K.legend * 1.9) * PT) + round(38 * PT)
 
 
 def legend(c, K: Look, x: int, y: int, w: int, entries: list[tuple[str, str]], rule: bool = True) -> int:
@@ -561,6 +561,18 @@ def legend(c, K: Look, x: int, y: int, w: int, entries: list[tuple[str, str]], r
                     **({"line_dash": st.line_dash} if st.line_dash else {}),
                 ),
             )
+            side = (st.border_left or "").split()  # "3pt solid <colour>": a stripe, as on the node
+            if len(side) == 3 and side[0].endswith("pt"):
+                try:
+                    stripe = max(round(float(side[0][:-2]) * PT * 0.8), round(2 * PT))
+                except ValueError:
+                    stripe = 0
+                if stripe:
+                    c.emit(
+                        Shape(shape="rect", attrs={"shape_name": f"Legend {key} swatch stripe"}),
+                        Rect(cx, mid - sw_h // 2, stripe, sw_h),
+                        fast_style(fill=side[2], line=None),
+                    )
         lst = V._text_style(c, K.legend, color="fg", align="left", valign="middle", padding="0pt")
         emit_text(
             c,

@@ -46,9 +46,9 @@ classes:
   kpi: {font_size: 26}
   # diagram roles: `## Postgres {.store}` or mermaid `A[DB]:::store` (tints are alpha fills over the slide)
   focal: {fill: "#C0000014", line: accent, line_width: 1.25}
-  store: {fill: "#1F29370D", line: muted}
+  store: {fill: "#1F293714", line: muted, line_width: 1}
   external: {fill: "#1F293708", line: border}
-  input: {fill: "#2F6B9A1A", line: muted}
+  input: {fill: "#FFFFFF", line: muted, border_left: "3pt solid primary"}
   optional: {line: muted, line_dash: dash}
   security: {fill: "#C000000D", line: accent, line_dash: dash}
 cover_band_h: 0.6

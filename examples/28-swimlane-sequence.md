@@ -25,7 +25,8 @@ footer: Process review
 
 # 受注から出荷までの業務フロー
 > 部門をまたぐ承認と在庫確認。滞留しやすいのは与信審査の差し戻し。
-@swimlane size=12
+@swimlane
+@defaults
 ## 営業部
 - 見積書を作成: 単価・納期
 - 4: 受注内容を連絡
@@ -49,7 +50,7 @@ footer: Process review
 - Astro Origin > Astro Origin: render MDX
 - Astro Origin --> Cloudflare: 200 · HTML
 - Cloudflare => Reader: 200 · cached
-- Reader --> Analytics: pageview beacon
+- Reader --> Analytics: pageview
 
 # Checkout request
 > The order service answers the client after the database confirms; one retry is the headline.
@@ -68,11 +69,10 @@ footer: Process review
 > A vertical lane per team; the one blocking handover is in the accent.
 @swimlane dir=v
 ## Dev
-- Merge to main
-- 3: Fix flaky test => BLOCKS QA {.focal}
+- Merge to main: squash · ci
+- 3: Fix flaky test: retry · seed => BLOCKS QA {.focal}
 ## QA
-- 2: Run regression
-- 4: Sign off
+- 2: Run regression: 412 specs
+- 4: Sign off: checklist
 ## Ops
-- 5: Deploy canary
-- 6: Promote to all
+- 5: Deploy canary: 5% traffic

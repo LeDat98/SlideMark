@@ -16,6 +16,7 @@ legend strip when two or more roles or kinds are used.
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 from .. import forms, forms5
@@ -123,6 +124,8 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     vertical = forms.words(slide.attrs, "swimlane", "dir") == "v"
     K0 = DK.look(c, slide)
     pinned = bool(forms.num(slide.attrs, "size"))
+    if not pinned:  # one name size per diagram; the swimlane keeps it small (diagram-design: names ~12pt)
+        K0 = dataclasses.replace(K0, name=min(K0.name, th.swimlane_name_size))
     order = sorted(steps, key=lambda s: (s.col, s.idx))
     kind_of = {a.idx: a.kind for a in order[:-1]}
     used_kinds = sorted(set(kind_of.values()), key=DK.KINDS.index)
@@ -136,12 +139,16 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     # air above / below a step: a label of a handover between lanes needs a free band beside its arrow
     lane_pad = round((0.27 if any(s.label for s in steps) else 0.19) * _K)
     gap_pref = V._emu(th.swimlane_gap) if th.swimlane_gap else round(0.5 * _K)
-    gap_min = min(gap_pref, round(0.3 * _K))
+    gap_floor = round(0.25 * _K)  # never a stub arrow: room for the line and its head
+    gap_min = max(min(gap_pref, round(0.3 * _K)), gap_floor)
+    gap_pref = max(gap_pref, gap_floor)
+    # two steps of one column in neighbouring lanes are joined across the lane rule: the air they leave
+    stack = any(a.col == b.col and a.lane != b.lane for a, b in zip(order, order[1:], strict=False))
 
     def head_size(K: DK.Look) -> float:
         return th.swimlane_head_size or K.label
 
-    def plan(k: float, wf: float, gap: int) -> dict[str, Any]:
+    def plan(k: float, wf: float, gap: int, lpm: float) -> dict[str, Any]:
         K = K0.scaled(k)
         tag_h = DK.tag_size(K, "X")[1]
         # every step is as wide as its text asks (a floor and a cap); the lane height / lane width is shared
@@ -153,11 +160,12 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             paras = DK.node_paras(c, K, s.name, s.subs)
             return DK.node_need(c, K, paras, wi[s.idx], bool(s.tag), tag_h, [*s.classes])
 
-        hi = {s.idx: max(need(s), round((2.3 if vertical else 2.5) * K.name * PT)) for s in steps}
+        hi = {s.idx: max(need(s), round((2.1 if vertical else 2.5) * K.name * PT)) for s in steps}
         hi = dict.fromkeys(hi, max(hi.values()))  # one height for every step
         ea = {i: (hi[i] if vertical else wi[i]) for i in wi}  # extent along the flow, per step
         across = max(wi.values()) if vertical else max(hi.values())
-        lp = lane_pad if vertical else min(lane_pad, max(round(0.05 * _K), (area.h // n - across) // 2))
+        lp_min = round(lpm * _K)  # half the arrow between two stacked steps
+        lp = lane_pad if vertical else min(lane_pad, max(lp_min, (area.h // n - across) // 2))
         lane_a = across + 2 * lp
         if vertical:  # the lanes share the width the diagram has (nodes stay their own size, centred)
             lane_a = max(lane_a, min(area.w // n, round(3.4 * _K)))
@@ -185,10 +193,13 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
 
     ks = [1.0] if pinned else [1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7]
     best = None
-    for k in ks:
-        for wf in (1.0, 0.85, 0.7, 0.6, 0.5, 0.4):
-            for gap in (gap_pref, gap_min, min(gap_min, round((0.14 if vertical else 0.2) * _K))):
-                best = plan(k, wf, gap)
+    for lpm in (0.14, 0.05) if stack else (0.05,):  # air above / below a step (inches): no stub arrows first
+        for k in ks:
+            for wf in (1.0, 0.85, 0.7, 0.6, 0.5, 0.4):
+                for gap in (gap_pref, gap_min, gap_floor):
+                    best = plan(k, wf, gap, lpm)
+                    if best["ok"]:
+                        break
                 if best["ok"]:
                     break
             if best["ok"]:
@@ -197,6 +208,11 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             break
     assert best is not None
     P = best
+    if vertical and P["ok"]:  # the lane height is there to be used: the gaps between the steps take the rest
+        add = min((area.h - P["th"]) // max(ncol, 1), round(0.7 * _K) - P["gap"])
+        if add > 0:
+            P["gap"] += add
+            P["th"] += add * ncol
     K: DK.Look = P["K"]
     x0, y0 = DK.centred(area, P["tw"], P["th"])
     fr = _Frame(Rect(x0, y0, P["tw"], P["th"]), vertical)
@@ -348,8 +364,7 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         entries = DK.legend_entries(
             c, roles, used_kinds, plain and bool(roles), _ja(slide, [s.name for s in steps])
         )
-        lw_ = min(max(P["tw"], DK.legend_width(K, entries)), body.w)
-        lx = min(max(x0, body.x), body.right - lw_)
+        lx, lw_ = body.x, body.w  # the legend starts at the margin of the title, on every form
         DK.legend(c, K, lx, body.bottom - leg_h + round(6 * PT), lw_, entries, rule=False)
     ok = P["ok"]
     info.update(n=len(steps), lanes=n, dir="v" if vertical else "h", size=K.name, head=hs, fit=ok)
@@ -398,7 +413,7 @@ def _sequence(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             continue
         acts.append((dst, j, end))
     legend_on = DK.wants_legend(c, roles, used_kinds + (["act"] if acts else []), slide)
-    leg_h = DK.legend_height(K0) if legend_on else 0
+    leg_h = DK.legend_height(K0) + round(6 * PT) if legend_on else 0  # (air above the strip)
     area = Rect(body.x, body.y, body.w, body.h - leg_h)
     act_w = V._emu(th.diagram_act_w)
     wts = [1.5 if x.is_self else 1.0 for x in msgs]
@@ -562,8 +577,7 @@ def _sequence(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         entries = DK.legend_entries(
             c, roles, used_kinds, plain and bool(roles), _ja(slide, names), act=bool(acts)
         )
-        lw_ = min(max(P["tw"], DK.legend_width(K, entries)), body.w)
-        lx = min(max(x0, body.x), body.right - lw_)
+        lx, lw_ = body.x, body.w  # the legend starts at the margin of the title, on every form
         DK.legend(c, K, lx, body.bottom - leg_h + round(6 * PT), lw_, entries)
     ok = P["ok"]
     info.update(n=m, parts=n, size=K.name, head=K.name, fit=ok)

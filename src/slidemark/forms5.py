@@ -8,6 +8,7 @@ token                   meaning
 ``swimlane.head.w``     width of the header band (a length; default 14% of the body, 0.9-1.8 in; for
                         ``dir=v`` the band height: 12% of the body, 0.45-0.9 in)
 ``swimlane.head.size``  lane name size in pt (default: as large as the band holds)
+``swimlane.name.size``  step name size in pt (default 12; the sublabel and tag sizes follow the diagram kit)
 ``swimlane.fill``       lane body fills ``a,b`` cycled (default: none, the slide shows through)
 ``swimlane.line``       lane outline / separator colour (default ``border``) and ``swimlane.line.w``
 ``swimlane.step.fill``  step fill (default: the ``node`` class card), ``swimlane.step.color`` its ink
@@ -101,6 +102,7 @@ class Forms5Tokens(Forms4Tokens):
     swimlane_head_color: str | None = None
     swimlane_head_w: Length | None = None
     swimlane_head_size: float | None = None
+    swimlane_name_size: float = 12.0  # step names (``size=N`` on the slide wins)
     swimlane_fill: str | None = None
     swimlane_line: str = "border"
     swimlane_line_w: Length = "0.75pt"
@@ -151,7 +153,7 @@ _LENGTHS = {
     "sequence_gap",
     "sequence_arrow_w",
 }
-_PTS = {"swimlane_head_size", "sequence_size"}
+_PTS = {"swimlane_head_size", "swimlane_name_size", "sequence_size"}
 _NONE = ("none", "null", "off")
 _KEEP = {  # tokens whose "none" is a real value (a width, a colour that must exist)
     "swimlane_line",

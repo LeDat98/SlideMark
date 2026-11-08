@@ -25,6 +25,7 @@ def _connectors(path: Path) -> list[int]:
             for sh in s.shapes
             if sh._element.tag.endswith("cxnSp")
             and sh.name.lower() != "rule"
+            and " border " not in sh.name  # (a class's side border, e.g. the stripe of `.input`)
             and not sh.name.startswith("Legend")
         )
         for s in Presentation(str(path)).slides

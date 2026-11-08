@@ -13,6 +13,7 @@ rectangles, bends in a free channel; the arrow colour is ``render.connector_colo
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 import math
 import re
@@ -28,6 +29,7 @@ from . import vocab as V
 from .grid import Rect
 
 _IN = 914400
+MIN_ARROW = 0.3  # inches: the least gap between two nodes joined by an arrow (no stubs)
 
 
 def _tw(text: str, size_pt: float, bold: bool = False) -> int:
@@ -125,6 +127,8 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         labw = max(
             (DK.small_w(K, e.label or "", K.label, th.diagram_label_track) for e in labelled), default=0
         )
+        if any(A.nodes[e.src].tier == A.nodes[e.dst].tier for e in edges):  # room for the arrow to be seen
+            gn = max(gn, round(MIN_ARROW * _IN))
         if same:  # a label on an arrow between neighbours of a tier needs its width between the nodes
             gn = max(
                 gn,
@@ -361,8 +365,7 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             plain and bool(roles),
             "ja" if any(DK.has_wide(nd.name) for nd in A.nodes) else None,
         )
-        lw_ = min(max(P.total_w, DK.legend_width(K, entries)), body.w)
-        lx = min(max(x0, body.x), body.right - lw_)
+        lx, lw_ = body.x, body.w  # the legend starts at the margin of the title, on every form
         DK.legend(c, K, lx, body.bottom - leg_h + round(6 * DK.PT), lw_, entries)
     info.update(n=len(A.nodes), tiers=n, edges=done, dir="h" if cols else "v", size=K.name, fit=ok)
     if not ok:
@@ -607,7 +610,7 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     ]
     otext, ocls = forms6.split_trailing(forms6.edge_text(slide)) if forms6.edge_text(slide) else ("", [])
     oname, osub = DK.split_sub(otext) if otext else ("", "")
-    o = th.venn_overlap or (0.36 if n == 2 else 0.42)
+    o = th.venn_overlap or (0.42 if n == 2 else 0.45)
     fills = V._colors(slide, th.venn_fill)
     palette = [x for x in (th.palette or []) if x] or ["primary", "secondary", "muted"]
     focal_overlap = "focal" in ocls
@@ -629,7 +632,7 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         K = K0.scaled(k)
         K.sub = max(K.sub, min(9.0, th.diagram_sub_size))  # a venn sublabel never drops below 9 pt
         name_pt = round(K.name + 3, 1)
-        r_h = (body.h - 2 * air) / extent(1.0)[1]
+        r_h = (body.h * 0.92 - 2 * air) / extent(1.0)[1]  # equal air above and below (the page number)
         r_w = body.w * (0.96 if mode == "in" else 0.5) / extent(1.0)[0]
         r = min(r_h, r_w, rmax)
         cs = centres(r)
@@ -722,6 +725,7 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             )
     gx = sum(ci[0] for ci in circ) / n
     gy = sum(ci[1] for ci in circ) / n
+    slots: dict[int, list] = {}  # set -> [cx, cy, w, h, paras, free]: where its label goes
     for i in range(n):
         bxi = S["boxes"][i]
         paras = _set_paras(c, K, heads[i], parts[i][1], bxi[2], name_pt)
@@ -729,29 +733,72 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             continue
         w, h = round(bxi[2]), round(bxi[3])
         cx_, cy_ = bxi[0], bxi[1]
+        free = False
         if S["mode"] == "in":
-            # a name sits towards the outside of its circle: a box of the text's own size, pushed outwards
+            # a name sits towards the outside of its circle: a box of the text's own size, pushed outwards;
+            # the mono sublabel keeps one line: it shrinks to 8 pt, then the box is as wide as the text
             st_ = V._text_style(c, name_pt, color=th.venn_name_color, align="center", valign="middle")
-            nat = max(
-                (
-                    max(
-                        DK.small_w(K, r.text, p.style.font_size or K.sub, th.diagram_label_track)
-                        if p.style.text_transform == "caps"
-                        else _tw(r.text, p.style.font_size or name_pt, bool(p.style.bold))
-                        for r in p.runs
-                    )
-                    for p in paras
-                ),
-                default=w,
-            )
-            tw_ = min(w, round(nat + 6 * EMU_PER_PT))
-            th_ = round(V._need(c, paras, tw_, st_))
             vx, vy = circ[i][0] - gx, circ[i][1] - gy
             vn = math.hypot(vx, vy) or 1.0
             outs = [circ[j] for j in range(n) if j != i]
-            got = _outward(circ[i], outs, tw_, th_, (vx / vn, vy / vn), S["margin"] + 0.05 * circ[i][2])
-            if got is not None and th_ <= h * 1.05:
-                cx_, cy_, w, h = got[0], got[1], tw_, th_
+            w0 = w
+            # the label on one line first (down to 8 pt; then nearer the outlines), then as the region allows
+            for whole in (1, 2, 0):
+                for sub_z in dict.fromkeys((K.sub, max(K.sub - 0.5, 8.0), 8.0)):
+                    paras_z = _set_paras(
+                        c, dataclasses.replace(K, sub=sub_z), heads[i], parts[i][1], w0, name_pt
+                    )
+                    nat = max(
+                        (
+                            max(
+                                DK.mono_w(r.text, p.style.font_size or sub_z, th.diagram_label_track)
+                                if p.style.text_transform == "caps"
+                                else _tw(r.text, p.style.font_size or name_pt, bool(p.style.bold))
+                                for r in p.runs
+                            )
+                            for p in paras_z
+                        ),
+                        default=w0,
+                    )
+                    tw_ = round(nat + 6 * EMU_PER_PT) if whole else min(w0, round(nat + 6 * EMU_PER_PT))
+                    th_ = round(V._need(c, paras_z, tw_, st_))
+                    got = _outward(
+                        circ[i],
+                        outs,
+                        tw_,
+                        th_,
+                        (vx / vn, vy / vn),
+                        (S["margin"] + 0.05 * circ[i][2]) * (0.5 if whole == 2 else 1.0),
+                    )
+                    if got is not None and (th_ <= h * 1.05 or whole):
+                        cx_, cy_, w, h, free, paras = got[0], got[1], tw_, th_, True, paras_z
+                        break
+                if free:
+                    break
+        slots[i] = [cx_, cy_, w, h, paras, free]
+    rows: dict[int, list[int]] = {}
+    for i in slots:  # sibling names (circles on one level) share one centre line
+        rows.setdefault(round(circ[i][1] / EMU_PER_PT), []).append(i)
+    for ids in rows.values():
+        if len(ids) > 1 and all(slots[i][5] for i in ids):
+            line = sum(slots[i][1] for i in ids) / len(ids)
+            hh = max(slots[i][3] for i in ids)
+            outs_ok = all(
+                _box_free(
+                    slots[i][0],
+                    line,
+                    slots[i][2],
+                    hh,
+                    [circ[i]],
+                    [circ[j] for j in range(n) if j != i],
+                    S["margin"],
+                )
+                for i in ids
+            )
+            if outs_ok:
+                for i in ids:
+                    slots[i][1], slots[i][3] = line, hh
+    for i, (cx_, cy_, w, h, paras, _free) in slots.items():
         V._emit_text(
             c,
             f"Venn {i + 1} name",
@@ -788,7 +835,7 @@ def _core_paras(
     return out
 
 
-_CORE_AR = (1.5, 2.0, 1.0, 2.6, 0.7, 3.4)
+_CORE_AR = (1.5, 2.0, 1.0, 2.6, 0.7, 3.4, 4.4, 5.6)
 
 
 def _core_label(c, K, circ, margin: float, oname: str, osub: str):
@@ -799,10 +846,13 @@ def _core_label(c, K, circ, margin: float, oname: str, osub: str):
     best = _best_box(circ, [], margin)
     names = [round(K.name - 0.5 * i, 1) for i in range(int((K.name - 9) / 0.5) + 1)] or [K.name]
     for wrap in (False, True):  # first shrink the sublabel to 8 pt on one line, then break it
+        fits: list[tuple[int, bool, float, float, tuple, list[str], float]] = []
         for nm in names:
             for sub_pt in (K.sub, max(K.sub - 0.5, 8.0), 8.0):
-                for ar in _CORE_AR:
-                    box = _best_box(circ, [], margin, ar)
+                for ar, mf in itertools.product(
+                    _CORE_AR, (1.0, 0.55)
+                ):  # then the label may come nearer the edge
+                    box = _best_box(circ, [], margin * mf, ar)
                     if box[2] <= 0:
                         continue
                     w = round(box[2])
@@ -814,7 +864,13 @@ def _core_label(c, K, circ, margin: float, oname: str, osub: str):
                         + [DK.small_w(K, ln, sub_pt, th.diagram_label_track) for ln in lines if ln]
                     )
                     if wide <= w and V._need(c, paras, w, st) <= box[3]:
-                        return box, (box, _CoreInk(c, K, oname, lines, nm, sub_pt)), True
+                        if not wrap:
+                            return box, (box, _CoreInk(c, K, oname, lines, nm, sub_pt)), True
+                        fits.append((len(lines), mf < 1.0, -nm, -sub_pt, box, lines, nm))
+        if fits:  # the fewest lines (two at most when any layout manages), then the largest type
+            fits.sort(key=lambda f: f[:4])
+            _nl, _tight, _nn, neg_sub, box, lines, nm = fits[0]
+            return box, (box, _CoreInk(c, K, oname, lines, nm, -neg_sub)), True
     nm = names[-1]
     lines = _balanced(osub, 8.0, round(best[2]), c, K) if osub else []
     return best, (best, _CoreInk(c, K, oname, lines, nm, 8.0)), False
