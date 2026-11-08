@@ -39,6 +39,7 @@ from .units import EMU_PER_PT, slide_size, to_emu
 
 _TOL = int(EMU_PER_PT)  # 1pt slack for rounding
 _OVERFLOW_TOL = 1.08  # measurement is an estimate: report only clear overflows
+_HTML_OVERFLOW_TOL = 1.25  # converted HTML text: Chromium measured it, so only a gross miss counts
 
 
 RGB = tuple[float, float, float]
@@ -561,6 +562,7 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
     if not bg and base:
         bg = [base]
 
+    html_spill: list[Placed] = []
     for i, p in enumerate(items):
         el = p.element
         # off-slide
@@ -597,13 +599,18 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
                 p,
             )
         # overflow (text frames only; shapes like chevrons carry short labels)
-        if isinstance(el, Text) and p.h > 0 and el.attrs.get("measured") != "html":  # Chromium measured it
+        if isinstance(el, Text) and p.h > 0:
             ph, pv = css.inset_hv(p.style)
             need = (
                 measure.paragraphs_height(paras, p.w - ph, p.style, p.font_scale, gap=measure.element_gap(el))
                 + pv
             )
-            if need > p.h * _OVERFLOW_TOL + _TOL:
+            if el.attrs.get("measured") == "html":
+                # Chromium measured it, so it is the truth: only a gross miss (the runs at their written size
+                # cannot fit the height even with 25% slack) is reported, once per slide
+                if need > p.h * _HTML_OVERFLOW_TOL + _TOL and not html_spill:
+                    html_spill.append(p)
+            elif need > p.h * _OVERFLOW_TOL + _TOL:
                 warn(
                     "overflow",
                     f"{_label(p)} needs {need / EMU_PER_PT:.0f}pt but has {p.h / EMU_PER_PT:.0f}pt",
@@ -625,6 +632,14 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
         for msg, hint in _contrast_findings(items, i, p, backs, theme):
             warn("contrast", msg, hint, p)
 
+    if html_spill:
+        p = html_spill[0]
+        warn(
+            "html-native-overflow",
+            f"{_label(p)} (converted HTML) needs more height than its box at the written font size",
+            "shorten the HTML text, lower its font-size, or give the block more room ({h=...})",
+            p,
+        )
     # overlap between items that are not nested in each other
     free = slide is not None and slide.layout == "free"
     solid = [p for p in items if not _is_line(p) and not _is_band(p) and p.w > 0 and p.h > 0]

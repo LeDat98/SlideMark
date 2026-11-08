@@ -706,6 +706,7 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             field=field,
             gap_em=float(gap) if isinstance(gap, (int, float)) else None,
             box_w=None if field else pl.w,
+            squeeze=el.attrs.get("measured") != "html",  # Chromium fixed the line breaks: no tracking squeeze
         )
         if el.attrs.get("nowrap"):  # one line measured by Chromium: a wider substitute font must not wrap it
             tf.word_wrap = False
