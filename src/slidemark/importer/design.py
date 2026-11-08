@@ -202,6 +202,9 @@ def _overlap(a, box) -> bool:
     return a.x < x1 and a.x + a.w > x0 and a.y < y1 and a.y + a.h > y0
 
 
+_CLAIM_PAD = 182880  # 0.2in in EMU
+
+
 def claim_fences(ent: dict[str, Any] | None, sd, n: int, diags: list[Diagnostic]) -> list[dict[str, Any]]:
     """Remove from ``sd`` the shapes that an unedited stored ```html fence produced; return those fences.
 
@@ -233,11 +236,12 @@ def claim_fences(ent: dict[str, Any] | None, sd, n: int, diags: list[Diagnostic]
             if not hit or +left:
                 diags.append(edited_diag(n, "html block"))
                 continue
+            pad = _CLAIM_PAD  # rules and borders just outside the text (a column's border-top) belong too
             box = (
-                min(i.x for i in hit),
-                min(i.y for i in hit),
-                max(i.x + i.w for i in hit),
-                max(i.y + i.h for i in hit),
+                min(i.x for i in hit) - pad,
+                min(i.y for i in hit) - pad,
+                max(i.x + i.w for i in hit) + pad,
+                max(i.y + i.h for i in hit) + pad,
             )
             gone = {id(i) for i in hit}
             for it in sd.items:
