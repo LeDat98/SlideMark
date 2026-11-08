@@ -58,7 +58,8 @@ class Style(Model):
     border_left: str | None = None
     line_dash: Literal["solid", "dash", "dot"] | None = None  # border style of `line`
     letter_spacing: float | None = None  # pt, added between characters
-    text_transform: Literal["upper", "lower", "capitalize", "none"] | None = None
+    # "caps" = capitals drawn by the font (`cap="all"`), the text itself keeps its case (diagram kit labels)
+    text_transform: Literal["upper", "lower", "capitalize", "none", "caps"] | None = None
     underline: bool | None = None
     strike: bool | None = None
     rotation: float | None = None  # degrees clockwise (CSS transform: rotate(), or `{rotate=15}`)

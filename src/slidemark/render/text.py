@@ -132,6 +132,8 @@ def _format_run(
         etree.SubElement(clr, qn("a:alpha")).set("val", str(round(style.opacity * 100000)))
     if run.strike or style.strike:
         rpr.set("strike", "sngStrike")
+    if style.text_transform == "caps":
+        rpr.set("cap", "all")
     if style.letter_spacing:
         rpr.set("spc", str(round(style.letter_spacing * scale * 100)))  # 1/100 pt
     elif squeeze:
@@ -275,7 +277,10 @@ def fill_text(
                     prev_r = None
                 if seg == "" and len(segs) > 1:
                     continue
-                seg = transform_text(seg, pst.text_transform)
+                if (
+                    pst.text_transform != "caps"
+                ):  # `caps`: the font draws capitals (cap="all"), the text keeps its case
+                    seg = transform_text(seg, pst.text_transform)
                 # badge: padding keeps bold CJK glyphs inside the highlight (LibreOffice clips them otherwise)
                 pad = ""
                 if run.highlight:

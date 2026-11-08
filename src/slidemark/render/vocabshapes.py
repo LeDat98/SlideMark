@@ -77,3 +77,19 @@ def draw_trapezoid(rc: RenderCtx, slide, pl: Placed, name: str, autoshape: Calla
     sp_pr.remove(prst)
     if el.paragraphs:
         fill_text(rc, shp.text_frame, el.paragraphs, pl.style, pl.font_scale, box_w=None, squeeze=False)
+
+
+def draw_freeform(rc: RenderCtx, slide, pl: Placed, name: str, style_shape: Callable) -> None:
+    """A closed polygon (``Shape(shape="freeform", attrs={"points": [(x, y), ...]})``, absolute EMU): the
+    exact lens where the circles of a ``@venn`` meet, as a native freeform (editable point by point)."""
+    pts = [(int(x), int(y)) for x, y in pl.element.attrs.get("points", [])]
+    if len(pts) < 3:
+        return
+    fb = slide.shapes.build_freeform(pts[0][0], pts[0][1], scale=1.0)
+    fb.add_line_segments(pts[1:], close=True)
+    shp = fb.convert_to_shape()
+    shp.name = name
+    style_el = shp._element.find(qn("p:style"))
+    if style_el is not None:
+        shp._element.remove(style_el)
+    style_shape(rc, shp, pl.style, pl)

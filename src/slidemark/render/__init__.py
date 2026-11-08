@@ -49,7 +49,7 @@ from .media import add_media, finish_timing
 from .objects import add_chart, add_image, add_table, code_paragraphs, resolve_image
 from .text import fill_text, insert_rpr_child, text_width
 from .util import RenderCtx, emu, is_gradient, parse_color, rgb
-from .vocabshapes import draw_arc, draw_trapezoid
+from .vocabshapes import draw_arc, draw_freeform, draw_trapezoid
 
 __all__ = ["render"]
 
@@ -188,6 +188,9 @@ def _render_slide(rc: RenderCtx, prs, slide: Slide, items: list[Placed]):
                 "simplify this element",
                 "error",
             )
+    for cx, at, fh, fv in rc.glue:
+        _glue(s, cx, at, fh, fv)
+    rc.glue.clear()
     if has_title and not used_title and s.shapes.title is not None:
         s.shapes.title._element.getparent().remove(s.shapes.title._element)
     if rc.template:  # drop unused template placeholders (empty "Click to add ..." prompts)
@@ -723,6 +726,8 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
         _connector(rc, s, pl, name)
     elif isinstance(el, Shape) and el.shape == "icon":
         add_icon(rc, s, pl, name)  # unknown names draw nothing (the parser warns)
+    elif isinstance(el, Shape) and el.shape == "freeform":  # `@venn` overlap: an exact lens, many points
+        draw_freeform(rc, s, pl, name, _style_shape)
     elif isinstance(el, Shape) and el.shape in ("arc", "trap"):  # DL3b: curved arrows, tapered stages
         (draw_arc if el.shape == "arc" else draw_trapezoid)(rc, s, pl, name, _autoshape)
     elif isinstance(el, Shape):
@@ -853,7 +858,10 @@ def _connector(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         cx._element.remove(style_el)
     if elbow:
         _elbow_geometry(cx, el.attrs, pl, fh, fv)
-    _glue(slide, cx, el.attrs, fh, fv)
+    if el.attrs.get("under"):  # drawn before (under) its boxes (diagram kit): glued once they exist
+        rc.glue.append((cx, el.attrs, fh, fv))
+    else:
+        _glue(slide, cx, el.attrs, fh, fv)
     st = pl.style
     cx.line.color.rgb = rgb(rc.theme, st.line or rc.theme.render.connector_color)
     cx.line.width = Pt(st.line_width if st.line_width is not None else rc.theme.render.connector_width)
