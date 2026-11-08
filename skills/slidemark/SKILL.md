@@ -63,13 +63,10 @@ short of a form, one emphasis (or `@noemph`), values (or `@defaults`). Advisory.
   A cover needs one visual: `style: cover.art=network` (`dots`, `rings`; native shapes in `secondary` with one accent
   node on the right 40%), a picture, or a large type scale.
 - One repeating visual motif, carried by every content slide: an icon disc on each card heading (`icon=` +
-  `style: icon.disc=secondary`), numbered discs (`@rows`, `num`), one chart style, one card style. Bars and
-  stripes are not a motif.
+  `style: icon.disc=secondary`), numbered discs (`@rows`, `num`), one chart style, one card style.
 - Starting points (write your own hexes when the brand or topic suggests them; do not default to blue):
-  `theme: editorial` (paper, ink, slate, one tangerine accent, serif titles, hairline borders) ·
-  navy + teal + amber `colors: primary=#0B2A3C secondary=#1B8A8F accent=#F2A33A surface=#EEF4F6` ·
-  forest + moss + cream `primary=#1E3A2F secondary=#6B8F71 accent=#D9A441 bg=#FBF8F1` ·
-  charcoal + coral `primary=#2B2D42 secondary=#8D99AE accent=#EF6F4C surface=#F4F5F7`.
+  `theme: editorial` (paper, ink, slate, one tangerine accent, serif titles, hairline cards) ·
+  navy + teal + amber `colors: primary=#0B2A3C secondary=#1B8A8F accent=#F2A33A surface=#EEF4F6`.
 
 **Every slide carries a visual element**: a chart, a table, icons, a diagram or shaped blocks. A slide of only
 text is a defect, not a style. Forms that give a slide its shape (see "Composition forms"):
@@ -84,9 +81,8 @@ text is a defect, not a style. Forms that give a slide its shape (see "Compositi
 
 **Type and spacing** (set once in `sizes:` and `style:`, then leave them):
 slide title 36–44pt bold · box headings 20–24pt bold · body 14–16pt · captions 10–12pt in `muted` · slide
-margin ≥ 0.5in (`margin=0.6in`) · one gap between blocks, kept throughout. Safe fonts that render at the
-measured width everywhere: Arial, Calibri, Cambria, Georgia, Times New Roman, Courier New; pair a serif heading
-with a sans body (`fonts: heading="Cambria" body="Calibri"`) for contrast.
+margin ≥ 0.5in (`margin=0.6in`) · one gap between blocks, kept throughout. Safe fonts: Arial, Calibri,
+Cambria, Georgia, Times New Roman, Courier New; a serif heading over a sans body gives contrast.
 Japanese: Meiryo or Yu Gothic.
 
 **Never**: a rule under the slide title (`title.rule`, `heading.rule`) and decorative bars or stripes
@@ -302,10 +298,11 @@ styles one list line; a chart frame takes `{fill= radius= pad=}`.
 - `@harvey` + a table of 0–4 (or 0/25/50/75/100%) → native Harvey balls (`harvey.size/.fill/.line`).
 - `@heatmap min=0 max=100 colors=#F3F6FA,primary` + a numeric table → interpolated cell fills, auto ink (`text=auto|on|off`).
 - `@pins legend=right|bottom|off` + image + `- x=32% y=58% label` → numbered pins on the image plus a legend (`pins.fill/.size`).
-- `@arch` + `## Tier` boxes of `- Node: sublabel {.store}` items + last line `> Web > API, API > DB: write` (elbow arrows).
-- `@swimlane` + `## Lane` boxes of `- step` items (column = order, `- 3: text`), arrows join steps across lanes.
-- `@sequence` + `- Client > API: POST` items (`>>` dashed reply, `A > A: retry` loop); participants inferred.
-- `@venn` + 2-3 `## Set` boxes + last `> overlap text` (`{.focal}` fills a set or the overlap in the accent).
+- `@arch` + `## Tier` boxes of `- [API] Gateway: auth · limits {.focal}` items (tag, name, mono sublabel) + a last
+  line of arrows `> Web ~> API, API => DB: write` (`>` flow, `=>` primary, `~>` HTTP, `-->` return / async).
+- `@swimlane` + `## Lane` boxes of `- step: sub` items (column = order, `- 3: text`; `- Open PR > HANDOFF` labels its arrow).
+- `@sequence` + `- Client ~> API: POST /order` items (same kinds, `A > A: retry` loop); actors inferred or `- [EXT] Reader: Browser, ...`.
+- `@venn` + 2-3 `## Set` boxes (body = sublabel) + last `> Overlap: sublabel` (ink; `{.focal}` = accent). Legends draw themselves.
 
 ## Components
 
@@ -348,6 +345,7 @@ category or a series). Numbers may be
 
 - `colors:` `bg fg primary accent surface border muted danger success` or any new name (`brand=#FF5A1F`).
   `primary` colours KPI numbers, badges, bars, charts and the title band.
+- `eyebrow: section` = a small caps line above each title (the section name; `# T {eyebrow="Q3"}`).
 - `fonts:` `heading body mono ea` (ea = Japanese/Chinese text) or `font="Yu Gothic"` for all three.
 - `sizes:` pt per role: `title heading body lead conclusion caption footnote table code cover-title`; a trailing
   `!` (`heading=20!`) pins the size against automatic growth.
@@ -363,9 +361,9 @@ category or a series). Numbers may be
 - A ` ```css ` fence (header = whole deck, in a slide = that slide) styles `slide h1 h2 p li .lead
   .conclusion .footnote .box .kpi table th td tr code img .chart` and your `{.class}`: colours, gradients,
   borders, radius, shadows, fonts, spacing, `transform: rotate()`.
-- A ` ```html ` fence under a title draws what syntax cannot (fishbone, kanban, journey map, treemap):
-  inline-CSS boxes and `<svg>` lines / `marker-end` arrows become editable shapes. Block about 1180 x 490 px
-  (`<svg viewBox="0 0 1180 490">`); text >= 20px (15pt), labels >= 16px; hairline borders, one accent.
+- A ` ```html ` fence under a title draws what syntax cannot (fishbone, kanban, journey map) as editable shapes,
+  styled by kit classes: `.node` (`.tag` `<b>` `.sub`; roles `.focal` ...) `.board .col .badge .card .meta` `.legend`
+  `.label` and SVG `.arrow` (`.primary .link .return`) `.bone`, heads `url(#arrow)`. Block 1180 x 490 px; text >= 20px.
 - `@html` + one ` ```html ` fence = a slide written in HTML/CSS, converted to editable shapes (`var(--primary)`
   reads your tokens).
 
