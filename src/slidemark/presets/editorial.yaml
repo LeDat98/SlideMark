@@ -27,6 +27,7 @@ sizes:
   table: 12
   cover-title: 52
   cover-subtitle: 22
+subtitle_font: body
 eyebrow: section
 title_color: primary
 title_bold: false
@@ -53,6 +54,8 @@ icon_disc: "#E3E5EA"
 icon_color: primary
 # series colors: ink first, then muted slate / sage / sand / clay / mauve (the accent is reserved for `hl=`)
 palette: [primary, "#5E7A9B", "#7C8F6F", "#B8915A", "#9C6B50", "#6E6479"]
+# chart bars are quiet slate (never heavy ink); the `hl=` bar is the accent tint (diagram fills keep the palette)
+chart_series: ["#8794AB", "#C2C9D6", "#7C8F6F", "#B8915A", "#9C6B50", "#6E6479"]
 # diagram kit (@arch @swimlane @sequence @venn): fixed type scale, hairline cards, mono capitals for tags,
 # arrow labels and captions; arrows slate / accent (primary) / link blue (HTTP) / dashed (return)
 diagram_name_size: 13
@@ -78,6 +81,9 @@ render:
   connector_color: secondary
   connector_width: 1
   line_width: 0.75
+  chart_hl_tint: 0.16
+  chart_hl_line: 1.25
+  chart_note_pointer: false
   chart_title_scale: 1.0
   chart_title_bold: false
   chart_label_scale: 0.9
@@ -88,7 +94,8 @@ classes:
   # hairline cards on the paper: white fill, #BFC0C0 border, small corners, no shadow
   card: {fill: "#FFFFFF", line: border, line_width: 0.75, radius: 4, padding: 10pt, font_size: 13}
   callout: {fill: "#ECECEC", line: border, line_width: 0.75, radius: 4}
-  chart-note: {fill: bg, line: accent, line_width: 0, radius: 3, bold: false, italic: true, color: accent, font: Georgia}
+  # a chart takeaway: small accent text on the paper, no box, no arrow (the reference callout)
+  chart-note: {fill: bg, line: bg, line_width: 0, color: accent, bold: false, padding: 2pt}
   node: {fill: "#FFFFFF", line: secondary, line_width: 1, radius: 4, padding: 6pt}
   diagram-node: {bold: true, font_size: 12}
   decision: {fill: "#FFFFFF", line: secondary}
@@ -104,6 +111,8 @@ classes:
   optional: {line: muted, line_dash: dash}
   security: {fill: "#BF45200D", line: accent, line_dash: dash}
 layout:
+  # one vertical rhythm: content hugs its size, is centred in the body and keeps air above the footer
+  vcentre: true
   grow_max: 1
   l3_fill: false
   cards_to_body: false

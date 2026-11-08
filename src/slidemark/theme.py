@@ -164,6 +164,13 @@ class LayoutTokens(BaseModel):
     tree_slack: float = 1.15  # org-tree boxes are at most this much taller than their content
     html_footer: bool = False  # True: the deck `footer:` and `num:` are drawn on `@html` slides too
     html_fit: bool = False  # True: a lone HTML block fills the body height (stretch, else center)
+    vcentre: bool = (
+        False  # True: a content slide's block is centred in the body with air under it (see vcentre.py)
+    )
+    vcentre_gap: Length = "0.3in"  # ... the block stays this far above the footnote / footer
+    vcentre_row_em: float = 3.0  # ... a lone table's rows are at most this x the text size (0 = off)
+    vcentre_hug_cols: bool = True  # ... a lone table's columns hug their content (the table is centred)
+    vcentre_col_pad_em: float = 2.4  # ... column padding added to the content width (em, both sides)
     html_hug: bool = False  # True: the html kit's boards / columns size to their content, the block centres
     html_zoom_max: float = 1.5  # a short HTML block renders zoomed up to this factor (1 = off)
     roomy_left: float = 0.25  # share of the body left empty that triggers the roomy pass
@@ -715,8 +722,10 @@ class RenderTokens(BaseModel):
     chart_hl_first: bool = False  # True: that outline marks the first series' bar only (not every series)
     chart_title_bold: bool = True  # `chart_title_bold=off`: a quiet regular-weight chart title
     chart_hl_marker: int = 11  # pt, marker of an `hl=` point in a line chart
+    chart_hl_tint: float = 0.0  # 0: an `hl=` bar is solid `chart_hl`; > 0: a tint (this share of it) + a line
     chart_note_size_add: float = 1.0  # pt, a `note=` is this much larger than the data labels
     chart_note_line_width: float = 1.0  # pt, the pointer of a `note=`
+    chart_note_pointer: bool = True  # False: a `note=` has no arrow, it sits beside the highlighted bar
     waterfall_up: str = "success"  # waterfall bars: increase, decrease, total (theme color names or hex)
     waterfall_down: str = "danger"
     waterfall_total: str = "primary"
@@ -859,6 +868,9 @@ class Theme(Forms6Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
     )  # share of the slide height of the cover band anchored to the top (0 = off)
     cover_pad: Length = "0.6in"  # air between the cover title block and the bottom edge of the band
     cover_gap: Length = "0.2in"  # air between the cover title and its subtitle
+    subtitle_font: Literal["heading", "body"] = (
+        "heading"  # the cover / section subtitle face (`body`: like every lead line)
+    )
     cover_rule: str | None = None  # color of a thin rule along the band edge (None = no rule)
     cover_rule_h: Length = "0.05in"  # ... its thickness
     cover_footer: bool = True  # the deck footer (organisation) shows on the cover as a quiet caption
@@ -995,6 +1007,7 @@ class Theme(Forms6Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
     palette: list[str] = Field(
         default_factory=lambda: ["primary", "secondary", "accent", "danger", "success", "muted"]
     )
+    chart_series: list[str] = Field(default_factory=list)  # chart series colors (empty = `palette`)
     layout: LayoutTokens = Field(default_factory=LayoutTokens)
 
     @model_validator(mode="before")
@@ -1256,7 +1269,7 @@ class Theme(Forms6Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
         if isinstance(colors, str):
             colors = [p.strip() for p in colors.replace(";", ",").split(",") if p.strip()]
         explicit = isinstance(colors, (list, tuple)) and bool(colors)
-        use = colors if explicit else self.palette
+        use = colors if explicit else (self.chart_series or self.palette)
         pal = [hex6(self, str(c)) for c in use] or [hex6(self, "primary")]
         if not explicit:  # distinct theme colors in order; they wrap only after all of them are used
             pal = list(dict.fromkeys(c.upper() for c in pal))

@@ -13,16 +13,15 @@ Architecture, throughput and cost, Q3
 
 # How a request travels
 > One focal service; the rest keeps to the quiet roles
-@4 a>b b>c c>d
+@arch
 @noemph defaults
-## Web client {.input}
-Browser app
-## API gateway {.focal}
-Auth, routing, rate limits
-## Postgres {.store}
-Orders and users
-## Nightly backup {.optional}
-Object storage copy
+## Client
+- [WEB] Web client: browser app {.input}
+## Platform
+- [API] API gateway: auth · limits {.focal}
+- [DB] Postgres: orders · users {.store}
+- [OBJ] Nightly backup: object copy {.optional}
+> Web client > API gateway, API gateway > Postgres, Postgres > Nightly backup
 
 # Where the data goes
 ```mermaid

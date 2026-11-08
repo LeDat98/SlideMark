@@ -29,6 +29,7 @@ def test_editorial_tokens():
     assert all(not st.shadow for st in th.classes.values())
     assert th.render.connector_color == "secondary" and th.render.connector_width == 1
     assert th.palette[0] == "primary" and "accent" not in th.palette
+    assert th.chart_series[0] != "#2D3142"  # chart bars are quiet slate, never heavy ink
 
 
 @pytest.mark.parametrize("name", PRESETS)

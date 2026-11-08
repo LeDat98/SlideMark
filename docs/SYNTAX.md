@@ -800,6 +800,8 @@ A bad value (an out-of-range number, `overlap` on a stacked chart, `+name` on a 
 `labels=`) is a `bad-chart-option` warning with a one-line hint and the option is dropped.
 A takeaway is two attributes: `` ```bar {hl=郊外大型 note="赤字42店の半数は郊外大型"} ``. Several series keep their colors: an `hl` category gets a `render.chart_hl` outline in each; a line gets a larger marker. A `note` pins the plot area and value axis so the pointer hits the bar; a too-long note shrinks, wraps, then warns (`chart-note`).
 
+Look tokens: `render.chart_hl_tint` (> 0: the `hl=` bar is that share of `chart_hl` over the background with a `chart_hl` hairline (`chart_hl_line`), never a solid fill; the editorial preset), `chart_series` (bar / line colors when the `palette` is for diagrams), `render.chart_note_pointer=off` (a `note=` is plain text beside the bar, no arrow). Layout: `layout.vcentre=on` hugs a lone table (columns to their content, rows <= `vcentre_row_em` x text) and a card row (height of the tallest content), centres the block in the body and keeps `vcentre_gap` of air above the footnote / footer; `subtitle_font=body` sets the cover subtitle in the body face.
+
 Chart look defaults are tokens (`style: render.chart_legend_scale=1.4`; `render.chart_grid=border` is the gridline color, `render.chart_line_width=3.5` the line width in pt, `render.chart_pie_line=bg` / `render.chart_pie_line_width=2` the wedge outline): legend size = `chart_legend_scale` x chart text,
 data labels = `chart_label_scale`, pie/doughnut wedge labels = `chart_pie_label_scale` (bold, `chart_pie_label_bold`,
 inside the wedge, `chart_pie_label_pos`; a wedge under `chart_pie_label_min` of the total labels outside). The series

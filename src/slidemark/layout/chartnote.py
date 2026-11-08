@@ -603,7 +603,7 @@ def _plan(ch: Chart, pl: Placed, theme: Theme, note: str) -> NotePlan:
             style=st_note,
         )
     )
-    if line_to:
+    if line_to and rt.chart_note_pointer:
         tgt = line_to
         a = _start(rect, tgt)
         if math.hypot(tgt[0] - a[0], tgt[1] - a[1]) > 1:

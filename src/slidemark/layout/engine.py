@@ -68,6 +68,7 @@ from .tables import (
     row_pins,
     table_grid,
 )
+from .vcentre import vcentre
 from .vfill import fill_body
 
 _SIZE_KEY = {
@@ -247,7 +248,7 @@ def _role_style0(ctx: _Ctx, role: str, cover: bool = False) -> Style:
     size = t.sizes.get(key, t.sizes.get("body", DEFAULT_SIZES["body"]))
     if role in ("body", "quote"):
         size *= ctx.dense_k
-    heading_font = role in ("title", "heading", "subtitle")
+    heading_font = role in ("title", "heading") or (role == "subtitle" and t.subtitle_font == "heading")
     st = fast_style(
         font=t.fonts.heading if heading_font else t.fonts.body,
         font_ea=t.fonts.ea,
@@ -1274,8 +1275,8 @@ def _place_block(ctx: _Ctx, el, rect: Rect, inherit: Style) -> None:
 
 HTML_FIT_OPEN = (
     "<style>.sm-fit{display:flex;flex-direction:column;justify-content:center;height:100vh}"
-    '.sm-fit>:only-child{flex:1 1 auto}</style><div class="sm-fit">'
-)  # a lone single-root HTML block stretches over the box; several roots / fixed content center vertically
+    '.sm-fit>:only-child{flex:0 1 auto}</style><div class="sm-fit">'
+)  # a lone HTML block is centred in the box; a root with `height:100%` (`.stack`) still fills it
 
 
 def _math_scale(ctx: _Ctx, el: Raw, rect: Rect) -> float:
@@ -5102,6 +5103,8 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             eb_st = eb_h = None
             if eb_text:  # the eyebrow takes a line above the title: everything below moves down by it
                 eb_st = _eyebrow_style(ctx)
+                if measure.has_cjk(eb_text):  # tracked CJK glyphs fall apart: no letter spacing on them
+                    eb_st = eb_st.merged(fast_style(letter_spacing=0))
                 eb_h = round((eb_st.font_size or 10) * 1.3 * EMU_PER_PT) + _emu("3pt")
                 if theme.title_band:
                     eb_st = eb_st.merged(fast_style(color=theme.title_band_color))
@@ -5579,6 +5582,16 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             and theme.sizes.get("body", DEFAULT_SIZES["body"]) > ctx.lt.grow_small_pt
         ):  # normal density: a block that still leaves a band under it sits at the optical center
             final_ctx.out = center_band(final_ctx.out, body_now, ctx.lt)
+        if (
+            kind == "content"
+            and ctx.lt.vcentre
+            and not final_ctx.over
+            and final_ctx.out
+            and not slide.links
+            and not pinned_kpi
+            and not (slide.conclusion is not None and slide.conclusion.paragraphs)
+        ):  # `layout.vcentre`: the block hugs its content, is centred and keeps air above the footer
+            final_ctx.out = vcentre(final_ctx.out, body_now, ctx.lt)
         ctx.diags += final_ctx.diags
         seen: set[str] = set()
         for lab in final_ctx.over:

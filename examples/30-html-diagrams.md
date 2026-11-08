@@ -9,43 +9,43 @@ num: on
 @noemph defaults
 ```html
 <div class="stack">
-<div style="position:relative;width:1180px;height:410px">
-<svg width="1180" height="410">
+<div style="position:relative;width:1180px;height:390px">
+<svg width="1180" height="390">
 <path class="bone main" d="M20 205H980"/>
 <path class="bone" d="M200 44L305 205"/>
 <path class="bone" d="M480 44L585 205"/>
 <path class="bone accent" d="M760 44L865 205"/>
-<path class="bone" d="M270 366L375 205"/>
-<path class="bone" d="M550 366L655 205"/>
-<path class="bone" d="M830 366L935 205"/>
+<path class="bone" d="M270 346L375 205"/>
+<path class="bone" d="M550 346L655 205"/>
+<path class="bone" d="M800 346L905 205"/>
 <path class="tick" d="M209 95h24"/>
 <path class="tick" d="M232 130h24"/>
 <path class="tick" d="M493 100h24"/>
 <path class="tick" d="M773 100h24"/>
-<path class="tick" d="M289 300h24"/>
-<path class="tick" d="M566 305h24"/>
-<path class="tick" d="M587 272h24"/>
-<path class="tick" d="M849 300h24"/>
+<path class="tick" d="M289 280h24"/>
+<path class="tick" d="M566 285h24"/>
+<path class="tick" d="M587 252h24"/>
+<path class="tick" d="M819 280h24"/>
 <rect class="node" x="125" y="12" width="150" height="32" rx="4"/>
 <text class="cat" x="200" y="33">People</text>
 <rect class="node" x="405" y="12" width="150" height="32" rx="4"/>
 <text class="cat" x="480" y="33">Process</text>
 <rect class="node focal" x="685" y="12" width="150" height="32" rx="4"/>
 <text class="cat hot" x="760" y="33">Product</text>
-<rect class="node" x="195" y="366" width="150" height="32" rx="4"/>
-<text class="cat" x="270" y="387">Pricing</text>
-<rect class="node" x="475" y="366" width="150" height="32" rx="4"/>
-<text class="cat" x="550" y="387">Platform</text>
-<rect class="node" x="755" y="366" width="150" height="32" rx="4"/>
-<text class="cat" x="830" y="387">Partners</text>
+<rect class="node" x="195" y="346" width="150" height="32" rx="4"/>
+<text class="cat" x="270" y="367">Pricing</text>
+<rect class="node" x="475" y="346" width="150" height="32" rx="4"/>
+<text class="cat" x="550" y="367">Platform</text>
+<rect class="node" x="725" y="346" width="150" height="32" rx="4"/>
+<text class="cat" x="800" y="367">Partners</text>
 <text class="sub" x="203" y="100" text-anchor="end">Support gaps</text>
 <text class="sub" x="226" y="135" text-anchor="end">No chat at night</text>
 <text class="sub" x="487" y="105" text-anchor="end">3-step form</text>
 <text class="sub" x="767" y="105" text-anchor="end">Slow page</text>
-<text class="sub" x="283" y="305" text-anchor="end">Hidden fees</text>
-<text class="sub" x="560" y="310" text-anchor="end">Card errors</text>
-<text class="sub" x="581" y="277" text-anchor="end">No saved cart</text>
-<text class="sub" x="843" y="305" text-anchor="end">PayPal outage</text>
+<text class="sub" x="283" y="285" text-anchor="end">Hidden fees</text>
+<text class="sub" x="560" y="290" text-anchor="end">Card errors</text>
+<text class="sub" x="581" y="257" text-anchor="end">No saved cart</text>
+<text class="sub" x="813" y="285" text-anchor="end">PayPal outage</text>
 </svg>
 <div class="node focal" style="position:absolute;left:980px;top:165px;width:200px"><span class="tag">Effect</span><b style="font-size:17px">Conversion -18%</b></div>
 </div>
@@ -57,10 +57,10 @@ num: on
 @noemph defaults
 ```html
 <div class="stack"><div class="board">
-<div class="col"><header>Backlog <span class="badge">3</span></header><div class="card"><b>Saved carts</b><div class="meta">CHK-12 · priya</div></div><div class="card"><b>Gift cards</b><div class="meta">CHK-15 · leo</div></div><div class="card wait"><b>Loyalty points</b><div class="meta">CHK-18 · maya</div></div></div>
-<div class="col"><header>In progress <span class="badge over">3/2</span></header><div class="card blocked"><b>One-page checkout</b><div class="meta">CHK-07 · sam · blocks Q4</div></div><div class="card"><b>Apple Pay</b><div class="meta">CHK-09 · priya</div></div><div class="card"><b>Retry on card error</b><div class="meta">CHK-10 · leo</div></div></div>
-<div class="col"><header>Review <span class="badge">1/2</span></header><div class="card"><b>Address autofill</b><div class="meta">CHK-04 · nadia</div></div></div>
-<div class="col"><header>Done <span class="badge">2</span></header><div class="card done"><b>Fraud check v2</b><div class="meta">CHK-01 · leo</div></div><div class="card done"><b>Receipt emails</b><div class="meta">CHK-02 · maya</div></div></div>
+<div class="col"><header>Backlog <span class="badge">3</span></header><div class="card"><b>Saved carts</b><div class="meta cap">CHK-12 · priya</div></div><div class="card"><b>Gift cards</b><div class="meta cap">CHK-15 · leo</div></div><div class="card wait"><b>Loyalty points</b><div class="meta cap">CHK-18 · maya</div></div></div>
+<div class="col"><header>In progress <span class="badge over">3/2</span></header><div class="card blocked"><b>One-page checkout</b><div class="meta cap">CHK-07 · sam · blocks Q4</div></div><div class="card"><b>Apple Pay</b><div class="meta cap">CHK-09 · priya</div></div><div class="card"><b>Retry on card error</b><div class="meta cap">CHK-10 · leo</div></div></div>
+<div class="col"><header>Review <span class="badge">1/2</span></header><div class="card"><b>Address autofill</b><div class="meta cap">CHK-04 · nadia</div></div></div>
+<div class="col"><header>Done <span class="badge">2</span></header><div class="card done"><b>Fraud check v2</b><div class="meta cap">CHK-01 · leo</div></div><div class="card done"><b>Receipt emails</b><div class="meta cap">CHK-02 · maya</div></div></div>
 </div>
 <div class="legend"><i class="eyebrow">Legend</i><span><i class="card"></i>Default</span><span><i class="card blocked"></i>Blocked</span><span><i class="card wait"></i>Waiting</span><span><i class="card done"></i>Done</span><span><i class="badge over"></i>Over WIP limit</span></div></div>
 ```
@@ -76,62 +76,63 @@ num: on
   <circle class="dot" cx="140" cy="60" r="8"/><circle class="dot" cx="440" cy="80" r="8"/>
   <circle class="dot hot" cx="740" cy="195" r="11"/><circle class="dot" cx="1040" cy="45" r="8"/>
 </svg>
-<div class="board" style="width:1180px;text-align:center"><div class="meta">Ad on social, lands on product page</div><div class="meta">Opens 3 tabs, reads reviews</div><div class="meta" style="color:var(--accent)">Surprise shipping fee at step 3</div><div class="meta">Tracking link, arrives early</div></div>
+<div class="board" style="width:1180px;text-align:center"><div class="meta cap">Ad on social, lands on the shop</div><div class="meta cap">Opens 3 tabs, reads reviews</div><div class="meta cap" style="color:var(--accent)">Surprise shipping fee at step 3</div><div class="meta cap">Tracking link, arrives early</div></div>
+<div class="legend"><i class="eyebrow">Legend</i><span><i class="pt hot"></i>Pain point</span><span><i class="pt"></i>Stage rating</span><span><i class="key dash"></i>Neutral line</span></div>
 </div>
 ```
 
 # Where the support hours go {eyebrow="Treemap · Support"}
 @noemph defaults
 ```html
-<div class="stack"><div style="position:relative;height:410px;margin:0 8px;font-size:16px;color:var(--primary)">
-  <div style="position:absolute;left:0;top:0;width:55%;height:100%;background:var(--surface);border:3px solid var(--bg);padding:20px"><b style="display:block;font-size:26px;margin-bottom:8px">Payments 46%</b>card errors, refunds</div>
-  <div style="position:absolute;left:55%;top:0;width:45%;height:58%;background:rgba(var(--fg-rgb),.1);border:3px solid var(--bg);padding:18px"><b style="display:block;font-size:22px;margin-bottom:6px">Delivery 27%</b>tracking, late parcels</div>
-  <div style="position:absolute;left:55%;top:58%;width:24%;height:42%;background:rgba(var(--fg-rgb),.17);border:3px solid var(--bg);padding:16px"><b style="display:block;font-size:19px">Accounts 15%</b></div>
-  <div style="position:absolute;left:79%;top:58%;width:21%;height:42%;background:var(--accent);border:3px solid var(--bg);padding:16px;color:#fff"><b style="display:block;font-size:19px;margin-bottom:4px">Fees 12%</b>up 3x</div>
-</div></div>
+<div style="position:relative;height:100%">
+  <div class="node" style="position:absolute;left:0;top:0;width:calc(55% - 4px);height:100%"><b>Payments 46%</b><div class="sub">card errors, refunds</div></div>
+  <div class="node" style="position:absolute;left:55%;top:0;width:45%;height:calc(58% - 4px)"><b>Delivery 27%</b><div class="sub">tracking, late parcels</div></div>
+  <div class="node" style="position:absolute;left:55%;top:58%;width:calc(24% - 4px);height:42%"><b>Accounts 15%</b><div class="sub">logins, resets</div></div>
+  <div class="node focal" style="position:absolute;left:79%;top:58%;width:21%;height:42%"><b>Fees 12%</b><div class="sub">up 3x</div></div>
+</div>
 ```
 
 # 品質不良の要因分析 {eyebrow="特性要因図 · 品質管理"}
 @noemph defaults
 ```html
 <div class="stack" lang="ja">
-<div style="position:relative;width:1180px;height:410px">
-<svg width="1180" height="410">
+<div style="position:relative;width:1180px;height:390px">
+<svg width="1180" height="390">
 <path class="bone main" d="M20 205H980"/>
 <path class="bone" d="M200 44L305 205"/>
 <path class="bone" d="M480 44L585 205"/>
 <path class="bone accent" d="M760 44L865 205"/>
-<path class="bone" d="M270 366L375 205"/>
-<path class="bone" d="M550 366L655 205"/>
-<path class="bone" d="M830 366L935 205"/>
+<path class="bone" d="M270 346L375 205"/>
+<path class="bone" d="M550 346L655 205"/>
+<path class="bone" d="M800 346L905 205"/>
 <path class="tick" d="M209 95h24"/>
 <path class="tick" d="M232 130h24"/>
 <path class="tick" d="M493 100h24"/>
 <path class="tick" d="M769 95h24"/>
 <path class="tick" d="M792 130h24"/>
-<path class="tick" d="M289 300h24"/>
-<path class="tick" d="M569 300h24"/>
-<path class="tick" d="M849 300h24"/>
+<path class="tick" d="M289 280h24"/>
+<path class="tick" d="M569 280h24"/>
+<path class="tick" d="M819 280h24"/>
 <rect class="node" x="125" y="12" width="150" height="32" rx="4"/>
 <text class="cat" x="200" y="33">人（作業者）</text>
 <rect class="node" x="405" y="12" width="150" height="32" rx="4"/>
 <text class="cat" x="480" y="33">方法（手順）</text>
 <rect class="node focal" x="685" y="12" width="150" height="32" rx="4"/>
 <text class="cat hot" x="760" y="33">機械（設備）</text>
-<rect class="node" x="195" y="366" width="150" height="32" rx="4"/>
-<text class="cat" x="270" y="387">材料（部品）</text>
-<rect class="node" x="475" y="366" width="150" height="32" rx="4"/>
-<text class="cat" x="550" y="387">測定（検査）</text>
-<rect class="node" x="755" y="366" width="150" height="32" rx="4"/>
-<text class="cat" x="830" y="387">環境（工場）</text>
+<rect class="node" x="195" y="346" width="150" height="32" rx="4"/>
+<text class="cat" x="270" y="367">材料（部品）</text>
+<rect class="node" x="475" y="346" width="150" height="32" rx="4"/>
+<text class="cat" x="550" y="367">測定（検査）</text>
+<rect class="node" x="725" y="346" width="150" height="32" rx="4"/>
+<text class="cat" x="800" y="367">環境（工場）</text>
 <text class="sub" x="203" y="100" text-anchor="end">夜勤の習熟不足</text>
 <text class="sub" x="226" y="135" text-anchor="end">交代時の引継ぎ漏れ</text>
 <text class="sub" x="487" y="105" text-anchor="end">手順書が旧版のまま</text>
 <text class="sub" x="763" y="100" text-anchor="end">成形機3号の温度ばらつき</text>
 <text class="sub" x="786" y="135" text-anchor="end">保全周期が長い</text>
-<text class="sub" x="283" y="305" text-anchor="end">仕入先変更（4月）</text>
-<text class="sub" x="563" y="305" text-anchor="end">抜取検査が週1回</text>
-<text class="sub" x="843" y="305" text-anchor="end">梅雨期の湿度上昇</text>
+<text class="sub" x="283" y="285" text-anchor="end">仕入先変更（4月）</text>
+<text class="sub" x="563" y="285" text-anchor="end">抜取検査が週1回</text>
+<text class="sub" x="813" y="285" text-anchor="end">梅雨期の湿度上昇</text>
 </svg>
 <div class="node focal" style="position:absolute;left:980px;top:165px;width:200px"><span class="tag">結果</span><b style="font-size:16px;white-space:nowrap">不良率 0.8% → 2.1%</b></div>
 </div>
