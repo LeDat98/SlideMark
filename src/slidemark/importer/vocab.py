@@ -34,10 +34,15 @@ _NAMES = {
     "nested": re.compile(r"Nested (\d+)(?: text| list| icon)?"),
     "flowdisc": re.compile(r"Flow (\d+) (?:disc|line|text|icon)"),
     "coverart": re.compile(r"Cover art (\d+)"),
-    "swimlane": re.compile(r"Lane \d+(?: head)?|Step \d+(?: next)?"),
-    "sequence": re.compile(r"Seq .+ (?:head|lifeline)|Seq \d+ (?:msg|label)(?: reply| self)?(?: \d)?"),
+    # the diagram kit also draws tags, rules, activation bars and a `Legend ...` strip: claimed, never content
+    "swimlane": re.compile(
+        r"Lane \d+(?: head| rule(?: end)?)?|Lane head rule|Step \d+(?: next(?: label)?| tag)?|Legend .+"
+    ),
+    "sequence": re.compile(
+        r"Seq .+ (?:head|lifeline|tag|act \d+)|Seq \d+ (?:msg|label)(?: reply| self)?(?: \d)?|Legend .+"
+    ),
     "venn": re.compile(r"Venn (?:(\d+) (?:set|name|text)|overlap(?: fill)?)"),  # wave 2026-11-08 lane D
-    "arch": re.compile(r"Arch (?:tier \d+(?: label)?|node .+|edge \d+(?: label)?)"),
+    "arch": re.compile(r"Arch (?:tier \d+(?: label)?|node .+|tag .+|edge \d+(?: label)?)|Legend .+"),
 }
 _TEXT = {
     "timeline": re.compile(r"Timeline (\d+)( now)?"),
@@ -95,8 +100,8 @@ def detect(data: SlideData) -> str | None:
 
 
 def _plain(r: RunT) -> RunT:
-    """A run without the form's own bold and ink (the layout sets them: they are not emphasis)."""
-    return replace(r, bold=False, color=None)
+    """A run without the form's own bold, ink and mono face (the layout sets them: they are not emphasis)."""
+    return replace(r, bold=False, color=None, code=False)
 
 
 def _quote(v: str) -> str:
@@ -357,12 +362,21 @@ def _venn(form: str, named: list[Item], texts: list[Item]) -> FormFold | None:
         return None
     boxes = []
     for n in sorted(names):
-        head = [p for p in names[n].paras if p.plain.strip()][:1]
-        rest = [p for p in (bodies[n].paras if n in bodies else []) if p.plain.strip()]
+        own = [p for p in names[n].paras if p.plain.strip()]  # the name, then (kit look) its sublabel lines
+        head = own[:1]
+        rest = own[1:] + [p for p in (bodies[n].paras if n in bodies else []) if p.plain.strip()]
+        head = [replace(p, size=None, runs=[replace(_plain(r), size=None) for r in p.runs]) for p in head]
+        rest = [replace(p, size=None, runs=[replace(_plain(r), size=None) for r in p.runs]) for p in rest]
         boxes.append(_box(bodies.get(n, names[n]), head, rest))
     ov = next((it for it in named if _name(it) == "Venn overlap" and it.paras), None)
     if ov is not None:
-        ov.paras = [replace(p, runs=[_plain(r) for r in p.runs]) for p in ov.paras]
+        ps = [p for p in ov.paras if p.plain.strip()]
+        ov.paras = [
+            replace(p, size=None, runs=[replace(_plain(r), size=None) for r in p.runs]) for p in ps[:1]
+        ]
+        if len(ps) > 1 and ov.paras:  # a name and its sublabel: `name: sub`
+            sub = " ".join(p.plain.strip() for p in ps[1:])
+            ov.paras[0].runs.append(RunT(text=": " + sub))
         ov.role = "conclusion"
     return FormFold("venn", ["venn"], boxes)
 
@@ -433,7 +447,18 @@ def _arch(named: list[Item], data: SlideData, conns: list) -> FormFold | None:
         return _name(it)[len("Arch node ") :].strip()
 
     edges = []
-    for k, cn in enumerate(sorted(conns, key=lambda c: c.order), 1):
+
+    def touches(it: Item, x: float, y: float) -> bool:  # an end on a port: on the node's edge, not glued
+        dx, dy = max(it.x - x, 0, x - (it.x + it.w)), max(it.y - y, 0, y - (it.y + it.h))
+        return dx * dx + dy * dy <= 45720**2
+
+    glued = [  # (a legend swatch is a free line that touches no node: not an arrow)
+        cn
+        for cn in conns
+        if (cn.st and cn.en)
+        or (any(touches(it, cn.x0, cn.y0) for it in nodes) and any(touches(it, cn.x1, cn.y1) for it in nodes))
+    ]
+    for k, cn in enumerate(sorted(glued or conns, key=lambda c: c.order), 1):
         if not cn.arrow_end:
             continue
         a, b = node_at(cn.st, cn.x0, cn.y0), node_at(cn.en, cn.x1, cn.y1)
@@ -548,18 +573,23 @@ def _swimlane(
         return None
     ns = sorted(lanes)
     vertical = abs(lanes[ns[1]].x - lanes[ns[0]].x) > abs(lanes[ns[1]].y - lanes[ns[0]].y)
-    flow = (lambda i: i.y) if vertical else (lambda i: i.x)  # along the flow
     across = (lambda i: i.cx) if vertical else (lambda i: i.cy)
 
     def lane_of(it: Item) -> int:
         return min(ns, key=lambda n: abs(across(lanes[n]) - across(it)))
 
-    xs = sorted({flow(s) for s in steps.values()})
-    diffs = [b - a for a, b in zip(xs, xs[1:], strict=False) if b - a > 20000]
-    pitch = min(diffs) if diffs else 1
+    # columns: steps sit centred in their cell, so a column is a cluster of equal centres along the flow
+    mid = (lambda i: i.cy) if vertical else (lambda i: i.cx)
+    centres: list[float] = []
+    tol = round(0.3 * 914400)
+    for v in sorted(mid(s) for s in steps.values()):
+        if centres and v - centres[-1] < tol:
+            continue
+        centres.append(v)
     per: dict[int, list[tuple[int, int, Item]]] = {n: [] for n in ns}
     for k, it in steps.items():
-        per[lane_of(it)].append((k, round((flow(it) - xs[0]) / pitch) + 1, it))
+        col = min(range(len(centres)), key=lambda c: abs(centres[c] - mid(it))) + 1
+        per[lane_of(it)].append((k, col, it))
     prev = 0
     cols: dict[int, int] = {}
     for k in sorted(steps):  # written order = the order of the `Step N` numbers
@@ -602,7 +632,10 @@ def _sequence(
     for it in named:
         nm = _name(it)
         if re.fullmatch(r"Seq .+ head", nm) and it.text:
-            parts.append((it.cx, it.text.replace("\n", " ").strip()))
+            first = next(
+                (p.plain.strip() for p in it.paras if p.plain.strip()), ""
+            )  # (name, then the sublabel)
+            parts.append((it.cx, first or it.text.replace("\n", " ").strip()))
         elif (m := re.fullmatch(r"Seq \d+ label( reply| self)?", nm)) and it.text:
             labels.append((it, (m.group(1) or "").strip()))
     parts.sort()

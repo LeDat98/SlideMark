@@ -3,8 +3,9 @@
 Source syntax (shortest unambiguous form, no lookup):
 
 ``@arch``  each ``## Tier`` box is a tier (rows top to bottom; ``dir=h`` = columns), each list item a node:
-``- API gateway {.focal}``, ``- Postgres: orders, users {.store}`` (text after the first colon is a smaller,
-muted sublabel; the role classes ``.focal .store .external .input .optional .security`` restyle the node).
+``- [API] API gateway {.focal}``, ``- Postgres: orders, users {.store}`` (a leading ``[TAG]`` is the type tag;
+text after the first colon is a mono sublabel; the role classes ``.focal .store .external .input
+.optional .security`` restyle the node).
 The connections are the final ``>`` line of the slide, edges by node name: ``> Web > API, API > Postgres,
 API > Stripe: charge`` (a chain ``A > B > C`` is two arrows, the text after ``:`` labels the last arrow of the
 item, a trailing ``{.focal}`` draws that arrow in the accent). Why a ``>`` line: it is the slide's last
@@ -26,7 +27,9 @@ token                   meaning
 ``arch.node.w``         node width (a length; default from the longest label, shared by all nodes)
 ``arch.node.h``         node height (a length; default from the tallest node text)
 ``arch.node.gap``       air between nodes of a tier (a length; default 0.2in)
-``arch.tier.fill``      fill of a tier band (default: a faint tint of ``muted``; ``none`` = no band)
+``arch.tier.look``      ``auto`` (rows: a caption; columns: a dashed container for 2+ nodes) ``caption``
+                        ``box`` ``band``; a set ``arch.tier.fill`` / ``.line`` means ``band``
+``arch.tier.fill``      fill of a tier band (``band`` look; default: a faint ``muted`` tint; ``none``)
 ``arch.tier.line``      outline of a tier band (default: none)
 ``arch.tier.label``     colour of the tier caption (default ``muted``)
 ``arch.tier.label.size``  caption size in pt (default 0.75 x the node text, at least 9)
@@ -42,6 +45,8 @@ token                   meaning
 ``venn.size``           circle diameter (a length; default from the room)
 ``venn.overlap``        share of a diameter two neighbouring circles share (default 0.36, three sets 0.42)
 ``venn.name.color``     colour of the set names (default ``fg``)
+``venn.max``            largest circle diameter (a length; default 3.6in: circles are never grown to fill)
+``venn.core``           fill of the overlap of all sets, an exact lens (default ``primary``)
 ``venn.text``           where a set's text goes: ``in`` the circle, ``out`` beside it, ``auto`` (default:
                         inside while it reads at ``venn.in.min`` x the body size, else beside the circle)
 ``venn.in.min``         smallest inside text, share of the body size (default 0.75)
@@ -58,7 +63,7 @@ from typing import Any
 from pydantic import Field
 
 from .forms4 import Forms4Tokens
-from .forms5 import Forms5Tokens
+from .forms5 import Forms5Tokens, kind_of, split_tag
 from .ir import Link, Slide
 
 Length = str | float | int
@@ -90,17 +95,68 @@ class Forms6Tokens(Forms5Tokens):
     venn_name_color: str = "fg"
     venn_text: str = "auto"
     venn_in_min: float = Field(0.75, ge=0.3, le=1.0)
+    venn_max: Length = "3.6in"
+    venn_core: str = "primary"
+    arch_tier_look: str = "auto"
+    # diagram kit (docs/SYNTAX.md "Diagram tokens"): shared by @arch @swimlane @sequence @venn
+    diagram_legend: str = "auto"
+    diagram_legend_text: str | None = None
+    diagram_name_size: float = Field(13.0, ge=6, le=40)
+    diagram_name_min: float = Field(11.0, ge=6, le=40)
+    diagram_sub_size: float = Field(9.0, ge=6, le=30)
+    diagram_tag_size: float = Field(8.0, ge=6, le=20)
+    diagram_label_size: float = Field(8.0, ge=6, le=20)
+    diagram_legend_size: float = Field(9.0, ge=6, le=20)
+    diagram_tag_track: float = Field(0.18, ge=0, le=0.6)
+    diagram_label_track: float = Field(0.08, ge=0, le=0.6)
+    diagram_font: str | None = None
+    diagram_muted: str = "muted"
+    diagram_tag_line: str = "border"
+    diagram_arrow: str | None = None
+    diagram_arrow_primary: str = "accent"
+    diagram_arrow_http: str = "link"
+    diagram_arrow_return: str | None = None
+    diagram_arrow_w: Length | None = None
+    diagram_return_dash: str = "dash"
+    diagram_node_pad: Length = "8pt"
+    diagram_act_fill: str = "surface"
+    diagram_act_line: str = "muted"
+    diagram_act_w: Length = "9pt"
+    diagram_hairline: Length = "0.75pt"
+    diagram_tag_radius: Length = "1pt"
+    diagram_group_radius: Length = "6pt"
+    diagram_group_fill: str | None = None
 
 
 _COLOR_LISTS = {"venn_fill"}
 _COLORS = {"arch_tier_fill", "arch_tier_line", "arch_tier_label", "arch_sub_color", "arch_edge_color"}
-_COLORS |= {"venn_line", "venn_name_color"}
+_COLORS |= {"venn_line", "venn_name_color", "venn_core"}
+_COLORS |= {"diagram_muted", "diagram_tag_line", "diagram_arrow", "diagram_arrow_primary"}
+_COLORS |= {"diagram_arrow_http", "diagram_arrow_return", "diagram_act_fill", "diagram_act_line"}
+_COLORS |= {"diagram_group_fill"}
 _LENGTHS = {"arch_gap", "arch_node_w", "arch_node_h", "arch_node_gap", "arch_tier_pad", "arch_label_w"}
-_LENGTHS |= {"venn_line_w", "venn_size"}
+_LENGTHS |= {"venn_line_w", "venn_size", "venn_max", "diagram_arrow_w", "diagram_node_pad", "diagram_act_w"}
+_LENGTHS |= {"diagram_hairline", "diagram_tag_radius", "diagram_group_radius"}
 _PTS = {"arch_tier_label_size", "arch_edge_size"}
 _NONE = ("none", "null", "off")
 _NOT_NONE = {"arch_node_gap", "arch_tier_pad", "venn_line_w", "arch_tier_label", "arch_sub_color"}
-_NOT_NONE |= {"arch_edge_color", "venn_name_color"}
+_NOT_NONE |= {
+    "arch_edge_color",
+    "venn_name_color",
+    "venn_core",
+    "venn_max",
+    "diagram_node_pad",
+    "diagram_act_w",
+}
+_NOT_NONE |= {"diagram_muted", "diagram_tag_line", "diagram_arrow_primary", "diagram_arrow_http"}
+_NOT_NONE |= {"diagram_act_fill", "diagram_act_line", "diagram_hairline", "diagram_tag_radius"}
+_NOT_NONE |= {"diagram_group_radius"}
+_WORDS = {
+    "venn_text": ("in", "out", "auto"),
+    "arch_tier_look": ("auto", "caption", "box", "band"),
+    "diagram_legend": ("auto", "on", "off"),
+    "diagram_return_dash": ("solid", "dash", "dot"),
+}
 
 
 def normalize(path: str, raw: str, names: set[str] | None) -> list[tuple[str, Any]] | None:
@@ -110,10 +166,13 @@ def normalize(path: str, raw: str, names: set[str] | None) -> list[tuple[str, An
     from .theme import TokenValueError, _color_value, _length_value, _pt_value, _unquote
 
     v = _unquote(raw)
-    if path == "venn_text":
-        if v.lower() in ("in", "out", "auto"):
+    key = path.replace("_", ".")
+    if path in _WORDS:
+        if v.lower() in _WORDS[path]:
             return [(path, v.lower())]
-        raise TokenValueError("venn.text is in, out or auto", "write venn.text=out")
+        raise TokenValueError(f"{key} is {', '.join(_WORDS[path])}", f"write {key}={_WORDS[path][0]}")
+    if path in ("diagram_font", "diagram_legend_text"):
+        return [(path, None if v.lower() in _NONE else v)]
     key = path.replace("_", ".")
     if path in _COLOR_LISTS:
         if v.lower() in _NONE:
@@ -145,7 +204,7 @@ FIT_NAMES = {"arch": "architecture", "venn": "venn"}
 
 _TRAIL = re.compile(r"\s*\{([^{}]*)\}\s*$")
 _COLON = re.compile(r"[:：]")
-_ARROW = re.compile(r"\s*(?:->|→|>)\s*")
+_ARROW = re.compile(r"\s*(-->|~>|=>|->|→|>)\s*")  # `>` flow, `=>` primary, `~>` HTTP, `-->` return
 _SPLIT = re.compile(r"[,;，；、\n]")
 FORM_TEXT = "form_text"  # Slide.attrs key that holds the lifted final `>` line
 
@@ -156,6 +215,7 @@ class Node:
     sub: str = ""
     classes: list[str] = field(default_factory=list)
     tier: int = 0
+    tag: str = ""  # `[EXT] Reader`: the type tag drawn at the top-left of the card
 
     @property
     def key(self) -> str:
@@ -175,6 +235,7 @@ class Edge:
     dst: int
     label: str | None = None
     focal: bool = False
+    kind: str = "flow"  # flow | primary | http | return (the arrow symbol: `>` `=>` `~>` `-->`)
 
 
 def split_trailing(text: str) -> tuple[str, list[str]]:
@@ -206,11 +267,12 @@ def parse_arch(slide: Slide) -> Arch | None:
                 if p.level > 0 or not p.plain.strip():
                     continue
                 body, classes = split_trailing(p.plain)
+                body, tag = split_tag(body)
                 parts = _COLON.split(body, maxsplit=1)
                 name = parts[0].strip()
                 if not name:
                     continue
-                n = Node(name, parts[1].strip() if len(parts) > 1 else "", classes, ti)
+                n = Node(name, parts[1].strip() if len(parts) > 1 else "", classes, ti, tag)
                 index.setdefault(n.key, len(nodes))
                 nodes.append(n)
                 row.append(n)
@@ -232,7 +294,9 @@ def parse_edges(text: str, arch: Arch) -> tuple[list[Edge], list[tuple[str, str,
         cut = _COLON.split(item, maxsplit=1)
         head = cut[0]
         label = cut[1].strip() or None if len(cut) > 1 else None
-        parts = [x.strip() for x in _ARROW.split(head)]
+        pieces = _ARROW.split(head)  # name, arrow, name, arrow, name ...
+        parts = [x.strip() for x in pieces[0::2]]
+        syms = [kind_of(x) for x in pieces[1::2]]
         if len(parts) < 2 or any(not x for x in parts):
             problems.append(
                 ("arch-edge", f"edge '{item[:30]}' is not 'A > B'", "write `> Web > API, API > Postgres`")
@@ -262,7 +326,8 @@ def parse_edges(text: str, arch: Arch) -> tuple[list[Edge], list[tuple[str, str,
                 continue
             seen.add((a, b))
             last = i == len(ids) - 2
-            edges.append(Edge(a, b, label if last else None, "focal" in classes))
+            kind = syms[i] if i < len(syms) else "flow"
+            edges.append(Edge(a, b, label if last else None, "focal" in classes, kind))
     return edges, problems
 
 

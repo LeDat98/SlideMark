@@ -15,7 +15,8 @@ against A's design system, not against your taste. For each item answer `ok` or 
 3. Node anatomy: cards with a hairline border, small radius; type tag, bold name, mono sublabel where A has them.
 4. Arrows: orthogonal, crisp small heads, colour by meaning (default slate, primary accent, HTTP blue, return dashed);
    no two arrows on one line; none through a node.
-5. Labels: mono uppercase, small, on a knockout, centred on their segment, touching nothing.
+5. Labels: mono uppercase, small, on a knockout, centred on their segment, touching no node or other label (a
+   knockout label over a lane rule or line is fine: the reference does it).
 6. Legend: present when two or more roles or arrow kinds are used; explains every style shown.
 7. Density and space: compact, centred, generous margins; no stretched shapes, no empty bands, nothing crammed.
 8. Type scale: consistent sizes per role; names >= 11pt, labels >= 8pt; nothing grown huge to fill space.

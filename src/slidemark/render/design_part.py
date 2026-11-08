@@ -52,7 +52,13 @@ def _len(x: float | int | str) -> str:
     return x if isinstance(x, str) else f"{_n(x)}pt"
 
 
-_TRANSFORM = {"upper": "uppercase", "lower": "lowercase", "capitalize": "capitalize", "none": "none"}
+_TRANSFORM = {
+    "upper": "uppercase",
+    "lower": "lowercase",
+    "capitalize": "capitalize",
+    "none": "none",
+    "caps": "uppercase",
+}
 _DASH = {"solid": "solid", "dash": "dashed", "dot": "dotted"}
 
 

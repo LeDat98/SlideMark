@@ -18,19 +18,21 @@ colors:
 fonts: {heading: Georgia, body: Arial, mono: Consolas, ea: Yu Gothic}
 sizes:
   title: 38
-  subtitle: 20
-  heading: 20
-  body: 17
-  lead: 22
+  subtitle: 14
+  heading: 14
+  body: 14
+  lead: 14
   caption: 12
   footnote: 10
-  table: 15
+  table: 12
   cover-title: 52
   cover-subtitle: 22
 subtitle_font: body
+eyebrow: section
 title_color: primary
 title_bold: false
 heading_color: primary
+heading_font: body
 lead_color: secondary
 cover_band_h: 0
 cover_rule: accent
@@ -39,6 +41,8 @@ cover_rule_h: 0.04in
 cover_rule_pos: above
 table_header_fill: bg
 table_header_color: primary
+table_rules: rows
+table_head_rule: primary
 table_body_fill: bg
 table_hl_fill: accent
 table_hl_strength: 0.1
@@ -52,10 +56,27 @@ icon_color: primary
 palette: [primary, "#5E7A9B", "#7C8F6F", "#B8915A", "#9C6B50", "#6E6479"]
 # chart bars are quiet slate (never heavy ink); the `hl=` bar is the accent tint (diagram fills keep the palette)
 chart_series: ["#8794AB", "#C2C9D6", "#7C8F6F", "#B8915A", "#9C6B50", "#6E6479"]
-layout:
-  # one vertical rhythm: content hugs its size, is centred in the body and keeps air above the footer
-  vcentre: true
-  html_fit: true
+# diagram kit (@arch @swimlane @sequence @venn): fixed type scale, hairline cards, mono capitals for tags,
+# arrow labels and captions; arrows slate / accent (primary) / link blue (HTTP) / dashed (return)
+diagram_name_size: 13
+diagram_sub_size: 9
+diagram_tag_size: 8
+diagram_label_size: 8
+diagram_tag_track: 0.08
+diagram_label_track: 0.08
+diagram_legend: auto
+diagram_arrow_primary: accent
+diagram_arrow_http: link
+diagram_return_dash: dash
+arch_tier_look: auto
+sequence_lifeline: border
+diagram_act_fill: "#E3E5EA"
+diagram_act_line: muted
+venn_fill: primary
+venn_alpha: 0.06
+venn_line: secondary
+venn_line_w: 0.9pt
+venn_core: primary
 render:
   connector_color: secondary
   connector_width: 1
@@ -63,13 +84,20 @@ render:
   chart_hl_tint: 0.16
   chart_hl_line: 1.25
   chart_note_pointer: false
+  chart_title_scale: 1.0
+  chart_title_bold: false
+  chart_label_scale: 0.9
+  chart_legend_scale: 0.9
+  chart_text_ratio: 0
+  chart_hl_first: true
 classes:
   # hairline cards on the paper: white fill, #BFC0C0 border, small corners, no shadow
-  card: {fill: "#FFFFFF", line: border, line_width: 0.75, radius: 4, padding: 10pt}
+  card: {fill: "#FFFFFF", line: border, line_width: 0.75, radius: 4, padding: 10pt, font_size: 13}
   callout: {fill: "#ECECEC", line: border, line_width: 0.75, radius: 4}
   # a chart takeaway: small accent text on the paper, no box, no arrow (the reference callout)
   chart-note: {fill: bg, line: bg, line_width: 0, color: accent, bold: false, padding: 2pt}
   node: {fill: "#FFFFFF", line: secondary, line_width: 1, radius: 4, padding: 6pt}
+  diagram-node: {bold: true, font_size: 12}
   decision: {fill: "#FFFFFF", line: secondary}
   kpi: {color: primary}
   rows: {fill: "#FFFFFF", line: border, line_width: 0.75}
@@ -82,3 +110,26 @@ classes:
   input: {fill: "#4F5D751A", line: muted}
   optional: {line: muted, line_dash: dash}
   security: {fill: "#BF45200D", line: accent, line_dash: dash}
+layout:
+  # one vertical rhythm: content hugs its size, is centred in the body and keeps air above the footer
+  vcentre: true
+  grow_max: 1
+  l3_fill: false
+  cards_to_body: false
+  kpi_to_body: false
+  steps_stretch: false
+  card_stretch: false
+  top_gap: 0.3in
+  body_valign: center
+  beside_min: 0
+  beside_align: 1.0
+  sparse_note: 1
+  center_min_fill: 0
+  table_grow: 1
+  table_alone_grow: 1
+  table_grow_roomy: 1
+  table_free: false
+  table_fill_width: true
+  diagram_grow: 1
+  html_hug: true
+  cjk_phrase_lines: true

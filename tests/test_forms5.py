@@ -176,7 +176,12 @@ def test_swimlane_shape_names_and_connector_kinds(tmp_path):
     assert {"Lane 1", "Lane 3", "Lane 1 head", "Lane 3 head", "Step 1", "Step 5"} <= names
     cx = _cxn(slide)
     # steps are joined in column order: 1 (col 1) -> 3 (col 2) -> 4 (col 3) -> 2 (col 4) -> 5 (col 5)
-    assert set(cx) == {"Step 1 next", "Step 3 next", "Step 4 next", "Step 2 next"}
+    assert {k for k in cx if k.startswith("Step")} == {
+        "Step 1 next",
+        "Step 3 next",
+        "Step 4 next",
+        "Step 2 next",
+    }
     assert cx["Step 1 next"][0] == "bentConnector3"  # Customer -> Sales: an elbow
     assert cx["Step 3 next"][0] != "bentConnector3"  # same lane: straight
     assert cx["Step 2 next"][0] == "bentConnector3"
@@ -195,6 +200,8 @@ def test_swimlane_connectors_are_glued_to_their_steps(tmp_path):
     ids = {sh.name: sh.shape_id for sh in slide.shapes}
     for el in slide.shapes._spTree.iter(qn("p:cxnSp")):
         name = el.find(qn("p:nvCxnSpPr")).find(qn("p:cNvPr")).get("name")
+        if not name.startswith("Step"):  # the lane rules and the legend swatches are free lines
+            continue
         c = el.find(qn("p:nvCxnSpPr")).find(qn("p:cNvCxnSpPr"))
         assert c.find(qn("a:stCxn")) is not None, name
         a = int(name.split()[1])

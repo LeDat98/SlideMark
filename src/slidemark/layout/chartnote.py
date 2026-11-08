@@ -483,7 +483,7 @@ def _plan(ch: Chart, pl: Placed, theme: Theme, note: str) -> NotePlan:
     em = size * EMU_PER_PT
     base = theme.classes.get(NOTE_CLASS) or fast_style()
     font = pl.style.font
-    note_style = base.merged(fast_style(font=font)) if font else base
+    note_style = base.merged(fast_style(font=font)) if font and not base.font else base  # (a class font wins)
     floor = size  # never smaller than the category / axis labels (they use the chart text size)
     size0 = max((opt_pt(pl, "label_size") or size * rt.chart_label_scale) + rt.chart_note_size_add, floor)
     d = _data(ch, theme) if ch.kind in PLOTTED else None

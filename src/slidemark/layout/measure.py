@@ -697,6 +697,10 @@ def paragraphs_height(
         segs = para_segments(p, bold, mono, tf, size if pinned else None)
         sq = paragraph_squeeze(p, style, wpt, size, segs, mono=mono) if squeeze and not pinned else 0.0
         lines = count_lines(segs, wpt, size, font, spc * scale + sq)
+        if _tok.cjk_phrase_lines and not pinned and has_cjk(p.plain):
+            from .jbreak import packed_lines
+
+            lines = max(lines, packed_lines(p, style, wpt, size, mono=mono))  # whole phrases may need more
         ls = (p.style.line_spacing if p.style and p.style.line_spacing else style.line_spacing) or 1.0
         fac = (_tok.line_cjk if has_cjk(p.plain) else _tok.line_latin) * ls
         lh = size * fac

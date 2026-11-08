@@ -77,7 +77,10 @@ def test_section_mode_uses_the_section_name(tmp_path):
 
 
 def test_off_by_default_and_per_slide_off(tmp_path):
-    prs, _ = _shapes(tmp_path, DECK.replace('{eyebrow="Platform · Strategy"}', ""))
+    plain = DECK.replace('{eyebrow="Platform · Strategy"}', "")
+    prs, _ = _shapes(tmp_path, plain.replace("theme: editorial", "theme: default"))
+    assert all(_by_name(s, "Eyebrow") is None for s in prs.slides)  # other presets: off
+    prs, _ = _shapes(tmp_path, plain.replace("theme: editorial", "theme: editorial\neyebrow: off"))
     assert all(_by_name(s, "Eyebrow") is None for s in prs.slides)
     prs, _ = _shapes(tmp_path, "eyebrow: section\n" + DECK.replace('"Platform · Strategy"', "off"))
     assert _by_name(prs.slides[2], "Eyebrow") is None
@@ -85,7 +88,12 @@ def test_off_by_default_and_per_slide_off(tmp_path):
 
 def test_title_moves_down_to_make_room(tmp_path):
     with_eb, _ = _shapes(tmp_path, DECK)
-    without, _ = _shapes(tmp_path, DECK.replace('{eyebrow="Platform · Strategy"}', ""))
+    without, _ = _shapes(
+        tmp_path,
+        DECK.replace('{eyebrow="Platform · Strategy"}', "").replace(
+            "theme: editorial", "theme: editorial\neyebrow: off"
+        ),
+    )
     assert _by_name(with_eb.slides[2], "Title").top > _by_name(without.slides[2], "Title").top
 
 
@@ -112,3 +120,35 @@ def test_round_trip(tmp_path):
 def test_cover_and_section_ignore_it(tmp_path):
     prs, _ = _shapes(tmp_path, '# Cover {eyebrow="X"}\n\n# Next\n- a\n')
     assert _by_name(prs.slides[0], "Eyebrow") is None
+
+
+def _eyebrows(tmp_path, text):
+    prs, _ = _shapes(tmp_path, text)
+    return [(_by_name(s, "Eyebrow").text_frame.text if _by_name(s, "Eyebrow") else None) for s in prs.slides]
+
+
+def test_editorial_is_automatic_with_the_deck_name_as_fallback(tmp_path):
+    # no section slide before the content slides: the deck name (the cover title) stands in
+    got = _eyebrows(tmp_path, "theme: editorial\n\n# Platform review\n\n# One\n- a\n\n# Two\n- b\n")
+    assert got == [None, "PLATFORM REVIEW", "PLATFORM REVIEW"]
+    # after a section slide the section name wins
+    assert _eyebrows(tmp_path, DECK)[3] == "ARCHITECTURE"
+
+
+def test_cover_takes_a_meta_eyebrow(tmp_path):
+    prs, _ = _shapes(
+        tmp_path, 'theme: editorial\n\n# Platform review {eyebrow="Engineering · Q3"}\n\n# One\n- a\n'
+    )
+    eb, title = _by_name(prs.slides[0], "Eyebrow"), _by_name(prs.slides[0], "Title")
+    assert eb is not None and eb.text_frame.text == "ENGINEERING · Q3"
+    assert eb.top + eb.height <= title.top + title.height  # above the title text
+    # without an own text: the author (never the title itself)
+    got = _eyebrows(tmp_path, "theme: editorial\nauthor: Platform team\n\n# Platform review\n\n# One\n- a\n")
+    assert got[0] == "PLATFORM TEAM"
+
+
+def test_editorial_fallback_never_repeats_a_content_title(tmp_path):
+    # no cover: slide 1 is content, so its title is not the deck name; the footer stands in, never a title
+    got = _eyebrows(tmp_path, "theme: editorial\nfooter: Process review\n\n# Order flow\n- a\n\n# Two\n- b\n")
+    assert got == ["PROCESS REVIEW", "PROCESS REVIEW"]
+    assert _eyebrows(tmp_path, "theme: editorial\n\n# Order flow\n- a\n\n# Two\n- b\n") == [None, None]

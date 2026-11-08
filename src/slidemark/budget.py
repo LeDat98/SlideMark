@@ -85,6 +85,11 @@ def accent_shapes(items: list[Placed], theme: Theme) -> int:
             continue
         if getattr(el, "role", None) in ("title", "subtitle", "lead", "caption") or el.attrs.get("field"):
             continue
+        name = str(el.attrs.get("shape_name") or "")
+        if name.startswith("Legend") or name.endswith(
+            " tag"
+        ):  # the legend swatches and type tags are no emphasis
+            continue
         if _accent(p.style.fill, theme, accent) or _accent(p.style.line, theme, accent):
             n += 1
     return n

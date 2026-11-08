@@ -289,6 +289,10 @@ def _build(
     scale = ctx.scale * q
     for el in kids:
         st = E._text_style(ctx, el, inherit)
+        if (
+            dn := ctx.theme.classes.get("diagram-node")
+        ) is not None:  # `diagram-node.bold=on`: flowchart nodes only
+            st = st.merged(dn)
         base = st.font_size or 18
         eff = measure.effective_scale(base, scale, ctx.theme.min_font_size)
         if q >= 1.0:

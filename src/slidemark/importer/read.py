@@ -938,12 +938,17 @@ def _read_conn(el, tf: Tf, order: int) -> ConnT | None:
     )
 
 
+_LEGEND = re.compile(r"Legend (?:rule|caption|\w+ (?:swatch|label))")
+
+
 def _one(sh, tf: Tf, data: SlideData, ctx: ReadCtx, part) -> None:
     el = sh._element
     tag = etree.QName(el).localname
     name = sh.name or ""
     if tag == "grpSp":
         _walk(sh.shapes, tf.child(el), data, ctx, part)
+        return
+    if _LEGEND.fullmatch(name):  # the diagram legend strip is drawn again by the build (roles / arrows)
         return
     if name.startswith(CHART_NOTE):  # the pointer of a `note=` is not content
         if tag == "sp":

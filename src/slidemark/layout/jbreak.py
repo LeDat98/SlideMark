@@ -10,6 +10,7 @@ the packed paragraph needs no more lines than the layout reserved (box heights n
 from __future__ import annotations
 
 from bisect import bisect_right
+from functools import lru_cache
 
 from ..ir import Paragraph, Style
 from . import measure
@@ -21,7 +22,8 @@ _parser = None
 _parser_failed = False
 
 
-def _phrases(text: str) -> list[str] | None:
+@lru_cache(maxsize=20000)
+def _phrases(text: str) -> tuple[str, ...] | None:
     global _parser, _parser_failed
     if _parser_failed:
         return None
@@ -33,7 +35,7 @@ def _phrases(text: str) -> list[str] | None:
         except Exception:  # not installed or broken: no phrase breaks, never an error
             _parser_failed = True
             return None
-    return _parser.parse(text)
+    return tuple(_parser.parse(text))
 
 
 def phrase_cuts(text: str) -> list[int]:
@@ -120,21 +122,8 @@ def _natural_starts(m: _Measure, width: float, sp: float) -> list[int] | None:
     return starts
 
 
-def plan_breaks(
-    p: Paragraph,
-    style: Style,
-    width_pt: float,
-    size_pt: float,
-    sq: float,
-    *,
-    mono: bool = False,
-) -> tuple[dict[int, list[int]], float] | None:
-    """Soft-break offsets for paragraph ``p`` and the letter spacing to render it with, or ``None``.
-
-    ``{run index: [offsets in the run's bound text]}``. ``sq`` is the orphan squeeze the renderer would
-    use. ``None`` when nothing to do: the viewer already breaks at phrase boundaries, the paragraph is not
-    CJK, has badges, hard breaks, explicit spacing or a text transform, no phrase packing exists, or it
-    would need more lines than the model reserved."""
+def _prepare(p: Paragraph, style: Style, width_pt: float, size_pt: float, sq: float, mono: bool):
+    """Shared set-up of plan_breaks and packed_lines; None when phrase breaks do not apply."""
     tk = measure.tokens()
     if not tk.cjk_phrase_break or mono or measure._explicit_spacing(style, p) or not p.runs:
         return None
@@ -181,6 +170,53 @@ def plan_breaks(
     if not bounds:
         return None
     cands = sorted(bounds) + [n]
+
+    return tk, m, flat, n, bounds, cands, reserved
+
+
+def packed_lines(p: Paragraph, style: Style, width_pt: float, size_pt: float, *, mono: bool = False) -> int:
+    """Lines ``p`` needs when whole phrases are packed into the width (0 = phrase breaks do not apply).
+
+    The layout reserves at least this many lines for a CJK paragraph: the viewer may need one more than its
+    plain character-wise count when it keeps phrases whole (a line cannot end in the middle of 単一の)."""
+    prep = _prepare(p, style, width_pt, size_pt, 0.0, mono)
+    if prep is None:
+        return 0
+    tk, m, _flat, n, _bounds, cands, _reserved = prep
+    width = width_pt * (1.0 - tk.cjk_phrase_margin)
+    s, lines = 0, 1
+    while s < n:
+        e = m.end(s, width, 0.0, cands)
+        if e < 0:
+            return 0
+        if e >= n:
+            break
+        lines += 1
+        s = e
+    return lines
+
+
+def plan_breaks(
+    p: Paragraph,
+    style: Style,
+    width_pt: float,
+    size_pt: float,
+    sq: float,
+    *,
+    mono: bool = False,
+) -> tuple[dict[int, list[int]], float] | None:
+    """Soft-break offsets for paragraph ``p`` and the letter spacing to render it with, or ``None``.
+
+    ``{run index: [offsets in the run's bound text]}``. ``sq`` is the orphan squeeze the renderer would
+    use. ``None`` when nothing to do: the viewer already breaks at phrase boundaries, the paragraph is not
+    CJK, has badges, hard breaks, explicit spacing or a text transform, no phrase packing exists, or it
+    would need more lines than the model reserved."""
+    prep = _prepare(p, style, width_pt, size_pt, sq, mono)
+    if prep is None:
+        return None
+    tk, m, flat, n, bounds, cands, reserved = prep
+    if tk.cjk_phrase_lines:  # the layout reserved the lines whole phrases need: packing may use them
+        reserved = max(reserved, packed_lines(p, style, width_pt, size_pt, mono=mono))
 
     def clean(sp: float) -> bool:
         """The viewer (also with a little more room) breaks only between phrases at spacing ``sp``."""

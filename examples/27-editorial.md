@@ -3,11 +3,11 @@ lang: en
 num: on
 colors: accent=#BF4520
 fonts: heading=Georgia body=Arial
-sizes: title=38 body=17
+sizes: title=38
 style: radius=4
 footer: Platform review
 
-# Platform review
+# Platform review {eyebrow="Engineering · Q3 2026"}
 Architecture, throughput and cost, Q3
 @defaults
 
@@ -16,11 +16,11 @@ Architecture, throughput and cost, Q3
 @arch
 @noemph defaults
 ## Client
-- Web client: browser app {.input}
+- [WEB] Web client: browser app {.input}
 ## Platform
-- API gateway: auth, limits {.focal}
-- Postgres: orders, users {.store}
-- Nightly backup: object copy {.optional}
+- [API] API gateway: auth · limits {.focal}
+- [DB] Postgres: orders · users {.store}
+- [OBJ] Nightly backup: object copy {.optional}
 > Web client > API gateway, API gateway > Postgres, Postgres > Nightly backup
 
 # Where the data goes
@@ -29,7 +29,7 @@ flowchart LR
   A[Checkout]:::input --> B{Fraud check}
   B --> C[Orders DB]:::store
   B --> D[Stripe]:::external
-  B --> E[Key vault]:::security
+  B --> E[Key vault]:::optional
   C --> F[Reports]:::focal
 ```
 @noemph defaults
@@ -73,7 +73,7 @@ Reports,Analytics,"$1,100",+1%
 - 読み取りレプリカを追加
 - 決済APIを分離
 - ログを一元化
-## 管理 {.security}
+## 管理 {.optional}
 - 鍵はVaultで集中管理
 - 四半期ごとに権限を棚卸し
 ※ 出所：社内計測（2026年9月）。遅延は95パーセンタイル値。
