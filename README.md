@@ -111,7 +111,7 @@ Toàn bộ thiết kế mà agent python-pptx tự viết (64 quyết định) n
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-10-08 · commit `2307797` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-11-08 · commit `7890a91` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -376,6 +376,35 @@ Nguồn: [`examples/26-ai-overview.md`](examples/26-ai-overview.md)
 ![26-ai-overview slide 13](docs/gallery/26-ai-overview/slide-13.png)
 ![26-ai-overview slide 14](docs/gallery/26-ai-overview/slide-14.png)
 ![26-ai-overview slide 15](docs/gallery/26-ai-overview/slide-15.png)
+
+### 27-editorial
+
+Nguồn: [`examples/27-editorial.md`](examples/27-editorial.md)
+
+![27-editorial slide 1](docs/gallery/27-editorial/slide-01.png)
+![27-editorial slide 2](docs/gallery/27-editorial/slide-02.png)
+![27-editorial slide 3](docs/gallery/27-editorial/slide-03.png)
+![27-editorial slide 4](docs/gallery/27-editorial/slide-04.png)
+![27-editorial slide 5](docs/gallery/27-editorial/slide-05.png)
+![27-editorial slide 6](docs/gallery/27-editorial/slide-06.png)
+
+### 28-swimlane-sequence
+
+Nguồn: [`examples/28-swimlane-sequence.md`](examples/28-swimlane-sequence.md)
+
+![28-swimlane-sequence slide 1](docs/gallery/28-swimlane-sequence/slide-01.png)
+![28-swimlane-sequence slide 2](docs/gallery/28-swimlane-sequence/slide-02.png)
+![28-swimlane-sequence slide 3](docs/gallery/28-swimlane-sequence/slide-03.png)
+![28-swimlane-sequence slide 4](docs/gallery/28-swimlane-sequence/slide-04.png)
+
+### 29-arch-venn
+
+Nguồn: [`examples/29-arch-venn.md`](examples/29-arch-venn.md)
+
+![29-arch-venn slide 1](docs/gallery/29-arch-venn/slide-01.png)
+![29-arch-venn slide 2](docs/gallery/29-arch-venn/slide-02.png)
+![29-arch-venn slide 3](docs/gallery/29-arch-venn/slide-03.png)
+![29-arch-venn slide 4](docs/gallery/29-arch-venn/slide-04.png)
 <!-- gallery:end -->
 
 ## Tài liệu

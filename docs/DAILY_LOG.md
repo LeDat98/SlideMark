@@ -170,3 +170,12 @@ Run goal (owner: look like the pptxgenjs deck; cost and time may rise to 50%):
 - [x] Wave 3 E: takeaway bar wraps before it shrinks, iconlist / card growth caps; F: one step label, headings never wrap in a row, proscons palette; judge round 12 at equal scale: SlideMark wave 3 3.5 ranked first, pptxgenjs 3.5, wave 2 3.0; run 6 calls / 77 s / cost above start 120k
 - Found: the judge sheets were not at one scale (pptxgenjs 640 px tiles vs ours 420): rebuilt, lesson recorded; at equal scale SlideMark ranks first in rounds 11 and 12.
 - Next: key-message weight (`conclusion.style`), card rows with two bullets still 37% empty, nested list repeating ring headings, steps heading wrap check, t4 diet round 2.
+
+## 2026-11-08 (run: the diagram-design editorial style, 12:15–13:25 UTC, orchestrator + 2 lanes per wave)
+Run goal (owner: adopt github.com/cathrynlavery/diagram-design as the default look, brand colours overridable):
+- [x] Step 1 A: `presets/editorial.yaml`, role classes `.focal .store .external .input .optional .security` in every preset, mermaid `:::class`, `render.connector_color`, `title_bold`, example 27; B: a built-in preset counts for colors / fonts / style, info rule `diagram-budget`
+- [x] Step 2: two fresh-agent t5 runs with editorial as the default (5 calls / 99k, then 4 calls / 79k, both accepted; wave 3 6 calls / 120k); judge rounds 13 and 14: editorial 3.0 both times vs wave 3 3.5 → the agreed rule kept `default` as the default, editorial stays opt-in
+- [x] Step 3 C: `@swimlane`, `@sequence` (example 28); D: `@arch`, `@venn` (example 29); SKILL.md lines (budget 7,400)
+- Metrics: tests 3,589 passed (3,447 at start); only the known t4 token gate is red; bench recorded.
+- Problems: the working branch on the remote holds an early history that main lacks, so it is synced with history-keeping merge commits; the judge reads the near-monochrome editorial palette as "wireframe".
+- Next: a default that keeps the editorial rules with one chromatic colour carrying weight (re-judge on t5); tiny node text in the Japanese `@arch` and swimlane lane labels; the venn centre label size; importer does not read role classes back.
