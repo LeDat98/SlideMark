@@ -5268,6 +5268,17 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         body = Rect(Mx, y_top, inner_w, bottom - y_top)
         if kind == "blank":
             body = Rect(Mx, My, inner_w, bottom - My)
+    legend_out: list[Placed] = []
+    if kind == "content" and body is not None and body.h > 0 and slide.elements and not forms.form_of(slide):
+        from . import diagramkit as DK  # (lazy: diagramkit imports the vocabulary)
+
+        got = DK.generic_legend(ctx, slide)
+        if got is not None and body.h > got[2] * 2.2:  # roles / connectors without a form: a legend band
+            entries, K_, leg_h = got
+            lctx = _Ctx(deck, theme, slide, index, W, H)
+            DK.legend(lctx, K_, body.x, body.bottom - leg_h + round(6 * EMU_PER_PT), body.w, entries)
+            legend_out = lctx.out
+            body = Rect(body.x, body.y, body.w, body.h - leg_h)
 
     # ---- body with global autofit
     elements = list(slide.elements)
@@ -5636,4 +5647,4 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
         "dense_k": ctx.dense_k,
         **({"vocab": vocab_info} if vocab_info else {}),
     }
-    return _stack(head + chrome + (final_ctx.out if final_ctx else []) + tail, ctx.lt.z_default)
+    return _stack(head + chrome + (final_ctx.out if final_ctx else []) + legend_out + tail, ctx.lt.z_default)

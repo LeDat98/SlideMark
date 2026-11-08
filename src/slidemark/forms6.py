@@ -125,6 +125,7 @@ class Forms6Tokens(Forms5Tokens):
     diagram_hairline: Length = "0.75pt"
     diagram_tag_radius: Length = "1pt"
     diagram_group_radius: Length = "6pt"
+    diagram_group_fill: str | None = None
 
 
 _COLOR_LISTS = {"venn_fill"}
@@ -132,6 +133,7 @@ _COLORS = {"arch_tier_fill", "arch_tier_line", "arch_tier_label", "arch_sub_colo
 _COLORS |= {"venn_line", "venn_name_color", "venn_core"}
 _COLORS |= {"diagram_muted", "diagram_tag_line", "diagram_arrow", "diagram_arrow_primary"}
 _COLORS |= {"diagram_arrow_http", "diagram_arrow_return", "diagram_act_fill", "diagram_act_line"}
+_COLORS |= {"diagram_group_fill"}
 _LENGTHS = {"arch_gap", "arch_node_w", "arch_node_h", "arch_node_gap", "arch_tier_pad", "arch_label_w"}
 _LENGTHS |= {"venn_line_w", "venn_size", "venn_max", "diagram_arrow_w", "diagram_node_pad", "diagram_act_w"}
 _LENGTHS |= {"diagram_hairline", "diagram_tag_radius", "diagram_group_radius"}

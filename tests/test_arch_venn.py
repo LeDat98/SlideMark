@@ -145,7 +145,13 @@ def test_arch_shapes_are_named_and_edges_are_elbow_connectors(tmp_path):
     for e in edges:
         ln = line_of(e)
         assert ln.find(qn("a:tailEnd")) is not None  # arrow head
-        assert e._element.find(qn("p:nvCxnSpPr")).find(qn("p:cNvCxnSpPr")).find(qn("a:stCxn")) is not None
+    # an end on the middle of a box side is glued to it; an end on its own port (fan-in / fan-out) is not
+    glued = [
+        e
+        for e in edges
+        if e._element.find(qn("p:nvCxnSpPr")).find(qn("p:cNvCxnSpPr")).find(qn("a:stCxn")) is not None
+    ]
+    assert len(glued) >= 3
     # labels: <= 14 characters, as texts over the line
     labels = named(prs, r"Arch edge \d+ label")
     assert sorted(s.text_frame.text for s in labels) == ["charge", "place order", "write"]

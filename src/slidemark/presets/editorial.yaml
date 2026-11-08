@@ -59,7 +59,7 @@ diagram_name_size: 13
 diagram_sub_size: 9
 diagram_tag_size: 8
 diagram_label_size: 8
-diagram_tag_track: 0.18
+diagram_tag_track: 0.08
 diagram_label_track: 0.08
 diagram_legend: auto
 diagram_arrow_primary: accent

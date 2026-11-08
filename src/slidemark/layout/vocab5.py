@@ -22,6 +22,7 @@ from .. import forms, forms5
 from ..ir import Paragraph, Run, Shape, Slide, Style, fast_style
 from ..units import EMU_PER_PT
 from . import diagramkit as DK
+from . import ports as PO
 from . import vocab as V
 from .grid import Rect
 
@@ -132,7 +133,8 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     area = Rect(body.x, body.y, body.w, body.h - leg_h)
     heads = [x.title for x in lanes]
     head_text = [" ".join(p.plain.strip() for p in h.paragraphs) if h is not None else "" for h in heads]
-    lane_pad = round(0.19 * _K)
+    # air above / below a step: a label of a handover between lanes needs a free band beside its arrow
+    lane_pad = round((0.27 if any(s.label for s in steps) else 0.19) * _K)
     gap_pref = V._emu(th.swimlane_gap) if th.swimlane_gap else round(0.5 * _K)
     gap_min = min(gap_pref, round(0.3 * _K))
 
@@ -143,27 +145,22 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         K = K0.scaled(k)
         tag_h = DK.tag_size(K, "X")[1]
         # every step is as wide as its text asks (a floor and a cap); the lane height / lane width is shared
-        wi = {
-            s.idx: max(
-                round(min(max(DK.node_width(c, K, s.name, s.subs, s.tag), 1.3 * _K), 2.4 * _K) * wf),
-                round(1.0 * _K),
-            )
-            for s in steps
-        }
-        if vertical:
-            wi = dict.fromkeys(wi, max(wi.values()))
+        nat = max(DK.node_width(c, K, s.name, s.subs, s.tag) for s in steps)
+        w1 = max(round(min(max(nat, 1.3 * _K), 2.4 * _K) * wf), round(1.0 * _K))
+        wi = dict.fromkeys((s.idx for s in steps), w1)  # every step is as wide as the widest wants
 
         def need(s) -> int:
             paras = DK.node_paras(c, K, s.name, s.subs)
             return DK.node_need(c, K, paras, wi[s.idx], bool(s.tag), tag_h, [*s.classes])
 
-        hi = {s.idx: max(need(s), round(2.9 * K.name * PT)) for s in steps}
-        if not vertical:
-            hi = dict.fromkeys(hi, max(hi.values()))
+        hi = {s.idx: max(need(s), round((2.3 if vertical else 2.5) * K.name * PT)) for s in steps}
+        hi = dict.fromkeys(hi, max(hi.values()))  # one height for every step
         ea = {i: (hi[i] if vertical else wi[i]) for i in wi}  # extent along the flow, per step
         across = max(wi.values()) if vertical else max(hi.values())
         lp = lane_pad if vertical else min(lane_pad, max(round(0.05 * _K), (area.h // n - across) // 2))
         lane_a = across + 2 * lp
+        if vertical:  # the lanes share the width the diagram has (nodes stay their own size, centred)
+            lane_a = max(lane_a, min(area.w // n, round(3.4 * _K)))
         ext: dict[int, int] = {}
         for s in steps:
             ext[s.col] = max(ext.get(s.col, 0), ea[s.idx])
@@ -190,7 +187,7 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     best = None
     for k in ks:
         for wf in (1.0, 0.85, 0.7, 0.6, 0.5, 0.4):
-            for gap in (gap_pref, gap_min, min(gap_min, round(0.2 * _K))):
+            for gap in (gap_pref, gap_min, min(gap_min, round((0.14 if vertical else 0.2) * _K))):
                 best = plan(k, wf, gap)
                 if best["ok"]:
                     break
@@ -288,6 +285,10 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     taken = {(s.lane, s.col) for s in steps}
     margin = (L - across) / 2
     obstacles = list(rect_of.values())
+    air = round(2 * PT)
+    for i in range(n + 1):  # the lane hairlines (and the head rule): a label never sits on one
+        obstacles.append(fr.rect(0, i * L - air, aw_total, 2 * air))
+    obstacles.append(fr.rect(hw - air, 0, 2 * air, n * L))
     area_box = Rect(fr.body.x, fr.body.y, fr.body.w, fr.body.h)
     label_jobs: list[tuple[str, list[tuple[float, float]], str, str | None]] = []
     for a, b in zip(order, order[1:], strict=False):
@@ -337,6 +338,7 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             rect_of[b.idx],
             dash,
         )
+        obstacles += PO.segment_rects(DK.polyline(pl))
         if a.label:
             label_jobs.append((name + " label", DK.polyline(pl), a.label, col if kind != "flow" else None))
     draw_steps()
@@ -348,7 +350,7 @@ def _swimlane(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         )
         lw_ = min(max(P["tw"], DK.legend_width(K, entries)), body.w)
         lx = min(max(x0, body.x), body.right - lw_)
-        DK.legend(c, K, lx, body.bottom - leg_h + round(6 * PT), lw_, entries)
+        DK.legend(c, K, lx, body.bottom - leg_h + round(6 * PT), lw_, entries, rule=False)
     ok = P["ok"]
     info.update(n=len(steps), lanes=n, dir="v" if vertical else "h", size=K.name, head=hs, fit=ok)
     if not ok:
@@ -429,7 +431,7 @@ def _sequence(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         free = area.h - hh - top_gap - round(0.2 * _K)
         u = free / sum(wts)
         u = min(u, 0.72 * _K)
-        u_min = max(round(K.label * 1.6 * PT) + round(16 * PT), round(0.36 * _K))
+        u_min = max(round(K.label * 1.6 * PT) + round(14 * PT), round(0.32 * _K))
         ok = u >= u_min and pitch >= hw * 0.9
         th_ = hh + top_gap + sum(wts) * u + round(0.2 * _K)
         return {

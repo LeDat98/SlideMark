@@ -246,9 +246,10 @@ def test_arch_is_compact_and_centred_not_stretched(tmp_path):
 def test_arch_columns_box_a_tier_with_a_group(tmp_path):
     md = "\n# T\n@arch dir=h\n## In\n- a\n- b\n## Out\n- c\n> a > c, b > c\n"
     _deck, s = make(tmp_path, md)
-    box = one(s, "Arch tier 1")  # two nodes: a dashed hairline container
-    ln = box._element.find(qn("p:spPr")).find(qn("a:ln"))
-    assert ln.find(qn("a:prstDash")).get("val") == "dash"
+    box = one(s, "Arch tier 1")  # two nodes: a light solid container (fill, hairline), not a dashed outline
+    sp = box._element.find(qn("p:spPr"))
+    assert sp.find(qn("a:solidFill")) is not None
+    assert sp.find(qn("a:ln")).find(qn("a:prstDash")) is None
     assert not named(s, "Arch tier 2")  # a lone node: caption only
 
 
@@ -362,10 +363,9 @@ def test_venn_neutral_circles_and_an_exact_lens_freeform(tmp_path):
     pts = sp.find(qn("a:custGeom")).findall(".//" + qn("a:pt"))
     assert len(pts) > 40  # many points: arcs, not a triangle
     ov = one(s, "Venn overlap")
-    assert [p.text.replace("\u00a0", " ") for p in ov.text_frame.paragraphs] == [
-        "Shippable",
-        "the sweet spot",
-    ]
+    lines = [p.text.replace("\u00a0", " ") for p in ov.text_frame.paragraphs]
+    assert lines[0] == "Shippable"
+    assert " ".join(lines[1:]) == "the sweet spot"  # the sublabel may take two balanced lines to fit the lens
     assert ov.text_frame.paragraphs[0].runs[0].font.bold
     nm = one(s, "Venn 1 name")
     assert [p.text.replace("\u00a0", " ") for p in nm.text_frame.paragraphs] == [

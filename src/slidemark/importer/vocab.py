@@ -447,7 +447,17 @@ def _arch(named: list[Item], data: SlideData, conns: list) -> FormFold | None:
         return _name(it)[len("Arch node ") :].strip()
 
     edges = []
-    glued = [cn for cn in conns if cn.st and cn.en]  # (a legend swatch is a free line: not an arrow)
+
+    def touches(it: Item, x: float, y: float) -> bool:  # an end on a port: on the node's edge, not glued
+        dx, dy = max(it.x - x, 0, x - (it.x + it.w)), max(it.y - y, 0, y - (it.y + it.h))
+        return dx * dx + dy * dy <= 45720**2
+
+    glued = [  # (a legend swatch is a free line that touches no node: not an arrow)
+        cn
+        for cn in conns
+        if (cn.st and cn.en)
+        or (any(touches(it, cn.x0, cn.y0) for it in nodes) and any(touches(it, cn.x1, cn.y1) for it in nodes))
+    ]
     for k, cn in enumerate(sorted(glued or conns, key=lambda c: c.order), 1):
         if not cn.arrow_end:
             continue
