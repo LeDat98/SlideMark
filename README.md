@@ -111,7 +111,7 @@ Toàn bộ thiết kế mà agent python-pptx tự viết (64 quyết định) n
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-11-08 · commit `7890a91` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-11-08 · commit `c74b733` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -405,6 +405,16 @@ Nguồn: [`examples/29-arch-venn.md`](examples/29-arch-venn.md)
 ![29-arch-venn slide 2](docs/gallery/29-arch-venn/slide-02.png)
 ![29-arch-venn slide 3](docs/gallery/29-arch-venn/slide-03.png)
 ![29-arch-venn slide 4](docs/gallery/29-arch-venn/slide-04.png)
+
+### 30-html-diagrams
+
+Nguồn: [`examples/30-html-diagrams.md`](examples/30-html-diagrams.md)
+
+![30-html-diagrams slide 1](docs/gallery/30-html-diagrams/slide-01.png)
+![30-html-diagrams slide 2](docs/gallery/30-html-diagrams/slide-02.png)
+![30-html-diagrams slide 3](docs/gallery/30-html-diagrams/slide-03.png)
+![30-html-diagrams slide 4](docs/gallery/30-html-diagrams/slide-04.png)
+![30-html-diagrams slide 5](docs/gallery/30-html-diagrams/slide-05.png)
 <!-- gallery:end -->
 
 ## Tài liệu

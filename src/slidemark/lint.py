@@ -607,8 +607,9 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
             )
             if el.attrs.get("measured") == "html":
                 # Chromium measured it, so it is the truth: only a gross miss (the runs at their written size
-                # cannot fit the height even with 25% slack) is reported, once per slide
-                if need > p.h * _HTML_OVERFLOW_TOL + _TOL and not html_spill:
+                # cannot fit the height even with 25% slack) is reported, once per slide; a one-line frame
+                # (`nowrap`) cannot wrap, and our measure misses letter-spacing (a tracked eyebrow label)
+                if not el.attrs.get("nowrap") and need > p.h * _HTML_OVERFLOW_TOL + _TOL and not html_spill:
                     html_spill.append(p)
             elif need > p.h * _OVERFLOW_TOL + _TOL:
                 warn(
