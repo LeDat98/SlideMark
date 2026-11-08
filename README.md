@@ -111,7 +111,7 @@ Toàn bộ thiết kế mà agent python-pptx tự viết (64 quyết định) n
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-11-08 · commit `c74b733` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-11-08 · commit `399b50a` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
