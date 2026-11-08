@@ -216,6 +216,13 @@ def pick_title(cands: list[Item], W: int) -> Item:
     return min(wide or group, key=lambda i: (i.y, i.x))
 
 
+def _eyebrow_attr(data: SlideData) -> str:
+    """` {eyebrow="TEXT"}` for the text box the renderer names `Eyebrow` (nothing when there is none)."""
+    it = next((i for i in data.items if i.kind == "text" and i.name.lower().strip() == "eyebrow"), None)
+    text = " ".join((it.text or "").split()).replace('"', "'").replace("}", ")") if it else ""
+    return f' {{eyebrow="{text}"}}' if text else ""
+
+
 def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
     """Set ``role`` on special items; returns (title item, pool of content items)."""
     W, H = deck.width, deck.height
@@ -232,6 +239,7 @@ def classify(data: SlideData, deck: DeckInfo) -> tuple[Item | None, list[Item]]:
             or it.has_slidenum
             or nm.startswith("band")
             or nm == "rule"
+            or nm == "eyebrow"  # the line above the title: read back as `{eyebrow=...}` on the title
             or nm == "stripe"  # `box.stripe` / `item.stripe`: the colour rides in the design tokens
             or _NUM_BADGE.fullmatch(nm)  # `@num`: the numbered circle of a box heading
             or nm == "background"
@@ -1354,13 +1362,15 @@ def _slide_bg(data: SlideData, deck: DeckInfo, found) -> tuple[str, bool] | None
 
 
 def _free_chunks(
-    seq: list[Block], loose: list[Item], lead_item: Item | None, deck: DeckInfo, out: Out
+    seq: list[Block], loose: list[Item], lead_item: Item | None, deck: DeckInfo, out: Out, eyebrow_h: int = 0
 ) -> list[tuple[str, list[str]]]:
     """``@free``: every block pinned (``x= y= w= h=`` from the body's corner), the loose shapes as
     attribute-only blocks, all in drawing order (an item's source position; made-up blocks come last)."""
     o = freeshape.origin(
         deck.margin_x, deck.body_top, deck.margin_y, lead_item.y + lead_item.h if lead_item else None
     )
+    if eyebrow_h and not deck.body_top and not lead_item:
+        o = (o[0], o[1] + eyebrow_h)  # the eyebrow line pushes the title (and the body) down
     names = {
         v: k
         for k, v in deck.colors.items()
@@ -1546,7 +1556,7 @@ def build_slide(
         out.shadow = deck.card_shadow
     lines: list[str] = []
     if title is not None:
-        lines.append("# " + _head(title.paras, out))
+        lines.append("# " + _head(title.paras, out) + _eyebrow_attr(data))
     else:
         lines.append("---")
         if not blocks and not any(by_role.values()) and not tokens:
@@ -1658,7 +1668,15 @@ def build_slide(
             starts[pos] = tk
             pos += len(g)
     if free_mode:
-        chunks = _free_chunks(seq, loose, lead_item=(by_role["lead"] or [None])[0], deck=deck, out=out)
+        eb = next((i for i in data.items if i.kind == "text" and i.name.lower().strip() == "eyebrow"), None)
+        chunks = _free_chunks(
+            seq,
+            loose,
+            lead_item=(by_role["lead"] or [None])[0],
+            deck=deck,
+            out=out,
+            eyebrow_h=eb.h if eb else 0,
+        )
         seq = []
     for i, b in enumerate(seq):
         if i in starts and i > 0:

@@ -221,12 +221,10 @@ def claim_fences(ent: dict[str, Any] | None, sd, n: int, diags: list[Diagnostic]
             left = Counter(need)
             hit = []
             for it in sd.items:
-                if it.kind not in ("text", "table") or it.ph in (
-                    "title",
-                    "ctrTitle",
-                    "subTitle",
-                    "ftr",
-                    "sldNum",
+                if (
+                    it.kind not in ("text", "table")
+                    or it.ph in ("title", "ctrTitle", "subTitle", "ftr", "sldNum")
+                    or it.name.lower().strip() == "eyebrow"  # the line above the title is slide chrome
                 ):
                     continue
                 w = _item_words(it)

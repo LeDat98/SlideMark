@@ -1095,10 +1095,19 @@ _DESIGN_CSS = (
 )
 
 
+# class names of the built-in html kit (`render/htmlkit.py`): a fence using one is designed, not a document
+_KIT_CLASS = re.compile(
+    r"""class\s*=\s*["'][^"']*\b(?:node|board|stack|legend|badge|tag|eyebrow|cat|bone|tick|card\s+(?:blocked|wait|done))\b""",
+    re.I,
+)
+
+
 def designed(text: str, root: Node) -> bool:
-    """True when the HTML carries its own design: a ``<style>`` or ``<svg>`` element, or an inline style
-    with a layout / box property (``_DESIGN_CSS``)."""
+    """True when the HTML carries its own design: a ``<style>`` or ``<svg>`` element, a class of the html kit,
+    or an inline style with a layout / box property (``_DESIGN_CSS``)."""
     if re.search(r"<\s*(style|svg)\b", text, re.I):  # (the tree builder drops <style>)
+        return True
+    if _KIT_CLASS.search(text):
         return True
     for n in find_all(root, lambda n: True, stop_at_match=False):
         if any(k.startswith(_DESIGN_CSS) for k in n.style()):

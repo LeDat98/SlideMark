@@ -44,6 +44,7 @@ num: on
 | `footer` | text | none |
 | `num` | `on` / `off`: slide numbers | `off` |
 | `density` | `normal` / `dense` (smaller default type for packed slides) | `normal` |
+| `eyebrow` | `section` / `off`: every content slide shows the title of the last section slide above its title ("Eyebrow" below) | `off` |
 | `sections` | `on` / `off`: section slides start PowerPoint sections named after their title | `on` |
 | `fit` | `on` / `off`: the per-slide fit lines of `slidemark build` (below; `--quiet` does the same for one run) | `on` |
 
@@ -897,6 +898,46 @@ The block is about 1180 x 490 px at 96 px per inch (16:9, with a title; 16px = 1
 `viewBox="0 0 1180 490"` and `width/height="100%"`. `var(--primary)` / `--accent` / `--muted` / `--border` /
 `--secondary` read the tokens in CSS and in SVG attributes (`fill="var(--accent)"`). `{zoom=1}` keeps the pixel
 sizes; the default `auto` enlarges short content and scales text and boxes by the same factor.
+
+## Eyebrow
+
+A small line above the slide title: theme mono face, UPPERCASE, tracked, muted, 10 pt (the editorial look: `ARCHITECTURE · DIAGRAM DESIGN` over a regular-weight serif title). The title and everything below it move down by the line's height.
+
+```markdown
+eyebrow: section            (header: every content slide shows its section's name; `off` = none, the default)
+
+# Checkout p99 latency {eyebrow="Fishbone · Diagram design"}   (own text; `{eyebrow=off}` removes it on one slide)
+```
+
+- Section name = the title of the last `section` slide (a title-only slide or `@section`) before the slide. A cover, a section or a blank slide never shows one (an `{eyebrow=}` there gives the info `eyebrow-ignored`).
+- Why an attribute on the title: no new line type, no lookup, ~6 tokens per slide (`{eyebrow="Architecture"}`); the deck-wide mode is ~3 tokens once, so most decks write it once.
+- Tokens (`style:`): `eyebrow.size=10` (pt) `eyebrow.color=muted` `eyebrow.font=mono` (`mono` / `heading` / `body` or a font name) `eyebrow.case=upper` (`upper` `lower` `capitalize` `none`) `eyebrow.spacing=1.8` (pt between letters, = 0.18 em at 10 pt). `{.eyebrow}` in a css fence styles it too. Presets: off everywhere (a preset may set `eyebrow: section` in its own YAML).
+- The text box is named `Eyebrow`, so the importer reads it back as `{eyebrow="TEXT"}` on the title (the text is stored uppercase in the file).
+- CJK text: the uppercase and the tracking do not change it; set `eyebrow.font=body` for a sans face.
+
+## HTML kit (classes for ```html fences)
+
+Every ` ```html ` fence page loads a small CSS kit before your own CSS (yours wins). Its values are the theme variables, so `colors:` / `fonts:` restyle it. All classes are optional; only these classes are styled, never bare elements, so your own `<svg fill=...>` attributes are untouched. Sizes are slide sizes (labels 12-14 px, names 17-19 px). A fence that uses `node` `board` `stack` `legend` `badge` `tag` `eyebrow` `cat` `bone` `tick` or `card blocked|wait|done` counts as designed (a lone `card` / `col` stays a structural card, as before). Adapted from diagram-design by Cathryn Lavery (MIT).
+
+| Class | One-line example |
+|---|---|
+| `.eyebrow` | mono UPPERCASE tracked muted line: `<div class="eyebrow">Legend</div>` (`.eyebrow.rule` adds a hairline under it) |
+| `.label` | arrow label on a paper knockout: `<span class="label">write</span>` |
+| `.tag` | tiny bordered mono UPPERCASE type tag: `<span class="tag">api</span>` |
+| `.sub` / `.meta` | mono muted sublabel (port, id): `<div class="sub">tcp :5432</div>` |
+| `.muted` | muted ink: `<span class="muted">optional</span>` |
+| `.node` | white hairline card, `<b>` = the name: `<div class="node"><span class="tag">api</span><b>Gateway</b><div class="sub">:443</div></div>` |
+| `.node.focal` `.store` `.external` `.input` `.optional` `.security` | the preset roles: `<div class="node focal"><b>Orders</b></div>` (1-2 `.focal` per slide) |
+| `.stack` | column: `<div class="stack"><div class="board">...</div><div class="legend">...</div></div>` (`.grow` takes the rest) |
+| `.board` `.col` `.badge` | kanban: `<div class="board"><div class="col"><header>Backlog <span class="badge">3</span></header>cards</div></div>`; `.badge.over` = over the WIP limit (accent) |
+| `.card` + `<b>` `.meta` | `<div class="card"><b>API rate limiting</b><div class="meta">AVA-201 · priya</div></div>`; `.card.blocked` dashed accent border + accent left bar, `.card.wait` dashed grey, `.card.done` greyed |
+| `.legend` | strip with a hairline: `<div class="legend"><i class="eyebrow">Legend</i><span><i class="node focal"></i>Focal</span></div>`; swatches are `.node` / `.card` / `.badge` / `.key` (a line: `.key.accent`, `.key.soft`) |
+| `.cat` | SVG text of a category tag (middle-anchored, bold UPPERCASE): `<rect class="node" x= y= width= height= rx="4"/><text class="cat" x= y=>People</text>` |
+| `.arrow` `.arrow.primary` `.arrow.link` `.arrow.return` | SVG lines with an arrowhead and no `<defs>`: muted, accent, link blue, dashed: `<path class="arrow primary" d="M0 5H90"/>` |
+| `.bone` `.bone.accent` `.bone.main` `.tick` `.dash` `.dot` `.dot.hot` | SVG helpers: a thin ink line (accent; with arrowhead), a hairline sub-bone tick, dashed, a filled dot (accent) |
+| `marker-end="url(#arrow)"` `#arrow-primary` `#arrow-link` | arrowheads (muted, accent, link) for your own `<line>` / `<path>` without writing `<defs>`; PowerPoint draws the head in the line colour |
+
+In `lang="ja"` / `zh` / `ko` content (put `lang="ja"` on the wrapper) the mono slots (`.eyebrow .label .tag .sub .meta .badge .cat`) switch to the body face, 15 px, no uppercase, no tracking. `text-transform: uppercase`, `letter-spacing`, dashed borders, a thicker `border-left` accent bar, pill radii and `stroke-dasharray` convert to native shapes and runs (the run text itself is uppercase). Example: `examples/30-html-diagrams.md` (fishbone, kanban, journey map, treemap).
 
 ## Editorial preset and diagram roles
 

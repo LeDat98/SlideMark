@@ -35,6 +35,8 @@ step does not apply (no visual risk to lint, or no syntax).
 | HTML subset → native, image fallback | x | x | x | x | x | | - | x |
 | HTML (Chromium-measured) → native shapes, `{render=native\|image}` | x | x | x | x | x | x | - | x |
 | Designed ```html fence under a title (svg / style / box CSS) → native, per-run sizes, `var(--token)` in SVG, `html-native-overflow` | x | x | x | x | x | x | - | - |
+| Eyebrow line above the title (`{eyebrow="..."}`, `eyebrow: section`, `eyebrow.size/.color/.font/.case/.spacing`; round trip) | x | x | x | x | x | x | - | x |
+| HTML kit for ```html fences (`.node .card .tag .label .eyebrow .sub .legend .board .col .badge`, `.arrow` / `.bone` svg lines, `url(#arrow-primary)` markers); converter: uppercase + letter-spacing in svg text, dashed svg lines, `border-left` accent bar | x | x | x | x | x | x | - | x |
 | Themes default / midnight / jp-business | x | x | - | x | x | x | x | - |
 | User templates `.pptx/.potx/.yaml` | x | x | x | x | x | x | - | - |
 | Build animations, transitions, sections, hidden | x | x | x | x | x | - | - | x |

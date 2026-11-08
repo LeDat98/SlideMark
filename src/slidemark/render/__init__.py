@@ -380,6 +380,8 @@ def _name(pl: Placed, counters: dict[str, int]) -> str:
             return "Footer"
         if field == "slide_number":
             return "Slide Number"
+        if field == "eyebrow":
+            return "Eyebrow"
         base = {"title": "Title", "subtitle": "Subtitle", "lead": "Lead", "conclusion": "Conclusion"}.get(
             el.role
         )
@@ -705,7 +707,8 @@ def _render_item0(rc: RenderCtx, s, pl: Placed, counters: dict[str, int], use_pl
             pl.font_scale,
             field=field,
             gap_em=float(gap) if isinstance(gap, (int, float)) else None,
-            box_w=None if field else pl.w,
+            # a one-line html text (Chromium measured it, `wrap="none"` below) gets no phrase breaks either
+            box_w=None if field or el.attrs.get("nowrap") else pl.w,
             squeeze=el.attrs.get("measured") != "html",  # Chromium fixed the line breaks: no tracking squeeze
         )
         if el.attrs.get("nowrap"):  # one line measured by Chromium: a wider substitute font must not wrap it

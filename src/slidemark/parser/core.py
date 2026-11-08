@@ -55,6 +55,7 @@ HEADER_KEYS = (
     "footer",
     "num",
     "density",
+    "eyebrow",
     "sections",
     "fit",
     "colors",
@@ -136,6 +137,8 @@ def _set_header(deck: Deck, key: str, value: str, ctx: Ctx, line: int) -> None:
             deck.slide_number = False
         else:
             ctx.warn(f"bad num '{value}'", line, "bad-header", "use num: on or num: off")
+    elif k == "eyebrow":  # `eyebrow: section` = the style token `eyebrow=section`
+        parse_token_line(deck, "style", f'eyebrow="{value}"', ctx, line)
     elif k == "density":
         if value in ("normal", "dense"):
             deck.density = value  # type: ignore[assignment]
@@ -771,6 +774,8 @@ def parse_slide(
                 setattr(slide, attr, val)
         if "hidden" in kv:
             slide.hidden = kv.pop("hidden") not in ("false", "0", "no", "off")
+        if "eyebrow" in kv:  # `# Title {eyebrow="Architecture"}`: the line above the title
+            slide.attrs["eyebrow"] = kv.pop("eyebrow")
         slide.id = title_attrs.id or slide.id
         slide.classes += [c for c in title_attrs.classes if c not in slide.classes]
         if slide.title is not None:
