@@ -817,3 +817,23 @@ difference is the card border line that stays under the shadow and the small `sh
   as default when the ring holds the heading); (4) `@steps` card heading growth without a wrap check (lane F note);
   (5) importer: stacked icon-list cards; (6) t4 token gate (diet round 2); (7) the gallery regression list in
   "Session stop" above is superseded by the wave-3 goldens, re-check 05 / 11 / 16 / 19 by eye.
+
+## Run 2026-11-08 (owner: the diagram-design editorial style as the default look)
+Owner request: adopt the style of github.com/cathrynlavery/diagram-design (MIT, Cathryn Lavery) as SlideMark's default
+look, brand colours still overridable per project. Owner agreed (2026-11-08) to both conflicts with the current guide:
+no shadows (borders in, shadows out), and a built-in preset counts as a decided frame when the brief names no brand.
+The style is ported as tokens and native forms, never as the skill's HTML / SVG output (an SVG would be an image).
+Fonts map to Office-safe faces (Georgia / Arial / Consolas, Yu Gothic for Japanese); sizes stay slide-sized.
+- **Step 1, wave 1 lane A (look):** `presets/editorial.yaml` (paper #F5F5F5, ink #2D3142, slate #4F5D75, accent
+  #BF4520 on 1-2 focal elements, hairline borders, no shadows, serif titles), role classes `.focal .store .external
+  .input .optional .security` in every preset, mermaid `:::class`, `examples/27-editorial.md` + golden.
+- **Step 1, wave 1 lane B (rules):** `design-none` accepts a built-in preset for colors / fonts / style (`sizes:` still
+  asked); role classes count as emphasis / values; info rule `diagram-budget` (> 9 nodes, > 12 edges, labels > 14
+  characters, > 2 accent shapes per slide), thresholds as tokens.
+- **Orchestrator:** SKILL.md design guide (borders not shadows, editorial default, brand override in one `colors:`
+  line, diagram budget), budget test, `skills/slidemark/SKILL.md` copy.
+- **Step 2:** on an experiment branch make `editorial` the default preset; one fresh-agent t5 run with that SKILL.md;
+  blind judge round 13 against the wave-3 arm and pptxgenjs at equal scale. Switch `main` only if the editorial arm
+  does not score below the wave-3 arm; then regenerate goldens and the gallery.
+- **Step 3, wave 2:** new native diagram forms from the diagram-design type list that SlideMark lacks:
+  `@arch` (typed nodes in tiers with elbow connectors), `@swimlane`, `@sequence`, `@venn`.
