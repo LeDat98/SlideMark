@@ -837,3 +837,14 @@ Fonts map to Office-safe faces (Georgia / Arial / Consolas, Yu Gothic for Japane
   does not score below the wave-3 arm; then regenerate goldens and the gallery.
 - **Step 3, wave 2:** new native diagram forms from the diagram-design type list that SlideMark lacks:
   `@arch` (typed nodes in tiers with elbow connectors), `@swimlane`, `@sequence`, `@venn`.
+- **Step 2 result (2026-11-08): the default stays `default`; `editorial` stays an opt-in preset.** Two fresh-agent t5
+  runs with editorial as the default (experiment branch, SKILL.md "keep the default look unless the brief names a
+  brand"): run 1 5 calls / 2 builds / 46 s / cost above start 99k, run 2 (preset tuned after round 13: white cards,
+  bold titles, ink takeaway bar, one arrow colour) 4 calls / 1 build / 35 s / 79k, both accepted (wave 3: 6 calls /
+  3 builds / 77 s / 120k). Blind judge rounds 13 and 14: pptxgenjs 4.0, wave 3 3.5, editorial 3.0 both times
+  (rank 3). Judge's reasons for editorial: the near-monochrome grey palette reads flat for a general business
+  audience, outlined white boxes on grey look like wireframes, no strong focal point; praised: one consistent dark
+  takeaway bar, the typographic numbered agenda, the accent spent only on meaning (2022, risk). The rule agreed
+  with the owner (switch only if not below the wave-3 arm) did not pass, so `main` keeps `default`; the cost gain
+  (fewer calls and builds when the agent need not pick a palette) is real and worth a later default that keeps the
+  editorial rules (borders, one accent, roles) with a warmer palette.
