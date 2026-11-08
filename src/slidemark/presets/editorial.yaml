@@ -1,4 +1,6 @@
 # Built-in preset "editorial": quiet paper, ink and one rust accent; hairline borders, no shadows.
+# Tuned after blind judge round 13 (2026-11-08): white cards on the paper, bold serif titles, an ink takeaway bar,
+# one arrow colour, and the accent kept off timeline dots and agenda numbers.
 # Palette and rules adapted from diagram-design by Cathryn Lavery (MIT).
 # The accent is for 1-2 focal elements per slide (`.focal`, `hl=`, the cover rule); series are ink and slate.
 colors:
@@ -9,7 +11,7 @@ colors:
   accent: "#BF4520"
   muted: "#5A6580"
   border: "#BFC0C0"
-  surface: "#ECECEC"
+  surface: "#FFFFFF"
   danger: "#9B3A2B"
   success: "#46704A"
   link: "#2E5AA8"
@@ -26,7 +28,7 @@ sizes:
   cover-title: 52
   cover-subtitle: 22
 title_color: primary
-title_bold: false
+title_bold: true
 heading_color: primary
 lead_color: secondary
 cover_band_h: 0
@@ -39,11 +41,11 @@ table_header_color: primary
 table_body_fill: bg
 table_hl_fill: accent
 table_hl_strength: 0.1
-conclusion_fill: surface
-conclusion_color: primary
-timeline_dot: accent
-agenda_num_color: accent
-icon_disc: surface
+conclusion_fill: primary
+conclusion_color: bg
+timeline_dot: secondary
+agenda_num_color: primary
+icon_disc: "#E3E5EA"
 icon_color: primary
 # series colors: ink first, then muted slate / sage / sand / clay / mauve (the accent is reserved for `hl=`)
 palette: [primary, "#5E7A9B", "#7C8F6F", "#B8915A", "#9C6B50", "#6E6479"]
@@ -54,14 +56,14 @@ render:
 classes:
   # hairline cards on the paper: white fill, #BFC0C0 border, small corners, no shadow
   card: {fill: "#FFFFFF", line: border, line_width: 0.75, radius: 4, padding: 10pt}
-  callout: {fill: surface, line: border, line_width: 0.75, radius: 4}
+  callout: {fill: "#ECECEC", line: border, line_width: 0.75, radius: 4}
   chart-note: {fill: "#FFFFFF", line: accent, line_width: 0.75, radius: 3, bold: false}
   node: {fill: "#FFFFFF", line: secondary, line_width: 1, radius: 4, padding: 6pt}
   decision: {fill: "#FFFFFF", line: secondary}
   kpi: {color: primary}
   rows: {fill: "#FFFFFF", line: border, line_width: 0.75}
   rows-num: {fill: primary, color: bg}
-  steps-arrow: {fill: "primary,secondary"}
+  steps-arrow: {fill: primary}
   # diagram roles: `## Postgres {.store}` or mermaid `A[DB]:::store`
   focal: {fill: "#BF452014", line: accent, line_width: 1.25}
   store: {fill: "#2D31420D", line: muted}

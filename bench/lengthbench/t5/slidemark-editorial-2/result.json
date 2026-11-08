@@ -1,0 +1,9 @@
+{
+ "arm": "slidemark skill-only, experiment: editorial as the default preset, tuned after judge round 13 (white cards, bold titles, ink takeaway bar, one arrow colour, accent off timeline dots)",
+ "model": "sonnet",
+ "calls": 4, "builds": 1, "image_looks": 1, "output_tokens": 4353,
+ "cost_units": 104725, "cost_above_start": 79338, "seconds": 35,
+ "accepted": true, "warnings_left": 1,
+ "agent_notes": "kept the default look (header: sizes, icon.disc, cover.art, footer, num); one advisory design-slide warning left; slides 5 and 8 sparse with small text, slide 14 bullets small",
+ "forms": {"1": "dark cover + network art", "2": "numbered agenda", "3": "nested", "4": "timeline + conclusion", "5": "3 icon cards", "6": "vs", "7": "steps", "8": "2x2 icon cards", "9": "cycle", "10": "flow disc + above node", "11": "table + conclusion", "12": "proscons", "13": "stairs + lead", "14": "steps head=arrow", "15": "dark cover + network art"}
+}
