@@ -177,13 +177,14 @@ def test_swimlane_labels_clear_of_lane_hairlines_and_nodes(tmp_path):
     _deck, prs = build_example(tmp_path, "28-swimlane-sequence.md")
     for i in (0, 1):
         sl = prs.slides[i]
-        rules = [rect(s) for s in sl.shapes if re.fullmatch(r"Lane \d+ rule( end)?", s.name)]
         nodes = [rect(s) for s in named(sl, r"Step \d+")]
         labels = label_rects(sl, r"Step \d+ next label")
         assert labels
         for name, r in labels:
-            for rl in rules:
-                assert not hit(r, Rect(rl.x, rl.y - 1, rl.w, rl.h + 2)), (name, "on a lane rule")
+            # a handover label may sit on a lane rule (the reference does: REVISE, DEPLOY TRIGGER) because it
+            # is a knockout of the slide colour; it never touches a node
+            shape = next(s for s in sl.shapes if s.name == name)
+            assert shape.fill.type is not None, (name, "no knockout")
             for n in nodes:
                 assert not hit(r, n), (name, "node")
 

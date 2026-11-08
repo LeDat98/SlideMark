@@ -3434,7 +3434,16 @@ def _eyebrow_text(theme: Theme, deck: Deck, slide: Slide, index: int) -> str:
         s = deck.slides[i]
         if _is_section(s, i) and s.title and s.title.paragraphs:
             return "".join(p.plain for p in s.title.paragraphs).strip()
-    return (deck.title or "").strip()  # no section yet (or none at all): the deck name
+    # no section yet (or none): the deck name when slide 1 is a cover (else deck.title is the first
+    # slide's title and would repeat or mislabel), then the footer; never the slide's own title
+    own_title = "".join(p.plain for p in slide.title.paragraphs).strip() if slide.title else ""
+    first = deck.slides[0] if deck.slides else None
+    cover = first is not None and (first.layout == "cover" or (first.layout is None and not first.elements))
+    name = (deck.title or "").strip() if cover else ""
+    for cand in (name, (deck.footer or "").strip()):
+        if cand and cand != own_title:
+            return cand
+    return ""
 
 
 def _cover_eyebrow_text(theme: Theme, deck: Deck, slide: Slide) -> str:

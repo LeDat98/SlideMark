@@ -431,7 +431,7 @@ def _sequence(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         free = area.h - hh - top_gap - round(0.2 * _K)
         u = free / sum(wts)
         u = min(u, 0.72 * _K)
-        u_min = max(round(K.label * 1.6 * PT) + round(14 * PT), round(0.32 * _K))
+        u_min = max(round(K.label * 1.6 * PT) + round(8 * PT), round(0.28 * _K))  # label + air
         ok = u >= u_min and pitch >= hw * 0.9
         th_ = hh + top_gap + sum(wts) * u + round(0.2 * _K)
         return {

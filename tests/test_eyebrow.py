@@ -145,3 +145,10 @@ def test_cover_takes_a_meta_eyebrow(tmp_path):
     # without an own text: the author (never the title itself)
     got = _eyebrows(tmp_path, "theme: editorial\nauthor: Platform team\n\n# Platform review\n\n# One\n- a\n")
     assert got[0] == "PLATFORM TEAM"
+
+
+def test_editorial_fallback_never_repeats_a_content_title(tmp_path):
+    # no cover: slide 1 is content, so its title is not the deck name; the footer stands in, never a title
+    got = _eyebrows(tmp_path, "theme: editorial\nfooter: Process review\n\n# Order flow\n- a\n\n# Two\n- b\n")
+    assert got == ["PROCESS REVIEW", "PROCESS REVIEW"]
+    assert _eyebrows(tmp_path, "theme: editorial\n\n# Order flow\n- a\n\n# Two\n- b\n") == [None, None]
