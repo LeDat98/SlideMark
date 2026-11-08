@@ -246,8 +246,13 @@ def test_store_and_input_are_distinct_in_every_preset():
 
 
 def test_store_and_input_swatches_differ_in_the_legend(tmp_path):
-    _deck, prs = build_example(tmp_path, "28-swimlane-sequence.md")
-    sl = prs.slides[3]
+    src = (
+        "theme: editorial\n\n# Flow\n@sequence\n"
+        "- [EXT] Client: Browser {.input}, [API] API: orders, [DB] DB: Postgres {.store}\n"
+        "- Client > API: POST\n- API > DB: insert\n- DB --> API: ok\n"
+    )
+    build(src, tmp_path / "s.pptx")
+    sl = Presentation(tmp_path / "s.pptx").slides[0]
     store = named(sl, "Legend store swatch")[0]
     inp = named(sl, "Legend input swatch")[0]
     assert str(store.fill.fore_color.rgb) != str(inp.fill.fore_color.rgb) or store.fill.fore_color.rgb is None

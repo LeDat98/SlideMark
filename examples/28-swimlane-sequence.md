@@ -44,7 +44,7 @@ footer: Process review
 > The edge answers from cache; on a miss it asks the origin, which renders once.
 @sequence
 @defaults
-- [EXT] Reader: Browser {.input}, [EDGE] Cloudflare: Pages · cache {.external}, [ORIG] Astro Origin: SSR · MDX {.focal}, [ASY] Analytics: Beacon · async {.optional}
+- [EXT] Reader: Browser {.external}, [EDGE] Cloudflare: Pages · cache {.external}, [ORIG] Astro Origin: SSR · MDX {.focal}, [ASY] Analytics: Beacon · async {.optional}
 - Reader ~> Cloudflare: GET /slug
 - Cloudflare > Astro Origin: cache miss
 - Astro Origin > Astro Origin: render MDX
@@ -56,7 +56,7 @@ footer: Process review
 > The order service answers the client after the database confirms; one retry is the headline.
 @sequence
 @defaults
-- [EXT] Client: Browser {.input}, [API] API: Order service, [IDP] Auth: JWT check {.external}, [DB] DB: Postgres {.store}
+- [EXT] Client: Browser {.external}, [API] API: Order service, [IDP] Auth: JWT check {.external}, [DB] DB: Postgres {.store}
 - Client > API: POST /order
 - API > Auth: verify token
 - Auth >> API: ok

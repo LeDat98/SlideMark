@@ -357,3 +357,6 @@ One line per item: `[area] problem → fix`. Newest at the bottom. Read before s
 - [layout] The eyebrow fallback must not use `deck.title` unless slide 1 is a cover (it is just the first slide's title otherwise); a title-only first slide has `layout=None` but renders as a cover.
 - [review] The reference itself puts knockout labels on lane rules (REVISE, DEPLOY TRIGGER): a reviewer's rule stricter than the reference is not a defect; check the reference before "fixing".
 - [worktree] An isolated lane's worktree starts from the remote default branch, not the orchestrator's local HEAD: push (or tell the lane to `git merge <local branch>` first) before spawning, or the lane redoes work on an old base and conflicts on merge (lane K, 2026-11-08).
+- [layout] Mermaid connectors lost their glue when later passes moved nodes (`src_box` / `dst_box` stale): glue by the arrow-end position (`render._find_site`); an unglued `bentConnector3` renders with the wrong orientation in LibreOffice.
+- [theme] A preset `palette` also colours diagram fills (venn): chart bar colours belong in `chart_series`; an rgba kit fill reads as solid through python-pptx `fore_color` (check `a:alpha`).
+- [examples] Role classes in an example are design decisions: four parallel cards with four roles read as decoration; one focal plus plain cards. Treemap areas must equal the data.

@@ -85,10 +85,10 @@ num: on
 @noemph defaults
 ```html
 <div style="position:relative;height:100%">
-  <div class="node" style="position:absolute;left:0;top:0;width:calc(55% - 4px);height:100%"><b>Payments 46%</b><div class="sub">card errors, refunds</div></div>
-  <div class="node" style="position:absolute;left:55%;top:0;width:45%;height:calc(58% - 4px)"><b>Delivery 27%</b><div class="sub">tracking, late parcels</div></div>
-  <div class="node" style="position:absolute;left:55%;top:58%;width:calc(24% - 4px);height:42%"><b>Accounts 15%</b><div class="sub">logins, resets</div></div>
-  <div class="node focal" style="position:absolute;left:79%;top:58%;width:21%;height:42%"><b>Fees 12%</b><div class="sub">up 3x</div></div>
+  <div class="node" style="position:absolute;left:0;top:0;width:calc(46% - 4px);height:100%"><b>Payments 46%</b><div class="sub">card errors, refunds</div></div>
+  <div class="node" style="position:absolute;left:46%;top:0;width:54%;height:calc(50% - 4px)"><b>Delivery 27%</b><div class="sub">tracking, late parcels</div></div>
+  <div class="node" style="position:absolute;left:46%;top:50%;width:calc(30% - 4px);height:50%"><b>Accounts 15%</b><div class="sub">logins, resets</div></div>
+  <div class="node focal" style="position:absolute;left:76%;top:50%;width:24%;height:50%"><b>Fees 12%</b><div class="sub">up 3x</div></div>
 </div>
 ```
 

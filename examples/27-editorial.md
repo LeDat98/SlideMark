@@ -16,7 +16,7 @@ Architecture, throughput and cost, Q3
 @arch
 @noemph defaults
 ## Client
-- [WEB] Web client: browser app {.input}
+- [WEB] Web client: browser app {.external}
 ## Platform
 - [API] API gateway: auth · limits {.focal}
 - [DB] Postgres: orders · users {.store}
@@ -61,11 +61,11 @@ Reports,Analytics,"$1,100",+1%
 > 読み取りと決済を分離し、繁忙期の遅延を半分にする
 @4
 @noemph defaults
-## 現状 {.external}
+## 現状
 - 注文処理は単一のDBに集中
 - 繁忙期の遅延 2.8秒
 - 夜間バッチが翌朝に残る
-## 課題 {.input}
+## 課題
 - 読み取りと書き込みが競合
 - 障害時の復旧に4時間
 - 監査ログが分散
@@ -73,7 +73,7 @@ Reports,Analytics,"$1,100",+1%
 - 読み取りレプリカを追加
 - 決済APIを分離
 - ログを一元化
-## 管理 {.optional}
+## 管理
 - 鍵はVaultで集中管理
 - 四半期ごとに権限を棚卸し
 ※ 出所：社内計測（2026年9月）。遅延は95パーセンタイル値。

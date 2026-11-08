@@ -111,7 +111,7 @@ Toàn bộ thiết kế mà agent python-pptx tự viết (64 quyết định) n
 ## Ảnh slide mẫu (cập nhật hằng ngày)
 
 <!-- gallery:start -->
-Cập nhật: 2026-11-08 · commit `399b50a` · tạo tự động bởi `scripts/gallery.py`.
+Cập nhật: 2026-11-08 · commit `2e1d1c6` · tạo tự động bởi `scripts/gallery.py`.
 
 ### Cơ bản: tiêu đề, danh sách, box, bảng, biểu đồ
 
@@ -396,6 +396,7 @@ Nguồn: [`examples/28-swimlane-sequence.md`](examples/28-swimlane-sequence.md)
 ![28-swimlane-sequence slide 2](docs/gallery/28-swimlane-sequence/slide-02.png)
 ![28-swimlane-sequence slide 3](docs/gallery/28-swimlane-sequence/slide-03.png)
 ![28-swimlane-sequence slide 4](docs/gallery/28-swimlane-sequence/slide-04.png)
+![28-swimlane-sequence slide 5](docs/gallery/28-swimlane-sequence/slide-05.png)
 
 ### 29-arch-venn
 

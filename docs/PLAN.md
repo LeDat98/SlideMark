@@ -857,9 +857,17 @@ neutral venn with a solid ink overlap, activation bars, kanban badges / meta lin
 sub-bones. Process faults: lanes built forms from text specs without the reference; QA was "0 warnings"; the preset
 was tuned toward a business-deck judge. Owner order: 4, 1, 2, 3.
 - [x] 4. Editorial preset back to the source (regular-weight titles, paper-2 takeaway bar).
-- [ ] 1. Lane F: `@arch @swimlane @sequence @venn` to the reference (anatomy, arrow kinds `> => ~> -->`, labels,
+- [x] 1. Lane F: `@arch @swimlane @sequence @venn` to the reference (anatomy, arrow kinds `> => ~> -->`, labels,
   legend, density, activation bars, lens overlap), `layout/diagramkit.py`.
-- [ ] 2. Lane G: eyebrow line (auto from `@section`), html CSS kit (`.node .tag .sub .label .legend .board .col
+- [x] 2. Lane G: eyebrow line (auto from `@section`), html CSS kit (`.node .tag .sub .label .legend .board .col
   .badge .card .arrow` + global markers), example 30 rewritten with the kit.
-- [ ] 3. Reference QA: each form rendered next to its reference; a UI/UX checklist review
+- [x] 3. Reference QA: each form rendered next to its reference; a UI/UX checklist review
   (`bench/ui_review_prompt.md`), fixes until only fonts and the 16:9 frame differ; SKILL.md lines.
+- **Status (2026-11-08, evening):** done in order 4, 1, 2, 3. Three blind UI/UX rounds against the reference
+  (`bench/ui_review.jsonl`) with two fix waves between them (lanes H + I, then J + K). Round 3: architecture, venn,
+  swimlane, sequence, fishbone, kanban at 4-4.5 (were 2-4); cover 4; generic boxes 3.5; flowchart, table, journey 3;
+  treemap and chart 2 (treemap areas fixed after the round). Leftovers for the next wave: vertical balance (no empty
+  band under the title, >= 48px under the subtitle), chart labels in the small mono style with the note anchored to
+  the bar, flowchart diamond at node scale with branch labels, table header in mono capitals, venn focal name at
+  least the set-name size, legend samples matching the drawn style, arrows entering from top / bottom with >= 24px
+  stubs, single-tier `@arch`.

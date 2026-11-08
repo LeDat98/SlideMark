@@ -316,16 +316,9 @@ def test_sequence_actors_are_filled_by_their_role(tmp_path):
         ln = s._element.spPr.find(qn("a:ln"))
         return ln is not None and ln.find(qn("a:prstDash")) is not None
 
-    assert (
-        len(
-            {
-                fill(heads["Seq Reader head"]),
-                fill(heads["Seq Cloudflare head"]),
-                fill(heads["Seq Astro Origin head"]),
-            }
-        )
-        == 3
-    )
+    # Reader and Cloudflare are both `.external` (one look per role), Astro Origin is the focal actor
+    assert fill(heads["Seq Reader head"]) == fill(heads["Seq Cloudflare head"])
+    assert fill(heads["Seq Astro Origin head"]) != fill(heads["Seq Reader head"])
     assert dash(heads["Seq Analytics head"]) and not dash(heads["Seq Reader head"])
 
 
