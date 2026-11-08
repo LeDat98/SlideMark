@@ -78,6 +78,7 @@ def _page(source: str, theme: Theme) -> str:
         f"<style>{_tokens(theme)}"
         f"*{{box-sizing:border-box}}html,body{{margin:0;padding:0;height:100%;background:#{bg};}}"
         f"body{{font-family:{_family(theme)};font-size:{size:.1f}px;color:#{fg};overflow:hidden}}"
+        "body>svg{display:block}"  # a top-level svg is a block: no inline baseline gap (false overflow)
         f"</style></head><body>{source}</body></html>"
     )
 

@@ -69,9 +69,7 @@ short of a form, one emphasis (or `@noemph`), values (or `@defaults`). Advisory.
   `theme: editorial` (paper, ink, slate, one tangerine accent, serif titles, hairline borders) ·
   navy + teal + amber `colors: primary=#0B2A3C secondary=#1B8A8F accent=#F2A33A surface=#EEF4F6` ·
   forest + moss + cream `primary=#1E3A2F secondary=#6B8F71 accent=#D9A441 bg=#FBF8F1` ·
-  charcoal + coral `primary=#2B2D42 secondary=#8D99AE accent=#EF6F4C surface=#F4F5F7` ·
-  plum + rose `primary=#4A1D3F secondary=#9A5B82 accent=#E8B44A surface=#F7F1F4` ·
-  slate + lime `primary=#1F2A37 secondary=#5B6B7F accent=#A4D65E surface=#F1F4F7`.
+  charcoal + coral `primary=#2B2D42 secondary=#8D99AE accent=#EF6F4C surface=#F4F5F7`.
 
 **Every slide carries a visual element**: a chart, a table, icons, a diagram or shaped blocks. A slide of only
 text is a defect, not a style. Forms that give a slide its shape (see "Composition forms"):
@@ -88,8 +86,8 @@ text is a defect, not a style. Forms that give a slide its shape (see "Compositi
 slide title 36–44pt bold · box headings 20–24pt bold · body 14–16pt · captions 10–12pt in `muted` · slide
 margin ≥ 0.5in (`margin=0.6in`) · one gap between blocks, kept throughout. Safe fonts that render at the
 measured width everywhere: Arial, Calibri, Cambria, Georgia, Times New Roman, Courier New; pair a serif heading
-with a sans body (`fonts: heading="Cambria" body="Calibri"`) for contrast. Not Aptos (older Office has no
-equivalent fallback). Japanese: Meiryo or Yu Gothic.
+with a sans body (`fonts: heading="Cambria" body="Calibri"`) for contrast.
+Japanese: Meiryo or Yu Gothic.
 
 **Never**: a rule under the slide title (`title.rule`, `heading.rule`) and decorative bars or stripes
 (`top.bar`, `bottom.bar`, `box.stripe`, `kpi.stripe`, `item.border-left`, a vertical band beside the content).
@@ -365,6 +363,9 @@ category or a series). Numbers may be
 - A ` ```css ` fence (header = whole deck, in a slide = that slide) styles `slide h1 h2 p li .lead
   .conclusion .footnote .box .kpi table th td tr code img .chart` and your `{.class}`: colours, gradients,
   borders, radius, shadows, fonts, spacing, `transform: rotate()`.
+- A ` ```html ` fence under a title draws what syntax cannot (fishbone, kanban, journey map, treemap, sankey):
+  boxes with inline CSS and `<svg>` lines / `marker-end` arrows become editable shapes. The block is about
+  1180 x 490 px (16px = 12pt; `<svg viewBox="0 0 1180 490">`). Same rules: hairline borders, one accent.
 - `@html` + one ` ```html ` fence = a slide written in HTML/CSS, converted to editable shapes (`var(--primary)`
   reads your tokens).
 

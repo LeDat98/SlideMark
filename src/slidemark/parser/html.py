@@ -1074,11 +1074,47 @@ def _parse_html(text: str, deck: Deck) -> None:
         deck.title = deck.slides[0].title.paragraphs[0].plain
 
 
+# CSS that states a design (place, size, box look): such a fence keeps its own layout and goes to the
+# Chromium-measured native converter (``htmlnative``) instead of the structural subset, which keeps only text
+# and structure. Colour, font, spacing and grid / flex columns alone still read as plain structure
+# (`display:grid` of `.card` divs becomes themed SlideMark cards).
+_DESIGN_CSS = (
+    "position",
+    "background",
+    "border",
+    "width",
+    "height",
+    "transform",
+    "box-shadow",
+    "clip-path",
+    "top",
+    "left",
+    "right",
+    "bottom",
+    "inset",
+)
+
+
+def designed(text: str, root: Node) -> bool:
+    """True when the HTML carries its own design: a ``<style>`` or ``<svg>`` element, or an inline style
+    with a layout / box property (``_DESIGN_CSS``)."""
+    if re.search(r"<\s*(style|svg)\b", text, re.I):  # (the tree builder drops <style>)
+        return True
+    for n in find_all(root, lambda n: True, stop_at_match=False):
+        if any(k.startswith(_DESIGN_CSS) for k in n.style()):
+            return True
+    return False
+
+
 def html_blocks(text: str, ctx: Ctx, line: int | None) -> list[Any] | None:
-    """Blocks for the body of a ```html fence, or ``None`` (with an ``html-fallback`` diagnostic)."""
+    """Blocks for the body of a ```html fence, or ``None``: a designed fence (``designed``) silently, anything
+    else the structural subset cannot read with an ``html-fallback`` diagnostic. ``None`` = keep the fence as
+    raw HTML, which the renderer converts to native shapes measured by Chromium (image only without it)."""
     local: list[Any] = []
     try:
         root = build_tree(text)
+        if designed(text, root):
+            return None
         conv = _Conv(Ctx(local), base_line=line or 0, slide_grid=False)
         conv.ctx.slide = ctx.slide
         sink = _Sink()
