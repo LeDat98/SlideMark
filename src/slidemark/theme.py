@@ -129,6 +129,7 @@ class LayoutTokens(BaseModel):
     )
     cjk_phrase_break: bool = True  # CJK paragraphs wrap at phrase boundaries (soft breaks, render only)
     cjk_phrase_margin: float = 0.02  # ... and every phrase line must fit this much narrower
+    cjk_phrase_lines: bool = False  # ... the layout reserves the lines that phrase packing needs (maybe +1)
     bind_margin: float = 0.12  # a no-break binding wider than a line minus this share is undone (render)
     cjk_phrase_slack: float = 0.07  # ... also when a viewer with this much more room would break inside one
     cjk_unit_join: bool = True  # Japanese numbers stay with their units (38万円, ▲8%): U+2060 joiners
@@ -163,6 +164,7 @@ class LayoutTokens(BaseModel):
     tree_slack: float = 1.15  # org-tree boxes are at most this much taller than their content
     html_footer: bool = False  # True: the deck `footer:` and `num:` are drawn on `@html` slides too
     html_fit: bool = False  # True: a lone HTML block fills the body height (stretch, else center)
+    html_hug: bool = False  # True: the html kit's boards / columns size to their content, the block centres
     html_zoom_max: float = 1.5  # a short HTML block renders zoomed up to this factor (1 = off)
     roomy_left: float = 0.25  # share of the body left empty that triggers the roomy pass
     roomy_grow: float = 1.2  # the roomy pass grows box / tree text by up to this factor more
@@ -710,6 +712,8 @@ class RenderTokens(BaseModel):
     chart_pie_line_width: float = 0.0  # ... and width in pt (0 = the PowerPoint default)
     chart_hl: str = "accent"  # `hl=` points: fill (bar / column / pie / waterfall), outline, line marker
     chart_hl_line: float = 2.25  # pt, outline of an `hl=` bar in a multi-series chart
+    chart_hl_first: bool = False  # True: that outline marks the first series' bar only (not every series)
+    chart_title_bold: bool = True  # `chart_title_bold=off`: a quiet regular-weight chart title
     chart_hl_marker: int = 11  # pt, marker of an `hl=` point in a line chart
     chart_note_size_add: float = 1.0  # pt, a `note=` is this much larger than the data labels
     chart_note_line_width: float = 1.0  # pt, the pointer of a `note=`
@@ -841,6 +845,8 @@ class Theme(Forms6Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
     # named styles used by `{.name}`, e.g. "card", "callout", "kpi"; tokens may add new ones (`hero.fill=`)
     classes: dict[str, Style] = Field(default_factory=_base_classes)
     heading_color: str = "fg"
+    heading_font: str = "heading"  # `heading.font=body|mono|heading|<name>`: face of box / card headings
+    heading_bold: bool = True  # `heading.bold=off`: box headings in the regular weight
     title_color: str = "fg"
     title_bold: bool = True  # `title.bold=off`: slide titles in the regular weight (serif display faces)
     eyebrow: str | None = None  # `eyebrow: section`: every slide shows its section's name above the title
@@ -969,6 +975,10 @@ class Theme(Forms6Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
     table_header_color: str = "fg"
     table_body_fill: str = "bg"
     table_border: str = "border"
+    table_rules: Literal["grid", "rows"] = (
+        "grid"  # `rows`: hairlines between rows only (no vertical lines) ...
+    )
+    table_head_rule: str = "primary"  # ... and a 1 pt rule of this color under the header
     table_zebra_fill: str | None = None  # alternate body row fill for `.zebra` tables (None = derived)
     # rows emphasised with `hl=` on a table: `table_hl_strength` of this color mixed into the body fill
     # (1 = exactly it; none = bold only), bold text, and an ink (None = the cell's own, made readable)

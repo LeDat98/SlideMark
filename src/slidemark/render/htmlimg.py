@@ -65,6 +65,13 @@ def _tokens(theme: Theme) -> str:
             parts.append(
                 f"--{key}-rgb:{int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)}"
             )  # rgba(var(--x-rgb), .1)
+    card = theme.classes.get("card")
+    if (
+        card is not None and card.fill and (card.fill.startswith("#") or card.fill in theme.colors)
+    ):  # the kit's `.card` / `.node` fill
+        parts.append(f"--card-fill:#{hex6(theme, card.fill)}")
+    if theme.layout.html_hug:  # kit boards and columns size to their content; the block is centred
+        parts.append("--board-flex:0 1 auto;--stack-justify:center")
     parts.append(f"--font-heading:{_stack(theme.fonts.heading, theme.fonts.ea)}")
     parts.append(f"--font-body:{_family(theme)}")
     parts.append(f"--font-mono:{_stack(theme.fonts.mono)}".replace(", sans-serif", ", monospace"))
