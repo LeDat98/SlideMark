@@ -257,7 +257,7 @@ def _role_style0(ctx: _Ctx, role: str, cover: bool = False) -> Style:
         valign="top",
     )
     if role == "title":
-        st = st.merged(fast_style(bold=True, color=t.title_color, valign="middle"))
+        st = st.merged(fast_style(bold=t.title_bold, color=t.title_color, valign="middle"))
     elif role == "heading":
         st = st.merged(fast_style(bold=True, color=t.heading_color))
     elif role == "subtitle":
@@ -2520,7 +2520,7 @@ def _emit_links(ctx: _Ctx, links: list[Link], rects: dict[int, Rect]) -> None:
         ctx.emit(
             Shape(shape="line", attrs=attrs),
             rect,
-            fast_style(line="primary", line_width=ctx.theme.render.connector_width),
+            fast_style(line=ctx.theme.render.connector_color, line_width=ctx.theme.render.connector_width),
         )
 
 

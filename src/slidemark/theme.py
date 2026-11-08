@@ -640,6 +640,9 @@ class RenderTokens(BaseModel):
 
     line_width: float = 0.75  # pt, a bordered shape without its own line width
     connector_width: float = 1.5  # pt, connectors / arrows between blocks
+    connector_color: str = (
+        "primary"  # ... their colour (a colour name or hex; `render.connector_color=muted`)
+    )
     chart_line_width: float = 2.25  # pt, line chart series
     chart_title_scale: float = 1.2  # chart title size / chart text size
     chart_text_ratio: float = 0.034  # big chart text >= this x the frame shorter side (0 = off) ...
@@ -836,6 +839,7 @@ class Theme(Forms4Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
     classes: dict[str, Style] = Field(default_factory=_base_classes)
     heading_color: str = "fg"
     title_color: str = "fg"
+    title_bold: bool = True  # `title.bold=off`: slide titles in the regular weight (serif display faces)
     lead_color: str = "fg"
     title_band: str | None = None  # full-width band color behind the slide title (None = no band)
     title_band_color: str = "bg"  # title text color when a band is drawn

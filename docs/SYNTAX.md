@@ -37,7 +37,7 @@ num: on
 
 | Key | Values | Default |
 |---|---|---|
-| `theme` | a preset (`default`, `midnight`, `jp-business`), `none` (bare schema defaults), or a path to `.yaml`/`.potx`/`.pptx` | `default` |
+| `theme` | a preset (`default`, `midnight`, `jp-business`, `editorial`), `none` (bare schema defaults), or a path to `.yaml`/`.potx`/`.pptx` | `default` |
 | `size` | `16:9`, `4:3`, `A4`, `16:10`, `<w>x<h>` (e.g. `10inx7.5in`) | `16:9` |
 | `lang` | `ja`, `vi`, `en`, ... (fonts, line breaking) | auto |
 | `title`, `author` | text | first slide title |
@@ -882,12 +882,27 @@ from `<style>`), is laid out by Chromium as a whole-slide HTML slide. `data-rend
 `<html data-slidemark="native">` forces that for one slide or all. Theme tokens are CSS custom properties in every HTML slide (`var(--primary)`, `var(--font-body)`,
 `var(--size-body)`), so HTML slides and SlideMark slides of one deck share one design.
 
+## Editorial preset and diagram roles
+
+`theme: editorial` is a quiet look (paper `#F5F5F5`, ink `#2D3142`, one rust accent `#BF4520`; white hairline cards, no shadows, no title band, regular-weight Georgia titles, ink-led chart series, slate 1 pt connectors). Palette and rules adapted from diagram-design by Cathryn Lavery (MIT). Everything in it is a token: `colors:` `fonts:` `sizes:` `style:` override any value; `title.bold=off` (field `title_bold`) gives regular titles to any theme, `render.connector_color=muted` colours every `a>b` / mermaid connector (default `primary`).
+
+Role classes, defined in every built-in preset in that preset's own colours (tints are alpha fills): `{.focal}` accent tint + accent line (the one highlighted node), `{.store}` faint ink fill + muted line (databases, files), `{.external}` fainter fill + light line (third parties), `{.input}` secondary tint + muted line, `{.optional}` dashed muted line (`line_dash`), `{.security}` accent tint + dashed accent line.
+
+```markdown
+@3 a>b b>c
+## Client {.input}
+## API {.focal}
+## Postgres {.store}
+```
+
+Mermaid: `A[Orders DB]:::store`. A typo (`:::focl`) is an `unknown-attr` warning with a did-you-mean; a class nobody defines is a plain class and draws nothing extra.
+
 ## Other fences
 
 | Fence | Result |
 |---|---|
 | ` ```python ` or any other language | code with native syntax highlighting |
-| ` ```mermaid ` | diagram |
+| ` ```mermaid ` | diagram; `A[DB]:::store` or `class A,B store` gives a node a SlideMark class (role classes above, or your own `style: store.fill=...`) |
 | ` ```math ` | native, editable equation (LaTeX subset: `\frac`, `^`, `_`, `\sqrt`, `\sum`, `\int`, Greek, `\times`, ...) |
 | ` ```html ` | HTML/CSS: structural subset, else laid out by Chromium into native shapes/text (CSS grid, flex, cards), else an image; `{render=native\|image}` forces one (canvas, svg, gradients, transforms stay images) |
 

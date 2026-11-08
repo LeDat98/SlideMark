@@ -10,14 +10,17 @@ import re
 from dataclasses import dataclass, field
 
 from ..ir import Container, Link, Paragraph, Raw, Run, Text
-from .ctx import Ctx
+from .attrs import KNOWN_CLASSES
+from .ctx import Ctx, closest
 
 MAX_NODES = 26
 HEADER_RE = re.compile(r"^(?:graph|flowchart)(?:[ \t]+(TD|TB|LR|RL|BT))?[ \t]*$", re.I)
 IGNORED_RE = re.compile(
     r"^(subgraph|end|classDef|class|style|linkStyle|click|direction|accTitle|accDescr|title)\b", re.I
 )
+CLASS_RE = re.compile(r"^class[ \t]+([^ \t]+)[ \t]+([\w-]+)[ \t]*$", re.I)
 ID_RE = re.compile(r"[\w\u0080-\U0010ffff]+")
+NAME_RE = re.compile(r"[\w-]+")
 OPENERS = [
     ("((", "))", "round"),
     ("([", "])", "round"),
@@ -47,6 +50,12 @@ class _Graph:
     text: dict[str, str] = field(default_factory=dict)
     kind: dict[str, str] = field(default_factory=dict)
     edges: list[tuple[str, str, bool, str | None]] = field(default_factory=list)
+    cls: dict[str, list[str]] = field(default_factory=dict)  # node id -> SlideMark classes (`A:::store`)
+
+    def add_class(self, nid: str, name: str) -> None:
+        got = self.cls.setdefault(nid, [])
+        if name not in got:
+            got.append(name)
 
     def node(self, nid: str, text: str | None, kind: str) -> None:
         if nid not in self.text:
@@ -128,10 +137,13 @@ class _Stmt:
                     text, self.i = self.s[j:e], e + len(cl)
                 kind = k
                 break
+        m2 = None
         if self.s.startswith(":::", self.i):
-            m2 = ID_RE.match(self.s, self.i + 3)
+            m2 = NAME_RE.match(self.s, self.i + 3)
             self.i = m2.end() if m2 else self.i + 3
         self.g.node(nid, _clean(text) or nid if text is not None else None, kind)
+        if m2:
+            self.g.add_class(nid, m2.group(0))
         return nid
 
     def group(self) -> list[str]:
@@ -201,6 +213,12 @@ def _parse(source: str) -> tuple[_Graph, bool]:
     g = _Graph(direction=(m.group(1) or "TD").upper().replace("TB", "TD"))
     ignored = False
     for s in stmts[1:]:
+        cm = CLASS_RE.match(s)
+        if cm:  # `class A,B store`: the same as `A:::store`
+            for nid in cm.group(1).split(","):
+                if nid in g.text:
+                    g.add_class(nid, cm.group(2))
+            continue
         if IGNORED_RE.match(s):
             ignored = True
             continue
@@ -327,6 +345,12 @@ def build_mermaid(source: str, ctx: Ctx, line: int | None) -> Container | Raw:
     children = []
     for n in order:
         classes = ["node"]
+        for name in g.cls.get(n, []):
+            if name not in classes:
+                classes.append(name)
+            near = closest(name, KNOWN_CLASSES, 0.75)
+            if near and name not in KNOWN_CLASSES:
+                ctx.warn(f"unknown class ':::{name}'", line, "unknown-attr", f"did you mean ':::{near}'?")
         if g.kind[n] in ("decision", "round"):
             classes.append(g.kind[n])
         paras = [Paragraph(runs=[Run(text=t)]) for t in g.text[n].split("\n") if t.strip()]

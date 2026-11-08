@@ -851,7 +851,7 @@ def _connector(rc: RenderCtx, slide, pl: Placed, name: str) -> None:
         _elbow_geometry(cx, el.attrs, pl, fh, fv)
     _glue(slide, cx, el.attrs, fh, fv)
     st = pl.style
-    cx.line.color.rgb = rgb(rc.theme, st.line or "primary")
+    cx.line.color.rgb = rgb(rc.theme, st.line or rc.theme.render.connector_color)
     cx.line.width = Pt(st.line_width if st.line_width is not None else rc.theme.render.connector_width)
     if "line_alpha" in el.attrs:  # `cover.art`: a thin line that is only partly opaque
         set_line_alpha(cx.line, el.attrs["line_alpha"])

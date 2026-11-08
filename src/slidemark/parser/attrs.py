@@ -144,6 +144,12 @@ KNOWN_CLASSES = (
     "dense",
     "dark",
     "light",
+    "focal",  # diagram role classes (every preset styles them)
+    "store",
+    "external",
+    "input",
+    "optional",
+    "security",
 )
 _BOX = ("x", "y", "w", "h")
 _ALIGN = ("left", "center", "right", "justify")
