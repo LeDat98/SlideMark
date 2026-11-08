@@ -49,6 +49,27 @@ icon_disc: "#E3E5EA"
 icon_color: primary
 # series colors: ink first, then muted slate / sage / sand / clay / mauve (the accent is reserved for `hl=`)
 palette: [primary, "#5E7A9B", "#7C8F6F", "#B8915A", "#9C6B50", "#6E6479"]
+# diagram kit (@arch @swimlane @sequence @venn): fixed type scale, hairline cards, mono capitals for tags,
+# arrow labels and captions; arrows slate / accent (primary) / link blue (HTTP) / dashed (return)
+diagram_name_size: 13
+diagram_sub_size: 9
+diagram_tag_size: 8
+diagram_label_size: 8
+diagram_tag_track: 0.18
+diagram_label_track: 0.08
+diagram_legend: auto
+diagram_arrow_primary: accent
+diagram_arrow_http: link
+diagram_return_dash: dash
+arch_tier_look: auto
+sequence_lifeline: border
+diagram_act_fill: "#E3E5EA"
+diagram_act_line: muted
+venn_fill: primary
+venn_alpha: 0.06
+venn_line: secondary
+venn_line_w: 0.9pt
+venn_core: primary
 render:
   connector_color: secondary
   connector_width: 1

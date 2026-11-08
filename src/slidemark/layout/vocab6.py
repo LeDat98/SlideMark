@@ -20,6 +20,7 @@ from typing import Any
 from .. import forms, forms6
 from ..ir import Link, Paragraph, Run, Shape, Slide, Text, fast_style
 from ..units import EMU_PER_PT
+from . import diagramkit as DK
 from . import measure
 from . import vocab as V
 from .grid import Rect
@@ -49,7 +50,7 @@ def _class_style(th, classes: list[str]):
 
 class _Plan:
     __slots__ = (
-        "size",
+        "k",
         "w",
         "h",
         "rows",
@@ -58,11 +59,13 @@ class _Plan:
         "gt",
         "pad",
         "lw",
-        "cap",
         "tier_h",
-        "total",
+        "tier_w",
+        "total_w",
+        "total_h",
         "ok",
         "capn",
+        "labw",
     )
 
     def __init__(self, **kw: Any) -> None:
@@ -71,227 +74,223 @@ class _Plan:
 
 
 def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
-    th, lt = c.theme, c.lt
+    th = c.theme
     A = forms6.parse_arch(slide)
     if A is None or not A.nodes:
         return False
     cols = forms.words(slide.attrs, "arch", "dir") == "h"
     edges, _bad = forms6.parse_edges(forms6.edge_text(slide), A)
     n = len(A.tiers)
-    base, _ratio, hi, lo, pinned = V._sizes(c, slide)
-    gn = V._emu(th.arch_node_gap)
+    K0 = DK.look(c, slide)
+    pinned = bool(forms.num(slide.attrs, "size"))
     pad = V._emu(th.arch_tier_pad)
-    labelled = [e.label for e in edges if e.label]
+    labelled = [e for e in edges if e.label]
+    own_band = bool(th.arch_tier_fill and th.arch_tier_fill != "none") or bool(th.arch_tier_line)
+    want = th.arch_tier_look
+    if want == "auto" and own_band:
+        want = "band"
 
-    def node_paras(node, s: float) -> list[Paragraph]:
-        out = [Paragraph(runs=[Run(text=node.name)])]
-        if node.sub:
-            st = fast_style(font_size=round(s * th.arch_sub_size, 2), color=th.arch_sub_color)
-            out.append(Paragraph(runs=[Run(text=node.sub)], style=st))
-        return out
+    def look_of(i: int) -> str:  # how tier i is drawn: caption | box | band
+        if want != "auto":
+            return want
+        return "box" if cols and len(A.tiers[i][1]) >= 2 else "caption"
 
-    def node_style(s: float, classes: list[str] | None = None):
-        st = V._text_style(c, s, align="center", valign="middle")
-        st = st.merged(_class_style(th, ["node", *(classes or [])]))
-        return st.merged(fast_style(font_size=s))
+    looks = [look_of(i) for i in range(n)]
+    has_title = [bool(A.tiers[i][0]) for i in range(n)]
+    tag_h = [0]
 
-    def plan(s: float) -> _Plan:
-        sub = s * th.arch_sub_size
-        same = [e for e in edges if e.label and A.nodes[e.src].tier == A.nodes[e.dst].tier]
-        gn_p = gn
+    def plan(k: float) -> _Plan:
+        K = K0.scaled(k)
+        tag_h[0] = DK.tag_size(K, "X")[1]
+        cap_h = round(K.label * 1.6 * DK.PT)
+        gn = V._emu(th.arch_node_gap)
+        same = [e for e in labelled if A.nodes[e.src].tier == A.nodes[e.dst].tier]
+        labw = max(
+            (DK.small_w(K, e.label or "", K.label, th.diagram_label_track) for e in labelled), default=0
+        )
         if same:  # a label on an arrow between neighbours of a tier needs its width between the nodes
-            gn_p = max(gn, max(_tw(e.label or "", s * 0.75) for e in same) + round(0.3 * _IN))
-        cap = th.arch_tier_label_size or max(round(s * 0.75, 1), 9.0)
-        gt = V._emu(th.arch_gap) if th.arch_gap else 0
-        if not gt:  # the arrows run in this gap: room for a label (rows) or its width (columns)
-            if cols:
-                lab = max((_tw(x, s * 0.75) for x in labelled), default=0)
-                gt = max(round(0.45 * _IN), lab + round(0.3 * _IN)) if labelled else round(0.5 * _IN)
-            else:
-                gt = max(round(sg * 1.5), round((0.5 if labelled else 0.4) * _IN))
-        st0 = node_style(s)
-        pads = (
-            V._emu(th.classes["node"].padding) if "node" in th.classes and th.classes["node"].padding else 0
-        )
-        nat = max(
-            max(_tw(nd.name, s), _tw(nd.sub, sub) if nd.sub else 0) + 2 * pads + round(0.12 * _IN)
-            for nd in A.nodes
-        )
-        w = (
-            V._emu(th.arch_node_w)
-            if th.arch_node_w
-            else min(max(round(nat * 1.08), round(1.25 * _IN)), round(2.9 * _IN))
-        )
-        if cols:
-            colw = (body.w - gt * (n - 1)) // n
-            lw = 0
-            w = min(w if th.arch_node_w else max(w, round(0.78 * colw)), colw - 2 * pad)
-        else:
-            cap_w = max((_tw(wd, cap, True) for t, _ in A.tiers for wd in t.split()), default=0)
-            lw = (
-                V._emu(th.arch_label_w)
-                if th.arch_label_w
-                else min(max(cap_w + round(0.12 * _IN), round(0.85 * _IN)), round(body.w * 0.2))
+            gn = max(
+                gn,
+                max(DK.small_w(K, e.label or "", K.label, th.diagram_label_track) for e in same)
+                + round(0.3 * _IN),
             )
-            avail = body.w - 2 * pad - lw - round(0.1 * _IN)
+        gt = V._emu(th.arch_gap) if th.arch_gap else 0
+        if not gt:
+            if cols:
+                gt = max(round(0.55 * _IN), labw + round(0.3 * _IN)) if labelled else round(0.55 * _IN)
+                gt = min(gt, round(2.0 * _IN))
+            else:
+                gt = round((0.55 if labelled else 0.45) * _IN)
+        nat = max(DK.node_width(c, K, nd.name, nd.sub, nd.tag) for nd in A.nodes)
+        w = V._emu(th.arch_node_w) if th.arch_node_w else min(max(nat, round(1.3 * _IN)), round(2.6 * _IN))
+        lw = 0
+        boxed = [lk != "caption" for lk in looks]
+        if cols:
+            avail = body.w - (n - 1) * gt - 2 * n * pad
+            if not th.arch_node_w:
+                w = max(min(w, avail // n), round(1.1 * _IN))
+        else:
+            cap_w = max(
+                (DK.small_w(K, t, K.label, th.diagram_label_track) for t, _ in A.tiers if t), default=0
+            )
+            lw = 0 if all(boxed) else (cap_w + round(0.2 * _IN) if cap_w else 0)
+            avail = body.w - lw - 2 * pad
             kmax = max(len(r) for _, r in A.tiers)
-            wmin = round(1.1 * _IN)
-            if not th.arch_node_w and kmax * (w + gn_p) - gn_p > avail:
-                w = max(min(w, (avail - (kmax - 1) * gn_p) // kmax), wmin)
+            if not th.arch_node_w and kmax * (w + gn) - gn > avail:
+                w = max(min(w, (avail - (kmax - 1) * gn) // kmax), round(1.1 * _IN))
             w = min(w, avail)
         h = V._emu(th.arch_node_h) if th.arch_node_h else 0
         if not h:
             h = max(
-                round(V._need(c, node_paras(nd, s), w, st0)) + round(0.1 * s * EMU_PER_PT) for nd in A.nodes
+                DK.node_need(
+                    c, K, DK.node_paras(c, K, nd.name, nd.sub), w, bool(nd.tag), tag_h[0], nd.classes
+                )
+                for nd in A.nodes
             )
-            h = max(h, round(2.4 * s * EMU_PER_PT))
-        per, rows, tier_h, capn = [], [], [], 0
+            h = max(h, round(2.9 * K.name * DK.PT))
+        per, rows, tier_h, tier_w = [], [], [], []
         if cols:
-            capn = max(
-                (
-                    V._need(
-                        c,
-                        [Paragraph(runs=[Run(text=t, bold=True)])],
-                        w + 2 * pad,
-                        V._text_style(c, cap, align="left"),
-                    )
-                    for t, _ in A.tiers
-                ),
-                default=0,
-            )
-            capn = round(capn + 0.3 * pad)
-            avail = 0
-            for _t, r in A.tiers:
+            for i, (_t, r) in enumerate(A.tiers):
                 per.append(1)
                 rows.append(len(r))
-            tier_h = [capn + rows[i] * h + (rows[i] - 1) * gn_p + 2 * pad for i in range(n)]
-            total = max(tier_h)
-            ok = total <= body.h * lt.vocab_fill
-            tier_h = [total] * n
+                inner = len(r) * h + (len(r) - 1) * gn
+                head = cap_h + round(0.5 * pad) if has_title[i] else 0
+                tier_h.append(inner + head + (2 * pad if boxed[i] else 0))
+                tier_w.append(w + (2 * pad if boxed[i] else 0))
+            total_h = max(tier_h)
+            total_w = sum(tier_w) + gt * (n - 1)
         else:
-            for _t, r in A.tiers:
-                m = max(1, (avail + gn_p) // (w + gn_p))
-                k = len(r)
-                nrows = -(-k // m)
+            for i, (_t, r) in enumerate(A.tiers):
+                m = max(1, (avail + gn) // (w + gn))
+                kk = len(r)
+                nrows = -(-kk // m)
                 rows.append(nrows)
-                per.append(-(-k // nrows))
-            tier_h = [rows[i] * h + (rows[i] - 1) * gn_p + 2 * pad for i in range(n)]
-            total = sum(tier_h) + gt * (n - 1)
-            ok = total <= body.h * lt.vocab_fill
+                per.append(-(-kk // nrows))
+                inner = nrows * h + (nrows - 1) * gn
+                head = cap_h + round(0.5 * pad) if boxed[i] and has_title[i] else 0
+                tier_h.append(inner + head + (2 * pad if boxed[i] else 0))
+            widest = max(per[i] * w + (per[i] - 1) * gn + (2 * pad if boxed[i] else 0) for i in range(n))
+            tier_w = [lw + widest] * n
+            total_w = lw + widest
+            total_h = sum(tier_h) + gt * (n - 1)
         return _Plan(
-            size=s,
-            w=w,
-            h=h,
-            rows=rows,
-            per=per,
-            gn=gn_p,
-            gt=gt,
-            pad=pad,
-            lw=lw,
-            cap=cap,
-            tier_h=tier_h,
-            total=total,
-            ok=ok,
-            capn=capn,
-        )
+            k=k, w=w, h=h, rows=rows, per=per, gn=gn, gt=gt, pad=pad, lw=lw, tier_h=tier_h, tier_w=tier_w,
+            total_w=total_w, total_h=total_h, ok=True, capn=cap_h, labw=labw,
+        )  # fmt: skip
 
-    best = plan(hi) if pinned else None
-    if best is None:
-        s = hi
-        while True:
-            best = plan(s)
-            if best.ok or s - V._STEP < lo - 1e-9:
-                break
-            s -= V._STEP
+    # the legend strip is reserved first; the diagram is centred in what is left
+    used_kinds = sorted({("primary" if e.focal else e.kind) for e in edges}, key=DK.KINDS.index)
+    roles = [r for r in DK.ROLES if any(r in nd.classes for nd in A.nodes)]
+    plain = any(not (set(nd.classes) & set(DK.ROLES)) for nd in A.nodes)
+    legend_on = DK.wants_legend(c, roles, used_kinds, slide)
+    area = Rect(body.x, body.y, body.w, body.h)
+    leg_h = DK.legend_height(K0) if legend_on else 0
+    if legend_on:
+        area = Rect(body.x, body.y, body.w, body.h - leg_h)
+    k = 1.0
+    best = plan(k)
+    while not pinned and (best.total_h > area.h or best.total_w > area.w) and k > 0.6:
+        k = round(k - 0.05, 2)
+        best = plan(k)
     P: _Plan = best
-    s = P.size
-    cap = P.cap
-    # spare height: tier bands grow a little, then the gaps, then the block is centred
-    if cols:
-        total = P.total
-        extra = max(body.h - total, 0)
-        grow = round(min(extra, 0.7 * total))
-        tier_h = [P.tier_h[0] + grow] * n
-        top = body.y + round(max(extra - grow, 0) * lt.vocab_top)
-        gt = P.gt
-        col_w = (body.w - gt * (n - 1)) // n
-        bands = [Rect(body.x + i * (col_w + gt), top, col_w, tier_h[i]) for i in range(n)]
-    else:
-        extra = max(body.h - P.total, 0)
-        e_t = round(min(extra / n, 0.5 * P.h))
-        extra -= e_t * n
-        e_g = round(min(extra / max(n - 1, 1), 0.8 * P.gt)) if n > 1 else 0
-        extra -= e_g * (n - 1)
-        top = body.y + round(max(extra, 0) * lt.vocab_top)
-        gt = P.gt + e_g
-        tier_h = [h + e_t for h in P.tier_h]
-        bands, y = [], top
-        for i in range(n):
-            bands.append(Rect(body.x, y, body.w, tier_h[i]))
-            y += tier_h[i] + gt
-    # bands and captions
-    band_fill = th.arch_tier_fill or V._eng()._tint(th, "muted", 0.07)
+    K = K0.scaled(P.k)
+    ok = P.total_h <= area.h * 1.02 and P.total_w <= area.w * 1.02
+    x0, y0 = DK.centred(area, P.total_w, P.total_h)
+    cap_h = P.capn
+    cap_st = V._text_style(c, K.label, align="left", valign="middle", padding="0pt")
     radius = _radius(th)
+    # tier regions
+    zones: list[Rect] = []
+    if cols:
+        x = x0
+        for i in range(n):
+            zones.append(Rect(x, y0 + (P.total_h - P.tier_h[i]) // 2, P.tier_w[i], P.tier_h[i]))
+            x += P.tier_w[i] + P.gt
+    else:
+        y = y0
+        for i in range(n):
+            zones.append(Rect(x0 + P.lw, y, P.tier_w[i] - P.lw, P.tier_h[i]))
+            y += P.tier_h[i] + P.gt
+    band_fill = th.arch_tier_fill or V._eng()._tint(th, "muted", 0.07)
+    caps: list[Rect] = []
     for i, (title, _row) in enumerate(A.tiers):
-        own = V._own(slide.elements[i], "fill")
-        fill = None if (own or band_fill) == "none" else (own or band_fill)
-        if fill or th.arch_tier_line:  # `arch.tier.fill=none` and no outline: no band at all
-            c.emit(
-                Shape(shape="rect", attrs={"shape_name": f"Arch tier {i + 1}"}),
-                bands[i],
-                fast_style(
+        z = zones[i]
+        lk = looks[i]
+        if lk != "caption":
+            own = V._own(slide.elements[i], "fill")
+            if lk == "band":
+                fill = None if (own or band_fill) == "none" else (own or band_fill)
+                st = fast_style(
                     fill=fill, line=th.arch_tier_line, **({"radius": radius} if radius is not None else {})
-                ),
-            )
+                )
+            else:  # a dashed hairline container
+                st = fast_style(
+                    fill=own,
+                    line=th.diagram_tag_line,
+                    line_width=DK.hairline(c),
+                    line_dash="dash",
+                    radius=V._pt(V._emu(th.diagram_group_radius)),
+                )
+            if fill_ok(st):
+                c.emit(Shape(shape="rect", attrs={"shape_name": f"Arch tier {i + 1}"}), z, st)
         if not title:
             continue
-        paras = [Paragraph(runs=[Run(text=title, bold=True)])]
-        lst = V._text_style(
-            c, cap, color=th.arch_tier_label, align="left", valign="top" if cols else "middle"
-        )
-        if cols:
-            rect = Rect(bands[i].x + P.pad, bands[i].y + P.pad // 2, bands[i].w - 2 * P.pad, bands[i].h)
+        tw = DK.small_w(K, title, K.label, th.diagram_label_track) + round(10 * DK.PT)
+        if lk == "caption":
+            if cols:
+                r = Rect(z.x, z.y, max(z.w, tw), cap_h)
+            else:
+                r = Rect(z.x - P.lw, z.y, P.lw, z.h)
         else:
-            rect = Rect(bands[i].x + P.pad, bands[i].y, P.lw, bands[i].h)
-        V._emit_text(c, f"Arch tier {i + 1} label", paras, rect, lst)
-    # nodes
+            r = Rect(
+                z.x + round(0.4 * pad), z.y - cap_h // 2 if lk == "box" else z.y + round(0.3 * pad), tw, cap_h
+            )
+        cst = cap_st
+        if lk == "box":
+            cst = V._text_style(c, K.label, align="center", valign="middle", padding="0pt", fill="bg")
+        DK.emit_text(
+            c,
+            f"Arch tier {i + 1} label",
+            [DK.small_para(c, K, title, K.label, th.diagram_label_track, th.arch_tier_label)],
+            r,
+            cst,
+            nowrap=True,
+        )
+        caps.append(r)
+    # node positions (drawn after the arrows, which run under them)
     rects: dict[int, Rect] = {}
+    node_draws: list[tuple[Any, Rect]] = []
     for i, (_title, row) in enumerate(A.tiers):
-        b = bands[i]
+        z = zones[i]
+        boxed = looks[i] != "caption"
+        head = (cap_h + round(0.5 * pad)) if has_title[i] and (cols or boxed) else 0
         if cols:
             ncol = P.rows[i]
             stack = ncol * P.h + (ncol - 1) * P.gn
-            top_y = b.y + P.pad + P.capn
-            y0 = top_y + max((b.bottom - P.pad - top_y - stack) // 2, 0)
-            x0 = b.x + (b.w - P.w) // 2
-            pts = [(x0, y0 + k * (P.h + P.gn)) for k in range(ncol)]
+            ytop = z.y + (pad if boxed else 0) + head
+            yy = ytop + max((z.bottom - (pad if boxed else 0) - ytop - stack) // 2, 0)
+            xx = z.x + (z.w - P.w) // 2
+            pts = [(xx, yy + kk * (P.h + P.gn)) for kk in range(ncol)]
         else:
-            ax0 = b.x + P.pad + P.lw + round(0.05 * _IN)
-            aw = b.w - 2 * P.pad - P.lw - round(0.1 * _IN)
+            ax0 = z.x + (pad if boxed else 0)
+            aw = z.w - (2 * pad if boxed else 0)
             rows_n = P.rows[i]
             block_h = rows_n * P.h + (rows_n - 1) * P.gn
-            y0 = b.y + (b.h - block_h) // 2
+            ytop = z.y + (pad + head if boxed else 0)
+            yy = ytop + max((z.bottom - (pad if boxed else 0) - ytop - block_h) // 2, 0)
             pts = []
-            for r in range(rows_n):
-                chunk = row[r * P.per[i] : (r + 1) * P.per[i]]
+            for r_ in range(rows_n):
+                chunk = row[r_ * P.per[i] : (r_ + 1) * P.per[i]]
                 rw = len(chunk) * P.w + (len(chunk) - 1) * P.gn
                 xr = ax0 + (aw - rw) // 2
-                pts += [(xr + k * (P.w + P.gn), y0 + r * (P.h + P.gn)) for k in range(len(chunk))]
+                pts += [(xr + kk * (P.w + P.gn), yy + r_ * (P.h + P.gn)) for kk in range(len(chunk))]
         for nd, (x, y) in zip(row, pts, strict=False):
-            k = A.nodes.index(nd)
+            kidx = A.nodes.index(nd)
             rect = Rect(x, y, P.w, P.h)
-            rects[k] = rect
-            V._emit_text(
-                c,
-                f"Arch node {nd.name}",
-                node_paras(nd, s),
-                rect,
-                node_style(s, nd.classes),
-                [*nd.classes],
-            )
-    # arrows (over the nodes), then their labels
+            rects[kidx] = rect
+            node_draws.append((nd, rect))
+    # arrows (glued to the node rectangles, drawn under the nodes), then the nodes, then the labels
     E = V._eng()
-    lab_size = th.arch_edge_size or max(round(s * 0.8, 1), 9.0)
     done = 0
     placed: list[tuple[Any, Any]] = []
     for e in edges:
@@ -303,20 +302,54 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             continue
         pl = c.out[-1]
         pl.element.attrs["shape_name"] = f"Arch edge {done + 1}"
-        if e.focal:
-            pl.style = pl.style.merged(
-                fast_style(line="accent", line_width=max(th.render.connector_width, 1.5))
-            )
+        pl.element.attrs["under"] = True
+        kind = "primary" if e.focal and e.kind == "flow" else e.kind
+        col, dash, wd = DK.style_of(K, kind, e.focal)
+        DK.restyle(pl, col, dash, wd)
+        pl.element.attrs["kind"] = kind
         done += 1
         placed.append((e, pl))
     _stagger(placed)
+    for nd, rect in node_draws:
+        DK.node(
+            c, K, f"Arch node {nd.name}", f"Arch tag {nd.name}", rect,
+            DK.node_paras(c, K, nd.name, nd.sub), nd.tag, nd.classes,
+        )  # fmt: skip
+    obstacles = [*rects.values(), *caps]
     for e, pl in placed:
         if e.label:
-            _edge_label(c, pl, pl.element.attrs["shape_name"] + " label", e.label, lab_size)
-    info.update(n=len(A.nodes), tiers=n, edges=done, dir="h" if cols else "v", size=s, fit=P.ok)
-    if not P.ok:
+            kind = "primary" if e.focal and e.kind == "flow" else e.kind
+            col = DK.style_of(K, kind, e.focal)[0] if (kind != "flow" or e.focal) else None
+            r = DK.edge_label(
+                c,
+                K,
+                pl.element.attrs["shape_name"] + " label",
+                DK.polyline(pl),
+                e.label,
+                col,
+                obstacles,
+                area,
+            )
+            obstacles.append(r)
+    if legend_on:
+        entries = DK.legend_entries(
+            c,
+            roles,
+            used_kinds,
+            plain and bool(roles),
+            "ja" if any(DK.has_wide(nd.name) for nd in A.nodes) else None,
+        )
+        lw_ = min(max(P.total_w, DK.legend_width(K, entries)), body.w)
+        lx = min(max(x0, body.x), body.right - lw_)
+        DK.legend(c, K, lx, body.bottom - leg_h + round(6 * DK.PT), lw_, entries)
+    info.update(n=len(A.nodes), tiers=n, edges=done, dir="h" if cols else "v", size=K.name, fit=ok)
+    if not ok:
         c.over.append("@arch nodes")
     return True
+
+
+def fill_ok(st) -> bool:
+    return bool(st.fill or st.line)
 
 
 def _stagger(placed: list[tuple[Any, Any]]) -> None:
@@ -387,27 +420,6 @@ def _radius(th) -> Any:
     return card.radius if card is not None and card.radius is not None else None
 
 
-def _edge_label(c, pl, name: str, text: str, size: float) -> None:
-    """The arrow label, centred on the middle segment of the connector, a knockout of the slide colour."""
-    th = c.theme
-    at = pl.element.attrs
-    fh, fv = bool(at.get("flip_h")), bool(at.get("flip_v"))
-    sx, ex = (pl.x + pl.w, pl.x) if fh else (pl.x, pl.x + pl.w)
-    sy, ey = (pl.y + pl.h, pl.y) if fv else (pl.y, pl.y + pl.h)
-    adj = float(at.get("adj", 0.5))
-    if at.get("route") == "h":
-        cx, cy = sx + adj * (ex - sx), (sy + ey) / 2
-    else:
-        cx, cy = (sx + ex) / 2, sy + adj * (ey - sy)
-    pad = round(3 * EMU_PER_PT)
-    w = _tw(text, size) + 2 * pad + round(0.04 * _IN)
-    h = round(size * 1.35 * EMU_PER_PT)
-    st = V._text_style(c, size, color=th.arch_edge_color, align="center", valign="middle", fill="bg")
-    V._emit_text(
-        c, name, [Paragraph(runs=[Run(text=text)])], Rect(round(cx - w / 2), round(cy - h / 2), w, h), st
-    )
-
-
 # --------------------------------------------------------------------------- @venn
 
 
@@ -426,14 +438,34 @@ def _inside(px: float, py: float, circ: tuple[float, float, float], grow: float 
     return math.hypot(px - circ[0], py - circ[1]) <= circ[2] + grow
 
 
+_BOX_CACHE: dict[tuple, tuple[float, float, float, float]] = {}
+
+
 def _best_box(
+    ins: list[tuple[float, float, float]], outs: list[tuple[float, float, float]], margin: float
+) -> tuple[float, float, float, float]:
+    """Memoised ``_best_box0``: the geometry is the same at every text size the layout tries."""
+    key = (
+        tuple(map(round, (v for c in ins for v in c))),
+        tuple(map(round, (v for c in outs for v in c))),
+        round(margin),
+    )
+    got = _BOX_CACHE.get(key)
+    if got is None:
+        if len(_BOX_CACHE) > 512:
+            _BOX_CACHE.clear()
+        got = _BOX_CACHE[key] = _best_box0(ins, outs, margin)
+    return got
+
+
+def _best_box0(
     ins: list[tuple[float, float, float]], outs: list[tuple[float, float, float]], margin: float
 ) -> tuple[float, float, float, float]:
     """``(cx, cy, w, h)`` of the largest box of aspect ``_AR`` inside every circle of ``ins`` and outside
     every circle of ``outs`` (``margin`` from the outlines); ``w = 0`` when the region is empty."""
     x0, y0, r0 = ins[0]
     best = (x0, y0, 0.0, 0.0)
-    steps = 26
+    steps = 16
     for iy in range(steps + 1):
         for ix in range(steps + 1):
             cx = x0 - r0 + 2 * r0 * ix / steps
@@ -454,12 +486,66 @@ def _best_box(
             if not ok(1.0):
                 continue
             lo_w, hi_w = 1.0, 2 * r0
-            for _ in range(16):
+            for _ in range(12):
                 mid = (lo_w + hi_w) / 2
                 lo_w, hi_w = (mid, hi_w) if ok(mid) else (lo_w, mid)
             if lo_w > best[2]:
                 best = (cx, cy, lo_w, lo_w / _AR)
     return best
+
+
+def _lens(circ: list[tuple[float, float, float]], steps: int = 720) -> list[tuple[int, int]]:
+    """The polygon of the region inside every circle: arc samples that lie in all the other circles plus the
+    exact crossing points of the circles, sorted around the (convex) region's centre. ``[]`` when empty."""
+    tol = 1.0 + 1e-6
+    pts: list[tuple[float, float]] = []
+    for i, (cx, cy, r) in enumerate(circ):
+        others = [o for j, o in enumerate(circ) if j != i]
+        for k in range(steps):
+            a = 2 * math.pi * k / steps
+            x, y = cx + r * math.cos(a), cy + r * math.sin(a)
+            if all(math.hypot(x - ox, y - oy) <= orr * tol for ox, oy, orr in others):
+                pts.append((x, y))
+    for i in range(len(circ)):
+        for j in range(i + 1, len(circ)):
+            (x0, y0, r0), (x1, y1, r1) = circ[i], circ[j]
+            d = math.hypot(x1 - x0, y1 - y0)
+            if d == 0 or d > r0 + r1 or d < abs(r0 - r1):
+                continue
+            a = (r0 * r0 - r1 * r1 + d * d) / (2 * d)
+            h = math.sqrt(max(r0 * r0 - a * a, 0.0))
+            mx, my = x0 + a * (x1 - x0) / d, y0 + a * (y1 - y0) / d
+            for sgn in (1, -1):
+                px, py = mx + sgn * h * (y1 - y0) / d, my - sgn * h * (x1 - x0) / d
+                if all(math.hypot(px - ox, py - oy) <= orr * (1 + 1e-4) for ox, oy, orr in circ):
+                    pts.append((px, py))
+    if len(pts) < 3:
+        return []
+    gx, gy = sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)
+    pts.sort(key=lambda p: math.atan2(p[1] - gy, p[0] - gx))
+    out: list[tuple[int, int]] = []
+    for x, y in pts:
+        q = (round(x), round(y))
+        if not out or q != out[-1]:
+            out.append(q)
+    return out
+
+
+def _set_paras(c, K, head: str, body: list, wide: float, name_pt: float) -> list[Paragraph]:
+    """The label of a set: the bold name, then its body line as a mono capitals sublabel (short Latin text)
+    or, for anything longer or CJK, as plain muted text."""
+    out = [Paragraph(runs=[Run(text=head)], style=fast_style(font_size=name_pt, bold=True))] if head else []
+    paras = [p for t in body for p in t.paragraphs if p.plain.strip()]
+    text = " ".join(p.plain.strip() for p in paras)
+    if not text:
+        return out
+    if len(paras) == 1 and len(text) <= 34 and not DK.has_wide(text) and not paras[0].marker:
+        out.append(DK.small_para(c, K, text, K.sub, c.theme.diagram_label_track))
+    else:
+        for p in paras:
+            st = fast_style(font_size=round(K.sub + 2, 1), color=K.muted)
+            out.append(p.model_copy(update={"style": st.merged(p.style), "marker": None, "level": 0}))
+    return out
 
 
 def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
@@ -468,58 +554,48 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     n = len(bx)
     if n not in (2, 3):
         return False
-    base, ratio, hi, lo, pinned = V._sizes(c, slide)
+    K0 = DK.look(c, slide)
+    pinned = bool(forms.num(slide.attrs, "size"))
     parts = [V._split_box(b) for b in bx]
+    heads = [
+        " ".join(p.plain.strip() for p in h.paragraphs).strip() if h is not None else "" for h, _ in parts
+    ]
     otext, ocls = forms6.split_trailing(forms6.edge_text(slide)) if forms6.edge_text(slide) else ("", [])
+    oname, osub = DK.split_sub(otext) if otext else ("", "")
     o = th.venn_overlap or (0.36 if n == 2 else 0.42)
     fills = V._colors(slide, th.venn_fill)
     palette = [x for x in (th.palette or []) if x] or ["primary", "secondary", "muted"]
     focal_overlap = "focal" in ocls
     emu = V._emu
+    air = round(0.08 * _IN)
+    rmax = emu(th.venn_size) / 2 if th.venn_size else emu(th.venn_max) / 2
 
     def centres(r: float) -> list[tuple[float, float]]:
         d = 2 * r * (1 - o)
         if n == 2:
             return [(-d / 2, 0.0), (d / 2, 0.0)]
-        return [(-d / 2, -d * 0.2887), (d / 2, -d * 0.2887), (0.0, d * 0.5774)]
+        return [(0.0, -d * 0.5774), (-d / 2, d * 0.2887), (d / 2, d * 0.2887)]
 
     def extent(r: float) -> tuple[float, float]:
         d = 2 * r * (1 - o)
         return (2 * r + d, 2 * r) if n == 2 else (2 * r + d, 2 * r + 0.866 * d)
 
-    def name_paras(i: int, s: float) -> list[Paragraph]:
-        h = parts[i][0]
-        if h is None:
-            return []
-        st = fast_style(font_size=round(s * ratio * 0.9, 2), bold=True)
-        return [p.model_copy(update={"style": st.merged(p.style)}) for p in h.paragraphs]
-
-    def solve(s: float, mode: str) -> dict[str, Any]:
-        nst = V._text_style(c, s * ratio * 0.9, bold=True, align="center", valign="middle")
-        # names: above the upper circles, below the lower one
-        top_names = [i for i in range(n) if n == 2 or i < 2]
-        bot_names = [i for i in range(n) if i not in top_names]
-        band_top = max((round(V._need(c, name_paras(i, s), emu("2.4in"), nst)) for i in top_names), default=0)
-        band_bot = max((round(V._need(c, name_paras(i, s), emu("2.4in"), nst)) for i in bot_names), default=0)
-        air = round(0.08 * _IN)
-        room_h = body.h - band_top - band_bot - air * (1 + (1 if bot_names else 0))
-        # circle radius: from the height and the width, or the token
-        r_h = room_h / (extent(1.0)[1])
+    def solve(k: float, mode: str) -> dict[str, Any]:
+        K = K0.scaled(k)
+        name_pt = round(K.name + 3, 1)
+        r_h = (body.h - 2 * air) / extent(1.0)[1]
         r_w = body.w * (0.96 if mode == "in" else 0.5) / extent(1.0)[0]
-        r = min(r_h, r_w)
-        if th.venn_size:
-            r = min(r, emu(th.venn_size) / 2)
+        r = min(r_h, r_w, rmax)
         cs = centres(r)
         w_, h_ = extent(r)
         ox = body.x + body.w / 2
-        oy = body.y + band_top + air + (room_h - h_) / 2 + (r if n == 2 else r + 0.2887 * 2 * r * (1 - o))
+        oy = body.y + (body.h - h_) / 2 + (r if n == 2 else r + 0.5774 * 2 * r * (1 - o))
         circ = [(ox + cx, oy + cy, r) for cx, cy in cs]
         margin = 0.04 * r + 3 * EMU_PER_PT
         boxes_: list[tuple[float, float, float, float]] = []
         aligns: list[str] = []
         fit = True
         for i in range(n):
-            body_t = parts[i][1]
             if mode == "in":
                 bxi = _best_box([circ[i]], [circ[j] for j in range(n) if j != i], margin)
                 al = "center"
@@ -538,62 +614,39 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
                 al = "right" if left else "left"
             boxes_.append(bxi)
             aligns.append(al)
-            if not body_t:
-                continue
             if bxi[2] <= 0:
                 fit = False
                 continue
-            st = V._text_style(c, s, align=al, valign="middle")
-            need = V._need(c, V._paras(None, body_t, s, 1.0, None), round(bxi[2]), st)
+            st = V._text_style(c, name_pt, align=al, valign="middle")
+            need = V._need(c, _set_paras(c, K, heads[i], parts[i][1], bxi[2], name_pt), round(bxi[2]), st)
             fit = fit and need <= bxi[3]
         ob = _best_box(list(circ), [], margin)
-        osize = s
-        ofits_ok = True
+        ofit = True
         if otext:
-            op = [Paragraph(runs=[Run(text=otext, bold=True)])]
-
-            def ofits(z: float) -> bool:
-                st = V._text_style(c, z, bold=True, align="center", valign="middle")
-                return ob[2] > 0 and V._need(c, op, round(ob[2]), st) <= ob[3]
-
-            osize, ofit = V._largest(s, lo, ofits)
-            ofits_ok = ofit
+            ost = V._text_style(c, K.name, bold=True, align="center", valign="middle")
+            op = _core_paras(c, K, oname, osub, K.name)
+            ofit = ob[2] > 0 and V._need(c, op, round(ob[2]), ost) <= ob[3]
         return {
-            "r": r,
-            "circ": circ,
-            "boxes": boxes_,
-            "aligns": aligns,
-            "ob": ob,
-            "osize": osize,
-            "fit": fit,
-            "ofit": ofits_ok,
-            "band_top": band_top,
-            "air": air,
-            "mode": mode,
-        }
+            "r": r, "circ": circ, "boxes": boxes_, "aligns": aligns, "ob": ob, "fit": fit, "ofit": ofit,
+            "mode": mode, "K": K, "name_pt": name_pt, "ox": ox,
+        }  # fmt: skip
 
     want = th.venn_text if th.venn_text in ("in", "out") else "auto"
-    best: dict[str, Any] | None = None
-    size = hi
     plan_: list[tuple[str, float]] = []
-    if pinned:
-        plan_ = [("out" if want == "out" else "in", hi)]
-    else:
-        floor_in = max(lo, base * th.venn_in_min)
-        if want in ("in", "auto"):
-            plan_ += [("in", z) for z in _sizes_down(hi, floor_in if want == "auto" else lo)]
-        if want in ("out", "auto"):
-            plan_ += [("out", z) for z in _sizes_down(hi, lo)]
-    for mode_, z in plan_:
-        best = solve(z, mode_)
-        size = z
-        if best["fit"]:
+    ks = [1.0] if pinned else [1.0, 0.95, 0.9, 0.85, 0.8, 0.75]
+    if want in ("in", "auto"):
+        plan_ += [("in", k) for k in ks]
+    if want in ("out", "auto"):
+        plan_ += [("out", k) for k in ks]
+    S = None
+    for mode_, k in plan_:
+        S = solve(k, mode_)
+        if S["fit"] and S["ofit"]:
             break
-    if best is None:
-        best = solve(hi, "in")
-    S = best
-    r, circ = S["r"], S["circ"]
-    # circles (translucent, in the palette); a `.focal` set takes the accent
+    if S is None:
+        S = solve(1.0, "in")
+    circ, K, name_pt = S["circ"], S["K"], S["name_pt"]
+    # circles: translucent, neutral by token (editorial: ink at a few percent, hairline strokes)
     line_w = V._pt(emu(th.venn_line_w))
     for i in range(n):
         focal = "focal" in bx[i].classes
@@ -611,61 +664,54 @@ def _venn(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             Rect(round(cx - rr), round(cy - rr), d, d),
             fast_style(fill=col, opacity=th.venn_alpha, line=lc, line_width=line_w),
         )
-    # focal overlap: an accent tint ellipse inset in the lens, under the labels
+    # the overlap of all sets: an exact lens (a freeform), solid
     ob = S["ob"]
-    if focal_overlap and ob[2] > 0:
-        lw_ = (2 * r - (circ[1][0] - circ[0][0])) * 0.86 if n == 2 else r * 0.7
-        lh_ = (
-            2 * math.sqrt(max(r * r - ((circ[1][0] - circ[0][0]) / 2) ** 2, 0.0)) * 0.7 if n == 2 else r * 0.7
-        )
-        c.emit(
-            Shape(shape="ellipse", attrs={"shape_name": "Venn overlap fill"}),
-            Rect(round(ob[0] - lw_ / 2), round(ob[1] - lh_ / 2), round(lw_), round(lh_)),
-            fast_style(fill="accent", opacity=max(th.venn_alpha, 0.35), line=None),
-        )
-    ncol = th.venn_name_color
-    nst = V._text_style(c, size * ratio * 0.9, bold=True, color=ncol, align="center", valign="middle")
-    for i in range(n):
-        ps = name_paras(i, size)
-        if not ps:
-            continue
-        cx, cy, rr = circ[i]
-        up = n == 2 or i < 2
-        w = round(min(2.4 * _IN, 0.96 * 2 * rr * (1 - o)) if up else min(2.4 * _IN, 1.9 * rr))
-        hh = round(S["band_top"] if up else max(S["band_top"], size * ratio * 1.6 * EMU_PER_PT))
-        y = round(cy - rr - S["air"] - hh) if up else round(cy + rr + S["air"])
-        V._emit_text(
-            c,
-            f"Venn {i + 1} name",
-            ps,
-            Rect(round(cx - w / 2), y, w, hh),
-            nst.merged(fast_style(valign="bottom" if up else "top")),
-        )
+    core_fill = "accent" if focal_overlap else th.venn_core
+    if otext:
+        poly = _lens(circ)
+        if len(poly) >= 3:
+            xs, ys = [p[0] for p in poly], [p[1] for p in poly]
+            c.emit(
+                Shape(shape="freeform", attrs={"shape_name": "Venn overlap fill", "points": poly}),
+                Rect(min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)),
+                fast_style(fill=core_fill, line=None),
+            )
     for i in range(n):
         bxi = S["boxes"][i]
-        if not parts[i][1] or bxi[2] <= 0:
+        paras = _set_paras(c, K, heads[i], parts[i][1], bxi[2], name_pt)
+        if not paras or bxi[2] <= 0:
             continue
         w, h = round(bxi[2]), round(bxi[3])
         V._emit_text(
             c,
-            f"Venn {i + 1} text",
-            V._paras(None, parts[i][1], size, 1.0, None),
+            f"Venn {i + 1} name",
+            paras,
             Rect(round(bxi[0] - w / 2), round(bxi[1] - h / 2), w, h),
-            V._text_style(c, size, align=S["aligns"][i], valign="middle"),
+            V._text_style(c, name_pt, color=th.venn_name_color, align=S["aligns"][i], valign="middle"),
         )
     if otext and ob[2] > 0:
         w, h = round(ob[2]), round(ob[3])
+        ink = th.ink_on(core_fill, "bg")
         V._emit_text(
             c,
             "Venn overlap",
-            [Paragraph(runs=[Run(text=otext, bold=True)])],
+            _core_paras(c, K, oname, osub, K.name, ink),
             Rect(round(ob[0] - w / 2), round(ob[1] - h / 2), w, h),
-            V._text_style(c, S["osize"], bold=True, align="center", valign="middle"),
+            V._text_style(c, K.name, color=ink, align="center", valign="middle"),
         )
-    info.update(n=n, size=size, fit=S["fit"] and S["ofit"], overlap=bool(otext), text=S["mode"])
+    info.update(n=n, size=name_pt, fit=S["fit"] and S["ofit"], overlap=bool(otext), text=S["mode"])
     if not (S["fit"] and S["ofit"]):
         c.over.append("@venn text")
     return True
+
+
+def _core_paras(c, K, name: str, sub: str, name_pt: float, ink: str | None = None) -> list[Paragraph]:
+    """The label of the overlap: the bold name and, after a colon, a mono capitals sublabel."""
+    st = fast_style(font_size=name_pt, bold=True, **({"color": ink} if ink else {}))
+    out = [Paragraph(runs=[Run(text=name)], style=st)]
+    if sub:
+        out.append(DK.small_para(c, K, sub, K.sub, c.theme.diagram_label_track, ink))
+    return out
 
 
 FORMS = {"arch": _arch, "venn": _venn}

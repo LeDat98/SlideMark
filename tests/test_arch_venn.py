@@ -133,8 +133,7 @@ def test_tokens_validate():
 def test_arch_shapes_are_named_and_edges_are_elbow_connectors(tmp_path):
     deck, prs = make(tmp_path, ARCH)
     assert not real(deck), deck.diagnostics
-    for i in (1, 2, 3):
-        one(prs, f"Arch tier {i}")
+    assert not named(prs, r"Arch tier \d")  # editorial: a tier is a caption, not a full-width band
     assert len(named(prs, r"Arch tier \d label")) == 3
     for name in ("Web app", "Mobile app", "API gateway", "Orders", "Billing", "Postgres", "Queue", "Stripe"):
         assert one(prs, f"Arch node {name}").has_text_frame
@@ -181,8 +180,11 @@ def test_arch_role_classes_fill_and_dash_and_the_one_focal_node_is_accent(tmp_pa
     assert cols.count("BF4520") == 1 and len(set(cols)) == 2
 
 
+BAND = HEAD + "style: arch.tier.look=band\n"
+
+
 def test_arch_nodes_in_a_tier_share_one_size_and_sit_in_their_tier(tmp_path):
-    _deck, prs = make(tmp_path, ARCH)
+    _deck, prs = make(tmp_path, ARCH, BAND)
     nodes = {n: one(prs, f"Arch node {n}") for n in ("Web app", "Mobile app", "API gateway", "Orders")}
     assert len({(s.width, s.height) for s in nodes.values()}) == 1
     tier1, tier2 = one(prs, "Arch tier 1"), one(prs, "Arch tier 2")
@@ -195,10 +197,12 @@ def test_arch_nodes_in_a_tier_share_one_size_and_sit_in_their_tier(tmp_path):
 
 def test_arch_dir_h_makes_columns_and_routes_horizontally(tmp_path):
     text = ARCH.replace("@arch", "@arch dir=h")
-    deck, prs = make(tmp_path, text)
+    deck, prs = make(tmp_path, text, BAND)
     assert not real(deck), deck.diagnostics
     t1, t2, t3 = (one(prs, f"Arch tier {i}") for i in (1, 2, 3))
-    assert t1.left < t2.left < t3.left and t1.top == t2.top == t3.top
+    assert t1.left < t2.left < t3.left
+    mids = [t.top + t.height / 2 for t in (t1, t2, t3)]
+    assert max(mids) - min(mids) < 2000  # columns share one centre line (each as tall as its nodes)
     for e in named(prs, r"Arch edge \d+"):
         xfrm = sppr(e).find(qn("a:xfrm"))
         assert xfrm.get("rot") is None, e.name  # horizontal-vertical-horizontal elbows are not rotated
@@ -234,17 +238,20 @@ def test_venn_circles_are_translucent_ellipses_with_names_and_a_bold_overlap(tmp
     assert not real(deck), deck.diagnostics
     sets = [one(prs, f"Venn {i} set") for i in (1, 2, 3)]
     assert all(geom(s) == "ellipse" for s in sets)
-    assert all(abs((fill_alpha(s) or 0) - 0.3) < 1e-3 for s in sets)
-    assert len({str(s.fill.fore_color.rgb) for s in sets}) == 3  # three palette colours
-    for i, name in enumerate(("Desirable", "Feasible", "Viable"), 1):
-        n = one(prs, f"Venn {i} name")
-        assert n.text_frame.text == name and n.text_frame.paragraphs[0].runs[0].font.bold
-        assert one(prs, f"Venn {i} text").text_frame.text
+    assert all(abs((fill_alpha(s) or 0) - 0.06) < 1e-3 for s in sets)  # editorial: ink at a few percent
+    assert {str(s.fill.fore_color.rgb) for s in sets} == {"2D3142"}  # neutral, not a palette colour each
+    for i, (name, body) in enumerate(
+        (("Desirable", "People want it"), ("Feasible", "We can build it"), ("Viable", "It pays for itself")),
+        1,
+    ):
+        n = one(prs, f"Venn {i} name")  # name + its body as a mono sublabel, inside the circle
+        ps = [p.text.replace("\u00a0", " ") for p in n.text_frame.paragraphs]
+        assert ps == [name, body] and n.text_frame.paragraphs[0].runs[0].font.bold
     ov = one(prs, "Venn overlap")
     assert ov.text_frame.text == "Worth building" and ov.text_frame.paragraphs[0].runs[0].font.bold
-    # `{.focal}` on the overlap: an accent tint inside the lens
+    # `{.focal}` on the overlap: the lens (a freeform) is solid accent
     fill = one(prs, "Venn overlap fill")
-    assert str(fill.fill.fore_color.rgb).upper() == "BF4520" and fill_alpha(fill) is not None
+    assert str(fill.fill.fore_color.rgb).upper() == "BF4520" and fill_alpha(fill) is None
     # the set circles overlap in the middle and the centre label lies inside all of them
     cx, cy = ov.left + ov.width / 2, ov.top + ov.height / 2
     for s in sets:
@@ -258,7 +265,7 @@ def test_venn_two_sets_and_focal_set_takes_the_accent(tmp_path):
     assert not real(deck), deck.diagnostics
     a, b = one(prs, "Venn 1 set"), one(prs, "Venn 2 set")
     assert str(b.fill.fore_color.rgb).upper() == "BF4520" and str(a.fill.fore_color.rgb).upper() != "BF4520"
-    assert not named(prs, "Venn overlap fill")  # the overlap is not focal
+    assert str(one(prs, "Venn overlap fill").fill.fore_color.rgb) == "2D3142"  # not focal: solid ink
     assert one(prs, "Venn overlap").text_frame.text == "A plan that ships"
     assert a.left + a.width > b.left  # they overlap
 
@@ -269,7 +276,7 @@ def test_venn_tokens(tmp_path):
     a, b = one(prs, "Venn 1 set"), one(prs, "Venn 2 set")
     assert str(a.fill.fore_color.rgb) == "CC0000" and str(b.fill.fore_color.rgb) == "0000CC"
     assert abs(fill_alpha(a) - 0.5) < 1e-3
-    left = one(prs, "Venn 1 text")  # `venn.text=out`: the set text sits beside the circle, not inside
+    left = one(prs, "Venn 1 name")  # `venn.text=out`: the set text sits beside the circle, not inside
     assert left.left + left.width <= a.left
 
 

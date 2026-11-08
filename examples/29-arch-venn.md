@@ -10,37 +10,37 @@ style: radius=4
 @arch
 @noemph defaults
 ## Clients
-- Web app {.external}
-- Mobile app {.external}
+- [EXT] Web app {.external}
+- [EXT] Mobile app {.external}
 ## Services
-- API gateway: auth, limits {.focal}
-- Orders
-- Billing
+- [API] API gateway: auth · limits {.focal}
+- [SVC] Orders
+- [SVC] Billing
 ## Data
-- Postgres: orders, users {.store}
-- Queue {.optional}
-- Stripe {.external}
-> Web app > API gateway, Mobile app > API gateway, API gateway > Orders: place order, Orders > Billing: invoice, Orders > Postgres: write, Orders > Queue: publish, Billing > Stripe: charge
+- [DB] Postgres: orders · users {.store}
+- [MQ] Queue {.optional}
+- [EXT] Stripe {.external}
+> Web app ~> API gateway: HTTPS, Mobile app ~> API gateway: HTTPS, API gateway => Orders: place order, Orders > Billing: invoice, Orders > Postgres: write, Orders --> Queue: publish, Billing ~> Stripe: charge
 
 # 受注データ基盤の構成
 @arch dir=h size=12
 @noemph defaults
 ## 入力
-- 受注API: 外部ECから受信 {.external}
-- 基幹ERP: 在庫・単価マスタ {.external}
+- [API] 受注API: 外部ECから受信 {.external}
+- [ERP] 基幹ERP: 在庫・単価マスタ {.external}
 ## 処理
-- 変換バッチ: 正規化・名寄せ
-- 与信チェック: 与信枠と滞留 {.focal}
-- 在庫引当: 倉庫別の引当
+- [BATCH] 変換バッチ: 正規化・名寄せ
+- [CHECK] 与信チェック: 与信枠と滞留 {.focal}
+- [STOCK] 在庫引当: 倉庫別の引当
 ## 保存
-- DWH: 全履歴・日次集計 {.store}
-- キャッシュ: 直近7日 {.store}
+- [DWH] DWH: 全履歴・日次集計 {.store}
+- [CACHE] キャッシュ: 直近7日 {.store}
 ## 出力
-- 管理画面: 営業・CS向け
-- 日次レポート {.optional}
-> 受注API > 変換バッチ: 受信, 基幹ERP > 在庫引当: 同期, 変換バッチ > 与信チェック, 与信チェック > DWH: 保存, 在庫引当 > キャッシュ, DWH > 管理画面: 参照, DWH > 日次レポート: 集計
+- [UI] 管理画面: 営業・CS向け
+- [CSV] 日次レポート {.optional}
+> 受注API ~> 変換バッチ: 受信, 基幹ERP ~> 在庫引当: 同期, 変換バッチ > 与信チェック, 与信チェック => DWH: 保存, 在庫引当 > キャッシュ, DWH > 管理画面: 参照, DWH --> 日次レポート: 集計
 
-# What makes an idea worth building
+# Good design: Desirable × Feasible × Viable
 @venn
 @noemph defaults
 ## Desirable
@@ -48,8 +48,8 @@ People want it
 ## Feasible
 We can build it
 ## Viable
-It pays for itself
-> Worth building {.focal}
+Business sustains
+> Shippable: the sweet spot
 
 # Strategy that ships
 @venn
@@ -58,4 +58,4 @@ It pays for itself
 Where to play and why
 ## Execution
 Who does what by when
-> A plan the team can run
+> Ships: a plan the team can run

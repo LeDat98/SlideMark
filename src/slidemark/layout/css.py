@@ -709,7 +709,10 @@ def margin_emu(st: Style) -> int:
 
 
 def transform_text(text: str, mode: str | None) -> str:
-    if mode == "upper":
+    if mode in (
+        "upper",
+        "caps",
+    ):  # (`caps` is drawn by the font: the renderer keeps the case, measuring does not)
         return text.upper()
     if mode == "lower":
         return text.lower()

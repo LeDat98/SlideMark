@@ -146,6 +146,7 @@ class RenderCtx:
     slides: list = field(default_factory=list)
     template: bool = False  # the base presentation comes from a user template
     chev_rank: dict[int, int] = field(default_factory=dict)  # id(Placed) -> reading rank of a chevron arrow
+    glue: list = field(default_factory=list)  # connectors drawn under their boxes: glued after the slide
 
     def diag(self, rule: str, message: str, hint: str, level: str = "warning", line: int | None = None):
         self.deck.diagnostics.append(
