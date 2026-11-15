@@ -7,7 +7,7 @@ sizes: title=34 body=16
 style: radius=4
 footer: Process review
 
-# Publishing an article
+# An article passes review and edit before CI deploys it
 > Who does what, in the order it happens. One focal step: the deploy.
 @swimlane
 @defaults
@@ -23,7 +23,7 @@ footer: Process review
 - 4: Build: astro build
 - 5: Deploy: cloudflare pages {.focal}
 
-# 受注から出荷までの業務フロー
+# 与信審査の差し戻しが受注フローの滞留点
 > 部門をまたぐ承認と在庫確認。滞留しやすいのは与信審査の差し戻し。
 @swimlane
 @defaults
@@ -40,7 +40,7 @@ footer: Process review
 - 5: 請求書を発行
 - 6: 入金を消し込む
 
-# Article request, cold cache
+# A cold cache costs one origin render per article
 > The edge answers from cache; on a miss it asks the origin, which renders once.
 @sequence
 @defaults
@@ -52,8 +52,8 @@ footer: Process review
 - Cloudflare => Reader: 200 · cached
 - Reader --> Analytics: pageview
 
-# Checkout request
-> The order service answers the client after the database confirms; one retry is the headline.
+# The order API answers after the DB confirms, with one retry
+> Auth checks the token first; the DB insert gates the reply.
 @sequence
 @defaults
 - [EXT] Client: Browser {.external}, [API] API: Order service, [IDP] Auth: JWT check {.external}, [DB] DB: Postgres {.store}
@@ -65,7 +65,7 @@ footer: Process review
 - API > API: retry once {.focal}
 - API >> Client: 201 created
 
-# Release train
+# A flaky test blocks QA in the release train
 > A vertical lane per team; the one blocking handover is in the accent.
 @swimlane dir=v
 ## Dev

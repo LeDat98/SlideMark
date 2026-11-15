@@ -7,7 +7,7 @@ sizes: title=34 body=17
 style: radius=4
 footer: Order platform
 
-# Order platform in three tiers
+# All client traffic enters through one API gateway
 @arch
 @noemph defaults
 ## Clients
@@ -23,7 +23,7 @@ footer: Order platform
 - [EXT] Stripe: card payments {.external}
 > Web app ~> API gateway: HTTPS, Mobile app ~> API gateway: HTTPS, API gateway => Orders: place order, Orders > Billing: invoice, Orders > Postgres: write, Orders --> Queue: publish, Billing ~> Stripe: charge
 
-# 受注データ基盤の構成
+# 全受注データは与信チェックを経てDWHへ入る
 @arch dir=h size=12
 @noemph defaults
 ## 入力
@@ -41,7 +41,7 @@ footer: Order platform
 - [CSV] 日次レポート {.optional}
 > 受注API ~> 変換バッチ: 受信, 基幹ERP ~> 在庫引当: 同期, 変換バッチ > 与信チェック, 与信チェック => DWH: 保存, 在庫引当 > キャッシュ, DWH > 管理画面: 参照, DWH --> 日次レポート: 集計
 
-# Good design: Desirable × Feasible × Viable
+# Build only what is desirable, feasible and viable
 @venn
 @noemph defaults
 ## Desirable
@@ -52,7 +52,7 @@ We can build it
 Business sustains
 > Shippable: the sweet spot
 
-# Strategy that ships
+# A strategy ships only where it meets execution
 @venn
 @noemph defaults
 ## Strategy

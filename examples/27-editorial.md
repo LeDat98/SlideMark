@@ -8,10 +8,10 @@ style: radius=4
 footer: Platform review
 
 # Platform review {eyebrow="Engineering · Q3 2026"}
-Architecture, throughput and cost, Q3
+Architecture, throughput and cost · Platform team, November 2026
 @defaults
 
-# How a request travels
+# Every request passes one API gateway
 > One focal service; the rest keeps to the quiet roles
 @arch
 @noemph defaults
@@ -23,7 +23,7 @@ Architecture, throughput and cost, Q3
 - [OBJ] Nightly backup: object copy {.optional}
 > Web client > API gateway, API gateway > Postgres, Postgres > Nightly backup
 
-# Where the data goes
+# The fraud check decides where checkout data goes
 ```mermaid
 flowchart LR
   A[Checkout]:::input --> B{Fraud check}
@@ -43,10 +43,10 @@ Refunds,12,14,18,17
 ```
 ## Reading
 - Growth came from **repeat buyers**
-- Refunds stayed flat at 7%
+- Refunds fell from 10% to 6.5% of orders
 @noemph defaults
 
-# Cost per service
+# Gateway cost grew fastest, +12%
 @1
 ```table {hl=Gateway}
 Service,Owner,Monthly cost,Change
@@ -57,7 +57,7 @@ Reports,Analytics,"$1,100",+1%
 ```
 @noemph defaults
 
-# 注文基盤の再構築計画
+# 3施策で注文基盤を再構築し、遅延を半減する
 > 読み取りと決済を分離し、繁忙期の遅延を半分にする
 @4
 @noemph defaults

@@ -58,10 +58,8 @@ short of a form, one emphasis (or `@noemph`), values (or `@defaults`). Advisory.
 - A palette that would fit any other deck is not specific enough. One colour carries 60–70% of the visual
   weight (`primary`), one or two support it (`secondary`, `surface`), one accent is rare and means something
   (`accent`: the key number, the current step, the verdict). Never split the weight evenly.
-- Light/dark contrast: dark cover and closing slide, light content between ("sandwich": `@cover bg=primary dark`
-  on the first and last slide), or dark throughout for a premium feel (`@bg=` on every slide or `theme: midnight`).
-  A cover needs one visual: `style: cover.art=network` (`dots`, `rings`; native shapes in `secondary` with one accent
-  node on the right 40%), a picture, or a large type scale.
+- Dark cover and closing, light content between (`@cover bg=primary dark` first and last), or dark throughout
+  (`theme: midnight`). A cover needs one visual: `style: cover.art=network` (`dots`, `rings`), a picture or large type.
 - One repeating visual motif, carried by every content slide: an icon disc on each card heading (`icon=` +
   `style: icon.disc=secondary`), numbered discs (`@rows`, `num`), one chart style, one card style.
 - Starting points (write your own hexes when the brand or topic suggests them; do not default to blue):
@@ -89,6 +87,8 @@ Japanese: Meiryo or Yu Gothic.
 (`top.bar`, `bottom.bar`, `box.stripe`, `kpi.stripe`, `item.border-left`, a vertical band beside the content).
 Both read as machine-made. Borders, not shadows: lift a card with a hairline line (`border=border`), a tinted
 `fill` or an icon disc.
+**Titles** state the takeaway as a sentence (`Refunds fell to 6.5%`, not `Refunds`); dense Japanese slides add a
+`>` conclusion line; the cover names who and when.
 **Avoid**: the same form on consecutive slides; a full stop at the end of a title; titles that move, change
 font or size between slides of one kind; centred paragraphs (centre titles only); titles under 36pt or body
 under 14pt (pin floors: `sizes: title=36! body=14!`, then cut text, widen the block or split the slide

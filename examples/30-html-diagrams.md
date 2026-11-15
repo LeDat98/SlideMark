@@ -5,7 +5,7 @@ style: title.bold=off
 footer: HTML diagrams: what syntax cannot say
 num: on
 
-# Why checkout conversion dropped {eyebrow="Fishbone · Root cause"}
+# Slow page load is the main cause of the conversion drop {eyebrow="Fishbone · Root cause"}
 @noemph defaults
 ```html
 <div class="stack">
@@ -53,7 +53,7 @@ num: on
 </div>
 ```
 
-# Q4 delivery board {eyebrow="Kanban · Delivery"}
+# One-page checkout is blocked and holds up the Q4 target {eyebrow="Kanban · Delivery"}
 @noemph defaults
 ```html
 <div class="stack"><div class="board">
@@ -65,7 +65,7 @@ num: on
 <div class="legend"><i class="eyebrow">Legend</i><span><i class="card"></i>Default</span><span><i class="card blocked"></i>Blocked</span><span><i class="card wait"></i>Waiting</span><span><i class="card done"></i>Done</span><span><i class="badge over"></i>Over WIP limit</span></div></div>
 ```
 
-# A first-time buyer's journey {eyebrow="Journey map · Checkout"}
+# The shipping fee at checkout is the low point of the journey {eyebrow="Journey map · Checkout"}
 @noemph defaults
 ```html
 <div class="stack">
@@ -81,7 +81,7 @@ num: on
 </div>
 ```
 
-# Where the support hours go {eyebrow="Treemap · Support"}
+# Payments take 46% of support hours; fees grew 3x {eyebrow="Treemap · Support"}
 @noemph defaults
 ```html
 <div style="position:relative;height:100%">
@@ -92,7 +92,7 @@ num: on
 </div>
 ```
 
-# 品質不良の要因分析 {eyebrow="特性要因図 · 品質管理"}
+# 成形機3号の温度ばらつきが不良率上昇の主因 {eyebrow="特性要因図 · 品質管理"}
 @noemph defaults
 ```html
 <div class="stack" lang="ja">
