@@ -140,3 +140,18 @@ def test_runs_become_a_report_with_medians_ranges_and_flags(tmp_path):
     out = tmp_path / "report.md"
     assert score.main([*paths, "--out", str(out)]) == 0
     assert out.read_text(encoding="utf-8").startswith("# Design")
+
+
+def test_a_campaign_writes_one_report_per_deck_and_a_summary(tmp_path):
+    rub = score.load_rubric(RUBRIC)
+    camp = _load("campaign")
+    t = yaml.safe_load((RUBRIC / "topics.yaml").read_text(encoding="utf-8"))
+    frame = next(tp for tp in t["topics"] if tp["id"] == "framing")
+    base = {k.id: 4 for k in rub.general.values() if k.id not in ("G-12", "G-14")}
+    base |= {k["id"]: 4 for k in frame["kpis"]}
+    for i, r in enumerate([_run(base, 4, 4), _run(base, 3, 4)], 1):
+        for deck in ("alpha", "beta"):
+            (tmp_path / f"run{i}-{deck}.json").write_text(json.dumps(r | {"deck": deck}), encoding="utf-8")
+    text = camp.campaign(tmp_path)
+    assert (tmp_path / "alpha.md").exists() and (tmp_path / "beta.md").exists()
+    assert "| alpha | 1 | 2 |" in text and "## Weakest KPIs" in text
