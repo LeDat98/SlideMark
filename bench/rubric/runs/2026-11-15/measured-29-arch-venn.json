@@ -1,0 +1,3 @@
+{"slides": {"3": {"G-06": 3}, "4": {"G-06": 3}},
+ "facts": {"3": "smallest text 8.0 pt (venn sublabels, legend): at the 8 pt floor for labels, so G-06 is not below the floor (level 3)",
+           "4": "smallest text 8.5 pt (venn sublabels): at the floor for labels, G-06 level 3"}}

@@ -2,7 +2,8 @@
 
     python bench/rubric/campaign.py <folder> [--out-dir <dir>]
 
-The folder holds judge runs named ``run<N>-<deck>.json`` (format: ``bench/rubric/score.py``). Writes
+The folder holds judge runs named ``run<N>-<deck>.json`` (format: ``bench/rubric/score.py``) and optionally
+``measured-<deck>.json`` (facts from the .pptx that override the judge for gate KPIs). Writes
 ``<deck>.md`` for each deck and ``SUMMARY.md`` (deck scores and bands, the weakest KPIs across all slides, gate
 failures and unstable KPIs) into ``--out-dir`` (default: the folder).
 """
@@ -46,7 +47,8 @@ def campaign(folder: Path, out_dir: Path | None = None) -> str:
         names.update({k.id: k.name for k in t.values()})
     rows, kpi_levels, gate_fails, unstable = [], defaultdict(list), [], []
     for deck, rs in sorted(runs.items()):
-        res = S.score_runs(rs, rub)
+        mp = folder / f"measured-{deck}.json"  # facts read from the .pptx override the judge for gate KPIs
+        res = S.score_runs(rs, rub, json.loads(mp.read_text(encoding="utf-8")) if mp.exists() else None)
         (out_dir / f"{deck}.md").write_text(S.report(res, rub), encoding="utf-8")
         d = res["deck"]
         rows.append((deck, len(res["slides"]), len(rs), d, res))

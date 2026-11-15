@@ -882,3 +882,16 @@ report), `bench/rubric/judge_prompt.md`, `tests/test_rubric.py` (the worked exam
   (R = 3, blind, JSON), compute the reports with `score.py`, then fix what the reports rank highest.
 - [ ] Calibrate before trusting numbers: an anchor set of >= 12 slides with human scores (method section 9) and the
   measured run-to-run SD (section 7); add a `measured.json` extractor from the .pptx for the gate KPIs.
+- **Campaign 2026-11-15 (first rubric use, `bench/rubric/runs/2026-11-15/SUMMARY.md`):** Opus, blind, R = 3. t5 deck
+  70 (66-75) Acceptable / Good borderline (deck KPIs 79: narrative 4, consistency 4, variety 5); editorial examples
+  59-65 Acceptable (slides 64-73; their deck KPIs are low because they are showcases). Gate caps: t5 slide 4
+  (timeline: 41-year and 5-year gaps drawn equal), 27 slides 3 / 5 (topic-label titles), 27 slide 4 (pale refund
+  bars; the text "refunds flat at 7%" contradicts the bars: 10% -> 6.5%). Single-run spread per slide up to ~14
+  points, consistent with the assumed SD_slide = 6.
+  Fixes ranked by the reports: (1) `@timeline` spacing proportional to the dates, or a scale-break cue; (2) card rows
+  with half-empty cards and dead bands (G-05 mean 3.3, t5 slides 8 / 14, 27 slide 2); (3) diagram labels at the 8 pt
+  floor and in light grey (G-06 / G-09 at 3 on most diagram slides): editorial labels 9-10 pt and a darker muted;
+  (4) action titles: SKILL.md and the examples state the takeaway, not the topic (G-01; T-JA-02 lead line on dense
+  JA slides); (5) editorial chart series 2 too pale (G-09); (6) cover metadata (presenter, date: T-FRAME-02);
+  (7) example 27 slide 4 text error; (8) a `.pptx` facts extractor for the gate KPIs (min font size per role,
+  contrast, bounds) so step 3 of the protocol runs automatically.
