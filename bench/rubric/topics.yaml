@@ -1,0 +1,1029 @@
+# Topic-specialised KPIs for the SlideMark slide-design rubric (research agent A).
+# Score = general KPIs (other agent) + the KPIs of the slide's topic. A slide may carry one primary topic;
+# 'dense-ja-business' is an overlay topic that is added on top of the primary topic when the slide is dense Japanese.
+# Evidence base: 18 briefs (bench/briefs, bench/briefs2: 108 slide specs), lengthbench t1-t5 + h1 (t1-t3: 45 specs, 3 open briefs
+# with ~34 slides whose form is chosen by the agent), 30 examples (154 slide titles), bench/corpus. Counts are approximate (grep on headings).
+# Source status: URLs listed were opened or returned by search in this session. Where the text of a book could not be checked,
+# the entry says 'secondary' (read via a summary or course notes) or 'unverified'. No quotations are used; all guidance is paraphrased.
+topics:
+  - id: data-chart
+    name: Data chart
+    covers: "Native editable charts (column, bar, line, stacked, area, pie, doughnut, waterfall) showing a quantitative relationship, with title, axes, labels, optional footnote."
+    recognise:
+      - "A plotted area with axes, bars, lines, wedges or waterfall steps"
+      - "Series legend or direct series labels; axis ticks or value labels"
+      - "Title that names a trend or comparison; footnote with unit or source"
+    frequency: "Most common data topic. Briefs: 20 of 108 specs (6 line, 6 column, 2 stacked, 2 pie, 2 doughnut, 2 bar); lengthbench t1-t3: 11 of 45; examples: ~21 chart blocks in 30 decks (column, line, stacked, waterfall, area, bar)."
+    kpis:
+      - id: T-CHART-01
+        name: Chart type fits the relationship
+        question: "Is the chart form the right one for the message (time series, ranking, part-to-whole, composition change, deviation)?"
+        gate: true
+        weight: 5
+        good_signals: ["Line or column for change over time; sorted bars for ranking; stacked or waterfall only when the parts and total both matter", "Pie or doughnut has few slices (about 5 or fewer) and shows one whole"]
+        bad_signals: ["Pie with many slices or similar-sized slices", "Line used for unordered categories, or bars used for a long continuous series", "3D, radar or dual-axis form that hides the comparison", "Stacked bars where the reader must compare middle segments"]
+        levels:
+          1: "Form contradicts the message (e.g. pie for a trend, line connecting unrelated categories, 3D effect distorting sizes)."
+          2: "Form works but is a clumsy choice: pie with 7+ slices, stacked chart where the key series floats in the middle, categories unordered."
+          3: "Form is conventional for the message; the comparison can be read, with some effort (e.g. unsorted bars, stacked chart with 4+ segments)."
+          4: "Form fits; categories are ordered logically or sorted by value; at most one minor friction (legend lookup, 5 slices)."
+          5: "Form is the simplest that shows the message; ordering supports the title's claim; a pie or stack is used only where part-to-whole is the point."
+        checks: ["Time on x axis implies line or column, not pie", "Pie or doughnut slices <= 5-6", "Bar categories sorted by value unless a natural order exists (months, age bands)", "No 3D chart"]
+        sources: ["Gene Zelazny, Say It with Charts: chart choice follows five relationships (component, item, time series, frequency distribution, correlation); https://www.oreilly.com/library/view/the-say-it/9780071474702/ch01.html (chapter listing checked; pairings of relationship to chart not fully checked)", "Cole Nussbaumer Knaflic, Storytelling with Data (2015): advice to avoid pie, doughnut and 3D charts, sort bars; read via summaries only, unverified in the book", "Alberto Cairo, The Truthful Art (2016): 'functional' quality = form suited to the task (the five-quality list is in The Truthful Art, not The Functional Art); https://thedataschool.co.uk/laura-brylka/the-five-qualities-of-great-vizualizations-according-to-alberto-cairo"]
+      - id: T-CHART-02
+        name: Honest scale and baseline
+        question: "Do axes and baselines show the data without exaggerating differences?"
+        gate: true
+        weight: 5
+        good_signals: ["Bar or column axis starts at zero", "A non-zero line axis is visibly marked as such", "Same scale across charts that are compared", "Axis range tight enough to use the space, not so tight that noise looks like a trend"]
+        bad_signals: ["Truncated bar axis", "Different y ranges on side-by-side charts with no note", "Broken or dual axes without labels", "Area or bubble size scaled by diameter"]
+        levels:
+          1: "Bars start above zero or axis is cut with no sign, so a small difference looks large; or dual axes imply a false link."
+          2: "Line axis is non-zero with no cue, or two paired charts use different scales silently; bars are fine."
+          3: "All bars start at zero; line axes are sensible but a non-zero start is not flagged, or the range is loose (large empty band)."
+          4: "Bars at zero; any non-zero line axis is flagged by a label or axis break; paired charts share one scale."
+          5: "All of level 4, and the range is chosen so the title's claim is visible without distortion; units on the axis or title."
+        checks: ["Bar/column value axis minimum == 0 (read from chart XML c:min or visible tick)", "If min > 0 on a line chart, a note or label says so", "Paired charts share axis max/min", "No secondary axis unless both axes are labelled with units"]
+        sources: ["Stephen Few, Show Me the Numbers: bar graphs should generally start at zero, line graphs may not (page 169 reported by secondary sources; unverified in the book); https://www.perceptualedge.com", "ONS Digital blog, 'Does the axis have to start at zero? Part 2 - bar charts': bar charts should include zero; https://digitalblog.ons.gov.uk/2016/07/23/does-the-axis-have-to-start-at-zero-part-2-bar-charts (opened)", "Storytelling with Data blog, 'bar charts must have a zero baseline': https://www.storytellingwithdata.com/blog/2012/09/bar-charts-must-have-zero-baseline (opened)", "Edward Tufte, The Visual Display of Quantitative Information (1983), lie factor = effect shown / effect in data, ideal 1; read via course notes https://faculty.cc.gatech.edu/~stasko/4460/Notes/tufte.pdf (secondary)"]
+      - id: T-CHART-03
+        name: Labels read without lookup
+        question: "Can the reader identify each series, unit and key value without hunting for a legend or decoding a colour key?"
+        gate: false
+        weight: 4
+        good_signals: ["Series named directly at the line end or bar", "Unit stated once in title, axis or footnote", "Value labels on the few points that carry the message", "Legend only when direct labels are impractical"]
+        bad_signals: ["Legend far from the data with 4+ similar colours", "Labels on every point so the chart becomes a table", "No unit anywhere", "Axis title missing when the title does not give the unit", "Rotated or truncated category labels"]
+        levels:
+          1: "Series cannot be identified (no legend, no labels) or unit is missing and cannot be inferred."
+          2: "Legend is the only key and colours are hard to tell apart, or every point is labelled and the data is cluttered; unit given only in small print."
+          3: "Legend present and usable; unit stated; category labels horizontal and complete."
+          4: "Series named at the data or the legend is adjacent and ordered like the data; unit in title or axis; labels only where they help."
+          5: "Direct labels for all series, value labels on the focal points only, unit once, no legend, no rotated text."
+        checks: ["Every series has a visible name", "Unit appears in title, axis title or footnote", "Category labels are horizontal and not clipped", "Legend order matches visual order of series"]
+        sources: ["EU Data Visualisation Guide, 'direct labelling': legends add lookup work, label directly when elements do not collide; https://data.europa.eu/apps/data-visualisation-guide/direct-labelling (returned by search; page not opened)", "ONS Service Manual, chart elements: direct labelling where practical, otherwise a legend; https://service-manual.ons.gov.uk/data-visualisation/build-specifications/chart-elements (returned by search)", "World Bank data visualization style guide: legends when direct labelling is not possible; https://worldbank.github.io/data-visualization-style-guide/chartelements (returned by search)"]
+      - id: T-CHART-04
+        name: Emphasis on the message series
+        question: "Does the chart guide the eye to the data the title talks about (one accent, the rest muted)?"
+        gate: false
+        weight: 4
+        good_signals: ["One highlighted bar, line or segment in the accent colour; others grey or a quiet tone", "Annotation or callout at the point that proves the title", "Title states the finding and matches what is highlighted"]
+        bad_signals: ["Every series in a different saturated colour", "Highlight on a series the title does not mention", "Rainbow category colours with no meaning", "Annotation covers the data"]
+        levels:
+          1: "Highlight contradicts the title, or colours rank series by accident so the eye lands on the wrong data."
+          2: "No emphasis: all series equal weight; the reader must find the point; or 5+ strong colours."
+          3: "Palette is restrained but emphasis is only implied (e.g. last series is the accent by default)."
+          4: "The focal series or point is visibly distinct and matches the title; others are quiet."
+          5: "Focal data is accent-coloured, the rest muted, a short annotation marks the key change, and non-focal colours stay distinguishable (3:1 against the background)."
+        checks: ["At most one accent colour for emphasis plus neutrals", "Highlighted element is the one named in the title", "Non-text marks (lines, bars) have >= 3:1 contrast against background (WCAG 1.4.11)"]
+        sources: ["Storytelling with Data (Knaflic 2015): use one accent colour and grey for context, titles state the takeaway; read via summaries (https://thebusinessdive.com/why-visuals-matter), unverified in the book", "W3C, WCAG 2.2 Understanding SC 1.4.11 Non-text Contrast: parts of graphics needed to understand them need 3:1 against adjacent colours; https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html (opened)", "bench/reference/diagram-design/style-guide.md: one focal accent, series palette is desaturated (repo)"]
+      - id: T-CHART-05
+        name: Chart ink and density
+        question: "Is the plot free of non-data ink (heavy grid, 3D, shadows, redundant labels) while keeping the data legible?"
+        gate: false
+        weight: 3
+        good_signals: ["Light or no gridlines; no chart border", "Series count 1-4 on one plot, or small multiples for more", "Data labels or gridlines, not both heavy"]
+        bad_signals: ["Heavy dark gridlines", "Gradient or shadowed bars", "8+ lines on one plot", "Value labels plus gridlines plus axis ticks all doing the same job"]
+        levels:
+          1: "Decoration dominates (3D, shadows, gradients, heavy grid) or 8+ series are tangled."
+          2: "Gridlines as strong as the data, or 6-7 series overlap, or redundant labelling clutters the plot."
+          3: "Plain chart with default gridlines; 5 or fewer series; readable."
+          4: "Gridlines faint; no border or effects; labelling is not redundant."
+          5: "Minimal ink: only data, a few faint reference lines, direct labels; many series are split into small multiples."
+        checks: ["No 3D or shadow effect on chart elements", "Gridline colour lighter than series colours", "Series per plot <= 5-6", "Chart plot occupies most of the chart frame (little empty margin)"]
+        sources: ["Edward Tufte, The Visual Display of Quantitative Information (1983): data-ink ratio, chartjunk, small multiples; via course notes https://faculty.cc.gatech.edu/~stasko/4460/Notes/tufte.pdf (secondary, not the book)", "Dona Wong, The Wall Street Journal Guide to Information Graphics (2010): simplify, avoid chart clutter; unverified in this session"]
+      - id: T-CHART-06
+        name: Title states the finding
+        question: "Does the slide title or subtitle say what the chart shows (finding plus unit/period) rather than naming the chart?"
+        gate: false
+        weight: 3
+        good_signals: ["Title gives the claim with a number or direction ('Response time falls within two quarters')", "Subtitle or axis gives unit and period"]
+        bad_signals: ["Title like 'Chart', 'Results' or 'Sales data'", "Claim in the title that the chart does not show"]
+        levels:
+          1: "Title is generic or contradicts the chart."
+          2: "Title names the subject only ('Sales by region') and the finding is left to the reader."
+          3: "Title names subject and unit/period; the trend is visible but not stated."
+          4: "Title states the finding and the chart shows it; unit and period are present."
+          5: "Title states the finding with a quantity or direction; chart highlight, annotation and title agree; a footnote gives the source or caveat."
+        checks: ["Title contains a verb or a number or a comparison", "Unit and period appear on the slide", "Highlight matches the title claim"]
+        sources: ["Barbara Minto, The Pyramid Principle (1987): slide title as the statement of the point; via https://www.think-cell.com/en/resources/content-hub/using-the-pyramid-principle-to-build-better-powerpoint-presentations (secondary)", "Gene Zelazny, Say It with Charts: the chart title carries the message (https://www.oreilly.com/library/view/the-say-it/9780071474702/ch01.html listing; exact wording unverified)"]
+
+  - id: data-table
+    name: Data table
+    covers: "Native editable tables of values or text attributes: results by region, competitor comparison grids, price lists, risk registers, schedules with columns."
+    recognise:
+      - "Grid of rows and columns with a header row"
+      - "Repeated numeric or short-text cells aligned in columns"
+      - "Row labels in the first column"
+    frequency: "Second most common structured topic. Briefs: 15 of 108 specs; lengthbench t1-t3: 6 of 45; examples: ~160 pipe-table lines across 30 decks, tables on most JP consulting decks (competitor, risk, financial plan)."
+    kpis:
+      - id: T-TABLE-01
+        name: Table is the right form and the right size
+        question: "Is a table justified (exact values or multi-attribute lookup) and small enough to read at the shown font size?"
+        gate: false
+        weight: 4
+        good_signals: ["Rows x columns fit the slide with body text still readable", "About 5-8 columns and 3-10 rows in a presentation context", "Rows that must be compared are adjacent"]
+        bad_signals: ["Spreadsheet dump with 12+ rows or 8+ columns", "Table where a chart would show the pattern at once", "Font shrunk to fit", "Long sentences inside cells"]
+        levels:
+          1: "Cells overflow, text is clipped or unreadable, or a pattern-in-numbers message is buried in a grid."
+          2: "Dense grid with tiny text; 10+ rows or 8+ columns; long sentences in cells."
+          3: "Readable table; size at the upper limit; cells are short phrases or numbers."
+          4: "Comfortable size; cells short; row order meaningful; the reader finds a value in seconds."
+          5: "Only the rows and columns needed; order serves the message; an alternative (chart) is not clearly better."
+        checks: ["No cell text clipped or overflowing", "Rows <= ~10 and columns <= ~8 for non-dense decks", "Min cell font size meets the deck's small-text floor", "Cell text mostly <= 2 lines"]
+        sources: ["Jonathan Schwabish, 'Ten Guidelines for Better Tables' (Journal of Benefit-Cost Analysis, 2020): tables serve lookup and exact values, charts show patterns; title seen via https://policyviz.com/2021/03/02/three-things-you-can-do-to-make-your-data-tables-more-visual/ (page text could not be retrieved; guidelines unverified)", "Stephen Few, Show Me the Numbers (2nd ed. 2012), ch. on tables vs graphs: use a table when values are looked up; unverified in this session"]
+      - id: T-TABLE-02
+        name: Alignment and number format
+        question: "Are numbers right-aligned (or decimal-aligned) with consistent decimals and units, and text left-aligned?"
+        gate: false
+        weight: 5
+        good_signals: ["Numeric columns right-aligned with the same decimals", "Units in the header, not repeated in each cell", "Header alignment matches its column", "Text left-aligned"]
+        bad_signals: ["Centred numbers of different length", "Mixed decimals (1.5, 2, 3.25)", "Units repeated in every cell", "Mixed currencies or scales in one column"]
+        levels:
+          1: "Numbers in one column use different units or scales, or are so misaligned that magnitude cannot be compared."
+          2: "Centre- or left-aligned numbers with ragged digits; mixed decimals."
+          3: "Numbers aligned consistently but decimals or units are not fully uniform."
+          4: "Numbers right-aligned, same decimals per column, units in the header."
+          5: "Level 4 plus consistent thousands separators and signs (+/-), header alignment matches column, totals visually distinct."
+        checks: ["Numeric cells have the same alignment within a column (right or decimal)", "Same number of decimals per column", "Unit appears in header or a note, not in every cell", "Header text alignment equals column alignment"]
+        sources: ["Storytelling with Data blog, 'what is a table?': left-align text and right-align numbers as a guideline; https://www.storytellingwithdata.com/blog/2020/9/24/what-is-a-table (search summary only; page body not retrieved)", "Datawrapper, 'What to consider when creating tables': https://www.datawrapper.de/blog/guide-what-to-consider-when-creating-tables (returned by search; not opened)", "Schwabish, Ten Guidelines for Better Tables: right-align numbers and headers over numeric columns (via search summary, unverified)"]
+      - id: T-TABLE-03
+        name: Light structure
+        question: "Do borders, fills and header treatment separate rows and columns without competing with the numbers?"
+        gate: false
+        weight: 3
+        good_signals: ["Thin or no row rules; no full cell borders", "Header row distinct by weight or a single fill", "Subtle zebra or whitespace for long rows", "Total row separated by a rule"]
+        bad_signals: ["Heavy borders on every cell", "Dark fills on many cells", "Header same weight as body", "Merged cells that break row reading"]
+        levels:
+          1: "Borders or fills are so heavy that they hide the numbers; header not identifiable."
+          2: "Full cell grid in strong colour; header distinguished only by size or not at all."
+          3: "Standard table style; header distinct; grid acceptable."
+          4: "Thin horizontal rules, no vertical rules, distinct header, faint banding if needed."
+          5: "Whitespace and thin rules carry the structure; total/summary rows are distinct; one deliberate emphasis style."
+        checks: ["Header row differs from body (weight/fill)", "Border width <= 1pt or only horizontal rules", "No more than one fill colour in body cells except emphasis"]
+        sources: ["Storytelling with Data (Knaflic 2015): remove unnecessary borders and shading, prefer light rules (read via search summary of the book, unverified in print)", "Edward Tufte, The Visual Display of Quantitative Information: data-ink ratio, erase non-data ink (secondary, course notes)"]
+      - id: T-TABLE-04
+        name: Emphasis guides the lookup
+        question: "Does one visual cue (bold, colour, bar, heat shade) point to the cells that matter for the message?"
+        gate: false
+        weight: 4
+        good_signals: ["Our row or best value emphasised once", "Heat shade or in-cell bar on a numeric column", "First column labels clearly separated from data"]
+        bad_signals: ["Everything bold", "Multiple unrelated colours across cells", "Colour as the only carrier of meaning", "No emphasis and 40 equal cells"]
+        levels:
+          1: "Emphasis misleads (the highlighted cell is not the point) or colour is the only signal and fails for colour-blind viewers."
+          2: "No emphasis at all with a table of 30+ numeric cells, or 3+ unrelated highlight colours."
+          3: "Some emphasis (header, total) but the key row/column is not marked."
+          4: "One clear emphasis on the key row/column/cell; legend or title explains it."
+          5: "Emphasis answers the title's question at a glance; a text cue (symbol, bold) backs any colour cue; rankings or deltas are visible."
+        checks: ["Highlight count is small (<= ~3 regions)", "Colour meaning is also encoded in text, symbol or weight", "Highlighted row/col matches the title claim"]
+        sources: ["Storytelling with Data (Knaflic 2015): heatmap table to show variation (via search summary; unverified in print)", "W3C WCAG 2.2, SC 1.4.1 Use of Color (colour is not the only carrier): https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html (known SC; page not opened)"]
+      - id: T-TABLE-05
+        name: Headers, units and source
+        question: "Do the headers, units and footnote make every number interpretable without guessing?"
+        gate: true
+        weight: 4
+        good_signals: ["Every column has a header", "Units and period stated", "Footnote for source or caveat", "Row header column identifies each record"]
+        bad_signals: ["Unlabelled columns", "Numbers without units (%, JPY million, k)", "Abbreviations never explained"]
+        levels:
+          1: "Columns or rows are unlabelled; numbers cannot be interpreted."
+          2: "Headers exist but units or period are missing in places."
+          3: "Headers and units present; abbreviations mostly obvious."
+          4: "Headers, units and period clear; footnote explains special values (n/a, estimates)."
+          5: "Level 4 plus consistent term use across header, title and body; totals labelled."
+        checks: ["Header cell present for every column", "Unit or % appears in header or cells", "Footnote present when data has a source or an estimate"]
+        sources: ["Few, Show Me the Numbers (2nd ed.): label and title so values are unambiguous; unverified in this session", "Urban Institute Data Visualization Style Guide: https://urbaninstitute.github.io/graphics-styleguide (exists; table rules not read)"]
+
+  - id: key-numbers
+    name: KPI cards / key numbers
+    covers: "Big-number cards and scorecards: 2-6 headline figures with label, change and note; metric tiles; financial summaries; targets vs actual."
+    recognise:
+      - "Several large numerals with small labels"
+      - "Card or tile layout of equal size"
+      - "Delta text (+14%, -6 min) or arrows near each number"
+    frequency: "Briefs: 11 of 108 specs; lengthbench t1-t3: 8 of 45 (highest per-deck share); examples: 33 '.kpi' cards over ~12 decks (JP consulting, pitch, traction, results)."
+    kpis:
+      - id: T-KPI-01
+        name: Number, label, unit are complete
+        question: "Does every card give a value with its unit, a label saying what it measures, and a period or basis where needed?"
+        gate: true
+        weight: 5
+        good_signals: ["Value, unit and label all visible per card", "Period or basis stated once ('FY2026', 'vs last year')", "Same unit format across comparable cards"]
+        bad_signals: ["Number without unit or label", "Mixed formats (1.28B vs 128,000 million)", "Label so small it is not read with the number"]
+        levels:
+          1: "A figure has no label or unit, or the reader cannot tell what the number measures."
+          2: "Labels exist but units or period are missing, or formats are inconsistent across cards."
+          3: "Every card has value, unit and label; period is implied."
+          4: "Value, unit, label and period are clear; formats are consistent."
+          5: "Complete and consistent; labels are plain words rather than codes; footnote defines any derived metric."
+        checks: ["Each card has numeric value + unit/symbol + label", "Same decimals and scale among comparable cards", "Period/basis appears on the slide"]
+        sources: ["Stephen Few, Information Dashboard Design (2006, 2013): metrics need context; secondary via https://www.perceptualedge.com/blog/?p=160 (opened by search; not read in depth) and unverified chapter detail", "Storytelling with Data (Knaflic 2015): a single big number works, with one sentence of interpretation; via https://www.skillsyouneed.com/rhubarb/data-storytelling.html (secondary)"]
+      - id: T-KPI-02
+        name: Context shows good or bad
+        question: "Does each key number carry a comparison (change, target, prior period, benchmark) so its meaning is clear?"
+        gate: false
+        weight: 5
+        good_signals: ["Delta vs previous period or target next to the number", "Sign and direction readable ('+14%', up arrow)", "Meaning of up (good/bad) is clear: e.g. wait time down is good"]
+        bad_signals: ["Bare numbers", "Delta with no base", "Red/green only to carry good/bad", "Up arrow on a metric where up is bad, uncoloured"]
+        levels:
+          1: "Bare numbers; the reader cannot judge good or bad."
+          2: "A comparison exists on some cards only, or the base is unnamed."
+          3: "Every card has a delta or a note; the base is implied."
+          4: "Every card shows a delta against a named base; direction and sentiment are readable."
+          5: "Delta plus target or trend (sparkline, bullet) where it helps; good/bad is encoded by text or shape, not colour only."
+        checks: ["Each card has a comparison element (delta, target, note)", "Delta base is stated or obvious", "Colour for good/bad also has a sign or text"]
+        sources: ["Stephen Few, Information Dashboard Design: bullet graphs show a measure against a target and ranges, sparklines add trend context; https://www.perceptualedge.com/blog/?p=160 (search result), https://en.wikipedia.org/wiki/Bullet_graph (secondary)", "W3C WCAG 2.2 SC 1.4.1 Use of Color (colour is not the only visual signal): https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html (not opened)"]
+      - id: T-KPI-03
+        name: Number dominance
+        question: "Is the number the largest element on its card, with a clear size step to label and note?"
+        gate: false
+        weight: 4
+        good_signals: ["Value at least ~2x the label size", "Numeral weight high, label light", "Number placed first in reading order"]
+        bad_signals: ["Label and number the same size", "Decoration or icon larger than the number", "Number is split across lines"]
+        levels:
+          1: "The number is hard to find or is smaller than its label/icon."
+          2: "Number is only slightly larger than the label; hierarchy is weak."
+          3: "Number is larger than the label; step is moderate."
+          4: "Number is clearly the largest (about 2x or more) and fits on one line."
+          5: "Strong, consistent size step across cards; number plus delta reads in one glance; icon is secondary."
+        checks: ["Numeral font size >= 2x label font size", "Number text does not wrap", "Numerals are the largest text on the card"]
+        sources: ["Nancy Duarte, slide:ology (2008): one dominant element sets what is read first (principle; page not verified)", "Garr Reynolds, Presentation Zen: signal-to-noise, remove what does not carry the message; https://www.oreilly.com/library/view/presentation-zen-simple/9780132901529/ch06lev1sec3.html (returned by search)"]
+      - id: T-KPI-04
+        name: Number count and grouping
+        question: "Is the count of cards small and uniform, with an order that has meaning (importance, financial flow)?"
+        gate: false
+        weight: 3
+        good_signals: ["3-6 cards in a single row or an even grid", "Equal card size and spacing", "Order follows importance or a P&L flow", "Related metrics grouped"]
+        bad_signals: ["8+ unrelated tiles", "Uneven card sizes with no meaning", "Ragged last row", "Cards mixing unrelated units with no grouping"]
+        levels:
+          1: "10+ tiles or cards of random size; no order discernible."
+          2: "7-9 cards, or uneven grid and unclear order."
+          3: "4-6 cards, uniform, order not explained."
+          4: "3-6 uniform cards; the order is logical; related ones grouped."
+          5: "Card count, order and grouping make the story (e.g. result -> driver -> outlook), with the hero metric first or larger by design."
+        checks: ["Card count 3-6 (up to 8 in dense decks)", "Card widths equal within a row", "Gutters equal"]
+        sources: ["Few, Information Dashboard Design: dashboards group related metrics, avoid fragmenting (unverified chapter detail)", "bench/reference/diagram-design/style-guide.md: grid and spacing divisible by 4, uniform treatments (repo)"]
+      - id: T-KPI-05
+        name: Number integrity and formatting
+        question: "Are numbers formatted for fast reading (thousands separators, rounded precision, consistent scale) and consistent with the title?"
+        gate: false
+        weight: 3
+        good_signals: ["Rounded to the precision the decision needs", "Separators and unit scale consistent (億円, M, k)", "Title and card numbers agree"]
+        bad_signals: ["False precision (12.3456%)", "Mixed scales (M and k)", "Title claims +20% but card shows +14%"]
+        levels:
+          1: "Numbers conflict with each other or with the title."
+          2: "Excess precision or mixed scales make comparison slow."
+          3: "Formatting is acceptable and consistent within a card."
+          4: "Precision and scale are consistent across cards."
+          5: "Precision matches the claim; scale is shortened for reading (1.28B not 1,280,000,000) and the unit is in a fixed place."
+        checks: ["Same scale suffix across cards", "Decimals per metric type are consistent", "Title numbers match card numbers"]
+        sources: ["Dona Wong, WSJ Guide to Information Graphics: round numbers and cut digits for the reader (unverified in this session)", "Few, Show Me the Numbers: appropriate precision for the task (unverified)"]
+
+  - id: process-flow
+    name: Process, flow and steps
+    covers: "Ordered sequences: step chevrons, numbered steps, flowcharts with decisions, swimlanes, sequence diagrams, cycles (improvement loops), release trains."
+    recognise:
+      - "Arrows or numbered shapes that imply order"
+      - "Words like step, phase, flow, procedure, フロー, ステップ"
+      - "Decision diamonds, lanes with actors, loop arrows"
+    frequency: "Briefs: 9 of 108 specs (process steps left to right); lengthbench t1-t3: 6 of 45; examples: ~13 titles with flow/step/process meaning (05-jp-process, 23 four steps, 27, 28 swimlane and sequence, 11 plan, 19 three steps)."
+    kpis:
+      - id: T-PROC-01
+        name: Order is unambiguous
+        question: "Can the reader tell where the process starts, which way it runs and in what order the steps occur?"
+        gate: true
+        weight: 5
+        good_signals: ["One reading direction (left to right or top to bottom)", "Numbers, chevrons or arrows show the order", "A single start and a clear end", "Loops marked as loops"]
+        bad_signals: ["Steps scattered with no arrows or numbers", "Arrows pointing in mixed directions", "Two possible starts", "Order only implied by position in an irregular layout"]
+        levels:
+          1: "Order cannot be read: no numbers or arrows, or arrows contradict each other."
+          2: "Order is guessable from position; direction changes mid-flow with no cue; start/end unclear."
+          3: "Order is readable via arrows or numbers; one direction; start/end identifiable."
+          4: "One direction, explicit markers (number or chevron), clear start and end; branches labelled."
+          5: "Order is read at a glance; the main path is visually dominant over exceptions; loops and returns are marked as such."
+        checks: ["Visible order markers (numbers, arrows, chevrons) on every step", "Arrows go in one overall direction", "Exactly one start (and at least one end)", "Branch labels on decision outputs"]
+        sources: ["Flowchart conventions, ISO 5807 (1985) is the standard for flowchart symbols; one primary direction, one start, labelled decision branches (practitioner guides via search, e.g. https://www.designtechguide.com/?p=567; standard text unverified)", "bench/reference/diagram-design/primitives-core.md: orthogonal connectors, labelled arrows (repo; MIT)", "Nancy Duarte, slide:ology (2008) on diagramming a process: unverified, taxonomy not checked"]
+      - id: T-PROC-02
+        name: Step content is uniform and short
+        question: "Are steps parallel in form (verb-first, similar length) with a short name and at most one line of detail?"
+        gate: false
+        weight: 4
+        good_signals: ["Step names are 1-4 words, same grammatical form", "Detail text is optional and about equal across steps", "Equal box sizes for equal-weight steps"]
+        bad_signals: ["Step 1 is a paragraph, step 2 is one word", "Boxes of unequal size with no meaning", "Text overflows or shrinks to fit"]
+        levels:
+          1: "Text is clipped, overflows, or steps cannot be told apart."
+          2: "Unequal length and form across steps; some paragraphs; boxes uneven."
+          3: "Steps readable; some inequality in text length."
+          4: "Parallel names; similar detail length; equal boxes."
+          5: "Parallel, terse steps with an outcome/owner/time where it matters; consistent size and spacing."
+        checks: ["Step names <= ~4 words (or ~12 CJK characters)", "Box widths equal where the steps have equal weight", "No clipped text", "All steps use the same pattern (verb-first or noun-first)"]
+        sources: ["Garr Reynolds, Presentation Zen: simplicity and signal-to-noise (https://www.oreilly.com/library/view/presentation-zen-simple/9780132901529/ch06lev1sec3.html)", "Barbara Minto, The Pyramid Principle: ideas in one group share a form and are the same kind of thing (via secondary https://thinkinsights.net/insights/minto-pyramid-principle)"]
+      - id: T-PROC-03
+        name: Step count and chunking
+        question: "Is the number of steps within what can be followed (about 3-7), with long processes chunked into phases?"
+        gate: false
+        weight: 3
+        good_signals: ["3-7 steps in one row", "Phases or stages group longer sequences", "Number of steps matches the title ('4 steps')"]
+        bad_signals: ["12 equal boxes in a row", "Title says 3 steps, slide shows 5", "Wraps over multiple rows without a clear path"]
+        levels:
+          1: "Step count contradicts the title or the sequence is lost across wraps."
+          2: "9+ steps at one level with no grouping."
+          3: "7-8 steps or a modest wrap; readable."
+          4: "3-7 steps, or longer sequence grouped in phases."
+          5: "Count and chunking suit the content; each phase has a name, and the count matches the title."
+        checks: ["Step count matches any number in the title", "Steps per row <= 7", "Wrapped rows have a visible link (arrow or numbering)"]
+        sources: ["George Miller (1956) 'The Magical Number Seven' as a rule of thumb for chunking (cited widely; original not checked here)", "Nancy Duarte, slide:ology: limit what the audience must hold at once (unverified detail)"]
+      - id: T-PROC-04
+        name: Connector quality
+        question: "Are arrows short, orthogonal or straight, unobstructed and attached to the boxes they join, with labels clear of the line?"
+        gate: false
+        weight: 4
+        good_signals: ["Arrows connect box edges", "No arrow crosses a box or another arrow without a hop", "Right-angle bends, same arrow style", "Labels sit beside the line with a gap"]
+        bad_signals: ["Floating arrows", "Diagonal lines between unaligned boxes", "Arrow passes behind boxes", "Two arrows share a path", "Label on top of the line"]
+        levels:
+          1: "Arrows are detached, cross boxes or each other so the path cannot be traced."
+          2: "Some arrows are diagonal or touch nothing; crossing without hops; labels sit on lines."
+          3: "Arrows connect the right boxes; minor crossings or mixed styles."
+          4: "Clean orthogonal or straight arrows; no crossings or crossings with a hop; labels beside lines."
+          5: "Every connector is traceable end to end; attach points fanned on shared edges; arrow roles (main/exception) use two clear styles."
+        checks: ["Arrow endpoints touch box edges", "No connector passes behind a non-endpoint box", "No two connectors overlap on the same segment", "Connector label gap >= 6px from the line (diagram-design rule 2)"]
+        sources: ["bench/reference/diagram-design/primitives-core.md: six connector rules (orthogonal, label margin 6-10px, no overlap, fan attach points, no pass-behind, label mask) (repo; read)", "bench/reference/diagram-design/style-guide.md: arrow roles and stroke (repo; read)"]
+      - id: T-PROC-05
+        name: Who, when and outcome per step
+        question: "Where the process spans actors or time, does the slide show who does what (lanes or labels) and the output or duration?"
+        gate: false
+        weight: 3
+        good_signals: ["Swimlanes or owner tags for multi-actor processes", "Duration or SLA beside steps where relevant", "An outcome or deliverable shown at the end"]
+        bad_signals: ["Steps without owners when the title is about responsibilities", "Lanes with no labels", "Cross-lane arrows that tangle"]
+        levels:
+          1: "Process mixes actors with no way to tell who acts, and the title is about responsibility."
+          2: "Owners named in text only in some steps; lanes unlabelled."
+          3: "Owners/durations appear where the brief required."
+          4: "Lanes or tags make owner clear; cross-lane handoffs readable."
+          5: "Owner, time and output are visible per step without clutter; handoffs are the visually strongest connectors."
+        checks: ["Each lane or actor has a label", "Handoff arrows cross lane borders only at the handoff point", "Duration or time label where the brief gave one"]
+        sources: ["Swimlane / sequence rules from bench/reference/diagram-design (repo; examples/28-swimlane-sequence.md used as local evidence)", "Japanese 業務フロー図 practice (lanes per department) is common but no primary guide was found; unverified"]
+
+  - id: system-diagram
+    name: System, architecture and concept diagram
+    covers: "Structural diagrams of parts and relations: tiered architecture, component maps, data flow, Venn overlaps, fishbone / cause-effect, kanban boards, customer journey maps, treemaps."
+    recognise:
+      - "Boxes inside boxes or in tiers, connected by lines"
+      - "Layer labels (Clients / Services / Data), icons, tech names"
+      - "Fishbone spine, kanban columns, Venn circles, journey lane with a sentiment line"
+    frequency: "Mostly open-form slides. Examples: 27, 28, 29, 30 (arch, fishbone, kanban, journey map, treemap, venn) plus 09 and 12 (mermaid/svg); open briefs h1 (3 of 4 slides: fishbone, kanban, journey map); briefs 0 of 108 (not specified as a form). Estimated 8-10% of open-form slides."
+    kpis:
+      - id: T-SYS-01
+        name: Structure shows the right relationship
+        question: "Does the diagram form (tiers, containment, flow, overlap, cause tree) show the relationship the title claims?"
+        gate: true
+        weight: 5
+        good_signals: ["Tiers imply layers; containment implies 'part of'; arrows imply flow or dependence", "One relationship type per diagram", "Title names the relationship ('Order platform in three tiers')"]
+        bad_signals: ["Arrows with no stated meaning", "Boxes placed arbitrarily", "Mixed relationships in one drawing (containment, flow and ownership)", "Decorative shapes that look like components"]
+        levels:
+          1: "Diagram does not show the claimed relationship or mixes meanings so it cannot be read."
+          2: "Relationship is guessable; arrows or containment have mixed meanings."
+          3: "One main relationship is readable; a few ambiguous connectors."
+          4: "Relationship clear; line styles carry one meaning each; the legend/labels explain them."
+          5: "Form is the minimum structure that proves the title; every shape, line and position has a stated meaning."
+        checks: ["Every connector is explained by an arrow label, legend or convention", "Layers or groups are labelled", "Boxes in one tier are visually parallel"]
+        sources: ["bench/reference/diagram-design/style-guide.md: node-type treatments (focal, backend, store, external, optional, security) and one-accent rule (repo)", "Alberto Cairo, The Functional Art (2012): form follows the task; framework summary via https://thedataschool.co.uk/laura-brylka/the-five-qualities-of-great-vizualizations-according-to-alberto-cairo (five qualities are from The Truthful Art)", "Nancy Duarte, slide:ology: choose a diagram family by the relationship (list, process, hierarchy, cycle, Venn); exact taxonomy not verified"]
+      - id: T-SYS-02
+        name: Focal element and hierarchy
+        question: "Is there one or two focal components (accent) and the rest quiet, so the reader knows where to look first?"
+        gate: false
+        weight: 4
+        good_signals: ["One or two accent-bordered nodes", "Supporting nodes neutral", "Larger or central position for the key node"]
+        bad_signals: ["Every node in its own colour", "Three or more accents", "Key node same style as others"]
+        levels:
+          1: "Colour is random and the key component cannot be found."
+          2: "Several accents compete; no focal point."
+          3: "Palette restrained; the focal node is implied by position only."
+          4: "One or two focal nodes marked; others quiet."
+          5: "Focal node, supporting nodes and externals are three clear visual levels; colour meaning is consistent and explained."
+        checks: ["Accent used on <= 2 nodes", "Node types use a consistent fill/stroke map", "Focal node named in the title or caption"]
+        sources: ["bench/reference/diagram-design/style-guide.md: 'focal (1-2 max)', one accent colour (repo; read)", "Edward Tufte, The Visual Display of Quantitative Information: layering and separation of data from background (secondary)"]
+      - id: T-SYS-03
+        name: Label legibility and fit
+        question: "Is every node and connector label readable at slide size, complete and inside its shape (no shrink or clip)?"
+        gate: true
+        weight: 5
+        good_signals: ["Node names 12pt-equivalent or larger", "Sublabels short and not tiny", "Text fits inside boxes with padding", "Labels masked off lines"]
+        bad_signals: ["Text 8pt or less to fit", "Clipped or overflowing labels", "Label crossing a connector", "Label ambiguous (abbreviations without legend)"]
+        levels:
+          1: "Labels are unreadable at slide size, clipped, or overlap lines."
+          2: "Several labels at very small size or touching edges; abbreviations unexplained."
+          3: "Labels readable and fit, with tight padding; minor overlap."
+          4: "Labels readable, padded, masked; abbreviations explained."
+          5: "Consistent label sizes by role (name, sublabel, arrow label); no shrink to fit; long names cut instead of shrunk."
+        checks: ["No text overflow in any node", "Min label font size >= deck floor (e.g. 10-12pt for projected slides)", "Padding >= ~8px inside boxes", "Connector labels do not overlap lines or boxes", "CJK width budget = 1em per full-width character"]
+        sources: ["bench/reference/diagram-design/style-guide.md: floor of 12px for CJK labels, width budget 1em for wide chars (repo; read)", "bench/reference/diagram-design/primitives-core.md: label mask and margin (repo; read)", "W3C WCAG 2.2 SC 1.4.3 Contrast (Minimum): 4.5:1 for regular text; https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html (known SC; not opened)"]
+      - id: T-SYS-04
+        name: Connector discipline
+        question: "Are connectors orthogonal or straight, non-overlapping, attached, and drawn behind the boxes?"
+        gate: false
+        weight: 4
+        good_signals: ["Right-angle connectors with rounded corners", "Distinct attach points on shared edges", "Arrows drawn behind boxes", "Crossings with a hop"]
+        bad_signals: ["Diagonal slashes", "Arrow passes behind an unrelated box", "Two arrows share a line", "Arrowhead hidden under a box"]
+        levels:
+          1: "The path of at least one connector cannot be traced."
+          2: "Diagonals, shared lines or pass-through boxes in several places."
+          3: "Mostly clean connectors; one or two crossings."
+          4: "Orthogonal, fanned attach points, no shared segments."
+          5: "All six diagram-design connector rules hold; crossings are rare and bridged."
+        checks: ["No diagonal connector between non-aligned nodes", "No two connectors share a segment", "Connectors do not cross unrelated boxes", "Distinct attach points per connector"]
+        sources: ["bench/reference/diagram-design/primitives-core.md, 'Mandatory connector rules' 1-6 (repo; read)"]
+      - id: T-SYS-05
+        name: Scope and completeness
+        question: "Does the diagram show the right amount of the system (the parts the title needs, no more) and name what is out of scope or external?"
+        gate: false
+        weight: 3
+        good_signals: ["8-15 nodes for a one-slide overview", "Externals visibly distinct", "Detail beyond the title's claim omitted or deferred"]
+        bad_signals: ["30+ nodes in one drawing", "Internal and external systems styled identically", "Components in the title missing"]
+        levels:
+          1: "Components named in the title are missing, or 30+ nodes make the structure unreadable."
+          2: "20-30 nodes; externals not distinguished."
+          3: "Key parts present; some extra detail."
+          4: "Only needed parts; externals distinct; groups labelled."
+          5: "Level of detail fits the audience; a caption states scope or what is omitted."
+        checks: ["Node count <= ~15 (non-dense) or grouped", "Every component named in the title is present", "External systems differ in stroke or fill"]
+        sources: ["bench/reference/diagram-design/style-guide.md: node-type treatments (external, optional, store) (repo; read)", "Garr Reynolds, Presentation Zen: signal-to-noise (https://www.oreilly.com/library/view/presentation-zen-simple/9780132901529/ch06lev1sec3.html)"]
+
+  - id: comparison
+    name: Comparison and options
+    covers: "Side-by-side comparison of 2-4 things on shared criteria: options A/B/C, before/after, pros/cons, build vs buy, current vs target, vendor fit, benefit boxes."
+    recognise:
+      - "Two to four parallel boxes or columns with equal weight"
+      - "Repeated headings or criteria rows across columns"
+      - "vs, before/after, option, recommend, 比較, 案"
+    frequency: "Briefs: 14 of 108 specs (side-by-side boxes) plus 15 tables that often compare; lengthbench t1-t3: 6 of 45; examples: ~11 comparison titles (競合比較, 売り切り型と稼働保証型, Build or buy, Vendor fit by criterion, options)."
+    kpis:
+      - id: T-CMP-01
+        name: Same criteria, same order
+        question: "Do all compared items answer the same questions in the same order, so each row can be compared directly?"
+        gate: true
+        weight: 5
+        good_signals: ["Aligned rows across columns", "Same attributes per option", "Equal slot for missing data (n/a)"]
+        bad_signals: ["Option A lists cost, B lists benefits", "Unequal number of points", "Unaligned rows"]
+        levels:
+          1: "Items are described on different dimensions; no fair comparison is possible."
+          2: "Mostly parallel but some attributes are missing or in a different order; rows do not align."
+          3: "Parallel attributes; alignment approximate."
+          4: "Same attributes, same order, aligned across columns; gaps marked."
+          5: "Attributes are the decision criteria; alignment is exact; difference cells are easy to scan."
+        checks: ["Each option has the same attribute set", "Row positions align across columns", "Missing values shown as n/a, not omitted"]
+        sources: ["Barbara Minto, The Pyramid Principle: items in a group are the same kind and ordered logically (secondary: https://thinkinsights.net/insights/minto-pyramid-principle)", "Consulting comparison-table practice (McKinsey/BCG-style option grids): no primary text found; unverified"]
+      - id: T-CMP-02
+        name: Recommendation or verdict is visible
+        question: "Does the slide say which option wins or what the comparison means (recommended highlight, bottom-line statement)?"
+        gate: false
+        weight: 5
+        good_signals: ["One option highlighted or marked recommended", "Conclusion line below the options", "Title states the verdict"]
+        bad_signals: ["Options equal and no conclusion", "Highlight on a different option than the text recommends", "Reader must compute the answer"]
+        levels:
+          1: "The visual emphasis contradicts the recommendation."
+          2: "No verdict; the slide lists options only."
+          3: "Verdict in text only, small or at the bottom."
+          4: "Verdict stated and the chosen option is highlighted."
+          5: "Title, highlight and bottom line agree; the deciding criteria are visible as the reason."
+        checks: ["Recommended option has distinct fill/border", "A conclusion sentence exists when the brief gave one", "Highlight and text name the same option"]
+        sources: ["Barbara Minto, The Pyramid Principle: answer first, then the support (secondary)", "Garr Reynolds, Presentation Zen: one clear message per slide (via https://www.free-power-point-templates.com/articles/presentation-zen, secondary)", "Japanese consulting tip: 1スライド1メッセージ; https://biz.moneyforward.com/work-efficiency/basic/22712/ (returned by search)"]
+      - id: T-CMP-03
+        name: Fair visual weight
+        question: "Do compared items get equal size, spacing and treatment, except the deliberate emphasis?"
+        gate: false
+        weight: 4
+        good_signals: ["Equal widths", "Same internal layout per column", "A single, deliberate emphasis"]
+        bad_signals: ["Uneven widths from text length", "One column crowded, another empty", "Colours imply a ranking that is not intended"]
+        levels:
+          1: "Size or colour implies a wrong ranking."
+          2: "Uneven sizes and spacing that do not carry meaning."
+          3: "Roughly equal; minor differences."
+          4: "Equal widths and layout; emphasis is deliberate."
+          5: "Exactly equal; emphasis applied once; whitespace balanced."
+        checks: ["Column widths within ~5% of each other", "Same font sizes per column", "Number of text lines per column balanced"]
+        sources: ["Tufte, Visual Display of Quantitative Information: small multiples, repeat the same design for comparison (secondary: https://faculty.cc.gatech.edu/~stasko/4460/Notes/tufte.pdf)", "bench/reference/diagram-design/style-guide.md: grid of 4 and consistent radius/stroke (repo)"]
+      - id: T-CMP-04
+        name: Differences are quantified or explicit
+        question: "Are the differences that decide the choice shown as numbers, marks or short phrases (not buried in prose)?"
+        gate: false
+        weight: 4
+        good_signals: ["Numbers with units per option", "Check or cross marks plus text", "Delta between options", "Bold on the deciding values"]
+        bad_signals: ["Paragraph per option", "Adjectives instead of figures", "Ratings by colour only"]
+        levels:
+          1: "Comparison relies on vague adjectives; nothing quantified."
+          2: "Some numbers, mixed with long prose."
+          3: "Numbers or marks for most criteria."
+          4: "Decisive criteria are numeric/explicit with units."
+          5: "Deltas or rankings are visible at a glance; marks have a legend or text, not colour alone."
+        checks: ["Numbers carry units", "Ratings use symbols plus text, not colour alone", "Text per cell <= ~2 lines"]
+        sources: ["Dona Wong, WSJ Guide to Information Graphics: be specific (unverified)", "W3C WCAG 2.2 SC 1.4.1 Use of Color (https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html; not opened)"]
+      - id: T-CMP-05
+        name: Item count
+        question: "Is the number of compared items small enough to compare (2-4), with larger sets moved to a table?"
+        gate: false
+        weight: 3
+        good_signals: ["2-4 columns", "5+ items shown in a grid or table instead"]
+        bad_signals: ["6 thin columns", "Cards with 5+ bullets each"]
+        levels:
+          1: "6+ columns of prose; no comparison is possible."
+          2: "5 columns or cards with long text."
+          3: "4 columns, moderate text."
+          4: "2-4 items, short text."
+          5: "Count fits the decision; 2 items are shown as before/after pair with matching rows."
+        checks: ["Columns <= 4 for box layouts", "Bullets per box <= ~4"]
+        sources: ["Common 3-option rule in consulting decks (e.g. options A/B/C); no primary source; unverified", "Garr Reynolds, Presentation Zen (signal-to-noise)"]
+
+  - id: timeline-roadmap
+    name: Timeline and roadmap
+    covers: "Time-ordered plans: milestones, phases across quarters/years, Gantt-like roadmaps, schedules, history timelines, release plans."
+    recognise:
+      - "A horizontal time axis with dates, quarters or years"
+      - "Bars or markers placed along the axis"
+      - "Words like roadmap, schedule, milestone, ロードマップ, スケジュール, Q1-Q4"
+    frequency: "Examples: ~15 of 154 titles (08, 11, 16, 19, 20, 22, 23, 26 roadmap or schedule); briefs 0 of 108 (not requested as a form); lengthbench t4/t5 open decks contain roadmap slides (e.g. 'Lộ trình 12 tuần'). About 6-10% of slides in real consulting decks."
+    kpis:
+      - id: T-TIME-01
+        name: Time axis is correct and legible
+        question: "Is there a visible time axis with ordered, evenly spaced or proportionally scaled periods?"
+        gate: true
+        weight: 5
+        good_signals: ["Labelled periods in left-to-right order", "Equal period widths or true-to-scale", "Axis at the top or bottom, repeated if the slide is tall"]
+        bad_signals: ["No dates", "Periods out of order", "A 1-month phase drawn as wide as a 12-month phase with no cue", "Axis labels clipped"]
+        levels:
+          1: "No time axis, or periods out of order, so the sequence in time cannot be read."
+          2: "Axis present but unequal periods with no scale cue, or labels clipped."
+          3: "Axis present, ordered and legible; scale is approximately even."
+          4: "Ordered, even or true-to-scale; start/end dates readable."
+          5: "Axis scale is honest; the current period or today is marked; breaks in scale are flagged."
+        checks: ["Periods in chronological order", "Equal column widths for equal periods", "Date/period labels present and not clipped", "A 'today' or current-period marker where status is shown"]
+        sources: ["Atlassian, 'Project roadmap explained': time axis is the spine of a roadmap; https://www.atlassian.com/agile/project-management/project-roadmap (returned by search)", "Gantt and roadmap conventions: diamonds for milestones, one axis (practitioner summaries via search; no primary standard)", "Edward Tufte, The Visual Display of Quantitative Information: scale integrity (secondary)"]
+      - id: T-TIME-02
+        name: Items placed at the right time
+        question: "Does each phase or milestone sit at the period it belongs to, with start and end visible where duration matters?"
+        gate: true
+        weight: 5
+        good_signals: ["Bars span the correct periods", "Milestones are markers at a date", "Dependencies or handoffs are arrows only where they matter"]
+        bad_signals: ["Bars placed by space convenience, not by date", "Milestone dates missing", "Overlapping bars hiding each other"]
+        levels:
+          1: "Items are placed at wrong periods, or placement contradicts the labels."
+          2: "Placement is approximate; some bars overlap or cannot be dated."
+          3: "Placement is correct but start/end are only implied."
+          4: "Bars/markers match dates; durations visible; no hidden overlaps."
+          5: "All items placed true to scale with start/end or labels; critical path or dependencies visible without clutter."
+        checks: ["Bar start/end match their labelled dates", "Markers have a date label", "No bar overlaps another in the same lane"]
+        sources: ["Atlassian and ProofHub roadmap guides: milestones are markers, phases are bars (https://www.atlassian.com/agile/project-management/project-roadmap; https://www.proofhub.com/articles/project-roadmap; search results)", "Gantt convention: milestone = diamond (practitioner sources via search)"]
+      - id: T-TIME-03
+        name: Swimlanes and ownership
+        question: "Are parallel workstreams grouped in labelled lanes with owners or deliverables where relevant?"
+        gate: false
+        weight: 3
+        good_signals: ["Lane labels at left", "One workstream per lane", "Owner or deliverable per bar when requested"]
+        bad_signals: ["Bars in one pile", "Lane labels missing", "Owners only in a footnote"]
+        levels:
+          1: "Parallel streams are mixed; cannot tell which bar belongs where."
+          2: "Lanes implied by position only; labels missing."
+          3: "Lanes labelled."
+          4: "Lanes labelled; owner/deliverable on bars or at lane head."
+          5: "Lanes are ordered by importance; dependencies across lanes are clear."
+        checks: ["Lane label per workstream", "Bars inside the lane boundary", "Owner text where the brief gives it"]
+        sources: ["Atlassian, 'Project roadmap explained' (key elements include milestones, timeline, ownership); https://www.atlassian.com/agile/project-management/project-roadmap (search result)", "bench/reference/diagram-design (swimlane type; repo example-swimlane.png)"]
+      - id: T-TIME-04
+        name: Milestone and phase salience
+        question: "Do key milestones and phase names stand out from supporting detail, with a limited number of items?"
+        gate: false
+        weight: 4
+        good_signals: ["Key milestones marked with distinct shape or colour", "Phase names readable at slide size", "Detail text short"]
+        bad_signals: ["15+ equal items", "Milestone text as small as footnotes", "Colours for each phase with no meaning"]
+        levels:
+          1: "Items are indistinguishable; milestones cannot be found."
+          2: "Too many equal items (15+); detail text tiny."
+          3: "Milestones differ in some way; text readable."
+          4: "Milestones distinct; phase names clear; fewer than ~12 items."
+          5: "Clear 3-level hierarchy: phase, milestone, detail; the item the title is about is emphasised."
+        checks: ["Milestone symbol differs from bars", "Min text size meets the deck floor", "Item count <= ~12 (dense decks up to ~20)"]
+        sources: ["Garr Reynolds, Presentation Zen: signal-to-noise (https://www.oreilly.com/library/view/presentation-zen-simple/9780132901529/ch06lev1sec3.html)", "Barbara Minto, Pyramid Principle: group and summarise (secondary)"]
+      - id: T-TIME-05
+        name: Status and realism cue
+        question: "Where the plan has a status (done, in progress, planned) or a decision point, is it visible and consistent?"
+        gate: false
+        weight: 2
+        good_signals: ["Done/now/next states have distinct fills", "Decision gate or approval marked", "Legend short or direct labels"]
+        bad_signals: ["Everything looks 'planned'", "Status colour without text", "Decision date missing"]
+        levels:
+          1: "Status is implied but the visuals contradict it (e.g. past items styled as future)."
+          2: "Status is not shown even though the title is about progress."
+          3: "Status is shown in part."
+          4: "Status and decision points are visible with consistent styling."
+          5: "Status has a text or shape cue besides colour, plus the next decision and its date."
+        checks: ["Past/current/future items differ in style", "Status has a non-colour cue", "Decision point or next step is marked"]
+        sources: ["W3C WCAG 2.2 SC 1.4.1 Use of Color (not opened)", "Atlassian roadmap guidance on keeping a roadmap current (search result; https://www.atlassian.com/agile/project-management/project-roadmap)"]
+
+  - id: hierarchy-org
+    name: Hierarchy, org chart and tree
+    covers: "Parent-child structures: org charts, governance bodies, steering committees, taxonomies, issue trees, pyramids, work breakdown structures."
+    recognise:
+      - "A top node with branches downward or rightward"
+      - "Boxes in levels joined by lines"
+      - "Words like organisation, 体制, committee, tree, structure"
+    frequency: "Examples: ~10 of 154 titles (07-jp-org, 11 推進体制, 16 実行体制, 19 Cơ cấu điều hành, 23, 25 組織の変更, 22); briefs 0 of 108; open decks t4/t5 include organisation slides. About 4-7% of slides."
+    kpis:
+      - id: T-ORG-01
+        name: Reporting lines are readable
+        question: "Can the reader trace who or what sits under whom, with one clear top and no ambiguous lines?"
+        gate: true
+        weight: 5
+        good_signals: ["One top node", "Straight vertical/horizontal connectors with rounded or square corners", "Children aligned under parents", "Different line style for dotted-line or advisory links with a legend"]
+        bad_signals: ["Lines crossing", "Child linked to two parents without style", "No visible top", "Diagonal lines"]
+        levels:
+          1: "Parent-child links cannot be traced (crossing lines, unattached boxes)."
+          2: "Mostly traceable; some crossings or ambiguous attachments; dotted vs solid not distinguished."
+          3: "Hierarchy traceable; minor line clutter."
+          4: "One top; tidy orthogonal lines; children aligned beneath; secondary links have a distinct style."
+          5: "Structure is read at a glance; line style carries a stated meaning (solid = line, dashed = advisory) and no crossing."
+        checks: ["Exactly one root node (unless stated)", "No crossing connectors", "Dotted/dashed lines used consistently with a legend or note", "Connectors attach at box edges"]
+        sources: ["bench/reference/diagram-design/primitives-core.md: orthogonal connectors, no overlap, fanned attach points (repo; read)", "Dotted-line vs solid-line reporting conventions: common practice, no primary guide found in search; unverified"]
+      - id: T-ORG-02
+        name: Levels are visible and balanced
+        question: "Are levels aligned in rows (or columns), with node size reflecting level and spacing even?"
+        gate: false
+        weight: 4
+        good_signals: ["Same-level boxes on one baseline", "Size or weight decreases down the levels", "3-4 levels on one slide"]
+        bad_signals: ["Staggered boxes at one level", "6+ levels in a tiny chart", "Siblings with wildly different widths"]
+        levels:
+          1: "Levels are not distinguishable (boxes scattered)."
+          2: "Same-level boxes are misaligned; or 6+ levels are shrunk."
+          3: "Levels visible; alignment adequate."
+          4: "Levels aligned and spaced evenly; box size or weight steps down."
+          5: "Levels, siblings and groups are clear; fewer than 5 levels or the lower levels are collapsed into text."
+        checks: ["Siblings share y (or x) coordinate", "Equal gutters between siblings", "Level count <= 4-5", "Sibling box widths equal"]
+        sources: ["Span-of-control guides: reasonable spans about 5-8 for managers, and few layers; https://theorgchart.com/?p=664 and https://umbrex.com/resources/the-organizational-design-playbook/spans-of-control-layers-and-managerial-workload/ (returned by search; practitioner)", "bench/reference/diagram-design/style-guide.md: grid divisible by 4 (repo)"]
+      - id: T-ORG-03
+        name: Node text is identifiable
+        question: "Does each node give role or name plus function in 1-2 short lines, in a consistent form?"
+        gate: false
+        weight: 4
+        good_signals: ["Role/title + name or function", "Same format per node", "Names or roles shortened rather than shrunk"]
+        bad_signals: ["Paragraphs in nodes", "Mix of names and roles", "Clipped text"]
+        levels:
+          1: "Node text is clipped or unreadable."
+          2: "Inconsistent form (names in some, roles in others); long text."
+          3: "Readable and mostly consistent."
+          4: "Consistent two-line form, e.g. role + responsibility."
+          5: "Form adds the one fact the title needs (owner, headcount, mandate) without crowding."
+        checks: ["No clipped text in nodes", "Same lines per node (role, name)", "<= 2-3 lines per node"]
+        sources: ["bench/reference/diagram-design/style-guide.md: node name and sublabel roles (repo; read)", "Garr Reynolds, Presentation Zen: simplicity (secondary)"]
+      - id: T-ORG-04
+        name: Branch count and layout fit
+        question: "Does the chosen layout (top-down, left-right, grouped columns) fit the number of branches without shrinking text?"
+        gate: false
+        weight: 3
+        good_signals: ["Wide trees are turned into left-right or column groups", "Leaf-level lists inside group boxes", "Text size constant"]
+        bad_signals: ["12 siblings in one row with tiny text", "Deep tree squeezed into one corner"]
+        levels:
+          1: "Text unreadable because the layout cannot fit the branches."
+          2: "Text shrunk to fit 8+ siblings."
+          3: "Layout fits with small text."
+          4: "Layout chosen to fit; text stays at body size."
+          5: "Layout makes comparisons between branches easy; the chart uses the slide area well."
+        checks: ["Siblings per row <= ~6-7", "Min font size meets deck floor", "Slide area utilisation: tree spans most of the body area"]
+        sources: ["Span-of-control practitioner guides (as above)", "Duarte, slide:ology: hierarchy diagrams; taxonomy unverified"]
+      - id: T-ORG-05
+        name: Emphasis and roles of groups
+        question: "Is the group or role the slide is about emphasised, and are groups (committee vs task force) distinguishable?"
+        gate: false
+        weight: 3
+        good_signals: ["Accent on the decision body", "Group frames or colours with meaning", "Legend short"]
+        bad_signals: ["Every group a different colour", "No distinction between permanent and temporary bodies"]
+        levels:
+          1: "Emphasis falls on an irrelevant node."
+          2: "No emphasis; or groups coloured randomly."
+          3: "Some distinction between groups."
+          4: "Key body emphasised; group types styled consistently."
+          5: "Emphasis matches the title; styling encodes role types (permanent, temporary, external) with a legend."
+        checks: ["Accent on <= 2 nodes", "Group frames label their group", "Emphasised node matches the title"]
+        sources: ["bench/reference/diagram-design/style-guide.md: focal and optional node types (repo; read)"]
+
+  - id: framing
+    name: Framing slides (cover, agenda, section, closing, decision)
+    covers: "Slides that frame the talk rather than carry content: cover/title, agenda, section divider, thank-you/closing, next steps, requested decisions, executive summary lead-ins."
+    recognise:
+      - "Title and subtitle with no body, or a short numbered list of sections"
+      - "Words like agenda, next steps, decision, thank you, summary, アジェンダ, ご決議事項"
+      - "Large whitespace, one message"
+    frequency: "Cover slides alone: 20 of 108 brief specs, 3 of 45 lengthbench t1-t3, and the first slide of every example deck (~30). Agenda/closing/decisions: examples 11, 16, 20, 22, 23, 26 have agenda or decision slides (~10 titles)."
+    kpis:
+      - id: T-FRAME-01
+        name: One message and one hierarchy
+        question: "Does the slide carry one idea (title, optional subtitle, maybe date or owner) with a clear first/second/third reading order?"
+        gate: false
+        weight: 5
+        good_signals: ["Title largest, subtitle clearly smaller", "Whitespace around the title", "No extra bullets"]
+        bad_signals: ["Several competing headlines", "A cover with a paragraph", "Logo, date, and tagline at equal weight"]
+        levels:
+          1: "No title hierarchy or content that is not framing (the slide is clutter)."
+          2: "Title and subtitle are nearly the same size; extra elements compete."
+          3: "Title dominant; subtitle and meta readable."
+          4: "Clear three-level hierarchy (title, subtitle, meta); ample space."
+          5: "The slide states the deck's topic and audience at a glance; every element has a reason; whitespace is deliberate."
+        checks: ["Title size >= ~1.5x subtitle size", "Text blocks <= 3 on a cover/section slide", "No body text paragraphs on a cover"]
+        sources: ["Garr Reynolds, Presentation Zen: simplicity, signal-to-noise; https://www.oreilly.com/library/view/presentation-zen-simple/9780132901529/ch06lev1sec3.html (returned by search; no divider/closing-specific passage was found)", "Nancy Duarte, slide:ology: one idea per slide (unverified in this session)"]
+      - id: T-FRAME-02
+        name: Metadata is complete
+        question: "Does a cover give the title, subject line, presenter or organisation and date; does an agenda give the numbered sections; does a closing give the ask or next step?"
+        gate: false
+        weight: 4
+        good_signals: ["Title + subtitle + organisation/date on a cover", "Numbered agenda items with parallel names", "Closing states a decision, owner, deadline"]
+        bad_signals: ["A cover with a title only when the brief gave a date and owner", "Thank you slide with no contact or next step", "Agenda items that do not match section titles"]
+        levels:
+          1: "Missing required elements from the brief (e.g. no title or date)."
+          2: "Elements present but unordered or mixed in size."
+          3: "All required elements present."
+          4: "Required elements present with clear order; agenda matches deck."
+          5: "Level 4 plus the closing slide states one specific action, owner and date."
+        checks: ["Every item given in the brief appears", "Agenda entries match later slide titles", "Closing slide has an action, owner, or date"]
+        sources: ["Barbara Minto, The Pyramid Principle: situation/complication/question/answer opening and governing thought; via https://www.think-cell.com/en/resources/content-hub/using-the-pyramid-principle-to-build-better-powerpoint-presentations (secondary)", "Consulting 'decisions requested' closing (ご決議事項) practice: no primary source found; unverified"]
+      - id: T-FRAME-03
+        name: Agenda and summary structure
+        question: "Does the agenda or executive summary use 3-6 parallel items, each with a message or a verb, in the order of the deck?"
+        gate: false
+        weight: 4
+        good_signals: ["3-6 items", "Parallel form", "Order matches deck", "Executive summary has conclusion then 3 support points"]
+        bad_signals: ["10 agenda items", "Mixed noun and verb forms", "Summary lists topics without conclusions"]
+        levels:
+          1: "Agenda items contradict the deck's order, or summary has no conclusion."
+          2: "7+ items or non-parallel; the summary lists topics."
+          3: "3-6 items, readable."
+          4: "Parallel items in deck order; summary states conclusions."
+          5: "Summary reads as an answer-first argument; each item can be mapped to a slide; progress marker on later dividers."
+        checks: ["Item count 3-6 (up to 8 in long decks)", "Items parallel in form", "Summary items contain a claim or number"]
+        sources: ["Barbara Minto, The Pyramid Principle: top-down answer first, grouped supports; secondary https://thinkinsights.net/insights/minto-pyramid-principle", "Japanese consulting guide: 1スライド1メッセージ and key message first; https://webtan.impress.co.jp/e/2019/08/07/32999 (returned by search; not opened)"]
+      - id: T-FRAME-04
+        name: Visual anchor and restraint
+        question: "Does the slide use one visual anchor (big type, band, image or simple shape) and stay restrained, consistent with the deck?"
+        gate: false
+        weight: 3
+        good_signals: ["One accent band or image", "Consistent with other framing slides", "No decorative clutter"]
+        bad_signals: ["Stock-style decoration with no meaning", "Different framing style on each divider", "Text over a busy image"]
+        levels:
+          1: "Decoration hides or fights the title."
+          2: "Several decorative elements; inconsistent with other dividers."
+          3: "Plain and legible."
+          4: "One anchor element; matches the deck's other dividers."
+          5: "The anchor expresses the topic or section number; all dividers in the deck match."
+        checks: ["Dividers share layout and anchor", "Text over image has 4.5:1 contrast (or 3:1 for large text)", "Number of decorative shapes <= ~3"]
+        sources: ["W3C WCAG 2.2 SC 1.4.3 Contrast (Minimum): 4.5:1 for text, 3:1 for large text; https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html (not opened)", "Garr Reynolds, Presentation Zen: restraint (secondary)"]
+
+  - id: text-message
+    name: Text argument / message slide
+    covers: "Slides carried by words: bullet lists, executive summary, president's message, key takeaways, text-plus-chart insight slides, quotes."
+    recognise:
+      - "Title plus 3-6 bullets or short paragraphs, no diagram or chart"
+      - "A key message line under the title"
+      - "Quotation or statement in large type"
+    frequency: "Most common text form. Briefs: 19 of 108 specs (bullet list); lengthbench t1-t3: 5 of 45; examples: ~15 titles (executive summaries, messages, outlook, takeaways) plus text-heavy halves of many slides."
+    kpis:
+      - id: T-TEXT-01
+        name: Message first, support second
+        question: "Does the title state the conclusion and do the bullets support it (and only it)?"
+        gate: false
+        weight: 5
+        good_signals: ["Title is a sentence with a claim", "Each bullet supports the claim", "Number of supports matches a number in the title, if any"]
+        bad_signals: ["Topic-label title ('Overview')", "Bullets drift to other topics", "Conclusion appears last"]
+        levels:
+          1: "Title and bullets are unrelated, or the slide has no discernible point."
+          2: "Title is a label; the message is found only by reading all bullets."
+          3: "Title states the topic with a hint of the message; bullets mostly support it."
+          4: "Title is the claim; all bullets support it."
+          5: "Title claim + key message line + bullets form an answer-first block; the reader gets the point from the title alone."
+        checks: ["Title has a verb or a quantity", "Each bullet maps to the claim", "No bullet repeats the title"]
+        sources: ["Barbara Minto, The Pyramid Principle (1987): answer first; supporting points grouped; via https://www.think-cell.com/en/resources/content-hub/using-the-pyramid-principle-to-build-better-powerpoint-presentations (secondary)", "Japanese guide: ワンスライド・ワンメッセージ; https://webtan.impress.co.jp/e/2019/08/07/32999 and https://biz.moneyforward.com/work-efficiency/basic/22712/ (search results; not opened)"]
+      - id: T-TEXT-02
+        name: Bullet count and length
+        question: "Is the bullet count limited (about 3-6) and each bullet a short phrase or one line?"
+        gate: false
+        weight: 4
+        good_signals: ["3-6 bullets", "One line per bullet", "Sentence-case phrases with a number"]
+        bad_signals: ["10+ bullets", "Multi-line paragraphs", "Sub-bullets under sub-bullets"]
+        levels:
+          1: "Wall of text: more than ~12 lines or paragraphs at small font."
+          2: "7-10 bullets or several 2+ line bullets."
+          3: "5-7 bullets; most one or two lines."
+          4: "3-6 bullets; one line each."
+          5: "Bullets are terse, parallel, front-loaded with the keyword or number; sub-levels avoided."
+        checks: ["Bullets <= 6 on non-dense slides", "Lines per bullet <= 2", "Nesting depth <= 1"]
+        sources: ["Garr Reynolds, Presentation Zen: cut the non-essential, signal-to-noise; https://www.oreilly.com/library/view/presentation-zen-simple/9780132901529/ch06lev1sec3.html", "Nancy Duarte, slide:ology: slides are glanceable (a 3-second rule is attributed to Duarte; unverified wording)"]
+      - id: T-TEXT-03
+        name: Parallel structure and grouping
+        question: "Are bullets parallel in grammar and grouped by logic (MECE) rather than a stream of facts?"
+        gate: false
+        weight: 3
+        good_signals: ["Same grammatical form", "Group headings for 6+ items", "No overlap between bullets"]
+        bad_signals: ["Mixed sentence and fragment", "Duplicate points", "Unordered list of unrelated items"]
+        levels:
+          1: "Items overlap or contradict each other."
+          2: "Mixed forms; no grouping; arbitrary order."
+          3: "Mostly parallel; order roughly logical."
+          4: "Parallel and ordered (importance, time, process)."
+          5: "Grouped, mutually exclusive, collectively exhaustive for the claim; the order is stated or obvious."
+        checks: ["Bullets start with the same part of speech", "No two bullets state the same fact", "Order follows importance, time or process"]
+        sources: ["Barbara Minto, The Pyramid Principle: ideas in a group are the same kind and are ordered logically; MECE (secondary: https://thinkinsights.net/insights/minto-pyramid-principle; https://vectree.io/c/history-core-concepts-and-structural-rules-of-the-minto-pyramid-principle-in-management-consulting)"]
+      - id: T-TEXT-04
+        name: Evidence and numbers in text
+        question: "Does the text carry numbers, names or examples rather than adjectives, and are key numbers visually emphasised?"
+        gate: false
+        weight: 4
+        good_signals: ["Figures with units", "Key number in bold or accent", "A source or footnote"]
+        bad_signals: ["'Significant growth' with no figure", "All text one weight", "Unsourced claims"]
+        levels:
+          1: "Claims are unsupported adjectives; nothing is checkable."
+          2: "Some numbers buried inside long sentences."
+          3: "Numbers present; weight uniform."
+          4: "Numbers present and emphasised; examples named."
+          5: "Each claim has one piece of evidence next to it; emphasis only on the number; source in a footnote."
+        checks: ["Bullets with a number >= ~50% when the brief supplies figures", "Bold/accent used on numbers only", "Source or note line when data is cited"]
+        sources: ["Barbara Minto, The Pyramid Principle: support claims with evidence (secondary)", "Storytelling with Data: 'the power of simple text' https://www.storytellingwithdata.com/blog/2012/06/power-of-simple-text (returned by search; not opened)"]
+      - id: T-TEXT-05
+        name: Text-only slide earns its form
+        question: "Is plain text the right form, or should the content be a chart, table or diagram?"
+        gate: false
+        weight: 3
+        good_signals: ["Argument, narrative or a decision rationale", "A bullet list has no hidden structure (steps, comparison, trend)", "Visual treatment where structure exists"]
+        bad_signals: ["Five bullets that are steps in a process", "A bulleted list of numbers over time", "Two options described in prose"]
+        levels:
+          1: "Hidden structure makes the text misleading (steps listed as unordered bullets, with the order lost)."
+          2: "Structured content (steps, comparison, numbers over time) left as prose."
+          3: "Text suits the content; a visual would help a little."
+          4: "Text is the best form; layout supports it (key message band, spacing)."
+          5: "Text form is deliberate; a small visual or number emphasis amplifies it without a different form."
+        checks: ["Bullets do not form a process, comparison or time series", "Sequence words (first, then) absent unless numbered"]
+        sources: ["Gene Zelazny, Say It with Charts: pick the form by the relationship in the message (https://www.oreilly.com/library/view/the-say-it/9780071474702/ch01.html listing)", "Cole Nussbaumer Knaflic, Storytelling with Data: 'the power of simple text' (blog above; not opened)"]
+
+  - id: matrix-quadrant
+    name: Matrix, quadrant and prioritisation
+    covers: "Two-axis positioning (2x2, bubble, priority matrix), grid matrices (capability x product), SWOT, Eisenhower, effort-impact."
+    recognise:
+      - "Two labelled axes (low-high) with items placed in cells or positions"
+      - "Four named quadrants or a labelled grid"
+      - "Words like priority, matrix, 優先度, impact, effort, SWOT"
+    frequency: "Low in the repo evidence: examples 23 ('施策の優先度'), 29 (Venn Desirable x Feasible x Viable), 16 and 20 (施策 matrices); briefs 0 of 108; about 2-3% of slides, but common in consulting decks generally."
+    kpis:
+      - id: T-MAT-01
+        name: Axes are named and meaningful
+        question: "Are both axes labelled with a dimension and direction (low to high), and are the dimensions independent and decision-relevant?"
+        gate: true
+        weight: 5
+        good_signals: ["Axis titles with 'low' and 'high' ends", "Dimensions that split the items (e.g. impact vs effort)", "One axis sentence in the title or caption"]
+        bad_signals: ["Unlabelled axes", "Axes that are the same thing (size vs revenue)", "Direction unclear (is up good?)"]
+        levels:
+          1: "Axes unlabelled or meaning unclear; a position cannot be interpreted."
+          2: "Axes named but direction unclear, or the dimensions correlate so that positions are arbitrary."
+          3: "Axes named with direction."
+          4: "Axes named with direction; dimensions independent; the favourable corner is clear."
+          5: "Axes defined by a one-line criterion; the favourable corner is stated; the title states what to do about it."
+        checks: ["Both axes have a title", "Low/high or arrow marks present", "Favourable corner is stated or obvious"]
+        sources: ["Slidemagic, 'Picking the 2x2 axes': place the best option top right; flipping axes can clarify; https://slidemagic.squarespace.com/blog/2019/9/3/picking-the-2x2-axes (returned by search; not opened)", "SlideModel and PrepLounge guides on 2x2 matrices (practitioner, search results)"]
+      - id: T-MAT-02
+        name: Position carries information
+        question: "Is each item placed by its value on the axes (not just dropped in a quadrant), with no overlaps?"
+        gate: true
+        weight: 5
+        good_signals: ["Items at different positions inside a quadrant", "Bubble size, if used, has a stated meaning", "No overlap or hidden labels"]
+        bad_signals: ["All items stacked in a corner", "Overlapping bubbles", "Item positions contradict text"]
+        levels:
+          1: "Positions contradict the data or labels, or items overlap so much that they cannot be read."
+          2: "Positions are decorative; overlaps; items cluster."
+          3: "Positions approximate the values; labels readable."
+          4: "Positions are consistent with stated values; labels clear; bubble size explained."
+          5: "Positions are quantitatively placed or rank-ordered; the claim (what goes where) is verifiable from the slide."
+        checks: ["No label overlaps", "An item's quadrant matches the text's description", "Bubble size has a legend if used"]
+        sources: ["Slidemagic and PrepLounge 2x2 practitioner guides (search results; positions should reflect the data)", "Edward Tufte, The Visual Display of Quantitative Information: position encodes data (secondary)"]
+      - id: T-MAT-03
+        name: Quadrants named and actionable
+        question: "Does each quadrant have a short name or action (invest, fix, drop) so the position implies a decision?"
+        gate: false
+        weight: 4
+        good_signals: ["Quadrant labels in the corners", "Action verbs", "Shading only for the priority quadrant"]
+        bad_signals: ["Four empty boxes", "Quadrant names that repeat axis labels", "Colour with no meaning"]
+        levels:
+          1: "Quadrants have no meaning or conflicting meanings."
+          2: "Quadrants unlabelled; the reader invents the meaning."
+          3: "Quadrants named."
+          4: "Quadrants named with actions; priority quadrant emphasised."
+          5: "Each quadrant has a name and an action, and the highlighted quadrant matches the recommendation."
+        checks: ["Quadrant label present for each region", "Highlight on <= 1-2 quadrants", "Quadrant action matches the recommendation text"]
+        sources: ["Slidemodel guidance on stating each quadrant and the supporting decision (practitioner; https://slidemodel.com/templates/2x2-matrix-quadrants-powerpoint-template, search result)", "bench/reference/diagram-design/example-quadrant.png (repo example; quadrant primitive)"]
+      - id: T-MAT-04
+        name: Item count and label discipline
+        question: "Is the number of items small enough to label directly (about 5-12), with short labels placed beside the marks?"
+        gate: false
+        weight: 3
+        good_signals: ["5-12 items", "Direct labels", "Numbered markers with a key if the count is higher"]
+        bad_signals: ["25 dots with a legend", "Labels long enough to cross quadrants"]
+        levels:
+          1: "Labels overlap so items cannot be identified."
+          2: "20+ items, tiny labels."
+          3: "12-15 items; labels readable."
+          4: "5-12 items; direct labels."
+          5: "Items are curated to the decision; the 2-3 key items are called out."
+        checks: ["Item count <= ~12", "Label text <= ~3 words", "No label overlaps"]
+        sources: ["EU Data Visualisation Guide, direct labelling (returned by search; https://data.europa.eu/apps/data-visualisation-guide/direct-labelling)", "World Bank data viz style guide (labels vs legends; search result)"]
+
+  - id: dense-ja-business
+
+    overlay: true  # scored on top of the slide's primary topic (topic: "data-table+dense-ja-business")
+    name: Dense Japanese business slide (overlay)
+    covers: "A slide in the Japanese consulting / 稟議 style: many boxes, 10-12pt text, tables, arrows, footnotes and a key message line. Added on top of the primary topic (table, comparison, process, etc.)."
+    recognise:
+      - "Japanese body text at 10-12pt with many elements (more than ~8 text blocks)"
+      - "Key message line (リード文) under the title, footnote or source line (注記, 出所) at the bottom"
+      - "Boxes with headings, arrows, tables and short bullets on one slide"
+    frequency: "Dense JP business look is requested in b04-b06 (3 briefs), lengthbench t1-t4, examples 02, 04, 05, 06, 07, 08, 11, 16, 20, 23, 25 and bench/corpus/jp-dense, jp-kpi (about 20 percent of decks in the repo; about 45 of 154 example slides)."
+    kpis:
+      - id: T-JA-01
+        name: Structured density (grouping and grid)
+        question: "Is the density organised by a grid, group boxes and headings so the eye can scan, rather than a pile of equal-weight text?"
+        gate: false
+        weight: 5
+        good_signals: ["Clear column/row grid", "Group headings", "Even gutters", "Whitespace between groups, not inside them"]
+        bad_signals: ["Text blocks floating", "Uneven margins", "Every element the same weight", "Whitespace ragged"]
+        levels:
+          1: "Elements overlap or overflow; no grid."
+          2: "Elements are readable but the grid is irregular; groups unclear."
+          3: "Grid present; groups visible; hierarchy moderate."
+          4: "Grid, headings and groups give three scan levels (message, group, detail)."
+          5: "A reader finds any item in seconds; gutters equal; the group boundaries match the logic of the content."
+        checks: ["Block edges align to a common grid", "Gutter variance small", "No overlapping shapes", "Heading per group"]
+        sources: ["Japanese 資料作成 guides: ワンスライド・ワンメッセージ with 3-4 colours max; https://biz.moneyforward.com/work-efficiency/basic/22712/ and https://webtan.impress.co.jp/e/2019/08/07/32999 (returned by search; general, not specific to dense slides)", "Garr Reynolds, Presentation Zen: density is allowed in documents if signal-to-noise is high (inference; Reynolds distinguishes slideuments, wording unverified)", "bench/reference/diagram-design/style-guide.md: 4px grid (repo; read)"]
+      - id: T-JA-02
+        name: Key message line and conclusion-first
+        question: "Is there a one-sentence Japanese key message (リード) under the title that states the so-what, and does the body support it?"
+        gate: false
+        weight: 5
+        good_signals: ["A lead sentence ending with a conclusion (である/する)", "Title is a topic or claim; lead gives the claim", "Body groups support the lead"]
+        bad_signals: ["Lead restates the title", "No lead on a dense slide", "Lead longer than 2 lines"]
+        levels:
+          1: "No message anywhere; the reader cannot tell the point."
+          2: "Message exists only inside the body text or only as a topic title."
+          3: "Lead line exists but is generic or restates the title."
+          4: "Lead line states a conclusion; body supports it."
+          5: "Title + lead + group headings form a readable top-down reading (read only these and the argument holds)."
+        checks: ["Lead line present on dense slides", "Lead <= 2 lines", "Lead contains a conclusion or number", "Group headings alone tell the argument"]
+        sources: ["Barbara Minto, The Pyramid Principle (answer first; via https://www.think-cell.com/en/resources/content-hub/using-the-pyramid-principle-to-build-better-powerpoint-presentations, secondary)", "Japanese consulting practice: key message then support (https://webtan.impress.co.jp/e/2019/08/07/32999; returned by search; not opened)"]
+      - id: T-JA-03
+        name: CJK text fit and line breaking
+        question: "Do Japanese texts fit their boxes at the stated size, with natural line breaks and no orphan characters or broken numbers?"
+        gate: true
+        weight: 5
+        good_signals: ["No overflow; lines break at phrase boundaries", "Numbers with units kept together (28万円)", "Full-width punctuation not at line starts (kinsoku)", "Latin and digits do not break mid-token"]
+        bad_signals: ["One character alone on the last line", "Number split from its unit", "Text clipped or overflowing the box", "Tiny text to force fit"]
+        levels:
+          1: "Text overflows or is clipped; digits and units split across lines."
+          2: "Orphan single characters or punctuation at line starts in several boxes; text shrunk below the floor."
+          3: "Fits, with an occasional orphan or awkward break."
+          4: "Fits at the deck size; breaks at phrase boundaries; units attach to numbers."
+          5: "Line breaks follow phrasing; no orphans; box padding even; width budget matches 1em per full-width character."
+        checks: ["No overflow (text height <= box height)", "No last line with a single full-width character", "No line starting with 、。）」", "Number and unit on one line"]
+        sources: ["bench/reference/diagram-design/style-guide.md: width budget of 1em per wide character, 12px floor for CJK (repo; read)", "W3C JLReq (Requirements for Japanese Text Layout), line-start/line-end prohibition (kinsoku): https://www.w3.org/TR/jlreq/ (known document; not opened in this session)", "CLAUDE.md of SlideMark: <a:ea> font and 1em width test requirement (repo)"]
+      - id: T-JA-04
+        name: Small text stays legible
+        question: "Is the smallest text readable (about 10pt or larger for body, footnotes allowed smaller) with enough contrast and a weight that holds in Japanese?"
+        gate: true
+        weight: 4
+        good_signals: ["Body text >= 10pt", "Footnotes about 8-9pt in a muted but passing colour", "Bold used for heads; light colour avoided for small text", "Gothic (sans) font"]
+        bad_signals: ["Body at 8pt", "Grey text on grey fill below 4.5:1", "Thin weights at small size", "Mixed fonts"]
+        levels:
+          1: "Body text below ~8pt or contrast under 3:1; not readable on a projected slide."
+          2: "Body text 8-9pt or contrast 3-4.5:1 on small text."
+          3: "Body text 10pt; contrast >= 4.5:1; footnote small but legible."
+          4: "Body 10-12pt, headings 12-14pt with a clear size step; contrast >= 4.5:1."
+          5: "Level 4 plus consistent size roles across slides; minimum size is never used for key facts."
+        checks: ["Min body font size >= 10pt (dense) / 12pt (normal)", "Text contrast >= 4.5:1", "Key facts are not in the smallest size", "Hiragino/Meiryo/Yu Gothic or equivalent sans"]
+        sources: ["W3C WCAG 2.2 SC 1.4.3 Contrast (Minimum) 4.5:1; https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html (not opened)", "bench/reference/diagram-design/style-guide.md: Hangul/Han floor of 12px; contrast contract (repo; read)", "Japanese guide: font count 2 max; https://biz.moneyforward.com/work-efficiency/basic/22712/ (returned by search)"]
+      - id: T-JA-05
+        name: Footnotes, sources and notes
+        question: "Do dense data and claims carry a footnote line (注、出所、単位) in a fixed position?"
+        gate: false
+        weight: 3
+        good_signals: ["注記 and 出所 line at the bottom, left aligned", "Unit stated at the top right of a chart or table (単位: 百万円)", "Consistent position across slides"]
+        bad_signals: ["Estimates without a note", "Source missing", "Footnote overlapping the content"]
+        levels:
+          1: "Data shown with no unit, period or source and cannot be interpreted."
+          2: "Unit present but no source for estimates."
+          3: "Unit and source appear in some form."
+          4: "Unit, period and source in a consistent, legible place."
+          5: "Footnotes are numbered to the claims they support; positions are the same on every slide."
+        checks: ["Unit shown for numbers", "Source/note line present when the brief supplies one", "Footnote does not overlap content", "Same position across the deck"]
+        sources: ["Common 注/出所 convention in Japanese business documents: no primary guide checked; unverified", "Dona Wong, WSJ Guide to Information Graphics: label sources (unverified)", "Urban Institute Data Visualization Style Guide: sources and notes under charts; https://urbaninstitute.github.io/graphics-styleguide (page exists; passage not read)"]
+      - id: T-JA-06
+        name: Color restraint and emphasis in dense slides
+        question: "Does the dense slide stay within 3-4 colours with one emphasis colour, so density does not become noise?"
+        gate: false
+        weight: 3
+        good_signals: ["Navy/grey base plus one accent", "Semantic colours (red for risk) used sparingly", "Emphasis through bold and rules before colour"]
+        bad_signals: ["6+ fill colours", "Coloured text on coloured boxes", "Every box has a coloured header"]
+        levels:
+          1: "Colours compete and make text unreadable."
+          2: "6+ colours without meaning."
+          3: "4-5 colours; mostly consistent."
+          4: "3-4 colours with one accent; semantic colours are consistent."
+          5: "Colour only encodes meaning, and the slide is still readable in greyscale."
+        checks: ["Distinct hues <= 4 (excluding neutrals)", "Semantic colours consistent with other slides", "Greyscale preview remains readable"]
+        sources: ["Japanese guide: 3-4 colours max, 2 fonts max; https://biz.moneyforward.com/work-efficiency/basic/22712/ (returned by search)", "bench/reference/diagram-design/style-guide.md: one accent, no rainbow palette (repo; read)", "Tufte, The Visual Display of Quantitative Information: restrained colour (secondary)"]

@@ -1,0 +1,559 @@
+# SlideMark design rubric: general KPIs (every slide) and deck-level KPIs.
+# Scale: each KPI scored 1..5 (integer per run). Weight 1..5. gate=true means level < 3 caps the slide (docs/DESIGN_RUBRIC.md).
+# Source status: "verified" = I fetched or searched the page this session. "unverified" = known from the published
+# work but not re-checked here; no quotation or page number is given. Paraphrase only.
+# Notes for judges:
+#  - Judge from the rendered image. Items marked (pptx) cannot be seen in a PNG; score them from a pptx inspection
+#    or mark N/A (docs/DESIGN_RUBRIC.md renormalizes the weights).
+#  - Size thresholds are given in points on a 13.33 x 7.5 in (16:9) slide.
+general:
+  - id: G-01
+    name: One message, true to content
+    question: "Does the slide carry one clear message that its content supports and that matches what the slide is for?"
+    gate: true
+    weight: 5
+    good_signals:
+      - "Title is a full sentence that states the takeaway (a claim, not a topic)"
+      - "Every element on the slide supports that claim; the evidence for it is visible on the slide"
+      - "A reader can state the message in one sentence after one look"
+      - "Numbers, labels and the title agree with each other"
+    bad_signals:
+      - "Title is a label such as 'Overview' or 'Results'"
+      - "Two or more competing messages of equal weight"
+      - "Chart or table shows something the title does not say, or the opposite of it"
+      - "Elements included only because the content existed (filler, decoration with no meaning)"
+    levels:
+      1: "Fails: the message cannot be stated, or the visuals contradict or misstate the content (title says growth, chart falls; total does not match its parts; a label sits on the wrong item)."
+      2: "Weak: two or three messages compete, or the title is a topic label and the point must be inferred from the body; at least one claim is not backed by anything shown."
+      3: "Acceptable: one message can be stated after reading title and body, but the title is a topic or a mixed message; everything shown is true and relevant."
+      4: "Strong: the title states the takeaway as a sentence; all elements support it; at most one element is off-message."
+      5: "Excellent: a complete action title; every element serves it; the proof is visible on the slide; nothing needed is missing and nothing extra is present."
+    checks:
+      - "Judge writes the message in one sentence from the image alone, then compares it with the brief's intended message (protocol, step 2)"
+      - "Title length: a sentence of roughly 1-2 lines, not a paragraph (heuristic)"
+      - "Cross-check every number in the title against the chart or table on the slide"
+    sources:
+      - "Barbara Minto, The Pyramid Principle (1987): one governing thought, slide title as the top of a small pyramid (checked only through secondary summaries, e.g. https://www.think-cell.com/en/resources/content-hub/using-the-pyramid-principle-to-build-better-powerpoint-presentations; primary text unverified)"
+      - "Cole Nussbaumer Knaflic, Storytelling with Data (2015), action titles; O'Reilly TOC https://oreilly.com/library/view/storytelling-with-data/9781119002253 (chapter-level only; paraphrase)"
+      - "Duarte Glance Test: single message as the first test of a slide, https://www.duarte.com/resources/guides-tools/the-glance-test/ (verified existence and 3-second framing via search)"
+      - "Japanese consulting slide guides: one slide, one message, conclusion first (no specific title verified; unverified)"
+
+  - id: G-02
+    name: Form fits content
+    question: "Is the chosen form (figure, table, steps, chart, cards, prose, diagram) the one this kind of content reads best in?"
+    gate: false
+    weight: 4
+    good_signals:
+      - "One number that matters is shown big, not in a sentence"
+      - "Comparison is side by side on a shared axis or in a table with aligned columns"
+      - "Sequence shows order and direction; parts of a whole show proportion"
+      - "Structure of the content (order, grouping, hierarchy) is visible without reading"
+    bad_signals:
+      - "Bullets used for a process, a comparison or a hierarchy"
+      - "Pie or 3D chart for a time series; area or size that does not match the data"
+      - "Cards in a grid with no reason for their arrangement"
+      - "Diagram where a table would be quicker, or a table where one number is the point"
+    levels:
+      1: "Fails: the form misrepresents the content (pie for a trend, sizes not proportional to values, an ordered process shown as an unordered list)."
+      2: "Weak: a generic form (bullets, equal cards) hides structure the content has; the reader must rebuild order, grouping or comparison in their head."
+      3: "Acceptable: the form works and is readable but is a default; structure is present in the text yet not made visible."
+      4: "Strong: the form matches the content type and the structure (order, group, comparison axis) can be seen at a glance."
+      5: "Excellent: the form makes the relation or the difference obvious in one look; a different form would be worse; the form changes where the content changes."
+    checks:
+      - "Name the content type (number, comparison, sequence, trend, part-of-whole, list, argument, structure) and the form used; they must be a known good pair"
+      - "Visual size (bar length, area, angle) is proportional to the value shown"
+      - "Topic KPIs refine this per slide topic; the topic set must not double count this KPI"
+    sources:
+      - "Cole Nussbaumer Knaflic, Storytelling with Data (2015): choose an appropriate visual (lesson list confirmed via secondary summaries, https://oreilly.com/library/view/storytelling-with-data/9781119002253)"
+      - "Edward Tufte, The Visual Display of Quantitative Information (1983): graphical integrity, proportion of visual size to data (not re-checked this session; unverified)"
+
+  - id: G-03
+    name: Hierarchy and focal point
+    question: "Is there one clear entry point and a visible reading order built from scale, contrast and position?"
+    gate: false
+    weight: 5
+    good_signals:
+      - "One element wins the first look (biggest, darkest or most saturated)"
+      - "Two or three clear levels: title, key content, supporting detail"
+      - "Order of reading follows position (top-left to bottom-right, or a stated axis)"
+      - "Hierarchy comes from size, weight and space before extra boxes or colours"
+    bad_signals:
+      - "Everything the same size and weight; the eye does not know where to start"
+      - "Several focal points of equal strength"
+      - "Title smaller or quieter than decoration"
+      - "Hierarchy created only by colour or boxes while type sizes are all equal"
+    levels:
+      1: "Fails: no entry point; all elements are equal, or a decorative element dominates the content."
+      2: "Weak: a focal point exists but is weak or competes with one or two others; levels two and three are indistinguishable."
+      3: "Acceptable: the title is clearly first and the body reads in a sensible order, but the key content does not stand out from supporting content."
+      4: "Strong: one focal element, then a clear second level; reading order is obvious; supporting detail recedes."
+      5: "Excellent: the eye lands on the key element within a second, travels the rest in the intended order, and the hierarchy would survive in greyscale."
+    checks:
+      - "Squint or blur the image: the focal element must still be identifiable"
+      - "Size ratio between adjacent levels >= about 1.25 (type scale, see G-06)"
+      - "Count of focal elements = 1 (a deliberate pair such as before/after counts as one)"
+    sources:
+      - "Nancy Duarte, slide:ology (2008): visual hierarchy and signal to noise (book contents not re-checked; unverified)"
+      - "Ellen Lupton, Thinking with Type (2004; 3rd ed. 2024): hierarchy through scale and weight (unverified)"
+      - "Cole Nussbaumer Knaflic, Storytelling with Data (2015): focus attention with preattentive attributes (secondary summaries only)"
+
+  - id: G-04
+    name: Grid, alignment and grouping
+    question: "Are elements on a visible grid, aligned, evenly spaced, and grouped by proximity so that related things sit together?"
+    gate: false
+    weight: 4
+    good_signals:
+      - "Few distinct left edges and tops; columns and rows share them"
+      - "Equal gaps between like elements; inside-group gap smaller than between-group gap"
+      - "Margins equal on both sides; same title position as other slides"
+      - "Related items are close together; unrelated items are visibly apart"
+    bad_signals:
+      - "Edges that nearly line up but differ by a few pixels"
+      - "Unequal gaps, cards of uneven size without meaning"
+      - "Labels nearer to the wrong object than to their own"
+      - "Content centred in some places and left aligned in others"
+    levels:
+      1: "Fails: no grid; elements scattered; labels or items attach to the wrong neighbour."
+      2: "Weak: a rough structure, but several near-miss alignments, uneven gaps or inconsistent margins are visible at a glance."
+      3: "Acceptable: major blocks align and margins are even; small gaps or sizes vary without reason; grouping is mostly clear."
+      4: "Strong: elements sit on one grid; gaps are equal; grouping by proximity is clear; at most one minor misalignment."
+      5: "Excellent: a visible, consistent grid; every edge and centre lines up; spacing rhythm is regular; proximity alone shows the grouping."
+    checks:
+      - "Distinct left-edge x values among body blocks <= 3-4 (heuristic)"
+      - "Gap tolerance: equal gaps within 1% of slide width"
+      - "Title anchor and margins identical to the deck's other slides (deck D-02)"
+    sources:
+      - "Josef Müller-Brockmann, Grid Systems in Graphic Design (1981): the grid as a framework for order (publisher listing only, e.g. https://www.slanted.de/?p=792761; content paraphrased, unverified)"
+      - "Robin Williams, The Non-Designer's Design Book: alignment and proximity (search found no page; unverified)"
+
+  - id: G-05
+    name: White space and density
+    question: "Is the amount of content per area right for this slide's purpose and audience, with space used as a choice?"
+    gate: false
+    weight: 4
+    good_signals:
+      - "Margins and gaps are visible and consistent; the content block is balanced on the slide"
+      - "Dense slide: dense on purpose, with structure (grid, rules, tables) that makes density readable"
+      - "Sparse slide: sparse on purpose, one thing carried by the space"
+    bad_signals:
+      - "Cramped: text or boxes nearly touching edges or each other"
+      - "A small block floating in a large empty area; a dead band of empty space"
+      - "Shapes stretched to fill space; text enlarged only to fill space"
+      - "Same density everywhere with no pause"
+    levels:
+      1: "Fails: unusably crammed (elements touch or overlap, no margin) or nearly empty with the content lost in space."
+      2: "Weak: clearly crowded in one zone or clearly leaving a large area dead; space looks left over, not chosen."
+      3: "Acceptable: no area is cramped or empty enough to hurt reading; the balance is neutral and space looks like a by-product."
+      4: "Strong: margins and gaps are even and generous enough for the density; the content block is balanced; density suits the purpose."
+      5: "Excellent: space is used as a design element (separates groups, isolates the focal point); a dense slide stays easy to scan, a sparse slide feels intentional."
+    checks:
+      - "Outer margin >= about 4% of slide width on every side (heuristic)"
+      - "No empty band wider than about 25% of slide height or width unless it is the design (heuristic)"
+      - "Dense JA business slides are judged against the dense standard: density is allowed if G-04 and G-06 hold"
+    sources:
+      - "Garr Reynolds, Presentation Zen (2008): simplicity, restraint, signal to noise (book contents not re-checked; unverified)"
+      - "Cole Nussbaumer Knaflic, Storytelling with Data (2015): declutter, alignment and white space (TOC verified via https://www.oreilly.com/library/view/storytelling-with-data/9781119002253/c08.xhtml for chapter naming only)"
+
+  - id: G-06
+    name: Type scale, size floor and CJK
+    question: "Is type a small consistent scale, large enough for its job, with correct line breaks and CJK handling?"
+    gate: true
+    weight: 5
+    good_signals:
+      - "Two to four sizes, each used for one role"
+      - "Body at or above the size floor; footnotes and sources at or above the footnote floor"
+      - "Sensible line length and leading; no one-word last lines (orphans) in headings"
+      - "CJK: a CJK-capable font is set for East Asian text; full-width glyphs not clipped; breaks fall at word or phrase boundaries; no punctuation starting a line"
+    bad_signals:
+      - "Many near-equal sizes (11, 12, 13, 14 pt) with no role"
+      - "Text below the floor to fit more in"
+      - "Text auto-shrunk so sizes differ between boxes of the same role"
+      - "Mid-word breaks in Latin text, CJK lines broken in the middle of a word or number+unit"
+    levels:
+      1: "Fails: body text is below the floor (under 10 pt for dense JA business, under 12 pt for other body text) or is unreadable at full size; glyphs missing or garbled (tofu boxes)."
+      2: "Weak: body meets the floor only barely; sizes are inconsistent per role or too many; headings break awkwardly; CJK lines crowded or wrongly broken."
+      3: "Acceptable: body at or above the floor; sizes consistent per role; at most 5 sizes; line breaks fine apart from one or two awkward places."
+      4: "Strong: a clear scale of 3-4 sizes with ratio >= 1.25 between levels; body comfortably above the floor; breaks clean; CJK text sized and spaced correctly."
+      5: "Excellent: a deliberate type scale the whole slide obeys; each size has one role; reading is effortless at full size; CJK and Latin sit together with matched weight and baseline."
+    checks:
+      - "Floors (SlideMark heuristic, not from a single source): body >= 14 pt for presentation use; dense JA business >= 10 pt (target 10-12 pt); footnotes, sources and chart labels >= 8 pt"
+      - "Distinct font sizes on the slide <= 5; adjacent role ratio >= 1.25"
+      - "Gate fails when any body text is below the floor for its slide class, measured from the pptx where possible"
+      - "No text in a different size than its sibling boxes without a role reason"
+    sources:
+      - "Ellen Lupton, Thinking with Type (2004; 3rd ed. 2024): type scale, leading, line length (unverified)"
+      - "Microsoft, Make your PowerPoint presentations accessible: suggests sans-serif fonts of 18 pt or larger for readability, https://support.microsoft.com/en-us/office/make-your-powerpoint-presentations-accessible-to-people-with-disabilities-6f7772b2-2f33-4bd2-8ca7-dae3b2b3ef25 (verified; used as an upper reference, the dense JA floor is an owner decision)"
+      - "WCAG 2.2 SC 1.4.3 treats CJK sizes as equivalent to Latin large-text sizes (verified: https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html); WCAG sets no minimum font size"
+
+  - id: G-07
+    name: Text economy
+    question: "Is every word needed, written as fragments or numbers rather than sentences, with nothing repeated?"
+    gate: false
+    weight: 3
+    good_signals:
+      - "Labels and bullets are short noun or verb phrases; numbers carry units"
+      - "Each phrase adds information not already in the title or the visual"
+      - "Detail is moved to a table or note when it is not the message"
+    bad_signals:
+      - "Full paragraphs on a slide meant to be presented"
+      - "The title repeated as the first bullet or as a chart title"
+      - "Filler words, redundant units, repeated axis and legend text"
+      - "A reading deck forced to presentation brevity, or the reverse, against its stated purpose"
+    levels:
+      1: "Fails: the slide is a block of prose or a copied document page; the message is buried in text."
+      2: "Weak: many full sentences or repeated phrases; about a third of the words could go without loss."
+      3: "Acceptable: mostly phrases; one or two redundant lines; amount of text fits the stated slide purpose."
+      4: "Strong: concise phrases; no repetition; every line adds information."
+      5: "Excellent: minimum words that still carry the message and its proof; wording is precise (numbers, units, names); nothing to cut."
+    checks:
+      - "Word or character count against the brief's purpose: presentation slide roughly <= 50 words; reading or leave-behind slide may carry more if structured (heuristic, not a source figure)"
+      - "Title text is not repeated verbatim in a chart title, subtitle or first bullet"
+    sources:
+      - "Garr Reynolds, Presentation Zen (2008): signal to noise, restraint (unverified)"
+      - "Nancy Duarte, Glance Test: elements that do not help the message count as noise, https://www.duarte.com/resources/slide-glance-test/ (verified via search)"
+
+  - id: G-08
+    name: Colour purpose and coherence
+    question: "Does colour encode something (group, status, emphasis) with a small coherent palette, rather than decorate?"
+    gate: false
+    weight: 3
+    good_signals:
+      - "A neutral base with one or two accent hues; accent reserved for what matters"
+      - "A colour keeps one meaning across the slide (and the deck)"
+      - "Categories separable by more than hue alone (label, shape, position)"
+      - "Palette suits subject and audience"
+    bad_signals:
+      - "More than about four hues with no meaning each"
+      - "Rainbow or default chart palette on a slide with its own palette"
+      - "The same colour meaning two things; a different colour for equal things"
+      - "Colour is the only carrier of meaning"
+    levels:
+      1: "Fails: colour misleads (red for good, same hue for opposite states) or clashes so that parts are hard to tell apart."
+      2: "Weak: many hues without a role, or accent colour spread over most elements; palette looks unrelated to the rest of the slide."
+      3: "Acceptable: a coherent palette of neutral plus one or two accents; colour is mostly decorative but not misleading."
+      4: "Strong: colour marks meaning (group, status, key figure); palette small and consistent; meaning is also given by label or position."
+      5: "Excellent: colour is spent on exactly what matters; the palette feels chosen for the subject; meaning survives greyscale and colour-blind viewing."
+    checks:
+      - "Distinct hues (excluding neutrals) <= 4 (heuristic)"
+      - "Greyscale render still separates categories and the focal element (via labels, position, pattern or value)"
+      - "WCAG 1.4.1 use of colour: colour not the only visual means of conveying information (not fetched this session; unverified)"
+    sources:
+      - "Robin Williams, The Non-Designer's Design Book: contrast and repetition (unverified)"
+      - "Cole Nussbaumer Knaflic, Storytelling with Data (2015): colour as an attention tool, used sparingly (secondary summaries)"
+      - "Microsoft, accessible PowerPoint guidance: do not use colour as the only way to convey meaning (verified, URL under G-06)"
+
+  - id: G-09
+    name: Contrast and non-text contrast
+    question: "Is all text and every meaningful graphic element clearly separable from what is behind it?"
+    gate: true
+    weight: 5
+    good_signals:
+      - "Normal text >= 4.5:1 against its actual background; large text >= 3:1"
+      - "Chart marks, lines, icons, arrows and borders that carry meaning >= 3:1 against adjacent colours"
+      - "Text over images has a scrim or solid panel behind it"
+      - "Dark-on-light or light-on-dark used consistently within the slide"
+    bad_signals:
+      - "Light grey text, thin pale lines, mid-tone text on mid-tone fills"
+      - "Text over a photo or gradient with changing background"
+      - "Key series colour close to the background or to its neighbour"
+      - "Footnotes and axis labels in the faintest grey"
+    levels:
+      1: "Fails: some content text is hard or impossible to read (below about 3:1), or a meaningful mark disappears into the background."
+      2: "Weak: body text is under 4.5:1 in places, or meaningful graphics are under 3:1; reading is possible but needs effort."
+      3: "Acceptable: all body text >= 4.5:1; large text and meaningful graphics >= 3:1; secondary text may sit close to the limit."
+      4: "Strong: body and labels comfortably above the limits (about 7:1 or more for text); graphics clearly separated; text over images has a backing."
+      5: "Excellent: contrast is used to rank importance (focal element highest) while every element stays above the limits; holds on a projector and in greyscale."
+    checks:
+      - "Text contrast ratio computed from pptx colours: >= 4.5:1 normal, >= 3:1 large (>= 18 pt, or >= 14 pt bold)"
+      - "Graphical objects needed to understand the content >= 3:1 (WCAG 1.4.11)"
+      - "Gate fails when any content text is under 3:1, or any body text under 4.5:1 by measurement"
+    sources:
+      - "WCAG 2.2 SC 1.4.3 Contrast (Minimum): 4.5:1 normal text; 3:1 large text (18 pt, or 14 pt bold), https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html (verified)"
+      - "WCAG 2.2 SC 1.4.11 Non-text Contrast: 3:1 for graphical objects and UI components needed to understand the content, https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html (verified)"
+
+  - id: G-10
+    name: Emphasis discipline
+    question: "Is emphasis (bold, colour, size, boxes, icons) spent in few places so that the emphasised item actually stands out?"
+    gate: false
+    weight: 3
+    good_signals:
+      - "One or two emphasised items; everything else quiet"
+      - "Emphasis means the same thing wherever it appears"
+      - "Structure (rules, numbering, cards) carries a meaning such as order, group or status"
+    bad_signals:
+      - "Bold, colour and boxes on most items"
+      - "Decoration that encodes nothing (icons, shadows, gradients, accent bars)"
+      - "Underline, bold and colour combined on one phrase"
+      - "Emphasis on an item that is not the message"
+    levels:
+      1: "Fails: emphasis is everywhere or on the wrong item, so the real point is the quietest thing on the slide."
+      2: "Weak: more than a third of the elements are emphasised, or decoration competes with content."
+      3: "Acceptable: emphasis is moderate and mostly on relevant items; some decoration carries no meaning."
+      4: "Strong: emphasis is limited to the key items; the rest is quiet; decoration is minimal and mostly meaningful."
+      5: "Excellent: emphasis is spent exactly once or twice on what matters; every rule, box and icon carries meaning or is removed."
+    checks:
+      - "Share of elements that are bold, accent-coloured or boxed <= about 25% (heuristic)"
+      - "Every decorative element can be named with the meaning it encodes; if not, it is noise"
+    sources:
+      - "Nancy Duarte, Glance Test: signal-to-noise per slide, https://www.duarte.com/resources/guides-tools/the-glance-test/ (verified existence)"
+      - "Edward Tufte, The Visual Display of Quantitative Information (1983): data-ink and chartjunk (not re-checked; unverified)"
+      - "Cole Nussbaumer Knaflic, Storytelling with Data (2015): declutter and focus attention (secondary summaries)"
+
+  - id: G-11
+    name: Glance test and legibility at distance
+    question: "Can a viewer get the message in about three seconds, and read the key content from the back of a room?"
+    gate: false
+    weight: 4
+    good_signals:
+      - "Within 3 seconds a viewer can say what the slide is about and its point"
+      - "Key text and numbers survive a half-size or blurred view"
+      - "Few distinct visual elements compete for the first look"
+    bad_signals:
+      - "Needs reading to learn the topic"
+      - "Key figure small or thin; hairline strokes that vanish when scaled"
+      - "Many small elements of equal weight"
+    levels:
+      1: "Fails: at a glance nothing can be named; at half size the key content is unreadable."
+      2: "Weak: topic is clear but the point needs reading; the key figure or label is small or thin and disappears at half size."
+      3: "Acceptable: topic and most of the point are clear in about 5 seconds; key content readable at half size, supporting detail is not."
+      4: "Strong: the point is clear within about 3 seconds; key content stays readable at half size."
+      5: "Excellent: the point lands in one look, and the focal element is still clear when the slide is shrunk to a thumbnail; supporting detail is available but not in the way."
+    checks:
+      - "Render at 50% width: the title and the key figure remain legible"
+      - "Render a thumbnail (about 320 px wide): the focal element is still identifiable"
+      - "Judge records the time-to-point estimate: a one-sentence description from a first look"
+      - "For dense JA business reading decks, use the 'headline and structure' reading: the title plus block headers must give the point"
+    sources:
+      - "Nancy Duarte, The Glance Test (3 seconds or less to grasp the main point; signal-to-noise per slide), https://www.duarte.com/resources/guides-tools/the-glance-test/ (verified via search results; scoring details unverified)"
+      - "Duarte, slide:ology (2008) and Resonate (2010): book passages not re-checked; unverified"
+
+  - id: G-12
+    name: Fidelity and polish
+    question: "Is the slide free of rendering defects: overflow, clipping, overlap, broken words, stray artefacts and distortion?"
+    gate: true
+    weight: 5
+    good_signals:
+      - "All text inside its box and the slide; nothing cut at an edge"
+      - "No overlap between text, shapes, arrows and labels unless intended (such as a label on a knock-out)"
+      - "Arrows connect to shapes at their edges; connectors do not pass through nodes"
+      - "Images undistorted and sharp; no placeholder text or leftover template shapes"
+    bad_signals:
+      - "Text overflowing a card or running past the slide edge"
+      - "Overlapping labels, arrows through boxes, lines crossing text"
+      - "Missing glyphs, wrong fallback font, words broken mid-word"
+      - "Stretched images or shapes, blurry raster, leftover empty placeholders"
+    levels:
+      1: "Fails: content is cut off or hidden (overflow, clipped text, overlap that hides text or a label), or glyphs are missing."
+      2: "Weak: a visible defect that does not hide content: a label touching a node, an arrow through a box, an awkward mid-word break, an empty placeholder."
+      3: "Acceptable: no defect hides or misleads; one or two cosmetic imperfections (slightly unequal padding, a tight label)."
+      4: "Strong: no visible defect at full size; only a hairline imperfection found on close zoom."
+      5: "Excellent: clean at full size and in zoom; padding inside every box is even; connectors, labels and images are exact."
+    checks:
+      - "Render full size (not a contact sheet) and zoom on dense areas; text bounding boxes lie inside their shapes and the slide"
+      - "Opens in LibreOffice and PowerPoint without repair prompts and with equal layout (SlideMark definition of done)"
+      - "Pairwise shape overlap list from layout is empty except for intended cases"
+      - "Gate fails when any content is cut, hidden or unreadable because of a rendering defect"
+    sources:
+      - "Cole Nussbaumer Knaflic, Storytelling with Data (2015): think like a designer, attend to details (secondary summaries only)"
+      - "SlideMark Definition of Done and bench/ui_review_prompt.md items 4, 5, 7, 11 (arrows, labels, spacing, CJK) for the diagram variants of the same defects"
+
+  - id: G-13
+    name: Deliberate, coherent choices
+    question: "Do the colour, type, shape and layout choices look chosen for this content and hold together as one system, whatever the style?"
+    gate: false
+    weight: 3
+    good_signals:
+      - "Choices can be explained from the subject and audience (a stated or evident reason)"
+      - "Corner radius, line weight, stroke, shadow and icon style are one family"
+      - "Dense or airy, dark or light, plain or bold is a consistent decision, not a mix"
+    bad_signals:
+      - "A template default that would fit any topic, with no sign of a decision"
+      - "Mixed styles: rounded and square cards, two icon sets, outlined next to filled"
+      - "Effects (gradient, shadow) used on some objects only"
+      - "Style borrowed and half applied"
+    levels:
+      1: "Fails: styles clash so strongly that the slide looks assembled from different sources."
+      2: "Weak: mostly default choices, with two or more mismatched styles (radius, stroke, icon family)."
+      3: "Acceptable: coherent but generic; nothing mismatched; no sign that the choices were made for this content."
+      4: "Strong: a recognisable system (type, colour, shape) that suits the subject; at most one stray element."
+      5: "Excellent: every choice is explainable and consistent, and the style is specific to this subject and audience; style could be named in one phrase."
+    checks:
+      - "Count distinct corner radii, stroke widths, shadow styles and icon families; each should be 1 (2 with a reason)"
+      - "No house style is assumed: judge fit and coherence, not taste (design freedom)"
+    sources:
+      - "bench/design_review_prompt.md: 'judges whether the choices are deliberate, coherent and serve the content' (repo)"
+      - "Robin Williams, The Non-Designer's Design Book: repetition (unverified)"
+      - "Ellen Lupton, Thinking with Type: consistent typographic systems (unverified)"
+
+  - id: G-14
+    name: Accessible structure (pptx)
+    question: "Does the file give assistive technology a title, alt text for meaningful visuals, a sensible reading order, and meaning that does not rely on colour alone?"
+    gate: false
+    weight: 2
+    good_signals:
+      - "Every slide has a unique, descriptive title (a real title placeholder or equivalent)"
+      - "Meaningful pictures and charts have alt text; decoration is marked decorative"
+      - "Reading (z-)order follows the visual order"
+      - "Tables have a header row and no merged cells where avoidable"
+    bad_signals:
+      - "No title on a slide, or the same title twice"
+      - "Charts and diagrams as images without alt text"
+      - "Reading order is creation order, so the footer is read first"
+      - "Meaning only by colour; text in images only"
+    levels:
+      1: "Fails: no slide title, content visuals without any alt text, and reading order contradicts the visual order."
+      2: "Weak: titles are missing or duplicated on some slides, or meaningful visuals lack alt text; order is partly wrong."
+      3: "Acceptable: every slide has a title; most meaningful visuals have alt text; reading order is mostly right."
+      4: "Strong: unique titles; alt text on all meaningful visuals and decorative ones marked; reading order matches the visual order; tables have headers."
+      5: "Excellent: as 4, plus alt text that states the takeaway of a chart in a sentence, and meaning that survives without colour."
+    checks:
+      - "(pptx) title placeholder text present and unique per slide"
+      - "(pptx) alt text (descr) present on picture, chart and diagram group shapes; decorative flagged"
+      - "(pptx) shape tree order equals reading order (title, body, footer last)"
+      - "Image-only run: mark N/A; the method renormalizes the weights"
+    sources:
+      - "Microsoft, Make your PowerPoint presentations accessible: alt text, slide titles, reading order, contrast, tables, https://support.microsoft.com/en-us/office/make-your-powerpoint-presentations-accessible-to-people-with-disabilities-6f7772b2-2f33-4bd2-8ca7-dae3b2b3ef25 (verified)"
+      - "WCAG 2.2 SC 1.4.3 and 1.4.11 (verified, URLs under G-09)"
+
+deck:
+  - id: D-01
+    name: Narrative and storyline
+    question: "Do the slide titles, read alone in order, tell the argument (answer first, grouped support, clear ending)?"
+    gate: false
+    weight: 5
+    good_signals:
+      - "Titles read in sequence form a summary of the deck (the 'title test')"
+      - "The answer or recommendation comes early; groups of support follow in a clear logic (such as MECE groups)"
+      - "Each slide has a role in the story: context, evidence, decision, next step"
+      - "There is a clear ending that states the ask or next step"
+    bad_signals:
+      - "Topic-label titles ('Background', 'Analysis', 'Summary')"
+      - "Order is by data source or by chronology of work rather than by argument"
+      - "Slides that could be deleted or swapped with no loss"
+      - "Conclusion appears only on the last slide, or is absent"
+    levels:
+      1: "Fails: slides are unrelated or contradict one another; no story can be told from the titles."
+      2: "Weak: mostly topic titles; order follows the data or the work, not an argument; the point appears late or not at all."
+      3: "Acceptable: a clear start and end; the order is logical; about half the titles are claims; some slides are filler."
+      4: "Strong: titles read alone give the argument; the answer comes early; supporting slides group logically; few redundant slides."
+      5: "Excellent: the title list is a complete executive summary; each slide has one role; nothing can be moved or removed without loss; the ending states the ask."
+    checks:
+      - "List all titles in order and judge the list alone (title test)"
+      - "Share of action titles (claim sentences) >= about 70% for a business argument deck (heuristic)"
+      - "Slide count fits the content, with no padding slides"
+    sources:
+      - "Barbara Minto, The Pyramid Principle (1987), and SCQA framing (secondary summaries verified, e.g. https://managementconsulted.com/the-pyramid-principle/; primary text unverified)"
+      - "Nancy Duarte, Resonate (2010): story structure for presentations (not re-checked; unverified)"
+      - "Cole Nussbaumer Knaflic, Storytelling with Data (2015): storytelling and action titles (secondary summaries)"
+      - "McKinsey/BCG consulting slide practice and Japanese 資料作成 guides: ghost-deck and title-first practice (no specific title verified; unverified)"
+
+  - id: D-02
+    name: Consistency as one system
+    question: "Do recurring parts (title, footer, page number, source line, cards, charts, tables, colour meaning) look and sit the same across the deck?"
+    gate: false
+    weight: 4
+    good_signals:
+      - "Title, footer and page number at identical positions and sizes"
+      - "The same kind of element looks the same everywhere (cards, tables, charts)"
+      - "A colour keeps its meaning across slides"
+      - "Deviations happen on purpose (cover, divider, closing)"
+    bad_signals:
+      - "Title position or size jumps between slides"
+      - "Charts of different styles in one deck; tables with different header treatment"
+      - "Colour meaning changes from slide to slide"
+      - "Changes between slides that carry no meaning"
+    levels:
+      1: "Fails: slides look like they came from different decks (fonts, palette, title position all vary)."
+      2: "Weak: a common palette but several recurring parts differ (title position, table style, chart style, footer)."
+      3: "Acceptable: one palette and one font family; title and footer fixed; some recurring elements vary in minor ways."
+      4: "Strong: recurring parts are the same; at most two slides deviate and each has a reason."
+      5: "Excellent: a complete system: type scale, grid, colour roles, chart and table treatment identical; deviations are deliberate and recognisable (cover, divider)."
+    checks:
+      - "Title, page number and footer bounding boxes identical on content slides (tolerance 1% of slide width)"
+      - "Same font families and the same size per role across the deck"
+      - "Overlay the slides: the title and margin frame coincide"
+    sources:
+      - "Robin Williams, The Non-Designer's Design Book: repetition (unverified)"
+      - "Edward Tufte, Envisioning Information / Visual Display: consistent design across a series (unverified)"
+      - "bench/design_review_prompt.md lens 'One system' (repo)"
+
+  - id: D-03
+    name: Variety of form
+    question: "Does the deck use different forms where the content differs, without variety for its own sake?"
+    gate: false
+    weight: 3
+    good_signals:
+      - "A number, a comparison, a sequence, a trend and a list each get a different suitable form"
+      - "Rhythm of dense and sparse slides"
+      - "Repetition only where the content repeats (a series of case studies)"
+    bad_signals:
+      - "Five or more consecutive slides with the same layout (title and bullets)"
+      - "Every content type forced into the same card grid"
+      - "Variety unrelated to content (random layouts, mixed styles)"
+    levels:
+      1: "Fails: one layout is used for every slide, whatever the content (all bullets, or all card grids)."
+      2: "Weak: two forms across the deck; runs of four or more slides with the same layout while the content differs."
+      3: "Acceptable: three or four forms; runs of the same layout of at most three slides; some content squeezed into the default."
+      4: "Strong: forms follow content types; at most one run of three same-layout slides; there is a visible rhythm."
+      5: "Excellent: each content type has its right form; rhythm of dense and sparse; repeated layouts occur only for parallel content and are clearly parallel."
+    checks:
+      - "Table: slide number to layout and form; longest run of the same layout"
+      - "Count of distinct forms used / count of distinct content types present"
+    sources:
+      - "bench/design_review_prompt.md ('the deck varies form when the content varies'; variety score used in round 14) (repo)"
+      - "Garr Reynolds, Presentation Zen (2008): avoid monotony (unverified)"
+
+  - id: D-04
+    name: Pacing and framing slides
+    question: "Does the deck pace its density and use framing slides (cover, agenda, section dividers, summary, closing) where they help?"
+    gate: false
+    weight: 3
+    good_signals:
+      - "A cover that states topic, owner, date; a closing that states the ask or next steps"
+      - "Agenda or dividers present in a deck longer than about 8-10 slides, matching the section structure"
+      - "Dense slides are separated by lighter slides (a key figure, a divider)"
+      - "Each section opens with its message"
+    bad_signals:
+      - "No cover or closing, or a closing that is only 'Thank you' when a decision is needed"
+      - "Agenda that does not match the sections"
+      - "Long run of maximum-density slides"
+      - "Dividers on a short deck that add length only"
+    levels:
+      1: "Fails: no entry or exit (starts mid-content; ends abruptly), and the density never varies."
+      2: "Weak: a cover only, or a cover and a generic 'thanks' closing; long runs of equally dense slides; agenda missing in a long deck."
+      3: "Acceptable: cover and closing present; agenda or dividers where length asks for them; density varies a little."
+      4: "Strong: framing slides match the structure; dense slides are separated by lighter ones; the closing carries the ask."
+      5: "Excellent: pacing is designed: framing slides orient the reader, density breathes, the key moments are given room, and the deck is as long as it needs to be."
+    checks:
+      - "Framing slide inventory against deck length and section count"
+      - "Density per slide (word or element count) plotted along the deck: no run of 4+ slides at the top of the range (heuristic)"
+    sources:
+      - "Nancy Duarte, Resonate (2010): rhythm between statement and evidence (not re-checked; unverified)"
+      - "Barbara Minto, The Pyramid Principle: introduction and summary framing (secondary summaries only)"
+      - "Japanese consulting deck practice: 目次, 章扉, エグゼクティブサマリー (no specific title verified; unverified)"
+
+  - id: D-05
+    name: Fit to purpose and audience
+    question: "Is the deck's density and register right for how it will be used (presented, read, or both) and for its audience?"
+    gate: false
+    weight: 3
+    good_signals:
+      - "Presented decks: sparse, large type; reading decks: structured density with full labels and sources"
+      - "Density the same kind across the deck (not one presented slide among reading slides)"
+      - "Terms, units and language match the audience (JA business conventions where relevant)"
+    bad_signals:
+      - "A reading deck that has only one idea per slide and no detail, or a presented deck full of 10 pt tables"
+      - "Mixed purposes with no pattern"
+      - "Terminology or format that does not fit the audience"
+    levels:
+      1: "Fails: the deck's use is obviously wrong for its density (a leave-behind with no detail; a talk deck that can only be read)."
+      2: "Weak: the density suits the purpose for about half of the slides; others are far off."
+      3: "Acceptable: density suits the purpose for most slides; one or two outliers; register is neutral."
+      4: "Strong: density and register suit the purpose and the audience throughout; outliers are deliberate."
+      5: "Excellent: the deck is clearly designed for its use; density, labels, sources and terms all match, and a reader or presenter would not change the format."
+    checks:
+      - "Brief states: presented / read / both, audience, language; judge compares density per slide to the stated use"
+      - "Dense JA business reading deck: 10-12 pt body, tables, footnotes and sources are expected, not defects"
+    sources:
+      - "Garr Reynolds, Presentation Zen (2008): slideument vs slide (unverified)"
+      - "Japanese 資料作成 guides: distinction between presentation material and reading material (no specific title verified; unverified)"

@@ -871,3 +871,14 @@ was tuned toward a business-deck judge. Owner order: 4, 1, 2, 3.
   the bar, flowchart diamond at node scale with branch labels, table header in mono capitals, venn focal name at
   least the set-name size, legend samples matching the drawn style, arrows entering from top / bottom with >= 24px
   stubs, single-tier `@arch`.
+
+## Run 2026-11-15: a KPI rubric for slide design (owner)
+Owner: the scores so far had no description per number. Built with two research agents (topics and topic KPIs; general
+KPIs and the method): `docs/DESIGN_RUBRIC.md` (method, formula, bands, uncertainty, report, protocol),
+`docs/DESIGN_RUBRIC_KPIS.md` (catalogue, generated), `bench/rubric/{general,topics}.yaml` (14 general + 5 deck KPIs,
+12 topics with 61 KPIs, 1-5 levels with good and bad signs, weights, gates), `bench/rubric/score.py` (scorer and
+report), `bench/rubric/judge_prompt.md`, `tests/test_rubric.py` (the worked examples: chart slide 67.8, deck 63.4).
+- [ ] Next (owner's next step): hand the rubric to a judge subagent, score the editorial examples and a t5 deck
+  (R = 3, blind, JSON), compute the reports with `score.py`, then fix what the reports rank highest.
+- [ ] Calibrate before trusting numbers: an anchor set of >= 12 slides with human scores (method section 9) and the
+  measured run-to-run SD (section 7); add a `measured.json` extractor from the .pptx for the gate KPIs.
