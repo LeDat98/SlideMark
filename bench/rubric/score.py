@@ -14,7 +14,8 @@ A run file (one judge run over one deck):
                            "evidence": [{"sign": "+", "text": "title states the takeaway"}]}]}],
      "deck_kpis": [{"id": "D-01", "level": 4, "evidence": [...]}]}
 
-A measured file (facts read from the .pptx, they override the judge for gate KPIs):
+A measured file (facts read from the .pptx, written by bench/rubric/measure.py; a failure below level 3 overrides the
+judge for gate KPIs, a pass only lifts a judge level below 3):
     {"slides": {"3": {"G-06": 2, "G-12": 1}}, "facts": {"3": "min font 8.5pt; text cut at the right edge"}}
 """
 
@@ -228,6 +229,14 @@ def _median_levels(per_run: list[dict[str, float | None]]) -> tuple[dict[str, fl
     return med, vals
 
 
+def measured_level(judged: float | None, measured: float) -> float:
+    """The level a gate KPI takes once the .pptx was measured: a measured failure (below 3) always wins; a measured
+    pass (3 or more) only lifts a judge level below 3 (it proves the floor is met, not that the design is strong)."""
+    if measured < 3 or judged is None or judged < 3:
+        return measured
+    return judged
+
+
 def score_runs(runs: list[dict], rub: Rubric, measured: dict | None = None) -> dict:
     """All runs of one deck -> per slide and per deck results with run ranges, flags and evidence."""
     measured = measured or {}
@@ -247,11 +256,12 @@ def score_runs(runs: list[dict], rub: Rubric, measured: dict | None = None) -> d
         for lv in per_run:  # measured facts win for gate KPIs
             for kid, s in (over.get(str(n)) or {}).items():
                 if _is_gate(kid, rub, tk):
-                    lv[kid] = float(s)
+                    lv[kid] = measured_level(lv.get(kid), float(s))
         med, vals = _median_levels(per_run)
         for kid, s in (over.get(str(n)) or {}).items():
             if _is_gate(kid, rub, tk):
-                med[kid], vals[kid] = float(s), [float(s)]
+                med[kid] = measured_level(med.get(kid), float(s))
+                vals[kid] = [med[kid]]
         unstable = {k for k, xs in vals.items() if xs and max(xs) - min(xs) >= UNSTABLE_SPREAD}
         unstable_gates = {k for k in unstable if _is_gate(k, rub, tk) and (med.get(k) or 0) >= 3}
         gen = {k: v for k, v in med.items() if k in rub.general}

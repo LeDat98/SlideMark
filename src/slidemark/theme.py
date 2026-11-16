@@ -172,6 +172,12 @@ class LayoutTokens(BaseModel):
     vcentre_hug_cols: bool = True  # ... a lone table's columns hug their content (the table is centred)
     vcentre_col_pad_em: float = 2.4  # ... column padding added to the content width (em, both sides)
     html_hug: bool = False  # True: the html kit's boards / columns size to their content, the block centres
+    html_kit_ink: bool = (
+        False  # True: the html kit's small text takes `diagram.muted`, its accent text is made readable
+    )
+    html_kit_scale: float = Field(
+        1.0, ge=0.5, le=2.0
+    )  # x the font sizes of the html kit's small classes (.label .sub .tag ...)
     html_zoom_max: float = 1.5  # a short HTML block renders zoomed up to this factor (1 = off)
     roomy_left: float = 0.25  # share of the body left empty that triggers the roomy pass
     roomy_grow: float = 1.2  # the roomy pass grows box / tree text by up to this factor more
@@ -682,6 +688,9 @@ class RenderTokens(BaseModel):
     )
     ink_auto: bool = True  # derive readable text colors the deck did not set (`style: ink.auto=off` disables)
     contrast_min: float = 4.5  # contrast ratio auto ink aims for (normal text)
+    chart_series_contrast: float = (
+        0.0  # > 0: lint a chart series fill under this ratio on its background (3 = WCAG 1.4.11)
+    )
     contrast_large: float = 3.0  # ... for large text (>= `large_pt`, e.g. KPI numbers)
     large_pt: float = 24  # text at least this size counts as large
     # --- chart axis and bars

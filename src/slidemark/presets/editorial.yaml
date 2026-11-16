@@ -54,16 +54,19 @@ icon_disc: "#E3E5EA"
 icon_color: primary
 # series colors: ink first, then muted slate / sage / sand / clay / mauve (the accent is reserved for `hl=`)
 palette: [primary, "#5E7A9B", "#7C8F6F", "#B8915A", "#9C6B50", "#6E6479"]
-# chart bars are quiet slate (never heavy ink); the `hl=` bar is the accent tint (diagram fills keep the palette)
-chart_series: ["#8794AB", "#C2C9D6", "#7C8F6F", "#B8915A", "#9C6B50", "#6E6479"]
+# chart bars are quiet slate (never heavy ink), every fill >= 3:1 on the paper (WCAG 1.4.11); the `hl=` bar is the
+# accent tint with an accent hairline (diagram fills keep the palette)
+chart_series: ["#56657F", "#7B8DA8", "#7A8D6C", "#A27B43", "#9C6B50", "#6E6479"]
 # diagram kit (@arch @swimlane @sequence @venn): fixed type scale, hairline cards, mono capitals for tags,
 # arrow labels and captions; arrows slate / accent (primary) / link blue (HTTP) / dashed (return)
 diagram_name_size: 13
-diagram_sub_size: 9
+diagram_sub_size: 10
 diagram_tag_size: 8
-diagram_label_size: 8
+diagram_label_size: 9
+diagram_legend_size: 9
+diagram_muted: secondary  # label ink: slate 6.1:1 on the paper (muted is 5.3:1 and reads faint when projected)
 diagram_tag_track: 0.08
-diagram_label_track: 0.08
+diagram_label_track: 0.03
 diagram_legend: auto
 diagram_arrow_primary: accent
 diagram_arrow_http: link
@@ -78,6 +81,7 @@ venn_line: secondary
 venn_line_w: 0.9pt
 venn_core: primary
 render:
+  chart_series_contrast: 3
   connector_color: secondary
   connector_width: 1
   line_width: 0.75
@@ -106,7 +110,7 @@ classes:
   # diagram roles: `## Postgres {.store}` or mermaid `A[DB]:::store`
   focal: {fill: "#BF452014", line: accent, line_width: 1.25}
   store: {fill: "#2D314214", line: muted, line_width: 1}
-  external: {fill: "#2D314208", line: border}
+  external: {fill: "#2D314208", line: "#7F889C"}
   input: {fill: "#FFFFFF", line: muted, border_left: "3pt solid secondary"}
   optional: {line: muted, line_dash: dash}
   security: {fill: "#BF45200D", line: accent, line_dash: dash}
@@ -132,4 +136,6 @@ layout:
   table_fill_width: true
   diagram_grow: 1
   html_hug: true
+  html_kit_scale: 1.1
+  html_kit_ink: true
   cjk_phrase_lines: true

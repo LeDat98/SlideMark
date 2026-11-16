@@ -219,7 +219,7 @@ def test_arch_labels_are_mono_capitals_on_a_knockout_clear_of_nodes(tmp_path):
     lab = one(s, "Arch edge 1 label")
     assert lab.text_frame.text == "https"  # the text keeps its case, the font draws capitals
     r = runs(lab)[0]
-    assert latin(r) == "Consolas" and r.font.size.pt == 8 and caps(r)
+    assert latin(r) == "Consolas" and r.font.size.pt == 9 and caps(r)  # editorial `diagram_label_size`: 9 pt
     assert lab.fill.type is not None  # a knockout of the slide colour
     nodes = named(s, r"Arch node .+")
     for n in nodes:

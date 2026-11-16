@@ -136,7 +136,7 @@ def test_flowchart_head_has_a_straight_run_and_branch_labels_are_mono_knockouts(
     assert sorted(s.text_frame.text for s in labs) == ["no", "yes"]
     for s in labs:
         r = s.text_frame.paragraphs[0].runs[0]
-        assert r.font.size.pt == 8 and r.font.name in ("Consolas", "Liberation Mono")
+        assert r.font.size.pt == 9 and r.font.name in ("Consolas", "Liberation Mono")
         assert s.fill.type is not None  # a knockout of the slide colour
 
 

@@ -499,7 +499,7 @@ the same words. Example: `examples/24-vocabulary-2.md`.
 | `diagram.sub.size` `.tag.size` `.label.size` `.legend.size` | sublabel 9, tag 8, arrow label / caption 8, legend text 9 (pt; the theme minimum is 8) |
 | `diagram.tag.track` `.label.track` | letter spacing in em (0.18 / 0.08) |
 | `diagram.font` | the mono face of tags, sublabels, labels (default `fonts.mono`) |
-| `diagram.muted` `.tag.line` | ink of tags / sublabels / labels (`muted`) and the tag outline (`border`) |
+| `diagram.muted` `.tag.line` | ink of tags / sublabels / labels (`muted`; editorial: `secondary`, 6.1:1 on the paper) and the tag outline (`border`). Editorial sizes: sub 10 pt, label 9 pt, legend 9 pt, tag 8 pt |
 | `diagram.arrow` `.arrow.primary` `.arrow.http` `.arrow.return` `.arrow.w` | arrow colours (`render.connector_color` / `accent` / `link` / the plain colour) and width; `diagram.return.dash` (`dash`) |
 | `diagram.node.pad` | inner padding of a node card (8pt) |
 | `diagram.act.fill` `.act.line` `.act.w` | the activation bar of `@sequence` (`surface` / `muted` / 9pt) |
@@ -801,6 +801,8 @@ A bad value (an out-of-range number, `overlap` on a stacked chart, `+name` on a 
 A takeaway is two attributes: `` ```bar {hl=郊外大型 note="赤字42店の半数は郊外大型"} ``. Several series keep their colors: an `hl` category gets a `render.chart_hl` outline in each; a line gets a larger marker. A `note` pins the plot area and value axis so the pointer hits the bar; a too-long note shrinks, wraps, then warns (`chart-note`).
 
 Look tokens: `render.chart_hl_tint` (> 0: the `hl=` bar is that share of `chart_hl` over the background with a `chart_hl` hairline (`chart_hl_line`), never a solid fill; the editorial preset), `chart_series` (bar / line colors when the `palette` is for diagrams), `render.chart_note_pointer=off` (a `note=` is plain text beside the bar, no arrow). Layout: `layout.vcentre=on` hugs a lone table (columns to their content, rows <= `vcentre_row_em` x text) and a card row (height of the tallest content), centres the block in the body and keeps `vcentre_gap` of air above the footnote / footer; `subtitle_font=body` sets the cover subtitle in the body face.
+
+Chart series contrast: `render.chart_series_contrast=3` (0 = off, the default) lints a series fill or stroke whose contrast on its background is below that ratio (WCAG 1.4.11): a `contrast` warning whose hint names a passing colour for `{colors=...}`. The editorial `chart_series` colours all reach 3:1 on the paper; the `hl=` bar stays the accent tint with an accent hairline.
 
 Chart look defaults are tokens (`style: render.chart_legend_scale=1.4`; `render.chart_grid=border` is the gridline color, `render.chart_line_width=3.5` the line width in pt, `render.chart_pie_line=bg` / `render.chart_pie_line_width=2` the wedge outline): legend size = `chart_legend_scale` x chart text,
 data labels = `chart_label_scale`, pie/doughnut wedge labels = `chart_pie_label_scale` (bold, `chart_pie_label_bold`,
@@ -1188,5 +1190,5 @@ in the same module.
 - Box anatomy: `heading.font=body|mono|heading|<name>` (face of box headings), `heading.bold=off`; `card.font_size`-style class tokens in `classes:` of a preset (`classes.card.font_size=13`).
 - Tables: `table.rules=rows` draws hairlines between rows only (no vertical rules) and a 1 pt rule of `table.head_rule` (default `primary`) under the header; default `grid`.
 - Charts: `render.chart_title_bold=off`, `render.chart_label_scale=0.9`, `render.chart_legend_scale=0.9`, `render.chart_text_ratio=0` (no growth for big frames), `render.chart_hl_first=on` (the `hl=` outline marks the first series' bar only). `classes.chart-note.font/color/italic` style the `note=` callout (a class font wins over the chart font).
-- html kit: `layout.html_hug=on` makes `.stack>.board` size to its content and centres the stack; `.card` / `.node` take the fill of `classes.card.fill` (`--card-fill`).
+- html kit: `layout.html_hug=on` makes `.stack>.board` size to its content and centres the stack; `.card` / `.node` take the fill of `classes.card.fill` (`--card-fill`). `layout.html_kit_scale=1.1` multiplies the font sizes of the kit's small classes (`.label .sub .meta .tag .eyebrow .legend .badge`; 1 = unchanged); `layout.html_kit_ink=on` gives them the ink of `diagram.muted` (`--kit-ink`) and makes accent text on a tinted node / badge pass 4.5:1 (`--accent-ink`). Both are on in editorial.
 - CJK phrase lines: `layout.cjk_phrase_lines=on` makes the layout reserve the lines that whole-phrase wrapping needs (a paragraph the viewer wraps as `注文処理は単一` / `の DB` takes 3 lines: `注文処理は` / `単一の DB に` / `集中`), so the renderer's phrase breaks always fit; off by default (it moves the goldens of every Japanese deck).

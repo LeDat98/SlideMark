@@ -3,7 +3,8 @@
     python bench/rubric/campaign.py <folder> [--out-dir <dir>]
 
 The folder holds judge runs named ``run<N>-<deck>.json`` (format: ``bench/rubric/score.py``) and optionally
-``measured-<deck>.json`` (facts from the .pptx that override the judge for gate KPIs). Writes
+``measured-<deck>.json`` (facts from the .pptx that override the judge for gate KPIs). A ``<deck>.pptx`` in the folder
+with no ``measured-<deck>.json`` is measured automatically (``bench/rubric/measure.py``). Writes
 ``<deck>.md`` for each deck and ``SUMMARY.md`` (deck scores and bands, the weakest KPIs across all slides, gate
 failures and unstable KPIs) into ``--out-dir`` (default: the folder).
 """
@@ -32,6 +33,23 @@ def _score_module():
     return mod
 
 
+def measure_pptx(pptx: Path, runs: list[dict]) -> dict:
+    """The measured facts of a deck (``bench/rubric/measure.py``); a slide the judge typed as dense JA business
+    gets the dense body floor."""
+    spec = importlib.util.spec_from_file_location("rubric_measure", HERE / "measure.py")
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    dense = {
+        int(sl["slide"])
+        for r in runs
+        for sl in r.get("slides", [])
+        if "dense-ja-business" in str(sl.get("topic", ""))
+    }
+    return mod.measure_deck(pptx, dense_slides=dense)
+
+
 def campaign(folder: Path, out_dir: Path | None = None) -> str:
     S = _score_module()
     rub = S.load_rubric(HERE)
@@ -48,6 +66,11 @@ def campaign(folder: Path, out_dir: Path | None = None) -> str:
     rows, kpi_levels, gate_fails, unstable = [], defaultdict(list), [], []
     for deck, rs in sorted(runs.items()):
         mp = folder / f"measured-{deck}.json"  # facts read from the .pptx override the judge for gate KPIs
+        if not mp.exists() and (folder / f"{deck}.pptx").exists():  # protocol step 3: measure the deck itself
+            mp.write_text(
+                json.dumps(measure_pptx(folder / f"{deck}.pptx", rs), ensure_ascii=False, indent=1) + "\n",
+                encoding="utf-8",
+            )
         res = S.score_runs(rs, rub, json.loads(mp.read_text(encoding="utf-8")) if mp.exists() else None)
         (out_dir / f"{deck}.md").write_text(S.report(res, rub), encoding="utf-8")
         d = res["deck"]

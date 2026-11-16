@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from slidemark.contrast import ratio
 from slidemark.htmlnative import html_to_placed
 from slidemark.ir import Shape, Text
 from slidemark.parser import parse
@@ -101,7 +102,8 @@ def test_node_roles_match_the_preset_roles(renderer):
 def test_badge_over_is_accent(renderer):
     items = _place(renderer, '<span class="badge over">4/3</span>')
     assert _shapes(items)[0].style.line == ACCENT
-    assert _texts(items)[0].style.color == ACCENT
+    ink = _texts(items)[0].style.color  # the accent, nudged to read 4.5:1 on the paper (--accent-ink)
+    assert ink in (ACCENT, "#B8421F") and ratio(ink, "#F5F5F5") >= 4.5
 
 
 def test_arrow_markers_without_defs_give_an_accent_head(renderer):

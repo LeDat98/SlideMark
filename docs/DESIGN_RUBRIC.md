@@ -276,6 +276,16 @@ depend on the content. This keeps the aesthetic scoring blind and still checks "
 contrast ratios, shape bounds versus slide and card bounds, overlap list, alt text, title and reading order. These
 override the judge for the gates (section 3.3) and supply G-14.
 
+`bench/rubric/measure.py deck.pptx --deck <id> [--dense-ja] -o measured-<id>.json` is that tooling. Per slide it reads
+the smallest text size per role (body, node, label, footnote, chart), the contrast of every run against the fill behind
+it, the non-text contrast of chart series, arrows and legend swatches (>= 3:1), text that overflows its frame,
+shapes past the slide edge and overlapping text shapes, and writes `{"slides": {"3": {"G-06": 2}}, "facts": {"3":
+"min body 12 pt (floor 14); ..."}}`. Floors are those of the KPI checks (body 14 pt, dense JA 10 pt, labels,
+footnotes and chart text 8 pt); a clear failure is level 1, a borderline one level 2, a pass level 3. G-12 is written
+only for a measured defect. `score.py` applies a measured failure over the judge, and lets a measured pass lift only a
+judge level below 3. `campaign.py` runs the extractor itself when `<deck>.pptx` sits in the campaign folder and no
+`measured-<deck>.json` exists.
+
 **Step 4 - repeat.** R = 3 independent runs with fresh context. Shuffle the slide order and the KPI order in each run to
 reduce position and order bias, and never show two versions in the same image unlabeled in a fixed order. Use a
 judge model that is not the model that generated the deck when possible (self-enhancement bias). Take the median per KPI;

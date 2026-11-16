@@ -14,6 +14,7 @@ from io import BytesIO
 
 from pptx.util import Emu
 
+from ..contrast import mix, nearest_passing
 from ..ir import Placed, Raw
 from ..theme import DEFAULT_SIZES, Theme
 from .htmlkit import KIT_CSS, KIT_DEFS
@@ -72,6 +73,15 @@ def _tokens(theme: Theme) -> str:
         parts.append(f"--card-fill:#{hex6(theme, card.fill)}")
     if theme.layout.html_hug:  # kit boards and columns size to their content; the block is centred
         parts.append("--board-flex:0 1 auto;--stack-justify:center")
+    if theme.layout.html_kit_ink:  # the kit's small text and accent text: the native kit's ink, >= 4.5:1
+        parts.append(f"--kit-ink:#{hex6(theme, theme.diagram_muted)}")
+        acc, bgc = theme.hexval("accent"), theme.hexval("bg")
+        if acc and bgc:
+            parts.append(
+                f"--accent-ink:{nearest_passing(acc, [bgc, mix(bgc, acc, 0.08)], theme.render.contrast_min)}"
+            )
+    if theme.layout.html_kit_scale != 1.0:
+        parts.append(f"--kit-scale:{theme.layout.html_kit_scale:g}")
     parts.append(f"--font-heading:{_stack(theme.fonts.heading, theme.fonts.ea)}")
     parts.append(f"--font-body:{_family(theme)}")
     parts.append(f"--font-mono:{_stack(theme.fonts.mono)}".replace(", sans-serif", ", monospace"))

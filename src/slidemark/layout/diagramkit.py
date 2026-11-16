@@ -19,6 +19,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from ..contrast import nearest_passing
 from ..forms5 import kind_of, split_sub, split_tag  # noqa: F401 (re-exported)
 from ..ir import Paragraph, Run, Shape, Style, Text, fast_style
 from ..units import EMU_PER_PT
@@ -316,6 +317,8 @@ def node(
         role = role_style(c, classes, None)
         accent = role.line if role.line and role.line not in ("muted", "border") else None
         col = accent or K.muted
+        if accent and (hx := c.theme.hexval(accent)) and (back := c.theme.hexval("surface")):
+            col = nearest_passing(hx, [back], c.theme.render.contrast_min)  # tag ink readable on the tag fill
         line = accent or c.theme.diagram_tag_line
         pad = round(7 * PT)
         c.emit(
@@ -504,7 +507,7 @@ def legend_width(K: Look, entries: list[tuple[str, str]]) -> int:
 
 
 def legend_height(K: Look) -> int:
-    return round((K.label * 1.6 + K.legend * 1.9) * PT) + round(38 * PT)
+    return round((K.label * 1.6 + K.legend * 1.9) * PT) + round(36 * PT)
 
 
 def legend(c, K: Look, x: int, y: int, w: int, entries: list[tuple[str, str]], rule: bool = True) -> int:

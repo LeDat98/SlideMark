@@ -439,6 +439,22 @@ def _chart_findings(p: Placed, theme: Theme, behind: list[RGB]) -> list[tuple[st
             hint = f"colors: fg={new}" if fix == "fg" else f"add {{color={new}}} to the chart fence"
             hint += f" (passes {need:g}:1 on {', '.join(every)})"
         out.append((f"chart {label} have low contrast {got:.1f}:1 (needs {need:g}:1) on {backs[0]}", hint))
+    need_g = rt.chart_series_contrast  # series fills / strokes are meaningful graphics (WCAG 1.4.11: 3:1)
+    if need_g > 0 and not pie:
+        for i in range(min(len(series), len(pal))):
+            got = min(_ratio("#" + pal[i], b) for b in back_hex)
+            if got < need_g:
+                new = nearest_passing("#" + pal[i], back_hex, need_g)
+                name = str(series[i].name or f"series {i + 1}")
+                out.append(
+                    (
+                        f"chart series '{name}' fill #{pal[i]} has low non-text contrast {got:.1f}:1 "
+                        f"(needs {need_g:g}:1) on {back_hex[0]}",
+                        f"add {{colors=...}} with {new} for it "
+                        f"(passes {need_g:g}:1 on {', '.join(back_hex)})",
+                    )
+                )
+                break
     return out
 
 
