@@ -700,6 +700,9 @@ class RenderTokens(BaseModel):
     chart_series_contrast: float = (
         0.0  # > 0: lint a chart series fill under this ratio on its background (3 = WCAG 1.4.11)
     )
+    accent_mark_contrast: float = (
+        3.0  # > 0: lint a text-less mark in the accent (dot, arrow, rule) under this ratio (WCAG 1.4.11)
+    )
     contrast_large: float = 3.0  # ... for large text (>= `large_pt`, e.g. KPI numbers)
     large_pt: float = 24  # text at least this size counts as large
     # --- chart axis and bars

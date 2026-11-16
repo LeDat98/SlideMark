@@ -901,3 +901,7 @@ report), `bench/rubric/judge_prompt.md`, `tests/test_rubric.py` (the worked exam
   decision); (b) `render.chart_series_contrast` is on in editorial only (on by default, six examples' palettes warn);
   (c) accents under 3:1 as marks (t5's pale orange dot): a lint like the chart one for accent marks, and SKILL.md
   "accent >= 3:1 on the background"; (d) anchor set and measured SD before trusting small differences.
+- **(a) and (c) done (2026-11-16, owner: "raise editorial to 14 pt, turn the accent lint on")**: editorial `table` 14 pt
+  and `card` 14 pt (example 27 slides 4-6 now measure 14 pt body); `render.accent_mark_contrast=3` on by default,
+  default accent `#C47E08`, SKILL.md amber `#CA790D`, examples 22 / 26 follow; t5's dot passes with the new default.
+  Still open: (b), (d).

@@ -108,4 +108,4 @@ def test_connector_color_token(tmp_path):
     slide = Presentation(tmp_path / "c.pptx").slides[0]
     cons = [s for s in slide.shapes if s.shape_type is not None and "Connector" in s.name]
     cons = cons or [s for s in slide.shapes if s._element.tag.endswith("}cxnSp")]
-    assert cons and str(cons[0].line.color.rgb) == "F59E0B"
+    assert cons and str(cons[0].line.color.rgb) == "C47E08"

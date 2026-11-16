@@ -467,6 +467,10 @@ def _label(p: Placed) -> str:
             return f"'{text[:24]}…'" if len(text) > 24 else f"'{text}'"
     if isinstance(el, (Image, Media)):
         return f"{el.type} {el.src}"
+    if name := el.attrs.get("shape_name"):
+        return f"'{name}'"  # a named vocabulary shape (`Timeline 2 dot`, `Legend focal swatch`)
+    if isinstance(el, Shape):
+        return "arrow" if el.attrs.get("head") else el.shape
     return el.type
 
 
@@ -507,12 +511,15 @@ def _is_image(fill: str | None, theme: Theme) -> bool:
     return bool(fill) and not _GRADIENT.match(fill or "") and _rgba(fill, theme) is None
 
 
-def _backdrop(items: list[Placed], i: int, bg: list[RGB], theme: Theme) -> list[RGB]:
-    """Colors directly behind item ``i``: the topmost earlier filled item containing its center (a gradient
-    gives one color per stop), else the slide background."""
+def _backdrop(items: list[Placed], i: int, bg: list[RGB], theme: Theme, whole: bool = False) -> list[RGB]:
+    """Colors directly behind item ``i``: the topmost earlier filled item containing its center (``whole``:
+    its whole box, so a dot on a thin track sees the slide around it; a gradient gives one color per stop),
+    else the slide background."""
     p = items[i]
     cx, cy = p.x + p.w // 2, p.y + p.h // 2
     for q in reversed(items[:i]):
+        if whole and not _inside(p, q):
+            continue
         if q.style.fill and q.x <= cx <= q.x + q.w and q.y <= cy <= q.y + q.h:
             if _is_image(q.style.fill, theme):
                 return []  # a picture behind the text: no verdict
@@ -522,6 +529,42 @@ def _backdrop(items: list[Placed], i: int, bg: list[RGB], theme: Theme) -> list[
             if got:
                 return got
     return bg
+
+
+def _mark_finding(items: list[Placed], i: int, bg: list[RGB], theme: Theme) -> tuple[str, str] | None:
+    """A text-less mark drawn in the accent (a timeline dot, a callout arrow, a progress fill, a legend
+    swatch) carries meaning, so WCAG 1.4.11 asks ``render.accent_mark_contrast`` (3:1) against what is behind
+    it. A gradient backdrop fails only when every stop and their average fail; translucent shapes, rules,
+    bands and cover art are decor, and an icon supports its text label."""
+    p, need = items[i], theme.render.accent_mark_contrast
+    acc = _hex("accent", theme)
+    if acc is None or (p.style.opacity is not None and p.style.opacity < 1):
+        return None
+    if p.element.shape == "icon":
+        return None  # an icon sits beside its text label: it is not the only carrier
+    if p.element.id in ("rule", "band") or str(p.element.attrs.get("shape_name", "")).startswith("Cover art"):
+        return None  # style decoration: title / heading rules, bands, the `cover.art=` motif
+    for what, col in (("fill", p.style.fill), ("line", p.style.line)):
+        got = _rgba(col, theme) if col else None
+        if not got or got[1] < 0.99 or max(abs(a - b) for a, b in zip(got[0], acc, strict=True)) > 1 / 255:
+            continue
+        if what == "line" and p.style.line_width == 0:
+            continue
+        backs = _backdrop(items, i, bg, theme, whole=True)
+        if not backs:
+            return None
+        ratios = [contrast_ratio(acc, b) for b in backs]
+        avg = tuple(sum(c) / len(backs) for c in zip(*backs, strict=True))
+        if max(ratios) >= need or (len(backs) > 1 and contrast_ratio(acc, avg) >= need):  # type: ignore[arg-type]
+            return None
+        back_hex = [_hexs(b) for b in backs]
+        fix = nearest_passing(_hexs(acc), back_hex, need)
+        return (
+            f"{_label(p)} {what} is the accent {_hexs(acc)} at {min(ratios):.1f}:1 on {back_hex[0]} "
+            f"(a mark needs {need:g}:1)",
+            f"darken the accent: `colors: accent={fix}` (passes {need:g}:1 on {back_hex[0]})",
+        )
+    return None
 
 
 def _kpi_stripe_backs(items: list[Placed], i: int, p: Placed, theme: Theme) -> list[RGB]:
@@ -579,6 +622,7 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
         bg = [base]
 
     html_spill: list[Placed] = []
+    marked = False
     for i, p in enumerate(items):
         el = p.element
         # off-slide
@@ -593,6 +637,15 @@ def lint_slide(items: list[Placed], deck: Deck, theme: Theme, index: int) -> lis
         if isinstance(el, (Image, Media)) and not el.alt.strip():
             what = "image" if isinstance(el, Image) else el.kind
             warn("alt", f"{what} {el.src} has no alt text", "write ![what it shows](path)", p)
+        if (
+            theme.render.accent_mark_contrast > 0
+            and isinstance(el, Shape)
+            and not _has_text(p)
+            and not marked
+        ):
+            if found := _mark_finding(items, i, bg, theme):
+                warn("contrast", *found, p)
+                marked = True  # one accent, one fix: reported once per slide
         if isinstance(el, (Table, Chart)):
             find = _table_findings if isinstance(el, Table) else _chart_findings
             for msg, hint in find(p, theme, _backdrop(items, i, bg, theme)):

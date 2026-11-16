@@ -1,5 +1,5 @@
 theme: default
-colors: bg=#FFFFFF fg=#1B2333 primary=#243B6B accent=#F2A33A surface=#F5F7FB border=#D5DBE7 muted=#5B6475
+colors: bg=#FFFFFF fg=#1B2333 primary=#243B6B accent=#CA790D surface=#F5F7FB border=#D5DBE7 muted=#5B6475
 fonts: heading="Montserrat" body="Inter"
 style: radius=6 title.band=none heading.band=primary h1.letter-spacing=0.5pt render.waterfall_down=success render.waterfall_up=danger
 sizes: title=32 body=18
