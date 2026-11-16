@@ -228,3 +228,17 @@ def test_lint_is_off_where_the_token_is_not_set(tmp_path):
     src.write_text(_chart_md("default", " colors=#8794AB;#C2C9D6"), encoding="utf-8")
     r = build(src, tmp_path / "d.pptx")
     assert not [d for d in r.diagnostics if d.rule == "contrast" and "series" in d.message]
+
+
+def test_an_icon_disc_is_a_container_not_a_mark(tmp_path):
+    # a disc near the paper colour is fine when its icon reads on it (the glyph is the essential graphic)
+    from slidemark import build
+
+    src = (
+        "style: icon.disc=#DCE3EA\n\n# Two ways\n@2\n"
+        "## Fast {icon=bolt}\nShip weekly.\n## Safe {icon=check}\nReview each change.\n"
+    )
+    out = tmp_path / "i.pptx"
+    build(src, out)
+    res = M.measure_deck(out)
+    assert "Icon disc" not in res["facts"]["1"].split("non-text")[-1] or res["slides"]["1"]["G-09"] >= 3

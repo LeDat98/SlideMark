@@ -1,0 +1,36 @@
+{
+ "slides": {
+  "1": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "2": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "3": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "4": {
+   "G-06": 2,
+   "G-09": 3
+  },
+  "5": {
+   "G-06": 2,
+   "G-09": 3
+  },
+  "6": {
+   "G-06": 3,
+   "G-09": 3
+  }
+ },
+ "facts": {
+  "1": "title 59.99 pt; min body 22 pt (floor 14); min label 10 pt (floor 8); min text contrast 5.3:1 ('Eyebrow' 'ENGINEERING · Q3 2')",
+  "2": "title 38 pt; min node 13 pt (floor 10); min label 8 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 4.5:1 ('Arch tag Web client' 'WEB'); min non-text contrast 3.3:1 (swatch 'Legend external swatch')",
+  "3": "title 34.2 pt; min node 12 pt (floor 10); min label 9 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 5.3:1 ('Eyebrow' 'PLATFORM REVIEW'); min non-text contrast 3.3:1 (swatch 'Legend external swatch')",
+  "4": "title 38 pt; min body 13 pt (floor 14); min label 10 pt (floor 8); min footnote 12 pt (floor 8); min chart 10.8 pt (floor 8); min text contrast 4.7:1 ('ChartNote' 'Q3 doubled\\xa0Q1'); min non-text contrast 3.1:1 (chart series 'Refunds')",
+  "5": "title 38 pt; min body 12 pt (floor 14); min label 10 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 5.3:1 ('Eyebrow' 'PLATFORM REVIEW')",
+  "6": "title 38 pt; min body 13 pt (floor 10); min label 10 pt (floor 8); min footnote 10 pt (floor 8); min text contrast 5.3:1 ('Eyebrow' 'PLATFORM REVIEW')"
+ }
+}

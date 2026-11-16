@@ -1,0 +1,81 @@
+{
+ "slides": {
+  "1": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "2": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "3": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "4": {
+   "G-06": 3,
+   "G-09": 2
+  },
+  "5": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "6": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "7": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "8": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "9": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "10": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "11": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "12": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "13": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "14": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "15": {
+   "G-06": 3,
+   "G-09": 3
+  }
+ },
+ "facts": {
+  "1": "title 48.6 pt; min body 24 pt (floor 14); min text contrast 9.8:1 ('Subtitle' 'Tổng quan cho ngườ')",
+  "2": "title 38 pt; min body 27 pt (floor 14); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b')",
+  "3": "title 36.1 pt; min body 19.44 pt (floor 14); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b'); min non-text contrast 15.3:1 (swatch 'icon brain')",
+  "4": "title 38 pt; min body 18 pt (floor 14); min label 21.6 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b'); min non-text contrast 2.5:1 (swatch 'Timeline 5 dot')",
+  "5": "title 38 pt; min body 24 pt (floor 14); min label 20.39 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b'); min non-text contrast 3.3:1 (icon on 'Icon disc')",
+  "6": "title 38 pt; min body 27.2 pt (floor 14); min node 18 pt (floor 10); min label 16.64 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b')",
+  "7": "title 38 pt; min body 18 pt (floor 14); min node 16.8 pt (floor 10); min label 12.48 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 4.7:1 ('Heading 1' 'Bước 1'); min non-text contrast 3.3:1 (icon on 'Icon disc')",
+  "8": "title 34.2 pt; min body 24 pt (floor 14); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b'); min non-text contrast 3.3:1 (icon on 'Icon disc')",
+  "9": "title 38 pt; min node 27 pt (floor 10); min label 21.6 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b'); min non-text contrast 15.3:1 (swatch 'icon search')",
+  "10": "title 38 pt; min body 18 pt (floor 14); min node 21.6 pt (floor 10); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b'); min non-text contrast 5.2:1 (arrow 'Flow 2 line')",
+  "11": "title 38 pt; min body 18 pt (floor 14); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b')",
+  "12": "title 38 pt; min body 18 pt (floor 14); min node 21.6 pt (floor 10); min label 26.4 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b')",
+  "13": "title 38 pt; min body 20 pt (floor 14); min node 21.6 pt (floor 10); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b')",
+  "14": "title 38 pt; min body 21 pt (floor 14); min node 21 pt (floor 10); min footnote 12 pt (floor 8); min text contrast 5.2:1 ('Footer' 'AI cho người mới b')",
+  "15": "title 48 pt; min body 21.6 pt (floor 14); min text contrast 9.8:1 ('Subtitle' 'Chọn một bài toán,')"
+ }
+}

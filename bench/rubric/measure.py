@@ -473,6 +473,29 @@ def measure_slide(slide, theme: Theme, dense: bool, sw: int, sh_: int) -> tuple[
         has_text = getattr(sh, "has_text_frame", False) and sh.has_text_frame and sh.text_frame.text.strip()
         if MARK_NAME.search(it.name) and not has_text and it.w * it.h > 0:
             f = _fill_rgb(it, theme)
+            if (
+                "disc" in it.name.lower()
+            ):  # a disc holding an icon is its container: the glyph must read on the disc
+                glyph = next(
+                    (
+                        o
+                        for o in items
+                        if o is not it
+                        and o.name.lower().startswith("icon ")
+                        and "disc" not in o.name.lower()
+                        and abs(o.cx - it.cx) < it.w / 2
+                        and abs(o.cy - it.cy) < it.h / 2
+                    ),
+                    None,
+                )
+                if glyph is not None and f:
+                    g = _fill_rgb(glyph, theme)
+                    disc = _blend(f[0], f[1], _backdrop(items, it.z, it.cx, it.cy, bg, theme))
+                    if g:
+                        nontext.append(
+                            (_ratio(_hex(_blend(g[0], g[1], disc)), _hex(disc)), f"icon on '{it.name}'")
+                        )
+                continue
             c, _wd = _line_of(sh, theme)
             back = _backdrop(items, it.z, it.cx, it.cy, bg, theme)
             best = 0.0
