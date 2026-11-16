@@ -174,8 +174,8 @@ def card_parts(placed):
 
 
 def test_box_cards_with_free_height_grow_heading_text_and_disc():
-    off, _, _ = lay(SHORT_CARDS, **{"card_fill_max": 0.0})
-    on, _, theme = lay(SHORT_CARDS)
+    off, _, _ = lay(SHORT_CARDS, **{"card_fill_max": 0.0, "card_balance": False})
+    on, _, theme = lay(SHORT_CARDS, card_balance=False)  # (the balance pass has its own tests)
     for (c0, i0, h0, b0), (c1, i1, h1, b1) in zip(card_parts(off), card_parts(on), strict=True):
         assert (c0.x, c0.y, c0.w, c0.h) == (c1.x, c1.y, c1.w, c1.h)  # the cards keep their size
         assert pt(h1) > pt(h0) - 1e-6 and pt(h1) <= theme.layout.card_heading_max_pt + 0.01

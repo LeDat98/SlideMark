@@ -327,7 +327,11 @@ def test_normal_boxes_of_a_large_theme_keep_the_small_growth():
     body, head, _ = _body_scales(s)
     assert max(body) <= 36 / 18 + 1e-9  # a lone row balances: text and cards grow together, capped at 36pt
     th = get_theme("default")
-    assert th.sizes["heading"] * min(head) >= th.sizes["body"] * max(body) * 0.98
+    # the body stays within `card_balance_body_head` x the heading (a wrap-bound heading cannot follow it)
+    assert (
+        th.sizes["heading"] * min(head) * th.layout.card_balance_body_head
+        >= th.sizes["body"] * max(body) * 0.98
+    )
 
 
 def test_text_above_code_has_no_gap():
@@ -533,6 +537,8 @@ def test_normal_density_lone_row_gets_taller_cards():
     s = Slide(title=T("t", "title"), grid="3", elements=[box("a", "x", "y"), box("b", "x"), box("c", "x")])
     placed, _ = lay(s, "default")
     th = get_theme("default").model_copy(deep=True)
+    th.layout.card_balance = False  # (the final balance pass hugs the cards: it has its own tests)
+    placed = layout_slide(s, Deck(slides=[s]), th, 0)
     th.layout.balance_air = 0.0
     off = layout_slide(s, Deck(slides=[s]), th, 0)
     assert cards(placed)[0].h >= cards(off)[0].h

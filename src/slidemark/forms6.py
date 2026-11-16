@@ -98,6 +98,12 @@ class Forms6Tokens(Forms5Tokens):
     venn_max: Length = "3.6in"
     venn_core: str = "primary"
     arch_tier_look: str = "auto"
+    arch_grow: float = Field(
+        1.5, ge=1.0, le=3.0
+    )  # a small diagram grows its gaps (and nodes by half as much) by up to this
+    arch_fill: float = Field(
+        0.8, ge=0.3, le=1.0
+    )  # ... while it fills at most this share of the body height / width
     # diagram kit (docs/SYNTAX.md "Diagram tokens"): shared by @arch @swimlane @sequence @venn
     diagram_legend: str = "auto"
     diagram_legend_text: str | None = None

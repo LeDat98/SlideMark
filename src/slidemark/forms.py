@@ -34,7 +34,7 @@ COMMON = ("gap", "size", "fill")
 
 # per form: attribute -> allowed words (None = free text)
 KEYS: dict[str, dict[str, tuple[str, ...] | None]] = {
-    "timeline": {"dir": ("h", "v"), "marks": ("on", "off", "num")},
+    "timeline": {"dir": ("h", "v"), "marks": ("on", "off", "num"), "scale": ("auto", "even", "time")},
     "vs": {},
     "matrix": {"x": None, "y": None},
     "funnel": {"dir": ("down", "up")},
