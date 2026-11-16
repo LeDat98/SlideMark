@@ -106,7 +106,11 @@ def test_no_empty_band_over_35_percent(name, number, what):
 
 
 def test_completion_is_what_closes_the_band():
-    off = {"sparse_left_max": 0.0, "band_shift": 0.0}  # the band balance would also move the block
+    off = {
+        "sparse_left_max": 0.0,
+        "band_shift": 0.0,
+        "card_balance": False,
+    }  # the band balance would also move the block
     for name, number in (
         (JA, 2),
         (VI, 4),

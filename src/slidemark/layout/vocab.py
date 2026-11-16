@@ -22,7 +22,7 @@ from typing import Any
 from .. import forms
 from ..ir import Container, Paragraph, Run, Shape, Slide, Style, Text, fast_style
 from ..units import EMU_PER_PT
-from . import css, measure
+from . import css, measure, timescale
 from .grid import Rect
 
 _RATIO = re.compile(r"^\d+(?:\.\d+)?(?::\d+(?:\.\d+)?)+$")
@@ -258,18 +258,33 @@ def _timeline(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     now = ["accent" in b.classes for b in bx]
     ws = _weights(c, slide, n, "timeline") or [1.0] * n
     info.update(n=n, dir="h" if horiz else "v", marks=marks)
+    scaled = _time_scale(c, slide, parts, explicit=_weights(c, slide, n, "timeline") is not None)
+    info["scale"] = "time" if scaled else "even"
 
     if horiz:
         slots = _split(body.w, ws)
         axis_y = body.y + body.h // 2
         half = body.h // 2 - dot_d // 2 - stem
+        cxs = [body.x + off + w // 2 for off, w in slots]
+        breaks: list[int] = []
+        if scaled:
+            inset = body.w // (2 * n)
+            offs, flags = timescale.place(
+                scaled, body.w - 2 * inset, lt.timeline_min_gap * (body.w - 2 * inset) / (n - 1)
+            )
+            cxs = [body.x + inset + round(o) for o in offs]
+            breaks = [(cxs[i] + cxs[i + 1]) // 2 for i, f in enumerate(flags) if f]
         rects = []
-        for off, w in slots:
-            cx = body.x + off + w // 2
-            # centred on its dot, never wider than twice the room to the nearer edge (so no text is clamped
-            # into its neighbour on the same side)
+        for i, cx in enumerate(cxs):
+            # centred on its dot, never wider than twice the room to the nearer edge or than the room to the
+            # same-side neighbours (so no text is clamped into its neighbour); the alternation spaces them
+            near = [abs(cxs[j] - cx) for j in (i - 2, i + 2) if 0 <= j < n]
             tw = min(
-                round(w * 1.9), round(lt.timeline_text_w * body.w), 2 * (cx - body.x), 2 * (body.right - cx)
+                round(0.95 * min(near)) if near else round(body.w * 1.9 / n),
+                round(body.w * 1.9 / n),
+                round(lt.timeline_text_w * body.w),
+                2 * (cx - body.x),
+                2 * (body.right - cx),
             )
             rects.append((cx, Rect(cx - tw // 2, 0, tw, half)))
 
@@ -282,7 +297,7 @@ def _timeline(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
 
         size, fit = _largest(hi, lo, ok)
         lw_emu = _emu(th.timeline_line_w)
-        _axis(c, Rect(body.x, axis_y - lw_emu // 2, body.w, lw_emu), th.timeline_line)
+        _axis_h(c, th, body, axis_y, lw_emu, breaks, dot_d)
         for i, ((h, bd), (cx, r)) in enumerate(zip(parts, rects, strict=True)):
             above = i % 2 == 0
             y = axis_y - dot_d // 2 - stem - half if above else axis_y + dot_d // 2 + stem
@@ -319,6 +334,20 @@ def _timeline(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
         axis_x = body.x + dot_d // 2
         tx = axis_x + dot_d // 2 + stem
         tw = body.right - tx
+        cys = [body.y + off + rh // 2 for off, rh in rows]
+        breaks = []
+        if scaled:
+            inset = body.h // (2 * n)
+            offs, flags = timescale.place(
+                scaled, body.h - 2 * inset, lt.timeline_min_gap * (body.h - 2 * inset) / (n - 1)
+            )
+            cys = [body.y + inset + round(o) for o in offs]
+            breaks = [(cys[i] + cys[i + 1]) // 2 for i, f in enumerate(flags) if f]
+            rows = []
+            for i, cy in enumerate(cys):
+                near = [abs(cys[j] - cy) for j in (i - 1, i + 1) if 0 <= j < n]
+                rh = min(round(min(near)), 2 * (cy - body.y), 2 * (body.bottom - cy))
+                rows.append((cy - rh // 2 - body.y, rh))
 
         def ok(s: float) -> bool:
             st = _text_style(c, s)
@@ -329,9 +358,9 @@ def _timeline(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
 
         size, fit = _largest(hi, lo, ok)
         lw_emu = _emu(th.timeline_line_w)
-        _axis(c, Rect(axis_x - lw_emu // 2, body.y, lw_emu, body.h), th.timeline_line)
+        _axis_v(c, th, body, axis_x, lw_emu, breaks, dot_d)
         for i, ((h, bd), (off, rh)) in enumerate(zip(parts, rows, strict=True)):
-            cy = body.y + off + rh // 2
+            cy = cys[i]
             col = _own(bx[i], "color") or (now_col if now[i] else head_col)
             name = f"Timeline {i + 1}" + (" now" if now[i] else "")
             _emit_text(
@@ -359,6 +388,84 @@ def _timeline(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     if not fit:
         c.over.append("@timeline text")
     return True
+
+
+def _time_scale(c, slide: Slide, parts, explicit: bool) -> list[float] | None:
+    """Years of the ``##`` headings when the marks are placed by time (``scale=auto|time``), else ``None``."""
+    th = c.theme
+    mode = str(slide.attrs.get("scale", th.timeline_scale or "auto")).lower()
+    if mode not in ("auto", "even", "time"):
+        c.diag(
+            "form-scale",
+            f"@timeline scale={mode} is not auto / even / time: auto is used",
+            "write scale=even",
+        )
+        mode = "auto"
+    if mode == "even" or explicit:
+        return None
+    vals = timescale.parse_all(
+        [" ".join(r.text for p in h.paragraphs for r in p.runs) if h else "" for h, _bd in parts]
+    )
+    if vals is None and mode == "time":
+        c.diag(
+            "form-scale",
+            "@timeline scale=time needs every ## heading to be a date in order: equal spacing is used",
+            "write dates as headings, or drop scale=time",
+        )
+    return vals
+
+
+def _axis_h(c, th, body: Rect, y: int, lw: int, breaks: list[int], d: int) -> None:
+    """The horizontal axis; at a scale break the line is cut and two slanted strokes mark the cut."""
+    _axis_cut(c, th, body.x, body.right, y, lw, breaks, d, vertical=False)
+
+
+def _axis_v(c, th, body: Rect, x: int, lw: int, breaks: list[int], d: int) -> None:
+    _axis_cut(c, th, body.y, body.bottom, x, lw, breaks, d, vertical=True)
+
+
+def _axis_cut(c, th, a: int, b: int, pos: int, lw: int, breaks: list[int], d: int, vertical: bool) -> None:
+    """Axis from ``a`` to ``b`` on the cross-axis position ``pos`` with a gap of ``d`` at every break."""
+    gap = max(round(d * 0.5), lw * 2)
+    stroke = max(round(d * 0.7), lw * 3)  # length of a slanted stroke across the axis
+    edges = [a]
+    for m in breaks:
+        edges += [m - gap // 2, m + gap // 2]
+    edges.append(b)
+    for i in range(0, len(edges), 2):
+        s0, s1 = edges[i], edges[i + 1]
+        r = Rect(pos - lw // 2, s0, lw, s1 - s0) if vertical else Rect(s0, pos - lw // 2, s1 - s0, lw)
+        c.emit(
+            Shape(shape="rect", attrs={"shape_name": "Timeline line"}),
+            r,
+            fast_style(fill=th.timeline_line, line=None),
+        )
+    for m in breaks:
+        for side in (-1, 1):
+            m0 = m + side * gap // 2
+            # a short stroke slanted across the axis: "//"
+            if vertical:
+                _line(
+                    c,
+                    "Timeline break",
+                    pos - stroke // 2,
+                    m0 + stroke // 4,
+                    pos + stroke // 2,
+                    m0 - stroke // 4,
+                    th.timeline_line,
+                    _pt(lw),
+                )
+            else:
+                _line(
+                    c,
+                    "Timeline break",
+                    m0 - stroke // 4,
+                    pos + stroke // 2,
+                    m0 + stroke // 4,
+                    pos - stroke // 2,
+                    th.timeline_line,
+                    _pt(lw),
+                )
 
 
 def _axis(c, rect: Rect, color: str) -> None:

@@ -34,6 +34,7 @@ from ..template import footer_top
 from ..theme import DEFAULT_SIZES, LayoutTokens, Theme, _base_classes
 from ..units import EMU_PER_INCH, EMU_PER_PT, slide_size, to_emu
 from . import boxpin, cardlook, coverart, css, forms2, headfit, icondisc, kpirow, measure, stepspin, vocab
+from .balance import balance
 from .chartnote import expand_notes, scale_warning
 from .diagram import fill_tree
 from .gantt import expand_gantt
@@ -5581,6 +5582,10 @@ def _layout(slide: Slide, deck: Deck, theme: Theme, index: int) -> list[Placed]:
             and final_ctx.dense_k >= 1.0
             and theme.sizes.get("body", DEFAULT_SIZES["body"]) > ctx.lt.grow_small_pt
         ):  # normal density: a block that still leaves a band under it sits at the optical center
+            if not final_ctx.css.active:
+                final_ctx.out = balance(
+                    final_ctx.out, body_now, ctx.lt, lambda e: _explicit_size(final_ctx, e)
+                )  # hollow / small card groups
             final_ctx.out = center_band(final_ctx.out, body_now, ctx.lt)
         if (
             kind == "content"

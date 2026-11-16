@@ -258,7 +258,8 @@ def _vocab(v: dict, theme: Theme, dense_k: float):
     asked = v.get("base") or _asked(theme, "body", dense_k)
     text = ("text " + _size(v.get("size"), asked)) if v.get("size") else "no body text"
     if form == "timeline":
-        return f"timeline {n} ({v.get('dir')}, marks {v.get('marks')})", [text]
+        scale = ", to scale" if v.get("scale") == "time" else ""
+        return f"timeline {n} ({v.get('dir')}, marks {v.get('marks')}{scale})", [text]
     if form == "vs":
         extra = (["verdict bar"] if v.get("verdict") else []) + (["winner marked"] if v.get("win") else [])
         return "vs 2 sides", [*extra, text]

@@ -118,7 +118,7 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     if cols:
         stacked = 1
 
-    def plan(k: float) -> _Plan:
+    def plan(k: float, geo: float = 1.0) -> _Plan:
         K = K0.scaled(k)
         tag_h[0] = DK.tag_size(K, "X")[1]
         cap_h = round(K.label * 1.6 * DK.PT)
@@ -135,6 +135,7 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
                 max(DK.small_w(K, e.label or "", K.label, th.diagram_label_track) for e in same)
                 + round(0.3 * _IN),
             )
+        gn = round(gn * geo)
         gt = V._emu(th.arch_gap) if th.arch_gap else 0
         if not gt:
             if cols:
@@ -143,6 +144,7 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             else:
                 gt = round((0.55 if labelled else 0.45) * _IN)
                 gt = max(gt, round((0.2 + 0.3 * stacked) * _IN))
+            gt = round(gt * geo)
         nat = max(DK.node_width(c, K, nd.name, nd.sub, nd.tag) for nd in A.nodes)
         w = V._emu(th.arch_node_w) if th.arch_node_w else min(max(nat, round(1.3 * _IN)), round(2.6 * _IN))
         lw = 0
@@ -160,7 +162,7 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
             kmax = max(len(r) for _, r in A.tiers)
             if not th.arch_node_w and kmax * (w + gn) - gn > avail:
                 w = max(min(w, (avail - (kmax - 1) * gn) // kmax), round(1.1 * _IN))
-            w = min(w, avail)
+            w = min(round(w * (1 + (geo - 1) * 0.5)), avail)
         h = V._emu(th.arch_node_h) if th.arch_node_h else 0
         if not h:
             h = max(
@@ -170,6 +172,7 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
                 for nd in A.nodes
             )
             h = max(h, round(2.9 * K.name * DK.PT))
+            h = round(h * (1 + (geo - 1) * 0.5))
         per, rows, tier_h, tier_w = [], [], [], []
         if cols:
             for i, (_t, r) in enumerate(A.tiers):
@@ -214,6 +217,18 @@ def _arch(c, slide: Slide, body: Rect, sg: int, info: dict) -> bool:
     while not pinned and (best.total_h > area.h or best.total_w > area.w) and k > 0.6:
         k = round(k - 0.05, 2)
         best = plan(k)
+    if (
+        not pinned
+        and k == 1.0
+        and th.arch_grow > 1.0
+        and not (th.arch_node_w or th.arch_node_h or th.arch_gap)
+    ):
+        for i in range(round((th.arch_grow - 1.0) / 0.05), 0, -1):  # a small diagram uses the body
+            geo = round(1.0 + 0.05 * i, 2)
+            cand = plan(1.0, geo)
+            if cand.total_h <= area.h * th.arch_fill and cand.total_w <= area.w * th.arch_fill:
+                best = cand
+                break
     P: _Plan = best
     K = K0.scaled(P.k)
     ok = P.total_h <= area.h * 1.02 and P.total_w <= area.w * 1.02

@@ -253,6 +253,12 @@ class LayoutTokens(BaseModel):
         False  # True: a card as tall as the chart / image beside it centers its content vertically
     )
     hug_cards: bool = True  # cards are as tall as their content (row_slack_hug)
+    card_balance: bool = True  # a card group alone on the slide: text grows, cards hug, the group is centred
+    card_min_fill: float = 0.72  # ... acts when a card's content ends before this share of its height ...
+    card_group_min: float = 0.7  # ... or the group is shorter than this share of the body ...
+    card_group_aim: float = 0.82  # ... the text grows while the hugged group stays within this share ...
+    card_balance_top: float = 0.45  # ... and the group sits with this share of the leftover above it
+    card_balance_body_head: float = 1.1  # ... a body text stays at most this x the grown heading size
     # --- sparse step: a slide whose content fills less than sparse_fill of the body takes ONE step up
     sparse_fill: float = (
         0.55  # content fills less than this share of the body: the slide sets the deck's step
@@ -501,6 +507,9 @@ class LayoutTokens(BaseModel):
     vocab_top: float = 0.25  # share of the leftover height above a block that does not fill the body
     timeline_stem: Length = "0.3in"  # dot -> milestone text
     timeline_text_w: float = 0.4  # `dir=h`: milestone text at most this share of the body width
+    timeline_min_gap: float = (
+        0.6  # dated `@timeline`: a mark is at least this x the equal gap from its neighbour
+    )
     timeline_num_ratio: float = 1.6  # `marks=num`: the dot is this x `timeline.dot.size`
     vs_badge_ratio: float = 2.6  # badge diameter = this x the body text size (pt), unless `vs.badge.size`
     vs_gap: Length = "0.12in"  # air between a card and the badge
@@ -928,6 +937,9 @@ class Theme(Forms6Tokens):  # Forms2/3/4Tokens: DL3b part 2, DL3d part 2, wave 2
     timeline_dot_size: Length = "0.26in"  # ... their diameter
     timeline_now: str = "accent"  # ... the dot (and date) of the `{.accent}` milestone
     timeline_date_color: str | None = None  # ... milestone headings (None = `primary`)
+    timeline_scale: str = (
+        "auto"  # ... `auto` places dated headings by time, `even` equal gaps, `time` asks for time
+    )
     vs_badge_text: str = "vs"  # `@vs`: the badge between the two sides ...
     vs_badge_fill: str = "primary"
     vs_badge_color: str | None = None  # ... (None = readable on the fill)
