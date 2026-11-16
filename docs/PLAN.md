@@ -895,3 +895,9 @@ report), `bench/rubric/judge_prompt.md`, `tests/test_rubric.py` (the worked exam
   JA slides); (5) editorial chart series 2 too pale (G-09); (6) cover metadata (presenter, date: T-FRAME-02);
   (7) example 27 slide 4 text error; (8) a `.pptx` facts extractor for the gate KPIs (min font size per role,
   contrast, bounds) so step 3 of the protocol runs automatically.
+- **Fixes 1-8 done (2026-11-16)** and re-judged (`bench/rubric/runs/2026-11-16/README.md`): examples +3 to +9 points
+  like-for-like, t5 flat (its text is the agent's). Open: (a) editorial table / card text 12-13 pt vs the 14 pt body
+  floor of the rubric (raise the editorial sizes, or a 12 pt floor for table and card text in the rubric: owner
+  decision); (b) `render.chart_series_contrast` is on in editorial only (on by default, six examples' palettes warn);
+  (c) accents under 3:1 as marks (t5's pale orange dot): a lint like the chart one for accent marks, and SKILL.md
+  "accent >= 3:1 on the background"; (d) anchor set and measured SD before trusting small differences.
