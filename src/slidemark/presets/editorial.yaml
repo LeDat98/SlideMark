@@ -24,7 +24,7 @@ sizes:
   lead: 14
   caption: 12
   footnote: 10
-  table: 12
+  table: 14
   cover-title: 52
   cover-subtitle: 22
 subtitle_font: body
@@ -96,7 +96,7 @@ render:
   chart_hl_first: true
 classes:
   # hairline cards on the paper: white fill, #BFC0C0 border, small corners, no shadow
-  card: {fill: "#FFFFFF", line: border, line_width: 0.75, radius: 4, padding: 10pt, font_size: 13}
+  card: {fill: "#FFFFFF", line: border, line_width: 0.75, radius: 4, padding: 10pt, font_size: 14}
   callout: {fill: "#ECECEC", line: border, line_width: 0.75, radius: 4}
   # a chart takeaway: small accent text on the paper, no box, no arrow (the reference callout)
   chart-note: {fill: bg, line: bg, line_width: 0, color: accent, bold: false, padding: 2pt}

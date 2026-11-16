@@ -98,7 +98,7 @@ def test_table_has_hairline_rows_and_no_vertical_rules(tmp_path):
     head = tbl.cell(0, 1)._tc.tcPr.find(ns + "lnB")
     assert head.get("w") == "12700"  # the 1 pt rule under the header
     sizes = {r.font.size.pt for c in tbl.iter_cells() for p in c.text_frame.paragraphs for r in p.runs}
-    assert max(sizes) <= 12.5
+    assert min(sizes) >= 14 and max(sizes) <= 14.5  # editorial table text meets the 14 pt body floor
 
 
 def test_table_rows_are_not_stretched(tmp_path):

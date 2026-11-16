@@ -57,14 +57,14 @@ short of a form, one emphasis (or `@noemph`), values (or `@defaults`). Advisory.
 **Before the first slide: palette and motif, chosen for THIS topic.**
 - A palette that would fit any other deck is not specific enough. One colour carries 60–70% of the visual
   weight (`primary`), one or two support it (`secondary`, `surface`), one accent is rare and means something
-  (`accent`: the key number, the current step, the verdict). Never split the weight evenly.
+  (`accent`, ≥ 3:1 on the background: the key number, the current step, the verdict). Never split evenly.
 - Dark cover and closing, light content between (`@cover bg=primary dark` first and last), or dark throughout
   (`theme: midnight`). A cover needs one visual: `style: cover.art=network` (`dots`, `rings`), a picture or large type.
 - One repeating visual motif, carried by every content slide: an icon disc on each card heading (`icon=` +
   `style: icon.disc=secondary`), numbered discs (`@rows`, `num`), one chart style, one card style.
-- Starting points (write your own hexes when the brand or topic suggests them; do not default to blue):
-  `theme: editorial` (paper, ink, slate, one tangerine accent, serif titles, hairline cards) ·
-  navy + teal + amber `colors: primary=#0B2A3C secondary=#1B8A8F accent=#F2A33A surface=#EEF4F6`.
+- Starting points (write your own hexes for the brand or topic; do not default to blue):
+  `theme: editorial` (paper, ink, slate, one rust accent, serif titles, hairline cards) ·
+  navy + teal + amber `colors: primary=#0B2A3C secondary=#1B8A8F accent=#CA790D surface=#EEF4F6`.
 
 **Every slide carries a visual element**: a chart, a table, icons, a diagram or shaped blocks. A slide of only
 text is a defect, not a style. Forms that give a slide its shape (see "Composition forms"):

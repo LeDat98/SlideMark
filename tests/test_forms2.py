@@ -308,7 +308,8 @@ def test_progress_bars_are_proportional_and_take_the_tokens(tmp_path):
         assert fill_hex(fill) == "E09F1F" and fill_hex(track) == "C9D2DE"
     assert txt(one(prs, 0, "Progress 1 value")) == "90%"
     assert txt(one(prs, 0, "Progress 2 label")) == "Test"
-    assert not bad(deck)
+    # the pale accent on the grey track is a real finding (a mark needs 3:1), and the only one
+    assert [d.rule for d in bad(deck)] == ["contrast"] and "'Progress 1 fill'" in bad(deck)[0].message
 
 
 def test_progress_max_table_source_and_bad_rows(tmp_path):

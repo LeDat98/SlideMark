@@ -5,7 +5,7 @@ colors:
   fg: "#1F2937"
   primary: "#1D4ED8"
   secondary: "#0F766E"
-  accent: "#F59E0B"
+  accent: "#C47E08"
   muted: "#6B7280"
   border: "#D1D5DB"
   surface: "#F3F4F6"
@@ -15,12 +15,12 @@ classes:
   callout: {fill: "#EFF6FF"}
   chart-note: {fill: "#FFFBEB"}
   # diagram roles: `## Postgres {.store}` or mermaid `A[DB]:::store` (tints are alpha fills over the slide)
-  focal: {fill: "#F59E0B14", line: accent, line_width: 1.25}
+  focal: {fill: "#C47E0814", line: accent, line_width: 1.25}
   store: {fill: "#1F293714", line: muted, line_width: 1}
   external: {fill: "#1F293708", line: border}
   input: {fill: "#FFFFFF", line: muted, border_left: "3pt solid primary"}
   optional: {line: muted, line_dash: dash}
-  security: {fill: "#F59E0B0D", line: accent, line_dash: dash}
+  security: {fill: "#C47E080D", line: accent, line_dash: dash}
 lead_color: fg
 cover_band_h: 0.58
 cover_pad: 0.5in
