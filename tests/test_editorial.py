@@ -57,7 +57,12 @@ def test_title_bold_is_a_token(tmp_path):
 def test_role_classes_render(tmp_path):
     src = "theme: editorial\n\n# Roles\n@2\n## Gateway {.focal}\nroutes\n## Cache {.optional}\nredis\n"
     d = build(src, tmp_path / "r.pptx")
-    assert not [x for x in d.diagnostics if x.level == "warning" and not x.rule.startswith("design")]
+    # composition is tested in tests/test_dead_space.py
+    assert not [
+        x
+        for x in d.diagnostics
+        if x.level == "warning" and not x.rule.startswith("design") and x.rule != "dead-space"
+    ]
     slide = Presentation(tmp_path / "r.pptx").slides[0]
     cards = [s for s in slide.shapes if s.name.startswith("Card")]
     focal, opt = cards
@@ -85,7 +90,12 @@ def test_mermaid_classes_render(tmp_path):
     assert "focal" in cls[0] and "input" in cls[0]  # `:::` plus a `class` line
     assert "focal" in cls[2] and "security" in cls[2]
     d = build(src, tmp_path / "m.pptx")
-    assert not [x for x in d.diagnostics if x.level == "warning" and not x.rule.startswith("design")]
+    # composition is tested in tests/test_dead_space.py
+    assert not [
+        x
+        for x in d.diagnostics
+        if x.level == "warning" and not x.rule.startswith("design") and x.rule != "dead-space"
+    ]
     slide = Presentation(tmp_path / "m.pptx").slides[0]
     dashed = [
         s for s in slide.shapes if 'prstDash val="dash"' in s._element.xml and not s.name.startswith("Legend")

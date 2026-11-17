@@ -81,11 +81,42 @@ def test_worked_example_1_chart_slide_and_its_gate_caps():
     }
     topic = {"T1": 4, "T2": 2, "T3": 4, "T4": 3, "T5": 5, "T6": 4}
     r = score.slide_score(general, topic, rub, tk)
-    assert r["general"] == pytest.approx(68.4, abs=0.05)
+    assert r["general"] == pytest.approx(68.1, abs=0.05)
     assert r["topic"] == pytest.approx(67.0, abs=0.05)
-    assert r["score"] == pytest.approx(67.8, abs=0.05) and r["cap"] is None and r["band"] == "Acceptable"
+    assert r["score"] == pytest.approx(67.6, abs=0.05) and r["cap"] is None and r["band"] == "Acceptable"
     assert score.slide_score(general | {"G-06": 2}, topic, rub, tk)["score"] == 59
     assert score.slide_score(general | {"G-06": 1}, topic, rub, tk)["score"] == 39
+
+
+def test_g05_is_a_soft_gate_that_keeps_dead_space_out_of_good():
+    rub = score.load_rubric(RUBRIC)
+    assert rub.general["G-05"].cap == 59 and not rub.general["G-05"].gate and rub.general["G-05"].weight == 5
+    general = {k: 4 for k in rub.general} | {"G-14": None}
+    assert score.slide_score(general, None, rub, {})["score"] == 75  # all 4: Good
+    capped = score.slide_score(general | {"G-05": 2}, None, rub, {})
+    assert capped["score"] == 59 and capped["cap_why"] == "G-05=2" and capped["band"] == "Acceptable"
+    assert score.slide_score(general | {"G-05": 1}, None, rub, {})["score"] == 49
+    hard = score.slide_score(general | {"G-05": 2, "G-06": 1}, None, rub, {})
+    assert hard["score"] == 39 and hard["cap_why"].startswith("G-06")  # the lower cap wins
+
+
+def test_a_measured_empty_body_only_lowers_a_soft_gate():
+    rub = score.load_rubric(RUBRIC)
+    run = {
+        "slides": [
+            {
+                "slide": 2,
+                "topic": "data-table",
+                "kpis": [{"id": "G-05", "level": 4}, {"id": "G-01", "level": 4}],
+            }
+        ]
+    }
+    got = score.score_runs([run], rub, {"slides": {"2": {"G-05": 2}}})["slides"][0]
+    assert got["levels"]["G-05"] == 2 and got["cap"] == 59
+    judged_1 = {"slides": [{"slide": 2, "topic": "data-table", "kpis": [{"id": "G-05", "level": 1}]}]}
+    assert (
+        score.score_runs([judged_1], rub, {"slides": {"2": {"G-05": 2}}})["slides"][0]["levels"]["G-05"] == 1
+    )
 
 
 def test_worked_example_2_ten_slide_deck():

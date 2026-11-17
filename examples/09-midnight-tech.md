@@ -36,6 +36,10 @@ C -->|yes| D[Post entry]
 C -->|no| E[Human review]
 E --> D
 ```
+| Path | Receipts | Time to post |
+|---|---|---|
+| Straight through | 92% | 30 s |
+| Human review | 8% | 4 h |
 > [!tip] ==92%== of receipts post without a human
 
 # Pricing model

@@ -704,7 +704,8 @@ def test_a_form_slide_builds_clean_and_valid(form, tmp_path):
     bad = [
         d
         for d in deck.diagnostics
-        if d.level in ("warning", "error") and d.rule not in ("design-none", "design-slide")
+        # composition is tested in tests/test_dead_space.py
+        if d.level in ("warning", "error") and d.rule not in ("design-none", "design-slide", "dead-space")
     ]
     assert not bad, [str(d) for d in bad]
     from slidemark.xsd import validate_pptx

@@ -181,8 +181,11 @@ def test_num_defaults_and_band_headings(tmp_path):
     assert all(
         h.left >= b.left + b.width for h, b in zip(heads, sorted(on_band, key=lambda s: s.left), strict=True)
     )
+    # composition is tested in tests/test_dead_space.py
     assert not [
-        d for d in deck.diagnostics if d.level == "warning" and not (d.rule or "").startswith("design-")
+        d
+        for d in deck.diagnostics
+        if d.level == "warning" and not (d.rule or "").startswith("design-") and d.rule != "dead-space"
     ]
 
 
@@ -274,8 +277,11 @@ def test_rows_plain_draws_unnumbered_bars_with_glyph_and_stripe(tmp_path):
     assert all(g.left > s.left + s.width for g, s in zip(glyphs, stripes, strict=True))
     assert bars[0].text_frame.text == "one"
     assert bars[0].text_frame.margin_left > glyphs[0].left - bars[0].left  # the text starts after the glyph
+    # composition is tested in tests/test_dead_space.py
     assert not [
-        d for d in deck.diagnostics if d.level == "warning" and not (d.rule or "").startswith("design-")
+        d
+        for d in deck.diagnostics
+        if d.level == "warning" and not (d.rule or "").startswith("design-") and d.rule != "dead-space"
     ]
 
 
@@ -532,7 +538,12 @@ def test_good_values_build_without_warnings(tmp_path):
         "render.chevron_shape=pentagon,chevron\n" + boxes("@3 num") + ROWS + STEPS + TABLE
     )
     deck, _ = make(tmp_path, md)
-    bad = [d for d in deck.diagnostics if d.level == "warning" and not (d.rule or "").startswith("design-")]
+    # composition is tested in tests/test_dead_space.py
+    bad = [
+        d
+        for d in deck.diagnostics
+        if d.level == "warning" and not (d.rule or "").startswith("design-") and d.rule != "dead-space"
+    ]
     assert not bad, [(d.rule, d.message) for d in bad]
 
 

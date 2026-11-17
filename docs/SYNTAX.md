@@ -1132,6 +1132,21 @@ the part of the body rectangle outside the bounding box of the content (chrome a
 body count as content); covers, sections, `@free` and `@html` slides are never sparse. `layout.sparse_note` is the
 threshold (`0.99` silences it); the check lives in `src/slidemark/fit.py` (`SPARSE`, `fit_report`).
 
+### `dead-space`
+
+A **warning**: one block floating in a large body, with empty bands above and below it (or on both sides). Example:
+`warning slide 5 dead-space: 55% of the body is empty bands around one block -> add a second block from the same
+content (chart of the table, KPI strip, takeaway \`>\` bar) or set blocks side by side; bigger sizes do not fix it`.
+The share is the rubric's G-05 measure (`bench/rubric/measure.py`, a soft gate that caps the slide at 59): full-width
+bands of the body (under the title, above the footer) that meet no block, each at least `layout.dead_band` (0.10) of
+the body high, plus `layout.dead_side` (0.5) times the full-height side bands (a tall figure centred on a wide slide is
+often the design); the larger of the two. Gutters between blocks never count. The lead, a conclusion bar and captions
+in the body are content. Covers, sections, `@free`, `@quote` and `@html` slides, and statement slides (text of
+`layout.statement_pt` = 54 pt or more with at most 3 blocks) are exempt. `layout.dead_space` (0.40) is the threshold,
+`0` turns it off; a slide with the warning gets no `sparse` info. The remedy is content, never size: a table with the
+chart of its key column (`@3:2`), cards with the table of their numbers under `@end`, KPI cards with the trend chart,
+a `>` takeaway bar. The editorial preset keeps `sparse_note: 1` (no growth cue) but not this warning.
+
 ### `diagram-budget`
 
 An **info** (never a warning, not counted in "0 warnings"; one per slide, reasons combined) when a diagram is more

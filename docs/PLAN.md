@@ -905,3 +905,9 @@ report), `bench/rubric/judge_prompt.md`, `tests/test_rubric.py` (the worked exam
   and `card` 14 pt (example 27 slides 4-6 now measure 14 pt body); `render.accent_mark_contrast=3` on by default,
   default accent `#C47E08`, SKILL.md amber `#CA790D`, examples 22 / 26 follow; t5's dot passes with the new default.
   Still open: (b), (d).
+- **Dead space (2026-11-17, owner: "the lone table / floating cards are the worst slides; does the rubric see it?")**:
+  the judge saw it (G-05 = 2 in every run) but a weight-4 KPI cost 2 points, so the lone table scored like the
+  timeline. Done in order 1-4: (1) `measure.py` empty-body share; (2) G-05 soft gate `cap: 59` (level 1: 49), weight
+  5; (3) G-02 signals for a lone component with room for its second face; (4) `dead-space` warning in `fit.py` (advisory
+  in `bench/eval.py`), examples 01 05 09 17 18 21 27 given a second block. Re-judge of example 27 after the fix:
+  `bench/rubric/runs/2026-11-17/`.

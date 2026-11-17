@@ -46,7 +46,10 @@ def arts(prs, i: int):
 
 def bad(deck):
     return [
-        d for d in deck.diagnostics if d.level in ("warning", "error") and not d.rule.startswith("design")
+        d
+        for d in deck.diagnostics
+        # composition is tested in tests/test_dead_space.py
+        if d.level in ("warning", "error") and not d.rule.startswith("design") and d.rule != "dead-space"
     ]
 
 

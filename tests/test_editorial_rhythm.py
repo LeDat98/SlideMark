@@ -76,7 +76,9 @@ def test_treemap_focus_tile_is_a_tint_with_a_hairline(tmp_path):
 
 
 def test_table_hugs_content_and_is_centred_with_air():
-    deck, theme, items = _placed((EX / "27-editorial.md").read_text(encoding="utf-8"), 5)
+    # the lone-table slide 5 as it was before it got its chart (now `dead-space`, tests/test_dead_space.py)
+    lone = Path(__file__).resolve().parent / "data" / "lone" / "27-editorial.md"
+    deck, theme, items = _placed(lone.read_text(encoding="utf-8"), 5)
     from slidemark.ir import Table
 
     tab = next(p for p in items if isinstance(p.element, Table))

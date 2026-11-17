@@ -22,7 +22,7 @@ def _cell(x: object) -> str:
 
 
 def _kpi(k: dict) -> list[str]:
-    gate = "**gate**" if k.get("gate") else "-"
+    gate = "**gate**" if k.get("gate") else (f"soft gate, cap {k['cap']}" if k.get("cap") else "-")
     out = [
         f"#### {k['id']} {k['name']}  (weight {k['weight']}, {gate})",
         "",
@@ -41,11 +41,13 @@ def _kpi(k: dict) -> list[str]:
     return out + [""]
 
 
+def _gate_cell(k: dict) -> str:
+    return "yes" if k.get("gate") else (f"soft ({k['cap']})" if k.get("cap") else "")
+
+
 def _summary(rows: list[dict]) -> list[str]:
     out = ["| id | name | weight | gate |", "|---|---|---|---|"]
-    out += [
-        f"| {k['id']} | {_cell(k['name'])} | {k['weight']} | {'yes' if k.get('gate') else ''} |" for k in rows
-    ]
+    out += [f"| {k['id']} | {_cell(k['name'])} | {k['weight']} | {_gate_cell(k)} |" for k in rows]
     return out + [""]
 
 
@@ -59,7 +61,8 @@ def render(folder: Path = HERE) -> str:
         "YAML, then re-run the script. Method, formula and protocol: `docs/DESIGN_RUBRIC.md`.",
         "",
         "Every KPI is scored 1 to 5. Levels 1-2 describe the bad signs, 4-5 the good ones, 3 is acceptable. Weight 1 (nice",
-        "to have) to 5 (critical). A **gate** KPI below level 3 caps the slide (level 2: at most 59, level 1: at most 39).",
+        "to have) to 5 (critical). A **gate** KPI below level 3 caps the slide (level 2: at most 59, level 1: at most 39);",
+        "a **soft gate** (`cap:`) at level 2 caps it at its cap, at level 1 at 49 (G-05 dead space: 59 / 49).",
         "",
         "## General KPIs (every slide)",
         "",

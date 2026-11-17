@@ -1,0 +1,28 @@
+{
+ "slides": {
+  "1": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "2": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "3": {
+   "G-06": 3,
+   "G-09": 3,
+   "G-05": 2
+  },
+  "4": {
+   "G-06": 3,
+   "G-09": 3,
+   "G-05": 2
+  }
+ },
+ "facts": {
+  "1": "title 34 pt; min node 11 pt (floor 10); min label 8 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 4.5:1 ('Arch tag Web app' 'EXT'); min non-text contrast 3.3:1 (swatch 'Legend external swatch'); empty body 0% (rows 0%, columns 0%; weak >= 40%)",
+  "2": "title 34 pt; min node 11.5 pt (floor 10); min label 8 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 4.5:1 ('Arch tag 受注API' 'API'); min non-text contrast 3.3:1 (swatch 'Legend external swatch'); empty body 0% (rows 0%, columns 0%; weak >= 40%)",
+  "3": "title 34 pt; min node 13 pt (floor 10); min label 8 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 5.3:1 ('Eyebrow' 'ORDER PLATFORM'); empty body 60% (rows 11%, columns 60%; weak >= 40%)",
+  "4": "title 34 pt; min node 13 pt (floor 10); min label 8 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 5.3:1 ('Eyebrow' 'ORDER PLATFORM'); empty body 54% (rows 36%, columns 54%; weak >= 40%)"
+ }
+}

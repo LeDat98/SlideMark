@@ -243,7 +243,10 @@ def test_spans_round_trip_through_import(tmp_path):
     assert "[9,800円]{size=22 bold color=secondary}" in text
     again = build(text, tmp_path / "rt2.pptx")
     assert not [
-        d for d in again.diagnostics if d.level == "warning" and d.rule not in ("design-slide", "design-none")
+        d
+        for d in again.diagnostics
+        # composition is tested in tests/test_dead_space.py
+        if d.level == "warning" and d.rule not in ("design-slide", "design-none", "dead-space")
     ]
     prs = Presentation(str(tmp_path / "rt2.pptx"))
     assert sizes(prs, 0, "420億円") == [28.0] and sizes(prs, 1, "9,800円") == [22.0]
@@ -343,7 +346,12 @@ def test_stripe_shapes_are_dropped_by_the_importer_and_tokens_survive(tmp_path):
     assert "box_stripe=primary,secondary" in text.split("# T")[0] and "Stripe" not in text
     deck = build(text, tmp_path / "rt2.pptx")
     assert len(shapes(Presentation(str(tmp_path / "rt2.pptx")), 0, "Stripe")) == 3
-    assert not [d for d in deck.diagnostics if d.level == "warning" and not d.rule.startswith("design")]
+    # composition is tested in tests/test_dead_space.py
+    assert not [
+        d
+        for d in deck.diagnostics
+        if d.level == "warning" and not d.rule.startswith("design") and d.rule != "dead-space"
+    ]
 
 
 # --------------------------------------------------------------------------- 3. number headings and tiles

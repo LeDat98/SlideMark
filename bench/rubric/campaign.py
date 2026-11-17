@@ -35,7 +35,7 @@ def _score_module():
 
 def measure_pptx(pptx: Path, runs: list[dict]) -> dict:
     """The measured facts of a deck (``bench/rubric/measure.py``); a slide the judge typed as dense JA business
-    gets the dense body floor."""
+    gets the dense body floor, a framing slide (cover, section, closing) is not measured for empty space."""
     spec = importlib.util.spec_from_file_location("rubric_measure", HERE / "measure.py")
     mod = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -47,7 +47,10 @@ def measure_pptx(pptx: Path, runs: list[dict]) -> dict:
         for sl in r.get("slides", [])
         if "dense-ja-business" in str(sl.get("topic", ""))
     }
-    return mod.measure_deck(pptx, dense_slides=dense)
+    framing = {
+        int(sl["slide"]) for r in runs for sl in r.get("slides", []) if "framing" in str(sl.get("topic", ""))
+    }
+    return mod.measure_deck(pptx, dense_slides=dense, sparse_ok=framing)
 
 
 def campaign(folder: Path, out_dir: Path | None = None) -> str:

@@ -4,6 +4,7 @@ hug their content, sparse text-card rows are top-anchored under the lead (exampl
 from __future__ import annotations
 
 import random
+from pathlib import Path
 
 import pytest
 
@@ -83,13 +84,17 @@ def test_card_table_balance_off_restores_old_geometry():
     assert cards(off)[0].h > cards(on)[0].h
 
 
+LONE = Path(__file__).resolve().parent / "data" / "lone" / "21-jp-dark-pitch.md"  # before its chart was added
+
+
 def test_sparse_cards_are_top_anchored_under_the_lead():
-    placed, _, _ = lay("21-jp-dark-pitch.md", 2, band_shift=0.0)  # the band balance is tested apart
+    lone = LONE.read_text(encoding="utf-8")
+    placed, _, _ = lay("21-jp-dark-pitch.md", 2, lone, band_shift=0.0)  # the band balance is tested apart
     lead = role(placed, "lead")[0]
     cs = cards(placed)
     assert min(c.y for c in cs) - (lead.y + lead.h) <= 30 * PT
     assert len({c.y for c in cs}) == 1 and len({c.h for c in cs}) == 1
-    off, _, _ = lay("21-jp-dark-pitch.md", 2, sparse_cards_top=False, band_shift=0.0)
+    off, _, _ = lay("21-jp-dark-pitch.md", 2, lone, sparse_cards_top=False, band_shift=0.0)
     assert min(c.y for c in cards(off)) > min(c.y for c in cs) + 20 * PT
 
 

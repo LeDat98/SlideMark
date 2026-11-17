@@ -180,8 +180,13 @@ def test_a_sparse_slide_ends_its_fit_line_with_the_free_share(tmp_path):
     assert "free " not in line.replace(m.group(0), "")  # it replaces the plain free-space fact
 
 
+NO_DEAD = (
+    "style: layout.dead_space=0\n"  # the `dead-space` warning replaces the info (tests/test_dead_space.py)
+)
+
+
 def test_sparse_info_is_info_not_warning_and_reads_the_same_number(tmp_path):
-    deck = _build("sizes: table=10\n" + SPARSE, tmp_path)
+    deck = _build(NO_DEAD + "sizes: table=10\n" + SPARSE, tmp_path)
     (line,) = deck.attrs["fit_map"]
     (d,) = [x for x in deck.diagnostics if x.rule == "sparse"]
     pct = int(re.search(r"sparse: (\d+)% free", line).group(1))
@@ -199,7 +204,7 @@ def test_sparse_info_is_info_not_warning_and_reads_the_same_number(tmp_path):
 
 
 def test_the_hint_names_the_ceiling_of_the_deck(tmp_path):
-    deck = _build("style: layout.grow_max=1.2\nsizes: table=10\n" + SPARSE, tmp_path)
+    deck = _build("style: layout.grow_max=1.2 layout.dead_space=0\nsizes: table=10\n" + SPARSE, tmp_path)
     (d,) = [x for x in deck.diagnostics if x.rule == "sparse"]
     assert d.hint.endswith("layout.grow_max=1.2")
 
@@ -222,7 +227,7 @@ def test_covers_sections_and_free_slides_are_never_sparse(tmp_path):
 
 
 def test_several_sparse_slides_print_one_line(tmp_path):
-    deck = _build("sizes: table=10\n" + SPARSE + "\n" + SPARSE.replace("Plan", "Plan 2"), tmp_path)
+    deck = _build(NO_DEAD + "sizes: table=10\n" + SPARSE + "\n" + SPARSE.replace("Plan", "Plan 2"), tmp_path)
     lines = [ln for ln in _grouped(deck.diagnostics) if " sparse: " in ln]
     assert len(lines) == 1 and lines[0].startswith("info slides 1,2 sparse: slide 1 is sparse (")
     assert lines[0].count("merge it into") == 1
