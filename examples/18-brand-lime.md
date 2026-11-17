@@ -20,6 +20,11 @@ target 98%
 ## CO₂ saved {.kpi}
 412 t
 per depot per year
+@end
+```bar {title="Cost per km ($)" labels=on hl=Electric}
+,Diesel,Electric
+Cost,0.34,0.21
+```
 
 # Rollout plan
 @chevron defaults

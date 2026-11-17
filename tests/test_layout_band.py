@@ -13,8 +13,11 @@ ROOT = Path(__file__).resolve().parent.parent
 SLIDE_H = 6858000
 
 
-def _slide(name: str, number: int, tokens: str = "") -> list[Placed]:
-    md = ROOT / "examples" / f"{name}.md"
+LONE = Path(__file__).resolve().parent / "data" / "lone"  # example slides as they were before `dead-space`
+
+
+def _slide(name: str, number: int, tokens: str = "", folder: Path | None = None) -> list[Placed]:
+    md = (folder or ROOT / "examples") / f"{name}.md"
     text = md.read_text(encoding="utf-8")
     if tokens:
         text = f"style: {tokens}\n" + text
@@ -55,8 +58,8 @@ def test_text_sizes_and_card_geometry_are_unchanged_by_the_shift():
 
 
 def test_ruled_columns_with_css_sizes_keep_their_sizes():  # 17-editorial-css slide 2
-    on = _slide("17-editorial-css", 2)
-    off = _slide("17-editorial-css", 2, "layout.band_shift=0")
+    on = _slide("17-editorial-css", 2, folder=LONE)
+    off = _slide("17-editorial-css", 2, "layout.band_shift=0", folder=LONE)
     heads = [p for p in on if isinstance(p.element, Text) and p.element.role == "heading"]
     assert heads and all(round((p.style.font_size or 0) * p.font_scale, 1) == 12.0 for p in heads)  # CSS 12pt
     heads_off = [p for p in off if isinstance(p.element, Text) and p.element.role == "heading"]
@@ -81,8 +84,8 @@ def test_diagram_and_consulting_slides_are_untouched():
 
 
 def test_lone_kpi_row_stays_at_its_optical_center():  # 17-editorial-css slide 3
-    on = _slide("17-editorial-css", 3)
-    off = _slide("17-editorial-css", 3, "layout.band_shift=0")
+    on = _slide("17-editorial-css", 3, folder=LONE)
+    off = _slide("17-editorial-css", 3, "layout.band_shift=0", folder=LONE)
     assert [p.y for p in on] == [p.y for p in off]  # fit_lone_kpi already centered it
     top, bottom = _above_below(on)
     assert 0.3 * SLIDE_H < top and bottom < 0.8 * SLIDE_H

@@ -124,7 +124,9 @@ def test_garbage_never_raises(garbage):
 def test_info_does_not_count_as_a_warning(tmp_path, capsys):
     f = tmp_path / "d.md"
     f.write_text(
-        "theme: default\nsizes: title=30\n\n# S\n@noemph defaults\n" + _mermaid(11), encoding="utf-8"
+        "theme: default\nsizes: title=30\nstyle: layout.dead_space=0\n\n# S\n@noemph defaults\n"
+        + _mermaid(11),
+        encoding="utf-8",
     )
     assert main(["build", str(f), "-o", str(tmp_path / "d.pptx")]) == 0
     out = capsys.readouterr()

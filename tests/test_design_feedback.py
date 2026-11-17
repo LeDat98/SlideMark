@@ -556,7 +556,8 @@ def test_build_prints_both_warnings_and_the_facts_line(tmp_path, capsys):
         "are short of a decision -> per slide state form" in text
     )
     assert "design: none; 0/2 slides decided form+emphasis+values; short: 2 (form, emphasis, values)" in text
-    assert "2 warnings" in text.splitlines()[-1]
+    # 2 design warnings + 1 dead-space per short slide (composition is tested in tests/test_dead_space.py)
+    assert text.count("dead-space") >= 1 and "4 warnings" in text.splitlines()[-1]
 
 
 # --------------------------------------------------------------------------- check, fix, JSON

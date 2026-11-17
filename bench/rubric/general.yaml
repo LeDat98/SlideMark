@@ -1,5 +1,6 @@
 # SlideMark design rubric: general KPIs (every slide) and deck-level KPIs.
-# Scale: each KPI scored 1..5 (integer per run). Weight 1..5. gate=true means level < 3 caps the slide (docs/DESIGN_RUBRIC.md).
+# Scale: each KPI scored 1..5 (integer per run). Weight 1..5. gate=true means level < 3 caps the slide (docs/DESIGN_RUBRIC.md);
+# cap: N on a non-gate KPI is a soft gate: level 2 caps the slide at N, level 1 at 49 (bench/rubric/score.py).
 # Source status: "verified" = I fetched or searched the page this session. "unverified" = known from the published
 # work but not re-checked here; no quotation or page number is given. Paraphrase only.
 # Notes for judges:
@@ -48,20 +49,23 @@ general:
       - "Comparison is side by side on a shared axis or in a table with aligned columns"
       - "Sequence shows order and direction; parts of a whole show proportion"
       - "Structure of the content (order, grouping, hierarchy) is visible without reading"
+      - "Composite where the content has two faces: a table with the chart of its key column, a figure with the takeaway or KPI strip that reads it"
     bad_signals:
       - "Bullets used for a process, a comparison or a hierarchy"
+      - "One lone component (a small table, a row of cards) while the slide has room and the content has a second face (trend, takeaway, key number) left unshown"
       - "Pie or 3D chart for a time series; area or size that does not match the data"
       - "Cards in a grid with no reason for their arrangement"
       - "Diagram where a table would be quicker, or a table where one number is the point"
     levels:
       1: "Fails: the form misrepresents the content (pie for a trend, sizes not proportional to values, an ordered process shown as an unordered list)."
-      2: "Weak: a generic form (bullets, equal cards) hides structure the content has; the reader must rebuild order, grouping or comparison in their head."
+      2: "Weak: a generic form (bullets, equal cards) hides structure the content has; the reader must rebuild order, grouping or comparison in their head; or one lone component sits in a body with room for a second, and the content's other face (the trend in the table, the number behind the cards, the takeaway) is left unshown."
       3: "Acceptable: the form works and is readable but is a default; structure is present in the text yet not made visible."
-      4: "Strong: the form matches the content type and the structure (order, group, comparison axis) can be seen at a glance."
+      4: "Strong: the form matches the content type and the structure (order, group, comparison axis) can be seen at a glance; where the content has two faces and the room allows, both are shown (table + chart, figure + takeaway)."
       5: "Excellent: the form makes the relation or the difference obvious in one look; a different form would be worse; the form changes where the content changes."
     checks:
       - "Name the content type (number, comparison, sequence, trend, part-of-whole, list, argument, structure) and the form used; they must be a known good pair"
       - "Visual size (bar length, area, angle) is proportional to the value shown"
+      - "When G-05 is at 2 or less because of dead space: could a second component (chart of the table, KPI strip, takeaway callout) fill it from the content already on the slide? If yes, G-02 is at most 3"
       - "Topic KPIs refine this per slide topic; the topic set must not double count this KPI"
     sources:
       - "Cole Nussbaumer Knaflic, Storytelling with Data (2015): choose an appropriate visual (lesson list confirmed via secondary summaries, https://oreilly.com/library/view/storytelling-with-data/9781119002253)"
@@ -130,7 +134,8 @@ general:
     name: White space and density
     question: "Is the amount of content per area right for this slide's purpose and audience, with space used as a choice?"
     gate: false
-    weight: 4
+    weight: 5
+    cap: 59  # soft gate: dead space at level 2 caps the slide at 59 (level 1: 49)
     good_signals:
       - "Margins and gaps are visible and consistent; the content block is balanced on the slide"
       - "Dense slide: dense on purpose, with structure (grid, rules, tables) that makes density readable"
@@ -138,17 +143,18 @@ general:
     bad_signals:
       - "Cramped: text or boxes nearly touching edges or each other"
       - "A small block floating in a large empty area; a dead band of empty space"
-      - "Shapes stretched to fill space; text enlarged only to fill space"
+      - "Shapes stretched to fill space; text enlarged only to fill space (fill the room with content, not with size)"
       - "Same density everywhere with no pause"
     levels:
       1: "Fails: unusably crammed (elements touch or overlap, no margin) or nearly empty with the content lost in space."
-      2: "Weak: clearly crowded in one zone or clearly leaving a large area dead; space looks left over, not chosen."
+      2: "Weak: clearly crowded in one zone or clearly leaving a large area dead (a lone block floating mid-slide, empty bands above and below or on both sides); space looks left over, not chosen."
       3: "Acceptable: no area is cramped or empty enough to hurt reading; the balance is neutral and space looks like a by-product."
       4: "Strong: margins and gaps are even and generous enough for the density; the content block is balanced; density suits the purpose."
       5: "Excellent: space is used as a design element (separates groups, isolates the focal point); a dense slide stays easy to scan, a sparse slide feels intentional."
     checks:
       - "Outer margin >= about 4% of slide width on every side (heuristic)"
       - "No empty band wider than about 25% of slide height or width unless it is the design (heuristic)"
+      - "Measured (bench/rubric/measure.py): empty body share = full-width / full-height bands of the body (each >= 10% of it) that meet no content; >= 40% is level 2 at most, >= 65% level 1. Framing slides and statement slides (one huge number or line) are not measured"
       - "Dense JA business slides are judged against the dense standard: density is allowed if G-04 and G-06 hold"
     sources:
       - "Garr Reynolds, Presentation Zen (2008): simplicity, restraint, signal to noise (book contents not re-checked; unverified)"

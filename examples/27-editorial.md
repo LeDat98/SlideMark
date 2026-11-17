@@ -47,7 +47,7 @@ Refunds,12,14,18,17
 @noemph defaults
 
 # Gateway cost grew fastest, +12%
-@1
+@3:2
 ```table {hl=Gateway}
 Service,Owner,Monthly cost,Change
 Gateway,Platform,"$4,200",+12%
@@ -55,6 +55,11 @@ Orders DB,Data,"$6,800",+3%
 Search,Discovery,"$2,900",-8%
 Reports,Analytics,"$1,100",+1%
 ```
+```bar {title="Change in monthly cost (%)" labels=on hl=Gateway}
+,Gateway,Orders DB,Search,Reports
+Change,12,3,-8,1
+```
+> Gateway is 28% of spend and the only line above +5%: cap its traffic before Q4
 @noemph defaults
 
 # 3施策で注文基盤を再構築し、遅延を半減する
@@ -76,4 +81,11 @@ Reports,Analytics,"$1,100",+1%
 ## 管理
 - 鍵はVaultで集中管理
 - 四半期ごとに権限を棚卸し
+@end
+```table {hl=繁忙期の遅延}
+指標,現状,目標（2027年3月）,施策
+繁忙期の遅延,2.8秒,1.4秒,読み取りレプリカ
+障害時の復旧,4時間,1時間,決済APIの分離
+監査ログの保管先,3系統,1系統,ログの一元化
+```
 ※ 出所：社内計測（2026年9月）。遅延は95パーセンタイル値。

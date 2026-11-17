@@ -27,6 +27,12 @@ Home espresso machines sold 2.1M units, up 34% since 2023.
 Cold brew cans grew to 18% of ready-to-drink sales.
 ## In the café
 Average visit time rose from 11 to ==19 minutes==.
+@end
+| Shift | 2023 | 2026 |
+|---|---|---|
+| Home espresso machines sold | 1.6M | 2.1M |
+| Cold brew, share of ready-to-drink | 11% | 18% |
+| Average café visit | 11 min | 19 min |
 
 # Numbers that matter
 @noemph defaults
@@ -39,6 +45,11 @@ of specialty sales
 ## Price per cup {.kpi}
 $5.40
 median, US cities
+@end
+```line {title="Specialty coffee market ($B)" labels=on}
+,2023,2024,2025,2026
+Market,3.4,3.8,4.3,4.8
+```
 
 # Where the growth comes from
 @1

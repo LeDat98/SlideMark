@@ -58,7 +58,12 @@ def rules(deck, rule: str):
 
 def bad(deck):
     """Warnings other than the advisory design ones."""
-    return [d for d in deck.diagnostics if d.level == "warning" and not d.rule.startswith("design-")]
+    # composition is tested in tests/test_dead_space.py
+    return [
+        d
+        for d in deck.diagnostics
+        if d.level == "warning" and not d.rule.startswith("design-") and d.rule != "dead-space"
+    ]
 
 
 def imported(tmp_path, name: str = "d") -> str:

@@ -11,6 +11,9 @@ For every slide it reads the file (no rendering, no judge):
   shape under it, else the slide background); semi-transparent colours are blended;
 * non-text contrast (WCAG 1.4.11): chart series fills and strokes, arrows / connectors and legend swatches against
   what is behind them (a card's hairline border is not judged: its text is what identifies it);
+* empty space (G-05): the share of the body (under the title, above the footer, between the title's margins)
+  taken by full-width or full-height bands (each >= 10% of the body) that meet no content box; >= 40% is weak (level 2), >= 65% fails
+  (level 1). Framing slides (cover, section, closing) are skipped; only a failure is written;
 * defects: text frames whose estimated text height (``slidemark.layout.measure``) exceeds the frame, shapes
   outside the slide, two text shapes that overlap without one holding the other.
 
@@ -412,7 +415,106 @@ def _level_floor(role: str, mn: float, dense: bool) -> int:
     return 1 if mn < hard - 1e-6 else 2
 
 
-def measure_slide(slide, theme: Theme, dense: bool, sw: int, sh_: int) -> tuple[dict, str]:
+EMPTY_WEAK, EMPTY_FAIL = (
+    0.40,
+    0.65,
+)  # G-05: share of the body with no content in a full-width / full-height band
+DECOR_NAME = re.compile(r"^(Eyebrow|Cover art|Background|band\b)", re.I)
+
+
+BAND_MIN = 0.10  # a gap narrower than this share of the body is a gutter between blocks, not dead space
+HERO_PT = 54  # a slide whose largest non-title text is this big is a statement slide: sparse on purpose
+SIDE_WEIGHT = 0.5  # empty side columns count half: a tall figure centred on a wide slide is often the design
+
+
+def _empty(pairs: list[tuple[float, float]], lo: float, hi: float) -> float:
+    """Share of ``[lo, hi]`` in gaps between the ``pairs`` (and the ends) at least ``BAND_MIN`` of it wide."""
+    gaps, end = [], lo
+    for a, b in sorted((max(a, lo), min(b, hi)) for a, b in pairs if min(b, hi) > max(a, lo)):
+        if a > end:
+            gaps.append(a - end)
+        end = max(end, b)
+    gaps.append(hi - end)
+    span = hi - lo
+    return sum(g for g in gaps if g >= BAND_MIN * span) / span
+
+
+def _largest_pt(it: Item) -> float:
+    tf = it.sh.text_frame if getattr(it.sh, "has_text_frame", False) and it.sh.has_text_frame else None
+    if tf is None:
+        return 0.0
+    sizes = [r.font.size.pt for p in tf.paragraphs for r in p.runs if r.font.size and r.text.strip()]
+    return max(sizes, default=0.0) * _scale(tf)
+
+
+def space_facts(items: list[Item], sw: int, sh_: int) -> tuple[int, float, float, float, str] | None:
+    """G-05 measured: the body is the area under the title (and eyebrow) and above the footer zone, between the
+    title's side margins. A full-width (full-height) band of the body that meets no content box and is at least
+    ``BAND_MIN`` of the body high (wide) is dead space; gutters between blocks are not. The empty share is the
+    larger of the row share and half the column share (side margins around a figure that fills the height are
+    often the design, the judge scores them as chosen space), so a small block floating in the middle (dead bands above and below, or
+    on both sides) shows as a large share while a slide whose content spans the body does not. A statement slide
+    (text of ``HERO_PT`` or more) is skipped. ``None`` when the slide has no title (a cover, a free-form slide).
+
+    Returns (level, empty share, empty rows, empty columns, fact): level 1 at >= ``EMPTY_FAIL``, 2 at >= ``EMPTY_WEAK``,
+    else 3."""
+    title = next(
+        (
+            i
+            for i in items
+            if getattr(i.sh, "is_placeholder", False)
+            and i.sh.placeholder_format.type in (PP_PLACEHOLDER.TITLE, PP_PLACEHOLDER.CENTER_TITLE)
+        ),
+        None,
+    ) or next((i for i in items if i.name == "Title"), None)
+    if title is None or title.w <= 0:
+        return None
+    feet = [
+        i
+        for i in items
+        if i.y > 0.6 * sh_
+        and (
+            FOOT_NAME.search(i.name)
+            or (
+                getattr(i.sh, "is_placeholder", False)
+                and i.sh.placeholder_format.type
+                in (PP_PLACEHOLDER.FOOTER, PP_PLACEHOLDER.SLIDE_NUMBER, PP_PLACEHOLDER.DATE)
+            )
+        )
+    ]
+    top = max(
+        [title.y + title.h] + [i.y + i.h for i in items if i.name == "Eyebrow" and i.y < title.y + title.h]
+    )
+    bottom = min([sh_] + [i.y for i in feet])
+    left, right = title.x, title.x + title.w
+    if bottom - top <= 0.15 * sh_ or right - left <= 0.3 * sw:
+        return None
+    boxes, hero = [], False
+    for i in items:
+        if i is title or i in feet or DECOR_NAME.match(i.name):
+            continue
+        if i.w >= 0.9 * sw and i.h >= 0.8 * sh_:
+            continue  # a full-slide background
+        x0, y0, x1, y1 = i.x, i.y, i.x + max(i.w, EMU_PT), i.y + max(i.h, EMU_PT)
+        if x1 <= left or x0 >= right or y1 <= top or y0 >= bottom:
+            continue
+        boxes.append((x0, y0, x1, y1))
+        hero = hero or _largest_pt(i) >= HERO_PT
+    if hero and len(boxes) <= 3:
+        return None  # a statement slide (one huge number or line and a caption) is sparse on purpose
+    if not boxes:
+        return 1, 1.0, 1.0, 1.0, "body empty"
+    rows = _empty([(b[1], b[3]) for b in boxes], top, bottom)
+    cols = _empty([(b[0], b[2]) for b in boxes], left, right)
+    share = max(rows, SIDE_WEIGHT * cols)
+    level = 1 if share >= EMPTY_FAIL else 2 if share >= EMPTY_WEAK else 3
+    fact = f"empty body {share:.0%} (rows {rows:.0%}, columns {cols:.0%}; weak >= {EMPTY_WEAK:.0%})"
+    return level, share, rows, cols, fact
+
+
+def measure_slide(
+    slide, theme: Theme, dense: bool, sw: int, sh_: int, space: bool = True
+) -> tuple[dict, str]:
     items: list[Item] = []
     _flatten(slide.shapes, items)
     bg = _slide_bg(slide, theme)
@@ -590,6 +692,12 @@ def measure_slide(slide, theme: Theme, dense: bool, sw: int, sh_: int) -> tuple[
     if defects:
         out["G-12"] = min(d[0] for d in defects)
         facts += [d[1] for d in dict.fromkeys(defects)][:3]
+    if space and (sp := space_facts(items, sw, sh_)):
+        facts.append(sp[4])
+        if sp[0] < 3:
+            out["G-05"] = sp[
+                0
+            ]  # only a failure is written: an even spread proves nothing about a cramped slide
     if heading_min is not None:
         facts.insert(0, f"title {heading_min:g} pt")
     return out, "; ".join(facts)
@@ -609,17 +717,28 @@ def _has_arrow(sh) -> bool:
     return False
 
 
-def measure_deck(path: Path, dense_ja: bool = False, dense_slides: set[int] | None = None) -> dict:
+def measure_deck(
+    path: Path,
+    dense_ja: bool = False,
+    dense_slides: set[int] | None = None,
+    sparse_ok: set[int] | None = None,
+) -> dict:
     """``{"slides": {"3": {"G-06": 2, ...}}, "facts": {"3": "..."}}`` of a .pptx (slide numbers from 1).
 
-    ``dense_ja`` applies the dense-JA body floor to every slide, ``dense_slides`` to those slide numbers only."""
+    ``dense_ja`` applies the dense-JA body floor to every slide, ``dense_slides`` to those slide numbers only;
+    ``sparse_ok`` slides (framing: cover, section, closing) are not measured for empty space (G-05)."""
     measure.set_tokens(LayoutTokens())
     prs = Presentation(str(path))
     theme = Theme(prs)
     res: dict = {"slides": {}, "facts": {}}
     for i, slide in enumerate(prs.slides, 1):
         levels, facts = measure_slide(
-            slide, theme, dense_ja or i in (dense_slides or ()), prs.slide_width, prs.slide_height
+            slide,
+            theme,
+            dense_ja or i in (dense_slides or ()),
+            prs.slide_width,
+            prs.slide_height,
+            space=i not in (sparse_ok or ()),
         )
         if levels:
             res["slides"][str(i)] = levels

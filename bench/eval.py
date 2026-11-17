@@ -18,8 +18,8 @@ Usage:
 A task file may start with ``<!-- tags: jp dense html -->``; the line is stripped before a model sees it.
 Answers may reference media, images and templates that do not exist on disk: those diagnostics
 (``image-missing``, ``missing-media``, ``bad-theme`` "file not found") are counted as ``assets`` and never
-fail the first pass. The design feedback rules (``design-none``, ``design-slide``) are advisory too: they are
-listed under ``design`` and do not count as warnings.
+fail the first pass. The design feedback rules (``design-none``, ``design-slide``, ``dead-space``) are
+advisory too: they are listed under ``design`` and do not count as warnings.
 """
 
 from __future__ import annotations
@@ -61,7 +61,9 @@ def parse_task(text: str) -> tuple[list[str], str]:
 ADVISORY_RULES = (
     "design-none",
     "design-slide",
-)  # "design: fonts: not stated" / "slides short of a decision": advice, not defects
+    "dead-space",
+)  # "fonts: not stated" / "short of a decision" / "one block floating in the body": advice, not
+#   defects (a conversion task may give only three cards; the rubric's G-05 judges the composition)
 
 
 def is_asset_missing(d) -> bool:

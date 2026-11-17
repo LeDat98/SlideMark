@@ -13,7 +13,7 @@ from slidemark.preview import contact_sheet, have_soffice
 FACTS_DECK = """colors: primary=#2B6CB0
 fonts: heading=Georgia
 sizes: title=30
-style: radius=8
+style: radius=8 layout.dead_space=0
 
 # Cover
 
@@ -42,7 +42,8 @@ style: radius=8
 
 BULLET_DECK = "# Hello\n\n* one\n* two\n"
 SAME_WARNING = (
-    "colors: primary=#2B6CB0\nfonts: heading=Georgia\nsizes: title=30\nstyle: radius=8\n\n"
+    "colors: primary=#2B6CB0\nfonts: heading=Georgia\nsizes: title=30\n"
+    "style: radius=8 layout.dead_space=0\n\n"
     "# A\n@dense noemph\n![x](nope.png)\n\n---\n# B\n@dense noemph\n![x](nope.png)\n\n"
     "---\n# C\n@1 dense noemph\n- ok\n"
 )

@@ -104,6 +104,18 @@ If the judge says 1 for text size but the pptx says 10.5 pt in a dense JA slide,
 re-scored from the measurement. A gate with a disagreement between runs of 2 levels or more is flagged `gate-unstable`
 and needs a human look; it is capped as if failed until it is resolved.
 
+Soft gates: a non-gate KPI with `cap: N` in the yaml caps the slide at N when its median is 2, and at 49 when it is
+1. G-05 (white space) has `cap: 59`: a lone block floating in dead space scores like a failed gate instead of costing
+two points of a weight-4 KPI, which let the worst slide of a deck score like the best (run 2026-11-16: the lone table
+71, the timeline 71; a first cap of 69 changed nothing, because a slide the judge sees as dead space already scores
+64-68 raw). Unlike a gate it does not trigger the deck caps, and a measured pass never lifts it. Its measured check (`bench/rubric/measure.py`) is the empty body share: full-width or
+full-height bands of the body (under the title and eyebrow, above the footer, between the title's margins), each at
+least 10% of the body, that meet no content box; 40% or more writes G-05 = 2, 65% or more G-05 = 1. Framing slides
+(judge topic `framing`) and statement slides (one text of 54 pt or more with at most a caption) are not measured. For
+a soft gate only a measured failure counts, and it never raises the judge's level (the measurement sees boxes, not
+the composition). The remedy the rubric rewards is content, not size: G-02 asks whether the content has a second face
+(the chart of a table's key column, the KPI strip, the takeaway) that would fill the room.
+
 Each cap and its trigger is printed in the report, so a capped slide always has a visible reason.
 
 ### 3.4 Score bands
@@ -139,7 +151,7 @@ Deck KPIs are judged once per deck (from the title list and the contact sheet or
 
 ## 5. Worked example 1: one chart slide
 
-General set (14 KPIs, G-14 is N/A because only an image was given, so sum of weights = 55 - 2 = 53).
+General set (14 KPIs, G-14 is N/A because only an image was given, so sum of weights = 56 - 2 = 54).
 
 | KPI | w | s_med | n | w*n |
 |---|---|---|---|---|
@@ -147,7 +159,7 @@ General set (14 KPIs, G-14 is N/A because only an image was given, so sum of wei
 | G-02 form | 4 | 4 | 0.75 | 3.00 |
 | G-03 hierarchy | 5 | 3 | 0.50 | 2.50 |
 | G-04 grid | 4 | 4 | 0.75 | 3.00 |
-| G-05 space | 4 | 3 | 0.50 | 2.00 |
+| G-05 space (soft gate, cap 59) | 5 | 3 | 0.50 | 2.50 |
 | G-06 type (gate) | 5 | 4 | 0.75 | 3.75 |
 | G-07 text economy | 3 | 4 | 0.75 | 2.25 |
 | G-08 colour | 3 | 3 | 0.50 | 1.50 |
@@ -156,9 +168,9 @@ General set (14 KPIs, G-14 is N/A because only an image was given, so sum of wei
 | G-11 glance | 4 | 3 | 0.50 | 2.00 |
 | G-12 fidelity (gate) | 5 | 4 | 0.75 | 3.75 |
 | G-13 deliberate | 3 | 4 | 0.75 | 2.25 |
-| total | 53 | | | 36.25 |
+| total | 54 | | | 36.75 |
 
-S_G = 36.25 / 53 = 0.684.
+S_G = 36.75 / 54 = 0.681.
 
 Topic set `data-chart` (illustrative KPIs and weights; the real ones are in `topics.yaml`):
 
@@ -174,12 +186,13 @@ Topic set `data-chart` (illustrative KPIs and weights; the real ones are in `top
 
 S_T = 16.75 / 25 = 0.670.
 
-Slide_raw = 100 * (0.6 * 0.684 + 0.4 * 0.670) = 100 * (0.4104 + 0.268) = **67.8**. Gates (G-01, G-06, G-09, G-12, T5)
+Slide_raw = 100 * (0.6 * 0.681 + 0.4 * 0.670) = 100 * (0.4083 + 0.268) = **67.6**. Gates (G-01, G-06, G-09, G-12, T5)
 all at 4, 4, 5, 4, 5, so g_min = 4 and no cap. Band: **Acceptable**. The report's top fix comes from the largest
-weighted loss: T2 (loss 5 * 0.75 = 3.75 weight points), then G-03 (2.5), G-05 and G-11 (2.0 each).
+weighted loss: T2 (loss 5 * 0.75 = 3.75 weight points), then G-03 and G-05 (2.5 each), G-11 (2.0). With G-05 = 2
+(a lone block in dead space) the soft gate caps it: Slide = min(raw, 59), whatever the raw score.
 
 Same slide, but the judge median for G-06 is 2 (body text on the edge of the floor, sizes inconsistent): g_min = 2, so
-Slide = min(67.8, 59) = **59**, still Acceptable but cannot reach Good. With G-06 = 1 (body at 9 pt on a presented
+Slide = min(67.6, 59) = **59**, still Acceptable but cannot reach Good. With G-06 = 1 (body at 9 pt on a presented
 slide), Slide = min(raw, 39) = **39** (raw would be about 64 after the G-06 drop), Fail, because the cap applies whatever the raw score is.
 
 ## 6. Worked example 2: a 10-slide deck

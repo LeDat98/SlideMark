@@ -1,0 +1,31 @@
+{
+ "slides": {
+  "1": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "2": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "3": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "4": {
+   "G-06": 3,
+   "G-09": 3
+  },
+  "5": {
+   "G-06": 3,
+   "G-09": 3
+  }
+ },
+ "facts": {
+  "1": "title 30.6 pt; min node 9.75 pt (floor 10); min label 10 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 4.5:1 ('Text 3' 'PRODUCT'); min non-text contrast 11.8:1 (arrow 'Shape 1'); empty body 0% (rows 0%, columns 0%; weak >= 40%)",
+  "2": "title 30.6 pt; min node 9.9 pt (floor 10); min label 10 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 4.7:1 ('Text 10' '3\\u2060/\\u20602'); empty body 27% (rows 27%, columns 0%; weak >= 40%)",
+  "3": "title 28.8 pt; min node 9.9 pt (floor 10); min label 10 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 4.7:1 ('Text 8' 'Surprise shipping '); empty body 29% (rows 29%, columns 0%; weak >= 40%)",
+  "4": "title 34.19 pt; min node 11.55 pt (floor 10); min label 10 pt (floor 8); min footnote 12 pt (floor 8); min text contrast 5.3:1 ('Eyebrow' 'TREEMAP · SUPPORT'); empty body 0% (rows 0%, columns 0%; weak >= 40%)",
+  "5": "title 36 pt; min node 9.9 pt (floor 10); min label 10 pt (floor 8); min footnote 10 pt (floor 8); min text contrast 4.5:1 ('Text 3' '機械（設備）'); min non-text contrast 11.8:1 (arrow 'Shape 1'); empty body 0% (rows 0%, columns 0%; weak >= 40%)"
+ }
+}

@@ -136,6 +136,45 @@ def _free_share(body: list[int] | None, items: list[Placed]) -> float | None:
     return 1.0 - max(right - left, 0) * max(bottom - top, 0) / (bw * bh)
 
 
+def _bands(spans: list[tuple[int, int]], lo: int, hi: int, band: float) -> float:
+    """Share of ``[lo, hi]`` in gaps between ``spans`` (and the ends) at least ``band`` of it wide."""
+    gaps, end = [], lo
+    for a, b in sorted((max(a, lo), min(b, hi)) for a, b in spans if min(b, hi) > max(a, lo)):
+        if a > end:
+            gaps.append(a - end)
+        end = max(end, b)
+    gaps.append(hi - end)
+    return sum(g for g in gaps if g >= band * (hi - lo)) / (hi - lo)
+
+
+def dead_share(body: list[int] | None, items: list[Placed], theme: Theme) -> float | None:
+    """The `dead-space` share (the rubric's G-05 measure, ``bench/rubric/measure.py``).
+
+    Full-width and full-height bands of the body that meet no block, each at least ``layout.dead_band``
+    of it; the larger of the row share and ``layout.dead_side`` (0.5) times the column share (side
+    space around a figure that fills the height is a choice). A small block floating mid-slide scores
+    high (dead bands above and below), content that spans the body scores 0 whatever its gutters.
+    ``None`` for a statement slide (text of ``layout.statement_pt`` or more and at most 3 blocks) or
+    when there is nothing to judge."""
+    if not body or not items or body[2] <= 0 or body[3] <= 0:
+        return None
+    if len(items) <= 3 and any((_pt(p) or 0) >= theme.layout.statement_pt for p in items):
+        return None
+    bx, by, bw, bh = body
+    band = theme.layout.dead_band
+    rows = _bands([(p.y, p.y + max(p.h, 1)) for p in items], by, by + bh, band)
+    cols = _bands([(p.x, p.x + max(p.w, 1)) for p in items], bx, bx + bw, band)
+    return max(rows, theme.layout.dead_side * cols)
+
+
+# the `dead-space` warning: (rule, message, hint)
+DEAD = (
+    "dead-space",
+    "{pct}% of the body is empty bands around one block",
+    "add a second block from the same content (chart of the table, KPI strip, takeaway `>` bar) "
+    "or set blocks side by side; bigger sizes do not fix it",
+)
+
 # the `sparse` info: (rule, message, hint); the fit-line suffix and the diagnostic read one share
 SPARSE = (
     "sparse",
@@ -337,17 +376,20 @@ def _set_ignored(slide, theme: Theme, index: int) -> list[str]:
     return out
 
 
-def _slide_line(deck: Deck, slide, items: list[Placed], theme: Theme, i: int) -> tuple[str, int | None]:
-    """(the fit line, the percent of the body left free when the slide counts as sparse, else ``None``)."""
+def _slide_line(
+    deck: Deck, slide, items: list[Placed], theme: Theme, i: int
+) -> tuple[str, int | None, float | None]:
+    """(the fit line, the percent of the body left free when the slide counts as sparse, else ``None``, the
+    dead-space share, else ``None``)."""
     n = i + 1
     if slide.html is not None:
         shapes = sum(1 for p in items if not _chrome(p))
-        return f"slide {n}: html, {_n(shapes, 'shape')}", None
+        return f"slide {n}: html, {_n(shapes, 'shape')}", None, None
     fit: dict[str, Any] = deck.attrs.get("_fit", {}).get(i) or {}
     kind, body = fit.get("kind"), fit.get("body")
     asked, dense_k = fit.get("asked") or {}, float(fit.get("dense_k") or 1.0)
     if kind in ("cover", "section"):
-        return _cover_line(slide, items, theme, n, kind, extra=_set_ignored(slide, theme, i)), None
+        return _cover_line(slide, items, theme, n, kind, extra=_set_ignored(slide, theme, i)), None, None
 
     inner = [p for p in items if not _chrome(p)]
     cards = [p for p in inner if isinstance(p.element, Container)]
@@ -450,7 +492,19 @@ def _slide_line(deck: Deck, slide, items: list[Placed], theme: Theme, i: int) ->
             facts.append(f"bar {_size(bar_pt)}")
     if sparse is not None:  # the composition cue ends the line (it replaces the plain free-space fact)
         facts.append(f"sparse: {sparse}% free")
-    return f"slide {n}: " + ", ".join([names, *facts]), sparse
+    dead = None
+    if inner and kind not in ("free",) and word_of(slide.classes) != "quote":
+        texts = [  # the lead, a conclusion bar or caption in the body are content for the reader
+            p
+            for p in items
+            if isinstance(p.element, Text)
+            and p.element.role in ("lead", "conclusion", "caption")
+            and body
+            and p.y + p.h > body[1]
+            and p.y < body[1] + body[3]
+        ]
+        dead = dead_share(body, [*inner, *bar_in, *(t for t in texts if t not in inner)], theme)
+    return f"slide {n}: " + ", ".join([names, *facts]), sparse, dead
 
 
 def _cover_line(slide, items: list[Placed], theme: Theme, n: int, kind: str, extra: list[str]) -> str:
@@ -482,11 +536,24 @@ def fit_report(deck: Deck, placed: list[list[Placed]], theme: Theme) -> tuple[li
     rule, msg, hint = SPARSE
     for i, (slide, items) in enumerate(zip(deck.slides, placed, strict=False)):
         try:
-            line, sparse = _slide_line(deck, slide, items, theme, i)
+            line, sparse, dead = _slide_line(deck, slide, items, theme, i)
         except Exception:
             out.append(f"slide {i + 1}: (no fit data)")
             continue
         out.append(line)
+        need = theme.layout.dead_space
+        if need > 0 and dead is not None and dead >= need - 1e-9:
+            d_rule, d_msg, d_hint = DEAD
+            diags.append(
+                Diagnostic(
+                    level="warning",
+                    message=d_msg.format(n=i + 1, pct=round(dead * 100)),
+                    slide=i + 1,
+                    rule=d_rule,
+                    hint=d_hint,
+                )
+            )
+            continue  # the warning carries the composition cue: no second `sparse` info
         if sparse is not None:
             diags.append(
                 Diagnostic(

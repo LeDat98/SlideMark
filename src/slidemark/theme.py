@@ -249,6 +249,14 @@ class LayoutTokens(BaseModel):
     sparse_note: float = (
         0.35  # a slide whose body stays more than this share empty after growth gets `sparse: N% free`
     )
+    dead_space: float = (
+        0.40  # `dead-space` warning: empty full-width / full-height bands >= this share of the body
+    )
+    dead_band: float = 0.10  # ... an empty band counts when at least this share of the body high (wide)
+    dead_side: float = 0.5  # ... empty side columns count this much (a tall figure centred on a wide slide)
+    statement_pt: float = (
+        54  # a slide with text this big and at most 3 blocks is a statement: never dead space
+    )
     center_beside: bool = (
         False  # True: a card as tall as the chart / image beside it centers its content vertically
     )

@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.text import MSO_AUTO_SIZE
@@ -242,3 +243,41 @@ def test_an_icon_disc_is_a_container_not_a_mark(tmp_path):
     build(src, out)
     res = M.measure_deck(out)
     assert "Icon disc" not in res["facts"]["1"].split("non-text")[-1] or res["slides"]["1"]["G-09"] >= 3
+
+
+# --------------------------------------------------------------------------- G-05 empty space
+
+LONE_TABLE = (
+    "theme: editorial\nfooter: F\n\n# Gateway cost grew fastest\n\n"
+    "| Service | Cost |\n|---|---|\n| Gateway | $4,200 |\n| Search | $2,900 |\n"
+)
+SPREAD = (
+    "footer: F\n\n# History\n@timeline dir=h\n## 1956\nDartmouth\n## 1997\nDeep Blue\n## 2012\nAlexNet\n"
+    "## 2017\nTransformer\n## 2022\nChatGPT\n"
+)
+
+
+def _space(tmp_path, src: str, sparse_ok: set[int] | None = None) -> dict:
+    build(src, tmp_path / "s.pptx")
+    return M.measure_deck(tmp_path / "s.pptx", sparse_ok=sparse_ok)
+
+
+def test_a_lone_small_table_in_dead_space_is_measured_weak(tmp_path):
+    res = _space(tmp_path, LONE_TABLE)
+    assert res["slides"]["1"]["G-05"] <= 2 and "empty body" in res["facts"]["1"]
+
+
+def test_content_that_spans_the_body_writes_no_g05(tmp_path):
+    res = _space(tmp_path, SPREAD)
+    assert "G-05" not in res["slides"].get("1", {}) and "empty body" in res["facts"]["1"]
+
+
+def test_framing_and_statement_slides_are_not_measured_for_space(tmp_path):
+    assert "G-05" not in _space(tmp_path, LONE_TABLE, sparse_ok={1})["slides"].get("1", {})
+    hero = "footer: F\n\n# Margin\n\n[+6pt]{size=96}\n\nOperating margin from 12% to 18%\n"
+    assert "G-05" not in _space(tmp_path, hero)["slides"].get("1", {})
+
+
+def test_empty_bands_count_only_when_wide():
+    assert M._empty([(0, 40), (45, 100)], 0, 100) == 0  # a 5% gutter is not dead space
+    assert M._empty([(30, 60)], 0, 100) == pytest.approx(0.7)  # 30% above + 40% below

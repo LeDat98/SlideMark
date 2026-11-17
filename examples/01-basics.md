@@ -28,6 +28,12 @@ Markdown in, native PowerPoint out
 - Absolute EMU boxes
 ## Render
 - Native objects
+@end
+| Stage | Reads | Writes |
+|---|---|---|
+| Parse | Markdown | Deck (IR) |
+| Layout | Deck | Placed boxes in EMU |
+| Render | Placed boxes | Editable .pptx |
 > The renderer never decides positions
 
 # Table and chart

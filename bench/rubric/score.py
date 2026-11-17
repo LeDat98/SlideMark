@@ -15,7 +15,8 @@ A run file (one judge run over one deck):
      "deck_kpis": [{"id": "D-01", "level": 4, "evidence": [...]}]}
 
 A measured file (facts read from the .pptx, written by bench/rubric/measure.py; a failure below level 3 overrides the
-judge for gate KPIs, a pass only lifts a judge level below 3):
+judge for gate KPIs, a pass only lifts a judge level below 3; for a soft gate (a KPI with ``cap:``, G-05) only a
+failure counts and never raises the judge's level):
     {"slides": {"3": {"G-06": 2, "G-12": 1}}, "facts": {"3": "min font 8.5pt; text cut at the right edge"}}
 """
 
@@ -40,6 +41,7 @@ DECK_SLIDE_SHARE = 0.7  # Deck = 0.7 * slides + 0.3 * deck KPIs
 SLIDE_MEAN_SHARE = 0.75  # slides = 0.75 * mean + 0.25 * bottom-quartile mean
 CAP_GATE_2 = 59  # a gate KPI at level 2 caps the slide (cannot reach Good)
 CAP_GATE_1 = 39  # a gate KPI at level 1 caps the slide (always Fail)
+CAP_SOFT_1 = 49  # a soft gate (``cap:``) at level 1 caps the slide here (level 2: at its own ``cap``)
 DECK_CAP_ANY_GATE = 84  # any slide with a failed gate: the deck cannot be Excellent
 DECK_CAP_GATE1_SHARE, DECK_CAP_GATE1 = 0.2, 49  # >= 20% of slides with a gate at 1: Fail
 DECK_CAP_FAIL_SHARE, DECK_CAP_FAIL = 0.4, 59  # >= 40% of slides in Fail: at most Acceptable
@@ -56,6 +58,7 @@ class Kpi:
     name: str
     weight: float
     gate: bool
+    cap: float | None = None  # soft gate: level 2 caps the slide at this score, level 1 at CAP_SOFT_1
 
 
 @dataclass
@@ -67,7 +70,10 @@ class Rubric:
 
 
 def _kpis(items: list[dict[str, Any]]) -> dict[str, Kpi]:
-    return {k["id"]: Kpi(k["id"], k["name"], float(k["weight"]), bool(k["gate"])) for k in items or []}
+    return {
+        k["id"]: Kpi(k["id"], k["name"], float(k["weight"]), bool(k["gate"]), k.get("cap"))
+        for k in items or []
+    }
 
 
 def load_rubric(folder: Path = HERE) -> Rubric:
@@ -145,6 +151,18 @@ def slide_score(
         cap, why = CAP_GATE_2, f"{min(gates, key=gates.get)}={_fmt(g_min)}"  # type: ignore[arg-type]
     elif unstable_gates:  # a gate whose runs disagree by 2+ levels is capped as failed until a human looks
         cap, why = CAP_GATE_2, "unstable " + ",".join(sorted(unstable_gates))
+    for kid, s in {
+        **general,
+        **(topic or {}),
+    }.items():  # soft gates: a weak level keeps the slide out of Good
+        k = rub.general.get(kid) or tk.get(kid)
+        soft = (
+            None
+            if not (k and k.cap is not None and s is not None and s < 3)
+            else (min(k.cap, CAP_SOFT_1) if s < 2 else k.cap)
+        )
+        if soft is not None and (cap is None or soft < cap):
+            cap, why = soft, f"{kid}={_fmt(s)}"
     score = min(raw, cap) if cap is not None else raw
     return {
         "general": None if sg is None else 100 * sg,
@@ -161,6 +179,23 @@ def slide_score(
 def _is_gate(kid: str, rub: Rubric, topic_kpis: dict[str, Kpi]) -> bool:
     k = rub.general.get(kid) or topic_kpis.get(kid)
     return bool(k and k.gate)
+
+
+def _is_soft(kid: str, rub: Rubric, topic_kpis: dict[str, Kpi]) -> bool:
+    k = rub.general.get(kid) or topic_kpis.get(kid)
+    return bool(k and k.cap is not None and not k.gate)
+
+
+def _apply_measured(
+    kid: str, judged: float | None, measured: float, rub: Rubric, tk: dict[str, Kpi]
+) -> float | None:
+    """Gate KPIs take the measured level (``measured_level``); a soft gate (G-05 empty space) only takes a measured
+    failure, and never above the judge's own level: the measurement is coarse, the judge sees the composition."""
+    if _is_gate(kid, rub, tk):
+        return measured_level(judged, measured)
+    if _is_soft(kid, rub, tk) and measured < 3:
+        return measured if judged is None else min(judged, measured)
+    return judged
 
 
 def deck_score(
@@ -253,14 +288,14 @@ def score_runs(runs: list[dict], rub: Rubric, measured: dict | None = None) -> d
         topic_id = "+".join(topic_ids) or None
         tk = topic_kpis(rub, topic_ids)
         per_run = [_levels(r.get("kpis", [])) for r in reps]
-        for lv in per_run:  # measured facts win for gate KPIs
+        for lv in per_run:  # measured facts win for gate KPIs (and failures of soft gates)
             for kid, s in (over.get(str(n)) or {}).items():
-                if _is_gate(kid, rub, tk):
-                    lv[kid] = measured_level(lv.get(kid), float(s))
+                if _is_gate(kid, rub, tk) or _is_soft(kid, rub, tk):
+                    lv[kid] = _apply_measured(kid, lv.get(kid), float(s), rub, tk)
         med, vals = _median_levels(per_run)
         for kid, s in (over.get(str(n)) or {}).items():
-            if _is_gate(kid, rub, tk):
-                med[kid] = measured_level(med.get(kid), float(s))
+            if _is_gate(kid, rub, tk) or _is_soft(kid, rub, tk):
+                med[kid] = _apply_measured(kid, med.get(kid), float(s), rub, tk)
                 vals[kid] = [med[kid]]
         unstable = {k for k, xs in vals.items() if xs and max(xs) - min(xs) >= UNSTABLE_SPREAD}
         unstable_gates = {k for k in unstable if _is_gate(k, rub, tk) and (med.get(k) or 0) >= 3}
@@ -411,14 +446,14 @@ def report(res: dict, rub: Rubric) -> str:
             f"{round(s['score'])} ({round(s['range'][0])}-{round(s['range'][1])}) | "
             f"{_band_label(s['score'], *s['range'])} | {weak} |"
         )
-    lines += ["", "## Top fixes (gates first, then by weighted loss)"]
+    lines += ["", "## Top fixes (gates and soft gates first, then by weighted loss)"]
     fixes = []
     for s in res["slides"]:
         tk = topic_kpis(rub, topic_list(s["topic_id"]))
         for w, kid in s["losses"]:
             k = rub.general.get(kid) or tk.get(kid)
             lv = s["levels"].get(kid)
-            gate_fail = bool(k and k.gate and lv is not None and lv < 3)
+            gate_fail = bool(k and (k.gate or k.cap is not None) and lv is not None and lv < 3)
             neg = next((e.get("text", "") for e in s["evidence"].get(kid, []) if e.get("sign") == "-"), "")
             fixes.append((0 if gate_fail else 1, -w, s["slide"], kid, k.name if k else kid, lv, neg))
     for i, (_g, w, n, kid, name, lv, neg) in enumerate(sorted(fixes)[:5], 1):
